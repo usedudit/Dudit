@@ -34,6 +34,9 @@ export async function computeMarketplaceCheckoutAmounts(
     payDepositOnly: boolean
     depositPercent: number
     depositAvailable: boolean
+    /** Selected carrier freight service (SuperFrete) when own delivery has no coverage */
+    carrierServiceId?: number | null
+    destinationPostalCode?: string | null
   },
 ): Promise<{ success: true; data: MarketplaceCheckoutAmounts } | { success: false; error: string }> {
   const serviceCartIds = params.cartItemIds
@@ -47,6 +50,8 @@ export async function computeMarketplaceCheckoutAmounts(
     destinationCoords: params.destinationCoords,
     couponCode: params.couponCode,
     skipCartUpdate: true,
+    carrierServiceId: params.carrierServiceId,
+    destinationPostalCode: params.destinationPostalCode,
   })
 
   if (!priced.success) {

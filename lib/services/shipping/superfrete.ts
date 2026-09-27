@@ -204,7 +204,7 @@ export interface SuperFreteCreateLabelParams {
   }>
 }
 
-class SuperFreteClient {
+export class SuperFreteClient {
   constructor(
     private token: string,
     private userEmail?: string,

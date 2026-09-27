@@ -36,6 +36,9 @@ import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/Chec
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 import { getMarketplaceCheckoutAmountsAction } from "@/app/actions/marketplace/checkout-amounts"
+import { quoteCarrierFreightAction } from "@/app/actions/marketplace/carrier-shipping"
+import { extractPostalCodeFromAddress } from "@/lib/services/shipping/postal-code"
+import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
 import type { MarketplaceCheckoutAmounts } from "@/lib/services/marketplace-checkout-amounts"
 
 interface ProductItem {
@@ -514,6 +517,79 @@ export function CheckoutPageClient() {
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
+
+    // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
+    const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
+    const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
+    const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
+    const [carrierQuoteKey, setCarrierQuoteKey] = useState<string | null>(null)
+    const [carrierError, setCarrierError] = useState<string | null>(null)
+
+    const destinationCep = useMemo(() => {
+        if (formData.deliveryType !== "delivery") return ""
+        const zip = (selectedAddress?.zip_code || "").replace(/\D/g, "")
+        if (zip.length === 8) return zip
+        return extractPostalCodeFromAddress(formData.deliveryAddress)
+    }, [formData.deliveryType, selectedAddress?.zip_code, formData.deliveryAddress])
+
+    // Reset carrier state whenever the destination CEP changes
+    useEffect(() => {
+        setCarrierOptions([])
+        setSelectedCarrierServiceId(null)
+        setCarrierQuoteKey(null)
+        setCarrierError(null)
+    }, [destinationCep])
+
+    // Quote carrier options once own delivery reports no coverage ("raio")
+    useEffect(() => {
+        if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep) return
+        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
+        if (carrierQuoteKey === destinationCep) return
+        let active = true
+        setCarrierQuoteKey(destinationCep)
+        setCarrierQuoteLoading(true)
+        ;(async () => {
+            try {
+                const res = await quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+                if (!active) return
+                if (res.success && res.options.length > 0) {
+                    setCarrierOptions(res.options)
+                    setCarrierError(null)
+                    setSelectedCarrierServiceId(res.options[0].serviceId)
+                    setShowOutsideRadiusModal(false)
+                } else {
+                    setCarrierOptions([])
+                    setSelectedCarrierServiceId(null)
+                    setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
+                    setShowOutsideRadiusModal(true)
+                }
+            } catch {
+                if (!active) return
+                setCarrierError("Não foi possível calcular o frete agora.")
+                setShowOutsideRadiusModal(true)
+            } finally {
+                if (active) setCarrierQuoteLoading(false)
+            }
+        })()
+        return () => { active = false }
+    }, [deliveryError, destinationCep, partnerId, formData.deliveryType, carrierQuoteKey])
+
+    const handleCarrierSelect = (opt: CarrierFreightOption) => {
+        setSelectedCarrierServiceId(opt.serviceId)
+        setDeliveryFee(Number(opt.price))
+        setDeliveryDistanceKm(null)
+        setDeliveryBreakdown({
+            source: "superfrete",
+            carrier: "SuperFrete",
+            serviceId: opt.serviceId,
+            serviceName: opt.serviceName,
+            companyName: opt.companyName,
+            deliveryMinDays: opt.deliveryMinDays,
+            deliveryMaxDays: opt.deliveryMaxDays,
+            toPostalCode: destinationCep,
+        })
+        setDeliveryError(null)
+    }
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
 
@@ -1122,6 +1198,8 @@ export function CheckoutPageClient() {
                         payDepositOnly,
                         depositPercent: checkoutContext.deposit?.percent ?? 50,
                         depositAvailable,
+                        carrierServiceId: selectedCarrierServiceId || undefined,
+                        destinationPostalCode: destinationCep || undefined,
                     })
                     if (!active) return
                     if (result.success) {
@@ -1133,7 +1211,7 @@ export function CheckoutPageClient() {
                     } else {
                         setCheckoutAmounts(null)
                         setDeliveryError(result.error)
-                        if (result.error?.toLowerCase().includes("raio")) {
+                        if (result.error?.toLowerCase().includes("raio") && !destinationCep) {
                             setShowOutsideRadiusModal(true)
                         }
                         setDeliveryFee(0)
@@ -1168,9 +1246,29 @@ export function CheckoutPageClient() {
                         setDeliveryFee(Number(quote.fee || 0))
                         setDeliveryDistanceKm(Number(quote.distanceKm || 0))
                         setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
+                    } else if (
+                        quote.error?.toLowerCase().includes("raio") &&
+                        selectedCarrierServiceId &&
+                        carrierOptions.length > 0
+                    ) {
+                        // Own delivery has no coverage → apply selected carrier freight
+                        const opt = carrierOptions.find(o => o.serviceId === selectedCarrierServiceId) || carrierOptions[0]
+                        setDeliveryError(null)
+                        setDeliveryFee(Number(opt.price))
+                        setDeliveryDistanceKm(null)
+                        setDeliveryBreakdown({
+                            source: "superfrete",
+                            carrier: "SuperFrete",
+                            serviceId: opt.serviceId,
+                            serviceName: opt.serviceName,
+                            companyName: opt.companyName,
+                            deliveryMinDays: opt.deliveryMinDays,
+                            deliveryMaxDays: opt.deliveryMaxDays,
+                            toPostalCode: destinationCep,
+                        })
                     } else {
                         setDeliveryError(quote.error)
-                        if (quote.error?.toLowerCase().includes("raio")) {
+                        if (quote.error?.toLowerCase().includes("raio") && !destinationCep) {
                             setShowOutsideRadiusModal(true)
                         }
                         setDeliveryFee(0)
@@ -1208,6 +1306,9 @@ export function CheckoutPageClient() {
         depositAvailable,
         refreshTrigger,
         selectedAddress,
+        selectedCarrierServiceId,
+        destinationCep,
+        carrierOptions,
     ])
 
     // Effect 2: Payment preview - ONLY recalculate on payment method/installments changes
@@ -1338,6 +1439,8 @@ export function CheckoutPageClient() {
             paymentMethodFixedFee: customerFixedFee,
             deliveryFee: checkoutDeliveryFee,
             finalTotal: checkoutTotalToCharge,
+            carrierServiceId: selectedCarrierServiceId,
+            destinationPostalCode: destinationCep || null,
         }
     }, [
         couponDiscount,
@@ -1355,6 +1458,8 @@ export function CheckoutPageClient() {
         checkoutDepositChargeTotal,
         checkoutDeliveryFee,
         contextTotalSubtotal,
+        selectedCarrierServiceId,
+        destinationCep,
     ])
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
@@ -1741,6 +1846,44 @@ export function CheckoutPageClient() {
                                 <span>Ajuste horário</span>
                                 <span>{Number(deliveryBreakdown.timeAdjustmentTotal) > 0 ? `+${formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}` : formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}</span>
                             </div>
+                        )}
+                    </div>
+                )}
+                {!isPickup && (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                            Entrega por transportadora (SuperFrete)
+                        </p>
+                        {carrierOptions.map((opt) => (
+                            <button
+                                key={opt.serviceId}
+                                type="button"
+                                onClick={() => handleCarrierSelect(opt)}
+                                className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${selectedCarrierServiceId === opt.serviceId
+                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                    : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
+                                }`}
+                            >
+                                <span className="flex flex-col">
+                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                        {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
+                                    </span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        {opt.deliveryMinDays != null && opt.deliveryMaxDays != null
+                                            ? `Entrega em ${opt.deliveryMinDays} a ${opt.deliveryMaxDays} dias`
+                                            : "Prazo a confirmar"}
+                                    </span>
+                                </span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(Number(opt.price))}
+                                </span>
+                            </button>
+                        ))}
+                        {carrierQuoteLoading && (
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculando opções de entrega...</p>
+                        )}
+                        {carrierError && !carrierQuoteLoading && (
+                            <p className="text-xs text-red-500">{carrierError}</p>
                         )}
                     </div>
                 )}
@@ -2175,12 +2318,17 @@ export function CheckoutPageClient() {
                 return
             }
             if (deliveryError) {
-                setDeliveryError(deliveryError)
-                if (deliveryError.toLowerCase().includes("raio")) {
-                    setShowOutsideRadiusModal(true)
+                const carrierCoversError = Boolean(
+                    deliveryError.toLowerCase().includes("raio") && selectedCarrierServiceId,
+                )
+                if (!carrierCoversError) {
+                    setDeliveryError(deliveryError)
+                    if (deliveryError.toLowerCase().includes("raio")) {
+                        setShowOutsideRadiusModal(true)
+                    }
+                    setIsLoading(false)
+                    return
                 }
-                setIsLoading(false)
-                return
             }
         }
 

@@ -3,9 +3,9 @@
 import { useCallback, useRef, useEffect, useState } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { AlertModal, Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader, Tabs, TabsList, TabsTrigger } from "../reusable"
+import { ActionsDropdown, AlertModal, Button, DropdownItem, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader, Tabs, TabsList, TabsTrigger } from "../reusable"
 import { usePushNotificationStatus } from "./PushNotificationManager"
-import { BellIcon, TrashIcon } from "@/lib/icons"
+import { BellIcon, CheckCircleIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 
 interface Group {
 	label: string
@@ -125,41 +125,46 @@ export function NotificationPanel({
 			{pushBanner}
 			{grouped.length > 0 && (
 				<div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
-					{(erpOptions.length > 0 || activePartnerId) && (
-						<Tabs value={erpFilter} onValueChange={onErpFilter}>
-							<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
-								<TabsTrigger value="all">Todos</TabsTrigger>
-								{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
-								{erpOptions.map((opt) => (
-									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
-										{opt.label}
-									</TabsTrigger>
-								))}
-							</TabsList>
-						</Tabs>
-					)}
-					<div className="px-3 py-2 flex items-center justify-between">
-						<div className="flex items-center gap-4">
-							{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
-								<button
-									type="button"
-									onClick={onMarkAllAsRead}
-									className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
+					<div className="flex items-center px-3 py-2">
+						{(erpOptions.length > 0 || activePartnerId) && (
+							<Tabs value={erpFilter} onValueChange={onErpFilter} className="flex-1">
+								<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
+									<TabsTrigger value="all">Todos</TabsTrigger>
+									{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
+									{erpOptions.map((opt) => (
+										<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
+											{opt.label}
+										</TabsTrigger>
+									))}
+								</TabsList>
+							</Tabs>
+						)}
+						{(((unreadCount ?? 0) > 0 && onMarkAllAsRead) || onDeleteAll) && (
+							<>
+								{(erpOptions.length > 0 || activePartnerId) && (
+									<div className="border-l border-brand-border dark:border-dark-border h-6 mx-2 shrink-0" />
+								)}
+								<ActionsDropdown
+									trigger={
+										<Button variant="ghost" size="sm" className="h-7 w-7 min-w-[28px] p-0">
+											<ThreeDotsIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-heading" />
+										</Button>
+									}
 								>
-									Marcar todas como lidas
-								</button>
-							)}
-						</div>
-						{onDeleteAll && (
-							<button
-								type="button"
-								onClick={() => setShowDeleteAll(true)}
-								className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
-								title="Excluir todas as notificações"
-							>
-								<TrashIcon className="h-3 w-3" />
-								Excluir todas
-							</button>
+									{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
+										<DropdownItem onClick={onMarkAllAsRead} disabled={isDeleting}>
+											<CheckCircleIcon size={16} className="text-brand-green" />
+											Marcar todas como lidas
+										</DropdownItem>
+									)}
+									{onDeleteAll && (
+										<DropdownItem onClick={() => setShowDeleteAll(true)} disabled={isDeleting}>
+											<TrashIcon size={16} className="text-brand-red" />
+											Excluir todas
+										</DropdownItem>
+									)}
+								</ActionsDropdown>
+							</>
 						)}
 					</div>
 				</div>

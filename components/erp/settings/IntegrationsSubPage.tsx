@@ -40,6 +40,7 @@ import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
+import { useStore } from "@/lib/store-context"
 
 // ─── Integration Card (same style as IntegrationsPage.tsx) ───────────────────
 
@@ -102,6 +103,9 @@ export const IntegrationsSubPage = ({
     onBack: () => void
 }) => {
     const searchParams = useSearchParams()
+    const { selectedStore } = useStore()
+    const currentStoreId = selectedStore?.id
+
     const [isLoading, setIsLoading] = useState(false)
     const [isCheckingPlan, setIsCheckingPlan] = useState(true)
     const [planSlug, setPlanSlug] = useState<string>("free")
@@ -154,7 +158,7 @@ export const IntegrationsSubPage = ({
     useEffect(() => {
         return () => {
             if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
-                resetEvolutionPairingStatusAction().catch(() => {})
+                resetEvolutionPairingStatusAction(currentStoreId).catch(() => {})
             }
         }
     }, [])
@@ -167,7 +171,11 @@ export const IntegrationsSubPage = ({
         const fetchStatus = async () => {
             const res = await getWhatsappIntegrationAction()
             if (res.success && res.data) {
-                const evo = res.data.allConnections?.find((c) => c.provider === "evolution") || null
+                const evo = res.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                ) || res.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === null
+                ) || null
                 setEvoConnection(evo)
                 if (evo) {
                     setEvoStatus(evo.status)
@@ -179,7 +187,7 @@ export const IntegrationsSubPage = ({
             }
         }
         fetchStatus()
-    }, [evoModalOpen])
+    }, [evoModalOpen, currentStoreId])
 
     useEffect(() => {
         if (evoConnection?.phoneNumber) setEvoPhoneNumber(evoConnection.phoneNumber)
@@ -204,7 +212,7 @@ export const IntegrationsSubPage = ({
                 toast.error("Tempo limite de pareamento atingido.")
                 return
             }
-            const res = await getEvolutionStatusAction()
+            const res = await getEvolutionStatusAction(currentStoreId)
             if (res.success && res.data) {
                 setEvoStatus(res.data.status)
                 if (res.data.status === "connected") {
@@ -213,11 +221,23 @@ export const IntegrationsSubPage = ({
                     toast.success("WhatsApp conectado com sucesso!")
                     const refresh = await getWhatsappIntegrationAction()
                     if (refresh.success && refresh.data) {
-                        setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                        const evo = refresh.data.allConnections?.find(
+                            (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                        ) || refresh.data.allConnections?.find(
+                            (c) => c.provider === "evolution" && c.storeId === null
+                        ) || null
+                        setEvoConnection(evo)
                     }
                     setTimeout(async () => {
                         const r2 = await getWhatsappIntegrationAction()
-                        if (r2.success && r2.data) setEvoConnection(r2.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                        if (r2.success && r2.data) {
+                            const evo = r2.data.allConnections?.find(
+                                (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                            ) || r2.data.allConnections?.find(
+                                (c) => c.provider === "evolution" && c.storeId === null
+                            ) || null
+                            setEvoConnection(evo)
+                        }
                     }, 3000)
                 } else if (res.data.qrCode) {
                     setEvoQrCode(res.data.qrCode)
@@ -226,20 +246,25 @@ export const IntegrationsSubPage = ({
             }
         }, 5000)
         return () => clearInterval(interval)
-    }, [evoStatus, evoModalOpen])
+    }, [evoStatus, evoModalOpen, currentStoreId])
 
     const handleEvoConnect = async () => {
         setEvoIsLoading(true)
         evoPairingInitiated.current = true
         try {
-            const res = await connectEvolutionAction()
+            const res = await connectEvolutionAction(currentStoreId)
             if (!res.success) { toast.error(res.error); return }
             setEvoStatus(res.data.status)
             setEvoQrCode(res.data.qrCode)
             if (res.data.status === "connected") toast.success("WhatsApp conectado com sucesso!")
             const refresh = await getWhatsappIntegrationAction()
             if (refresh.success && refresh.data) {
-                setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                const evo = refresh.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                ) || refresh.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === null
+                ) || null
+                setEvoConnection(evo)
             }
         } finally { setEvoIsLoading(false) }
     }
@@ -247,13 +272,18 @@ export const IntegrationsSubPage = ({
     const handleEvoCancel = async () => {
         setEvoIsLoading(true)
         try {
-            const res = await resetEvolutionPairingStatusAction()
+            const res = await resetEvolutionPairingStatusAction(currentStoreId)
             if (res.success) {
                 setEvoStatus("disconnected")
                 setEvoQrCode(null)
                 const refresh = await getWhatsappIntegrationAction()
                 if (refresh.success && refresh.data) {
-                    setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                    const evo = refresh.data.allConnections?.find(
+                        (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                    ) || refresh.data.allConnections?.find(
+                        (c) => c.provider === "evolution" && c.storeId === null
+                    ) || null
+                    setEvoConnection(evo)
                 }
             }
         } finally { setEvoIsLoading(false) }
@@ -262,19 +292,20 @@ export const IntegrationsSubPage = ({
     const handleEvoDisconnect = async () => {
         setEvoIsLoading(true)
         try {
-            const res = await disconnectEvolutionAction()
+            const res = await disconnectEvolutionAction(currentStoreId)
             if (!res.success) { toast.error(res.error); return }
             toast.success("WhatsApp desconectado")
             setEvoStatus("disconnected")
             setEvoQrCode(null)
             setEvoPhoneNumber(null)
             setEvoConnection(null)
+            await fetchWaStatus()
         } finally { setEvoIsLoading(false) }
     }
 
     const handleEvoModalClose = () => {
         if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
-            resetEvolutionPairingStatusAction().catch(() => {})
+            resetEvolutionPairingStatusAction(currentStoreId).catch(() => {})
         }
         setEvoStatus("disconnected")
         setEvoQrCode(null)
@@ -296,11 +327,28 @@ export const IntegrationsSubPage = ({
             const res = await getWhatsappIntegrationAction()
             if (res.success && res.data) {
                 setWaConnection(res.data.connection)
+                // Sync Evolution status for card display (the modal's useEffect
+                // only runs when evoModalOpen, so without this the card always
+                // shows "Desconectado" until the modal is opened).
+                // Prefer store-specific connection, fall back to partner-level.
+                const evo = res.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === currentStoreId
+                ) || res.data.allConnections?.find(
+                    (c) => c.provider === "evolution" && c.storeId === null
+                ) || null
+                setEvoConnection(evo)
+                if (evo) {
+                    setEvoStatus(evo.status)
+                    setEvoPhoneNumber(evo.phoneNumber)
+                } else {
+                    setEvoStatus("disconnected")
+                    setEvoPhoneNumber(null)
+                }
             }
         } catch (err) {
             console.error("Error fetching WA status:", err)
         }
-    }, [])
+    }, [currentStoreId])
 
     const handleWaConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "escalar")) {
@@ -313,7 +361,7 @@ export const IntegrationsSubPage = ({
     const handleDisconnectWa = async () => {
         setWaIsLoading(true)
         try {
-            const result = await disconnectWhatsappAction(provider)
+            const result = await disconnectWhatsappAction(provider, currentStoreId)
             if (!result.success) {
                 toast.error(`Erro: ${result.error}`)
             } else {
@@ -1178,6 +1226,7 @@ export const IntegrationsSubPage = ({
                                     className="flex-1 h-[46px]"
                                     planSlug={planSlug}
                                     requiredPlan="escalar"
+                                    storeId={currentStoreId}
                                     onSuccess={async () => {
                                         setWaActiveModal(null)
                                         await fetchWaStatus()

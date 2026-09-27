@@ -639,6 +639,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasActiveReturn = !!activeReturnRequest;
     const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
 
+    // Latest outbound shipment with tracking (SuperFrete / carrier labels)
+    const trackedShipment = (() => {
+        const shipments = Array.isArray(order.order_shipments)
+            ? order.order_shipments.filter((s: any) => s.kind !== "return")
+            : []
+        shipments.sort((a: any, b: any) =>
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        )
+        return shipments.find((s: any) => s.tracking_number) || null
+    })()
+
     useEffect(() => {
         if (!activeReturnRequest) {
             setReturnAuditLogs([])
@@ -1893,6 +1904,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         </div>
                                     </FormSection>
 
+                                    {/* Rastreio do envio (transportadora) */}
+                                    {trackedShipment?.tracking_number && (
+                                        <FormSection title="Rastreio">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
+                                                        <TruckIcon size={20} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                            {trackedShipment.tracking_number}
+                                                        </div>
+                                                        <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            Código de rastreamento do envio
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {trackedShipment.tracking_url && (
+                                                    <a
+                                                        href={trackedShipment.tracking_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="shrink-0 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                                                    >
+                                                        Rastrear
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </FormSection>
+                                    )}
+
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (
                                         <FormSection title="Entregador">
@@ -2235,6 +2277,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             );
                                         })()}
                                     </FormSection>
+
+                                    {/* Rastreio do envio (transportadora) */}
+                                    {trackedShipment?.tracking_number && (
+                                        <FormSection title="Rastreio">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
+                                                        <TruckIcon size={22} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                            {trackedShipment.tracking_number}
+                                                        </div>
+                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            Código de rastreamento do envio
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {trackedShipment.tracking_url && (
+                                                    <a
+                                                        href={trackedShipment.tracking_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="shrink-0 p-2.5 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                                                    >
+                                                        Rastrear
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </FormSection>
+                                    )}
 
                                     {/* Card do Entregador */}
                                     {order.delivery_driver ? (

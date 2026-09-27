@@ -13,6 +13,8 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
   payDepositOnly: boolean
   depositPercent: number
   depositAvailable: boolean
+  carrierServiceId?: number | null
+  destinationPostalCode?: string | null
 }) {
   const user = await requireUser()
 
@@ -31,5 +33,7 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
     payDepositOnly: input.payDepositOnly,
     depositPercent: input.depositPercent,
     depositAvailable: input.depositAvailable,
+    carrierServiceId: input.carrierServiceId,
+    destinationPostalCode: input.destinationPostalCode,
   })
 }

@@ -157,11 +157,6 @@ const OrderListItem = React.memo(
                                     {order.statusLabel}
                                 </Badge>
                             )}
-                            {order.is_refunded && (
-                                <Badge variant="purple" icon={<MoneyIcon />}>
-                                    Reembolsado
-                                </Badge>
-                            )}
                             {!order.hasOnlyServices && order.situation !== "cancelled" && (
                                 <Badge variant={order.deliveryStatusColor || "gray"} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                     {order.deliveryStatusLabel || "Não informado"}

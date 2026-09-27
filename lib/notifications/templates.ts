@@ -85,8 +85,8 @@ export function buildWhatsappMessage(
     const orderRef = isBatch
         ? `de ${batchCount} pedidos seus`
         : ctx.order_number
-        ? `o pedido #${ctx.order_number}`
-        : "seu pedido"
+            ? `o pedido #${ctx.order_number}`
+            : "seu pedido"
     const amount = ctx.amount || ""
 
     switch (trigger) {
@@ -460,6 +460,30 @@ export function buildWhatsappMessage(
                 `Volte e finalize sua compra enquanto os itens ainda estão disponíveis! ✨`,
             ].filter(Boolean).join("\n")
 
+        case "order_cancelled":
+            return [
+                `❌ *Pedido cancelado*`,
+                ``,
+                ``,
+                `Olá, ${customer}! O ${orderRef} em ${store} foi cancelado.`,
+                ctx.cancellation_note ? `*Motivo:* ${ctx.cancellation_note}` : "",
+                ``,
+                ``,
+                `Se tiver dúvidas, é só responder esta mensagem. Estamos à disposição! 💬`,
+            ].filter(Boolean).join("\n")
+
+        case "order_refunded":
+            return [
+                `💰 *Reembolso processado*`,
+                ``,
+                ``,
+                `Olá, ${customer}! O reembolso do ${orderRef} em ${store} foi processado.`,
+                amount ? `*Valor:* ${amount}` : "",
+                ``,
+                ``,
+                `Se tiver dúvidas, é só falar com a gente! 💬`,
+            ].filter(Boolean).join("\n")
+
         default:
             return `🔔 Você tem uma nova atualização de ${store}. Confira no app ou no site!`
     }
@@ -717,7 +741,7 @@ export function buildNotificationContent(
                     ? `Temos sugestões! ${ctx.count} produto(s) precisam de reposição de estoque. Clique para conferir. 📦`
                     : "Há produtos que precisam de reposição.",
             }
-         case "admin_announcement":
+        case "admin_announcement":
             return {
                 title: ctx.storeName || "📢 Comunicado Importante",
                 message: ctx.customerName || "Confira o novo comunicado da plataforma.",

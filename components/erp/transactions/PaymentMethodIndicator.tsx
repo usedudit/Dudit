@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { CreditCardIcon, MoneyBagIcon, MultiplePaymentsIcon } from "@/lib/icons"
+import { MoneyBagIcon, MultiplePaymentsIcon } from "@/lib/icons"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 export function PaymentMethodIndicator({
@@ -149,7 +149,7 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = fa
     }
 
     return (
-        <span className={`inline-flex items-center gap-2 text-xs font-semibold ${colorClass}`}>
+        <span className={`inline-flex items-center gap-2 text-sm font-semibold ${colorClass}`}>
             <span className="flex items-center gap-1">
                 {icons}
             </span>

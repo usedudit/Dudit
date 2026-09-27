@@ -27,9 +27,10 @@ import {
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
+import { getReturnShippingStateAction, createReturnShippingLabelAction } from "@/app/actions/shipping/superfrete"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
@@ -210,6 +211,11 @@ export default function CreateReturnPage({
     const [returnItems, setReturnItems] = useState<ReturnItemState[]>([])
     const [returnDate, setReturnDate] = useState<Date>(new Date())
     const [returnStatus, setReturnStatus] = useState<ReturnRequest["status"]>("PENDING_REVIEW")
+    // Reverse logistics label (SuperFrete) state
+    const [returnShipping, setReturnShipping] = useState<Record<string, any> | null>(null)
+    const [returnShippingGate, setReturnShippingGate] = useState<{ canGenerate: boolean; reason: string | null }>({ canGenerate: false, reason: null })
+    const [isReturnShippingOpen, setIsReturnShippingOpen] = useState(false)
+    const [isGeneratingReturnLabel, setIsGeneratingReturnLabel] = useState(false)
     const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
     const [refundValue, setRefundValue] = useState<number>(0)
@@ -224,6 +230,11 @@ export default function CreateReturnPage({
     const isMarketplaceRequest = useMemo(() => {
         return !!(returnRequest?.source === "marketplace")
     }, [returnRequest])
+
+    const showReturnShippingButton = useMemo(() => {
+        if (mode === "create" || !returnRequest) return false
+        return ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(returnStatus) || Boolean(returnShipping)
+    }, [mode, returnRequest, returnStatus, returnShipping])
 
     const isMercadoPagoOrder = useMemo(() => {
         if (!selectedOrder) return false
@@ -472,6 +483,46 @@ export default function CreateReturnPage({
             setObservations(returnRequest.sellerNotes || "")
         }
     }, [mode, returnRequest, productBucket.bucket])
+
+    // Load reverse logistics label state (SuperFrete) for this return
+    useEffect(() => {
+        let active = true
+        if ((mode === "view" || mode === "edit") && returnRequest?.id) {
+            getReturnShippingStateAction({ returnRequestId: returnRequest.id })
+                .then((res) => {
+                    if (!active) return
+                    if (res.success) {
+                        setReturnShipping(res.shipment)
+                        setReturnShippingGate({ canGenerate: res.canGenerate, reason: res.reason })
+                    }
+                })
+                .catch(() => { })
+        }
+        return () => { active = false }
+    }, [mode, returnRequest?.id])
+
+    const handleOpenReturnShipping = () => {
+        setIsReturnShippingOpen(true)
+    }
+
+    const handleGenerateReturnLabel = async () => {
+        if (!returnRequest?.id || isGeneratingReturnLabel) return
+        setIsGeneratingReturnLabel(true)
+        try {
+            const res = await createReturnShippingLabelAction({ returnRequestId: returnRequest.id })
+            if (!res.success) throw new Error(res.error)
+            const state = await getReturnShippingStateAction({ returnRequestId: returnRequest.id })
+            if (state.success) {
+                setReturnShipping(state.shipment)
+                setReturnShippingGate({ canGenerate: state.canGenerate, reason: state.reason })
+            }
+            notifySuccess("Etiqueta de devolução gerada com sucesso!")
+        } catch (err: any) {
+            notifyError(err?.message || "Erro ao gerar etiqueta de devolução.")
+        } finally {
+            setIsGeneratingReturnLabel(false)
+        }
+    }
 
     useEffect(() => {
         setReplacementProduct(replacementItems.map(item => item.product.name).join(", "))
@@ -966,6 +1017,11 @@ export default function CreateReturnPage({
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
                                             {isViewOnly ? "Voltar" : "Cancelar"}
                                         </Button>
+                                        {showReturnShippingButton && (
+                                            <Button variant="outline" onClick={handleOpenReturnShipping} leftIcon={<TruckIcon size={18} />}>
+                                                Etiqueta de devolução
+                                            </Button>
+                                        )}
                                         {isViewOnly && returnRequest && (
                                             <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} leftIcon={<PrinterIcon size={18} />}>
                                                 Imprimir
@@ -2184,6 +2240,11 @@ export default function CreateReturnPage({
                 <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
                     {isViewOnly ? "Voltar" : "Cancelar"}
                 </Button>
+                {showReturnShippingButton && (
+                    <Button variant="outline" onClick={handleOpenReturnShipping} className="flex-1" leftIcon={<TruckIcon size={18} />}>
+                        Etiqueta de devolução
+                    </Button>
+                )}
                 {isViewOnly && returnRequest && (
                     <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} className="flex-1" leftIcon={<PrinterIcon size={18} />}>
                         Imprimir
@@ -2207,6 +2268,70 @@ export default function CreateReturnPage({
                 />
             )
             }
+
+            <DefaultModal
+                isOpen={isReturnShippingOpen}
+                onClose={() => setIsReturnShippingOpen(false)}
+                title="Etiqueta de devolução"
+                maxWidth="sm"
+            >
+                <div className="flex flex-col gap-4">
+                    {returnShipping && returnShipping.status !== "cancelled" ? (
+                        <>
+                            <div className="border border-brand-border/40 dark:border-dark-border/40 rounded-xl divide-y divide-brand-border/40 dark:divide-dark-border/40 text-sm">
+                                <div className="flex justify-between px-4 py-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Transportadora</span>
+                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{returnShipping.carrier || "SuperFrete"}</span>
+                                </div>
+                                <div className="flex justify-between px-4 py-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Serviço</span>
+                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{returnShipping.service_name || "-"}</span>
+                                </div>
+                                <div className="flex justify-between px-4 py-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Valor</span>
+                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{returnShipping.price != null ? formatCurrency(Number(returnShipping.price)) : "-"}</span>
+                                </div>
+                                <div className="flex justify-between px-4 py-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Rastreio</span>
+                                    {returnShipping.tracking_url ? (
+                                        <a href={returnShipping.tracking_url} target="_blank" rel="noopener noreferrer" className="font-medium text-brand-green underline">
+                                            {returnShipping.tracking_number || "Acompanhar"}
+                                        </a>
+                                    ) : (
+                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{returnShipping.tracking_number || "-"}</span>
+                                    )}
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => returnShipping.label_url && window.open(returnShipping.label_url, "_blank")}
+                                disabled={!returnShipping.label_url}
+                                leftIcon={<PrinterIcon size={18} />}
+                            >
+                                Abrir etiqueta
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                {returnShipping && returnShipping.status === "cancelled"
+                                    ? "A última etiqueta foi cancelada. Gere uma nova para a devolução."
+                                    : "Nenhuma etiqueta gerada para esta devolução."}
+                            </p>
+                            {returnShippingGate.reason && (
+                                <p className="text-xs text-red-500">{returnShippingGate.reason}</p>
+                            )}
+                            <Button
+                                onClick={handleGenerateReturnLabel}
+                                disabled={isGeneratingReturnLabel || !returnShippingGate.canGenerate}
+                                leftIcon={<TruckIcon size={18} />}
+                            >
+                                {isGeneratingReturnLabel ? "Gerando..." : "Gerar etiqueta"}
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </DefaultModal>
+
 
             <DefaultModal
                 isOpen={isInventoryRestoreModalOpen}

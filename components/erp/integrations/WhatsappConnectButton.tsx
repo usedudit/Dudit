@@ -70,6 +70,7 @@ export function WhatsappConnectButton({
   children,
   planSlug,
   requiredPlan = "escalar",
+  storeId,
 }: {
   onSuccess?: () => void
   disabled?: boolean
@@ -77,6 +78,7 @@ export function WhatsappConnectButton({
   children?: React.ReactNode
   planSlug?: string
   requiredPlan?: PlanTierSlug
+  storeId?: string | null
 }) {
   const [metaConfig, setMetaConfig] = useState<EmbeddedSignupClientConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
@@ -228,6 +230,7 @@ export function WhatsappConnectButton({
         code,
         wabaId: session.wabaId,
         phoneNumberId: session.phoneNumberId,
+        storeId,
       })
 
       if (!result.success) {

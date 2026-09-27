@@ -8,6 +8,10 @@ import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import {
+  quoteCarrierFreightFee,
+  extractPostalCodeFromAddress,
+} from "@/lib/services/shipping/carrier-checkout"
+import {
   buildFulfillmentPayload,
   type ResolvedCartLine,
 } from "@/lib/services/marketplace-cart-resolver"
@@ -48,6 +52,9 @@ export async function priceMarketplaceCartCheckout(
     /** Payment method configuration for discount/interest/fee computation */
     paymentMethod?: PricingInput["paymentMethod"]
     skipCartUpdate?: boolean
+    /** Selected carrier freight service (SuperFrete) when own delivery has no coverage */
+    carrierServiceId?: number | null
+    destinationPostalCode?: string | null
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
   // Ensure cart fulfillment mode for products matches the requested deliveryType
@@ -85,6 +92,7 @@ export async function priceMarketplaceCartCheckout(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
+  let carrierApplied = false
 
   const targetStoreId = resolvedLines.find((l) => l.storeId)?.storeId || null
 
@@ -99,10 +107,28 @@ export async function priceMarketplaceCartCheckout(
       freeDeliveryCoupon: false,
       orderSubtotal: subtotal,
     })
-    if (!quote.success) return { success: false, error: quote.error || "Erro na cotação de entrega." }
-    deliveryFee = Number(quote.fee || 0)
-    distanceKm = Number(quote.distanceKm || 0)
-    deliveryBreakdown = quote.breakdown
+    if (quote.success) {
+      deliveryFee = Number(quote.fee || 0)
+      distanceKm = Number(quote.distanceKm || 0)
+      deliveryBreakdown = quote.breakdown
+    } else if (params.carrierServiceId) {
+      // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+      const cep =
+        String(params.destinationPostalCode || "").replace(/\D/g, "") ||
+        extractPostalCodeFromAddress(params.deliveryAddress)
+      const carrier = await quoteCarrierFreightFee(adminClient, {
+        partnerId,
+        toPostalCode: cep,
+        serviceId: params.carrierServiceId,
+      })
+      if (!carrier.success) return { success: false, error: carrier.error }
+      deliveryFee = carrier.fee
+      distanceKm = null
+      deliveryBreakdown = carrier.breakdown
+      carrierApplied = true
+    } else {
+      return { success: false, error: quote.error || "Erro na cotação de entrega." }
+    }
   }
 
   let couponId: string | null = null
@@ -150,7 +176,7 @@ export async function priceMarketplaceCartCheckout(
   const isFreeShippingCoupon = Boolean(
     couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping",
   )
-  if (hasDeliveryLines && isFreeShippingCoupon) {
+  if ((hasDeliveryLines || carrierApplied) && isFreeShippingCoupon) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       storeId: targetStoreId,
@@ -162,6 +188,11 @@ export async function priceMarketplaceCartCheckout(
     if (quote.success) {
       deliveryFee = Number(quote.fee || 0)
       deliveryBreakdown = quote.breakdown
+    } else if (carrierApplied) {
+      deliveryFee = 0
+      if (deliveryBreakdown) {
+        deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+      }
     }
   }
 

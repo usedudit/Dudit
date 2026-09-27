@@ -22,6 +22,10 @@ import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
 import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
 import { quoteDeliveryFeeAction, resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import {
+  quoteCarrierFreightFee,
+  extractPostalCodeFromAddress,
+} from "@/lib/services/shipping/carrier-checkout"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -47,6 +51,8 @@ interface ProcessPaymentRequest {
     paymentMethodFixedFee?: number
     deliveryFee: number
     finalTotal: number
+    carrierServiceId?: number | null
+    destinationPostalCode?: string | null
   }
   existingOrderId?: string
   deviceId?: string | null
@@ -396,6 +402,8 @@ async function handler(request: NextRequest) {
         deliveryAddress: deliveryAddress || "",
         couponCode,
         paymentMethod: pmtConfig,
+        carrierServiceId: body.checkoutPricing?.carrierServiceId,
+        destinationPostalCode: body.checkoutPricing?.destinationPostalCode,
       })
 
       if (!priced.success) {
@@ -446,6 +454,8 @@ async function handler(request: NextRequest) {
           deliveryAddress: deliveryAddress || "",
           couponCode,
           paymentMethod: pmtConfig,
+          carrierServiceId: body.checkoutPricing?.carrierServiceId,
+          destinationPostalCode: body.checkoutPricing?.destinationPostalCode,
         })
 
         await adminClient
@@ -620,9 +630,26 @@ async function handler(request: NextRequest) {
           orderSubtotal: totalAmount,
         })
         if (!deliveryQuote.success) {
-          return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+          // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+          const carrierServiceId = Number(body.checkoutPricing?.carrierServiceId || 0)
+          if (!carrierServiceId) {
+            return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+          }
+          const cep =
+            String(body.checkoutPricing?.destinationPostalCode || "").replace(/\D/g, "") ||
+            extractPostalCodeFromAddress(deliveryAddress)
+          const carrier = await quoteCarrierFreightFee(adminClient, {
+            partnerId,
+            toPostalCode: cep,
+            serviceId: carrierServiceId,
+          })
+          if (!carrier.success) {
+            return NextResponse.json({ error: carrier.error }, { status: 400 })
+          }
+          deliveryFee = carrier.fee
+        } else {
+          deliveryFee = Number(deliveryQuote.fee || 0)
         }
-        deliveryFee = Number(deliveryQuote.fee || 0)
       } else {
         deliveryFee = 0
       }

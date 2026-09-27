@@ -20,6 +20,10 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import {
+  quoteCarrierFreightFee,
+  extractPostalCodeFromAddress,
+} from "@/lib/services/shipping/carrier-checkout"
 import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import {
@@ -51,6 +55,9 @@ export type MarketplaceCheckoutPricingSnapshot = {
   paymentMethodFixedFee?: number
   deliveryFee: number
   finalTotal: number
+  /** Selected carrier freight service (SuperFrete) when own delivery has no coverage */
+  carrierServiceId?: number | null
+  destinationPostalCode?: string | null
 }
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -71,6 +78,8 @@ function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPri
     paymentMethodFixedFee: moneyOrZero(input.paymentMethodFixedFee),
     deliveryFee: moneyOrZero(input.deliveryFee),
     finalTotal: moneyOrZero(input.finalTotal),
+    carrierServiceId: typeof input.carrierServiceId === "number" && Number.isFinite(input.carrierServiceId) ? Number(input.carrierServiceId) : null,
+    destinationPostalCode: typeof input.destinationPostalCode === "string" ? input.destinationPostalCode : null,
   }
   const expected = roundMoney(
     snapshot.subtotal
@@ -1057,11 +1066,30 @@ export async function checkoutCartAction(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
+  let carrierApplied = false
   if (shouldQuoteDelivery) {
-    if (!deliveryQuote.success) return { error: (deliveryQuote as any).error }
-    deliveryFee = Number(deliveryQuote.fee || 0)
-    distanceKm = Number(deliveryQuote.distanceKm || 0)
-    deliveryBreakdown = deliveryQuote.breakdown
+    if (!deliveryQuote.success) {
+      const carrierServiceId = checkoutPricingSnapshot?.carrierServiceId ?? null
+      if (!carrierServiceId) return { error: (deliveryQuote as any).error }
+      // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+      const cep =
+        String(checkoutPricingSnapshot?.destinationPostalCode || "").replace(/\D/g, "") ||
+        extractPostalCodeFromAddress(deliveryAddress)
+      const carrier = await quoteCarrierFreightFee(adminClient, {
+        partnerId,
+        toPostalCode: cep,
+        serviceId: carrierServiceId,
+      })
+      if (!carrier.success) return { error: carrier.error }
+      deliveryFee = carrier.fee
+      distanceKm = null
+      deliveryBreakdown = carrier.breakdown
+      carrierApplied = true
+    } else {
+      deliveryFee = Number(deliveryQuote.fee || 0)
+      distanceKm = Number(deliveryQuote.distanceKm || 0)
+      deliveryBreakdown = deliveryQuote.breakdown
+    }
   }
 
   let couponIdToSave: string | null = null
@@ -1101,7 +1129,7 @@ export async function checkoutCartAction(
 
   // Adjust delivery fee if the chosen coupon is free shipping
   const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
-  if (hasDeliveryLines && isFreeShippingCoupon) {
+  if ((hasDeliveryLines || carrierApplied) && isFreeShippingCoupon) {
     deliveryFee = 0
     if (deliveryBreakdown) {
       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }

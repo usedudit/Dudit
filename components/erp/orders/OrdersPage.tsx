@@ -428,7 +428,9 @@ export default function OrdersPage({
                     ? o.customer_name
                     : (cust?.name || cust?.email || o.buyer_email || o.customer_name || "Consumidor final")
 
-                const shipments = Array.isArray(o.order_shipments) ? [...o.order_shipments] : []
+                const shipments = Array.isArray(o.order_shipments)
+                    ? o.order_shipments.filter((s: any) => s.kind !== "return")
+                    : []
                 shipments.sort((a: any, b: any) =>
                     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
                 )

@@ -8,6 +8,10 @@ import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import {
+  quoteCarrierFreightFee,
+  extractPostalCodeFromAddress,
+} from "@/lib/services/shipping/carrier-checkout"
 import { issuePaymentQuote } from "@/lib/mercadopago/payment-quote"
 
 interface PreferenceRequest {
@@ -48,6 +52,8 @@ interface PreferenceRequest {
     paymentMethodFixedFee?: number
     deliveryFee?: number
     finalTotal: number
+    carrierServiceId?: number | null
+    destinationPostalCode?: string | null
   }
 }
 
@@ -405,9 +411,26 @@ async function handler(request: NextRequest) {
           orderSubtotal: totalAmount,
         })
         if (!deliveryQuote.success) {
-          return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+          // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+          const carrierServiceId = Number(body.checkoutPricing?.carrierServiceId || 0)
+          if (!carrierServiceId) {
+            return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+          }
+          const cep =
+            String(body.checkoutPricing?.destinationPostalCode || "").replace(/\D/g, "") ||
+            extractPostalCodeFromAddress(body.deliveryAddress)
+          const carrier = await quoteCarrierFreightFee(adminClient, {
+            partnerId,
+            toPostalCode: cep,
+            serviceId: carrierServiceId,
+          })
+          if (!carrier.success) {
+            return NextResponse.json({ error: carrier.error }, { status: 400 })
+          }
+          deliveryFee = carrier.fee
+        } else {
+          deliveryFee = Number(deliveryQuote.fee || 0)
         }
-        deliveryFee = Number(deliveryQuote.fee || 0)
       }
 
       // Build pricing items from already-resolved preference items

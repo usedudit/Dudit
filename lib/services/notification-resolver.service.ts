@@ -41,8 +41,9 @@ const NOTIFICATION_TYPE_TO_WHATSAPP_TRIGGER: Partial<Record<NotificationType, Wh
   order_paid: "order_payment_approved",
   order_shipped: "order_shipped",
   order_delivered: "order_delivered",
-  order_cancelled: "order_cancelled",
-  service_return_reminder: "service_return_reminder",
+   order_cancelled: "order_cancelled",
+   order_refunded: "order_refunded",
+   service_return_reminder: "service_return_reminder",
   cart_abandoned: "cart_abandoned",
 }
 

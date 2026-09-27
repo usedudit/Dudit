@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     const { data: shipments } = await supabase
       .from("order_shipments")
-      .select("id, order_id, partner_id, integration_id, provider_slug")
+      .select("id, order_id, partner_id, integration_id, provider_slug, kind")
       .eq("provider_slug", SUPERFRETE_PROVIDER)
       .eq("external_label_id", superfreteOrderId)
 
@@ -99,7 +99,9 @@ export async function POST(req: Request) {
         .eq("id", shipment.id)
         .eq("partner_id", shipment.partner_id)
 
-      if (deliveryStatus) {
+      // Reverse shipments (buyer -> store) never change the order's own
+      // delivery status — only outbound labels (store -> buyer) do.
+      if (deliveryStatus && shipment.kind !== "return") {
         await supabase
           .from("orders")
           .update({ delivery_status: deliveryStatus })
@@ -113,11 +115,16 @@ export async function POST(req: Request) {
         entityType: "order",
         entityId: shipment.order_id,
         actionType: "shipping_status_updated",
-        changeLines: [`Status de frete atualizado para: ${status}`],
+        changeLines: [
+          shipment.kind === "return"
+            ? `Status da etiqueta de devolução atualizado para: ${status}`
+            : `Status de frete atualizado para: ${status}`,
+        ],
         source: "webhook",
         metadata: {
           shipment_id: shipment.id,
           shipment_status: status,
+          shipment_kind: shipment.kind,
           delivery_status: deliveryStatus,
           tracking_number: tracking,
         },

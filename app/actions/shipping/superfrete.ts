@@ -24,52 +24,15 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 
 const SUPERFRETE_WEBHOOK_URL = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL}/api/shipping/superfrete/webhook`
-const SUPERFRETE_PROVIDER = "superfrete"
+import {
+  SUPERFRETE_PROVIDER,
+  findSuperFreteIntegration as getSuperFreteIntegration,
+  buildSuperFreteClient as createClientFromIntegration,
+  resolveSuperFreteEnvironment,
+  type PartnerIntegrationRow,
+} from "@/lib/services/shipping/superfrete-integration"
 
-export interface PartnerIntegrationRow {
-  id: string
-  partner_id: string
-  provider_slug: string
-  status: "connected" | "disconnected" | "pending" | "error"
-  account_id: string | null
-  account_email: string | null
-  access_token_encrypted: string | null
-  webhook_secret_encrypted: string | null
-  webhook_id: string | null
-  config: Record<string, any>
-  credentials: Record<string, any>
-  metadata: Record<string, any>
-  connected_at: string | null
-}
-
-async function getSuperFreteIntegration(
-  supabase: ReturnType<typeof getAdminClient>,
-  partnerId: string,
-): Promise<PartnerIntegrationRow | null> {
-  const { data } = await supabase
-    .from("partner_integrations")
-    .select("*")
-    .eq("partner_id", partnerId)
-    .eq("provider_slug", SUPERFRETE_PROVIDER)
-    .maybeSingle()
-  return (data as PartnerIntegrationRow) || null
-}
-
-function resolveSuperFreteEnvironment(
-  explicit: unknown,
-  fallback?: unknown,
-): SuperFreteEnvironment {
-  if (explicit === "sandbox" || explicit === "production") return explicit
-  if (fallback === "sandbox" || fallback === "production") return fallback
-  return process.env.NODE_ENV === "production" ? "production" : "sandbox"
-}
-
-function createClientFromIntegration(integration: PartnerIntegrationRow | null) {
-  if (!integration?.access_token_encrypted) return null
-  const token = decrypt(integration.access_token_encrypted, SUPERFRETE_PROVIDER)
-  const environment = resolveSuperFreteEnvironment((integration.config as SuperFreteConfig)?.environment)
-  return createSuperFreteClient(token, integration.account_email || undefined, environment)
-}
+export type { PartnerIntegrationRow }
 
 export interface SuperFreteStatus {
   connected: boolean
@@ -1271,6 +1234,7 @@ export async function getOrderShipmentAction(payload: { orderId: string }): Prom
       )
       .eq("order_id", payload.orderId)
       .eq("partner_id", ctx.partnerId)
+      .eq("kind", "outbound")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -1283,5 +1247,274 @@ export async function getOrderShipmentAction(payload: { orderId: string }): Prom
       partnerId: ctx.partnerId,
     })
     return { success: false, error: err?.message || "Erro ao carregar envio do pedido." }
+  }
+}
+
+// ============================================================================
+// Reverse logistics (kind = "return"): buyer -> store labels for returns
+// ============================================================================
+
+const RETURN_SHIPMENT_BLOCKED_STATUSES = ["RESOLVED", "REJECTED", "EXPIRED"]
+
+async function loadReturnShippingRequest(returnRequestId: string, partnerId: string) {
+  const supabase = getAdminClient()
+  const { data } = await supabase
+    .from("return_requests")
+    .select("id, partner_id, order_id, status")
+    .eq("id", returnRequestId)
+    .eq("partner_id", partnerId)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (!data) return { error: "Solicitação de devolução não encontrada." }
+  if (RETURN_SHIPMENT_BLOCKED_STATUSES.includes(data.status)) {
+    return { error: "Solicitação de devolução encerrada: não é possível gerar etiqueta." }
+  }
+  return { supabase, returnRequest: data }
+}
+
+export async function getReturnShippingStateAction(payload: {
+  returnRequestId: string
+}): Promise<{
+  success: true
+  shipment: OrderShipmentSummary | null
+  canGenerate: boolean
+  reason: string | null
+} | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "view", user)
+
+  try {
+    const supabase = getAdminClient()
+    const { data: returnRequest } = await supabase
+      .from("return_requests")
+      .select("id, status")
+      .eq("id", payload.returnRequestId)
+      .eq("partner_id", ctx.partnerId)
+      .is("deleted_at", null)
+      .maybeSingle()
+    if (!returnRequest) return { success: false, error: "Solicitação de devolução não encontrada." }
+
+    const { data } = await supabase
+      .from("order_shipments")
+      .select(
+        "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+      )
+      .eq("return_request_id", payload.returnRequestId)
+      .eq("partner_id", ctx.partnerId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let canGenerate = true
+    let reason: string | null = null
+
+    if (RETURN_SHIPMENT_BLOCKED_STATUSES.includes(returnRequest.status)) {
+      canGenerate = false
+      reason = "Solicitação de devolução encerrada: não é possível gerar etiqueta."
+    } else {
+      const plan = await getPartnerPlan(ctx.partnerId)
+      if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
+        canGenerate = false
+        reason = "Entrega nacional exige o plano Escalar."
+      } else {
+        const integration = await getSuperFreteIntegration(supabase, ctx.partnerId)
+        if (!integration || integration.status !== "connected" || !integration.access_token_encrypted) {
+          canGenerate = false
+          reason = "SuperFrete não conectado."
+        }
+      }
+    }
+
+    return {
+      success: true,
+      shipment: (data as OrderShipmentSummary) || null,
+      canGenerate,
+      reason,
+    }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "get_return_shipping_state",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao carregar etiqueta de devolução." }
+  }
+}
+
+export async function createReturnShippingLabelAction(payload: {
+  returnRequestId: string
+  service?: SuperFreteServiceId
+}): Promise<
+  | {
+      success: true
+      label: {
+        id: string
+        price: number
+        status: string
+        serviceId: number
+        tracking: string | null
+        labelUrl: string | null
+      }
+    }
+  | { success: false; error: string }
+> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "edit", user)
+
+  const plan = await getPartnerPlan(ctx.partnerId)
+  if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
+    return { success: false, error: "Entrega nacional exige o plano Escalar." }
+  }
+
+  try {
+    const loaded = await loadReturnShippingRequest(payload.returnRequestId, ctx.partnerId)
+    if ("error" in loaded && loaded.error) return { success: false, error: loaded.error }
+    const { returnRequest } = loaded as { returnRequest: { id: string; order_id: string } }
+
+    const context = await loadShippingOrderContext(returnRequest.order_id, ctx.partnerId)
+    if ("error" in context && context.error) return { success: false, error: context.error }
+    const { integration, partner, order, config, supabase } = context as any
+
+    // Reverse route: buyer (from) -> store (to)
+    const buyerAddress = await resolveDestinationAddress(supabase, order)
+    const storeAddress = await resolveOriginAddress(supabase, order, partner, ctx.partnerId)
+
+    if (!buyerAddress || !buyerAddress.postal_code) {
+      return { success: false, error: "O pedido não tem endereço do comprador com CEP. Não é possível gerar a etiqueta de devolução." }
+    }
+    if (!buyerAddress.district) {
+      return { success: false, error: "O endereço do comprador está incompleto (bairro, cidade, estado e CEP são obrigatórios)." }
+    }
+    if (!storeAddress || !storeAddress.postal_code || !storeAddress.district || !storeAddress.city || !storeAddress.state_abbr) {
+      return { success: false, error: "Cadastre o endereço completo da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
+    }
+
+    const client = createClientFromIntegration(integration)
+    if (!client) return { success: false, error: "SuperFrete não conectado." }
+
+    const fromPostalCode = buyerAddress.postal_code
+    const toPostalCode = (config.originCep || storeAddress.postal_code).replace(/\D/g, "")
+
+    const services: SuperFreteServiceId[] =
+      Array.isArray(config.services) && config.services.length > 0
+        ? (config.services as SuperFreteServiceId[])
+        : ([1, 2] as SuperFreteServiceId[])
+
+    const quotes = await client.calculateFreight({
+      fromPostalCode,
+      toPostalCode,
+      services,
+      package: buildVolumes(config),
+      options: {
+        own_hand: Boolean(config.ownHand),
+        receipt: Boolean(config.receipt),
+        insurance_value: Number(config.insuranceValue || 0),
+        use_insurance_value: Number(config.insuranceValue || 0) > 0,
+      },
+    })
+
+    const validQuotes = (Array.isArray(quotes) ? quotes : []).filter(
+      (q: any) => q && !q.has_error && Number.isFinite(Number(q.price)),
+    )
+    if (validQuotes.length === 0) {
+      return { success: false, error: "Nenhuma transportadora disponível para a devolução neste endereço." }
+    }
+
+    const chosen = payload.service
+      ? validQuotes.find((q: any) => Number(q.id) === Number(payload.service))
+      : undefined
+    const quote = chosen || validQuotes.reduce((a: any, b: any) => (Number(a.price) <= Number(b.price) ? a : b))
+    const serviceId = Number(quote.id) as SuperFreteServiceId
+
+    const label = await client.createOrder({
+      service: serviceId,
+      from: {
+        name: buyerAddress.name,
+        address: buyerAddress.address,
+        number: buyerAddress.number,
+        complement: buyerAddress.complement,
+        district: buyerAddress.district,
+        city: buyerAddress.city,
+        state_abbr: buyerAddress.state_abbr,
+        postal_code: buyerAddress.postal_code,
+        phone: buyerAddress.phone,
+      },
+      to: {
+        name: storeAddress.name,
+        address: storeAddress.address,
+        number: storeAddress.number,
+        complement: storeAddress.complement,
+        district: storeAddress.district,
+        city: storeAddress.city,
+        state_abbr: storeAddress.state_abbr,
+        postal_code: storeAddress.postal_code,
+        document: "",
+      },
+      products: buildShippingProducts(order),
+      volumes: buildVolumes(config),
+      options: {
+        insurance_value: Number(config.insuranceValue || 0),
+        receipt: Boolean(config.receipt),
+        own_hand: Boolean(config.ownHand),
+        non_commercial: true,
+      },
+      tags: [{ tag: `Dudit devolução ${order.order_number || order.id}` }],
+    })
+
+    const labelServiceId = label.service_id || serviceId
+
+    await supabase.from("order_shipments").insert({
+      order_id: returnRequest.order_id,
+      partner_id: ctx.partnerId,
+      integration_id: integration.id,
+      provider_slug: SUPERFRETE_PROVIDER,
+      kind: "return",
+      return_request_id: returnRequest.id,
+      status: label.status || "pending",
+      service_code: String(labelServiceId),
+      service_name: SERVICE_LABELS[labelServiceId] || SERVICE_LABELS[serviceId],
+      carrier: "SuperFrete",
+      external_label_id: label.id,
+      price: typeof label.price === "number" ? label.price : null,
+      tracking_number: label.tracking || null,
+      label_url: label.print?.url || null,
+      requested_at: new Date().toISOString(),
+      payload: {
+        kind: "return",
+        return_request_id: returnRequest.id,
+        service: serviceId,
+        service_id: labelServiceId,
+        response_status: label.status,
+        from_postal_code: fromPostalCode,
+        to_postal_code: toPostalCode,
+      },
+    })
+
+    revalidateOrders(ctx.partnerId)
+
+    return {
+      success: true,
+      label: {
+        id: label.id,
+        price: typeof label.price === "number" ? label.price : Number(quote.price || 0),
+        status: label.status,
+        serviceId: labelServiceId,
+        tracking: label.tracking || null,
+        labelUrl: label.print?.url || null,
+      },
+    }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "create_return_shipping_label",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao criar etiqueta de devolução." }
   }
 }

@@ -7,7 +7,6 @@ import {
     AlertCircleIcon,
     XIcon,
     ClockIcon,
-    MoneyIcon,
     ReturnIcon,
     CalendarIcon,
     TruckIcon,
@@ -120,27 +119,35 @@ const formatReturnReasonLabel = (rawReason?: string | null): string => {
     const r = String(rawReason).trim().toLowerCase();
 
     const labels: Record<string, string> = {
-        defective: "Defeituoso / Danificado",
-        wrong_item: "Item Errado",
-        wrong_size: "Tamanho Errado / Incompatível",
-        regret: "Desistência / Arrependimento",
-        not_as_described: "Diferente do Anúncio",
-        delayed: "Atraso na Entrega",
-        other: "Outro Motivo",
-        outro: "Outro Motivo",
-        defeito: "Defeituoso / Danificado",
-        item_errado: "Item Errado",
-        "item errado": "Item Errado",
-        "recebi item errado": "Item Errado",
-        arrependimento: "Desistência / Arrependimento",
-        tamanho: "Tamanho Errado / Incompatível",
+        defective: "Item com defeito",
+        wrong_item: "Item errado",
+        damaged: "Item danificado",
+        different_from_description: "Diferente da descrição",
+        missing_parts: "Faltam partes",
+        arrived_late: "Chegou atrasado",
+        changed_mind: "Mudou de ideia",
+        other: "Outro",
+        wrong_size: "Tamanho errado / incompatível",
+        regret: "Desistência / arrependimento",
+        not_as_described: "Diferente do anúncio",
+        delayed: "Atraso na entrega",
+        outro: "Outro",
+        defeito: "Item com defeito",
+        item_errado: "Item errado",
+        "item errado": "Item errado",
+        "recebi item errado": "Item errado",
+        arrependimento: "Desistência / arrependimento",
+        tamanho: "Tamanho errado / incompatível",
+        danificado: "Item danificado",
+        diferente_da_descricao: "Diferente da descrição",
+        faltando_partes: "Faltam partes",
+        chegou_atrasado: "Chegou atrasado",
+        mudou_de_ideia: "Mudou de ideia",
     };
 
     if (labels[r]) return labels[r];
 
-    return r
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
+    return r.charAt(0).toUpperCase() + r.slice(1);
 };
 
 const formatReturnConditionLabel = (rawCondition?: string | null): string => {
@@ -807,11 +814,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <Badge variant={paymentStatus.variant}>
                                                     {paymentStatus.label}
                                                 </Badge>
-                                                {order.is_refunded && (
-                                                    <Badge variant="purple" icon={<MoneyIcon />}>
-                                                        Reembolsado
-                                                    </Badge>
-                                                )}
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -986,9 +988,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                                 <div className="text-xs text-dark-body dark:text-brand-dark space-y-0.5">
                                                                                                                     <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
                                                                                                                     <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
-                                                                                                                    <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
-                                                                                                                    <p><strong>Tipo:</strong> {ret.resolution_type ? (ret.resolution_type === "refund" ? "Reembolso" : ret.resolution_type === "exchange" ? "Troca" : ret.resolution_type === "store_credit" ? "Vale-compra" : ret.resolution_type) : "—"}</p>
-                                                                                                                    {Number(ret.refund_amount || 0) > 0 && (
+                                                                <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
+                                                                {Number(ret.refund_amount || 0) > 0 && (
                                                                                                                         <p><strong>Valor reembolsado:</strong> {formatCurrency(Number(ret.refund_amount))}</p>
                                                                                                                     )}
                                                                                                                     {Number(ret.store_credit_amount || 0) > 0 && (

@@ -4747,7 +4747,7 @@ export async function getERPOrdersPageAction(
                         delivery_status, delivery_type, order_source, created_at, store_id,
                         stores(name),
                         customers(id, name, email, phone),
-                        order_shipments(id, status, tracking_number, tracking_url, provider_slug, created_at),
+                        order_shipments(id, status, tracking_number, tracking_url, provider_slug, kind, created_at),
                         return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                         order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                         payment_method, payment_breakdown, payment_provider,

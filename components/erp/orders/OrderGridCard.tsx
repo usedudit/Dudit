@@ -97,15 +97,6 @@ const OrderGridCard = React.memo(
                                             />
                                         </Tooltip>
                                     )}
-                                    {order.is_refunded && (
-                                        <Tooltip text="Reembolsado">
-                                            <Badge
-                                                variant="purple"
-                                                icon={<MoneyIcon />}
-                                                className="whitespace-nowrap"
-                                            />
-                                        </Tooltip>
-                                    )}
                                     {!order.hasOnlyServices && order.situation !== "cancelled" && (
                                         <Tooltip text={order.deliveryStatusLabel || "Não informado"}>
                                             <Badge
