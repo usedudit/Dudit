@@ -1,9 +1,10 @@
 import { createHash, createHmac } from "crypto"
 
 const SUPERFRETE_BASE_URL =
-  process.env.NODE_ENV === "production"
+  process.env.SUPERFRETE_BASE_URL ||
+  (process.env.NODE_ENV === "production"
     ? "https://api.superfrete.com"
-    : "https://sandbox.superfrete.com"
+    : "https://sandbox.superfrete.com")
 
 export const USER_AGENT_TEMPLATE = (email?: string) =>
   email ? `Dudit/1.0 (${email})` : "Dudit/1.0 (integracao@superfrete.com)"
@@ -204,16 +205,23 @@ class SuperFreteClient {
     path: string,
     body?: unknown,
   ): Promise<unknown> {
-    const res = await fetch(`${SUPERFRETE_BASE_URL}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": this.userAgent,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    })
+    const url = `${SUPERFRETE_BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": this.userAgent,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      })
+    } catch (e: any) {
+      const cause = e?.cause?.code || e?.cause?.message || e?.message || "erro desconhecido"
+      throw new Error(`Falha de conexão com a API SuperFrete (${cause}). Verifique sua rede/proxy e tente novamente.`) as any
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "")
