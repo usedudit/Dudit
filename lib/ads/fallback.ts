@@ -59,7 +59,7 @@ export function getHouseBannerConfig(): HouseBannerConfig {
     const isEnabled = process.env.NEXT_PUBLIC_ADS_HOUSE_BANNER_ENABLED === "true"
     const contactUrl =
         process.env.NEXT_PUBLIC_ADS_CONTACT_URL ||
-        "https://wa.me/5516999999999?text=Ol%C3%A1%21+Gostaria+de+anunciar+na+Dudit."
+        "https://wa.me/5516999999999?text=" + encodeURIComponent("Olá! Gostaria de anunciar na Dudit.")
 
     return {
         enabled: isEnabled,

@@ -1025,7 +1025,7 @@ export function PaymentWrapper({
                                                         {formatBrazilPhone(partnerPhone)}
                                                     </p>
                                                     <a
-                                                        href={`https://wa.me/${partnerPhone.replace(/\D/g, "")}?text=Olá! Segue o comprovante do sinal referente ao meu agendamento no valor de ${formatCurrency(amount)}.`}
+                                                        href={`https://wa.me/${partnerPhone.replace(/\D/g, "")}?text=${encodeURIComponent('Olá! Segue o comprovante do sinal referente ao meu agendamento no valor de ' + formatCurrency(amount))}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-2 text-sm font-semibold text-brand-green hover:underline mt-1"

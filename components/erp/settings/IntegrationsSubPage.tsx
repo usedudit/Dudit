@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -18,9 +18,10 @@ import {
     disconnectSuperFreteAction,
     setupSuperFreteWebhookAction,
     saveSuperFreteConfigAction,
-    type SuperFreteStatus,
-    type SuperFreteConfig,
+  type SuperFreteStatus,
+  type SuperFreteConfig,
 } from "@/app/actions/shipping/superfrete"
+import type { SuperFreteEnvironment } from "@/lib/services/shipping/superfrete"
 import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
     getWhatsappIntegrationAction,
@@ -119,6 +120,7 @@ export const IntegrationsSubPage = ({
     const [sfIsLoading, setSfIsLoading] = useState(false)
     const [sfActiveTab, setSfActiveTab] = useState<"connect" | "settings">("connect")
     const [sfTokenInput, setSfTokenInput] = useState("")
+    const [sfEnvironment, setSfEnvironment] = useState<SuperFreteEnvironment>("sandbox")
     const [sfOriginCep, setSfOriginCep] = useState("")
     const [sfDefaultHeight, setSfDefaultHeight] = useState("10")
     const [sfDefaultWidth, setSfDefaultWidth] = useState("10")
@@ -385,6 +387,7 @@ export const IntegrationsSubPage = ({
                 setSfStatus(res.data)
                 const cfg = res.data.config
                 if (cfg) {
+                    if (cfg.environment === "sandbox" || cfg.environment === "production") setSfEnvironment(cfg.environment)
                     if (cfg.originCep) setSfOriginCep(cfg.originCep)
                     if (cfg.height !== undefined) setSfDefaultHeight(String(cfg.height))
                     if (cfg.width !== undefined) setSfDefaultWidth(String(cfg.width))
@@ -411,6 +414,7 @@ export const IntegrationsSubPage = ({
             const res = await connectSuperFreteAction({
                 token: sfTokenInput,
                 webhookSecret: crypto.randomUUID(),
+                environment: sfEnvironment,
             })
             if (res.success) {
                 toast.success("SuperFrete conectado com sucesso!")
@@ -912,7 +916,7 @@ export const IntegrationsSubPage = ({
                                     Como obter o token:
                                 </p>
                                 <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
-                                    <li>Acesse sandbox.superfrete.com/#/integrations</li>
+                                    <li>Acesse sandbox.superfrete.com/#/integrations (teste) ou web.superfrete.com/#/integrations (produção)</li>
                                     <li>Clique em "Desenvolvedores" → "Integrar"</li>
                                     <li>Copie o token gerado e cole abaixo</li>
                                 </ol>
@@ -924,6 +928,19 @@ export const IntegrationsSubPage = ({
                                 onChange={(e) => setSfTokenInput(e.target.value)}
                                 variant="full-rounded"
                             />
+                            <FormDropdown
+                                label="Ambiente"
+                                options={[
+                                    { value: "sandbox", label: "Sandbox (teste)" },
+                                    { value: "production", label: "Produção" },
+                                ]}
+                                value={sfEnvironment}
+                                setValue={(v: string) => setSfEnvironment(v === "production" ? "production" : "sandbox")}
+                                placeholder="Selecione o ambiente"
+                            />
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
+                                O token deve ser do mesmo ambiente selecionado. Em Sandbox as etiquetas são apenas para testes.
+                            </p>
                             {sfStatus?.balance !== undefined && (
                                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/40 rounded-xl p-3">
                                     <p className="text-xs text-green-700 dark:text-green-400">
@@ -1092,6 +1109,7 @@ export const IntegrationsSubPage = ({
                                             ownHand: sfOwnHand,
                                             receipt: sfReceipt,
                                             services: sfServices,
+                                            environment: sfEnvironment,
                                         })
                                         if (res.success) {
                                             toast.success("Configurações salvas!")

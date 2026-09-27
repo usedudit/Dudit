@@ -12,6 +12,7 @@ import { revalidateOrders, safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
   createSuperFreteClient,
+  type SuperFreteEnvironment,
   type SuperFreteQuoteParams,
   type SuperFreteCreateLabelParams,
   type SuperFreteServiceId,
@@ -54,10 +55,20 @@ async function getSuperFreteIntegration(
   return (data as PartnerIntegrationRow) || null
 }
 
+function resolveSuperFreteEnvironment(
+  explicit: unknown,
+  fallback?: unknown,
+): SuperFreteEnvironment {
+  if (explicit === "sandbox" || explicit === "production") return explicit
+  if (fallback === "sandbox" || fallback === "production") return fallback
+  return process.env.NODE_ENV === "production" ? "production" : "sandbox"
+}
+
 function createClientFromIntegration(integration: PartnerIntegrationRow | null) {
   if (!integration?.access_token_encrypted) return null
   const token = decrypt(integration.access_token_encrypted, SUPERFRETE_PROVIDER)
-  return createSuperFreteClient(token, integration.account_email || undefined)
+  const environment = resolveSuperFreteEnvironment((integration.config as SuperFreteConfig)?.environment)
+  return createSuperFreteClient(token, integration.account_email || undefined, environment)
 }
 
 export interface SuperFreteStatus {
@@ -80,6 +91,7 @@ export interface SuperFreteConfig {
   ownHand?: boolean
   receipt?: boolean
   services?: SuperFreteServiceId[]
+  environment?: SuperFreteEnvironment
 }
 
 export async function getSuperFreteStatusAction(): Promise<{
@@ -145,6 +157,7 @@ export async function getSuperFreteStatusAction(): Promise<{
 export async function connectSuperFreteAction(payload: {
   token: string
   webhookSecret?: string
+  environment?: SuperFreteEnvironment
 }): Promise<{ success: boolean; error?: string; balance?: number; email?: string }> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
@@ -173,7 +186,11 @@ export async function connectSuperFreteAction(payload: {
   const supabase = getAdminClient()
 
   try {
-    const client = createSuperFreteClient(token)
+    const existing = await getSuperFreteIntegration(supabase, ctx.partnerId)
+    const existingConfig = (existing?.config as Record<string, any> | null) || {}
+    const environment = resolveSuperFreteEnvironment(payload.environment, existingConfig.environment)
+
+    const client = createSuperFreteClient(token, undefined, environment)
     const userInfo = await client.getUserInfo()
 
     const encryptedToken = encrypt(token, "superfrete")
@@ -193,6 +210,7 @@ export async function connectSuperFreteAction(payload: {
         webhook_secret_encrypted: webhookSecret,
         connected_at: new Date().toISOString(),
         disconnected_at: null,
+        config: { ...existingConfig, environment },
       },
       { onConflict: "partner_id,provider_slug" },
     )
@@ -294,6 +312,10 @@ export async function saveSuperFreteConfigAction(config: SuperFreteConfig): Prom
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
   try {
+    const supabase = getAdminClient()
+    const existing = await getSuperFreteIntegration(supabase, ctx.partnerId)
+    const existingConfig = (existing?.config as Record<string, any> | null) || {}
+
     const sanitized: SuperFreteConfig = {
       originCep: typeof config.originCep === "string" ? config.originCep.replace(/\D/g, "").slice(0, 8) : undefined,
       height: clampNumber(config.height, 0, 200),
@@ -308,13 +330,15 @@ export async function saveSuperFreteConfigAction(config: SuperFreteConfig): Prom
         : undefined,
     }
 
-    const { error } = await getAdminClient()
+    const environment = resolveSuperFreteEnvironment(config.environment, existingConfig.environment)
+
+    const { error } = await supabase
       .from("partner_integrations")
       .upsert(
         {
           partner_id: ctx.partnerId,
           provider_slug: SUPERFRETE_PROVIDER,
-          config: sanitized,
+          config: { ...existingConfig, ...sanitized, environment },
         },
         { onConflict: "partner_id,provider_slug" },
       )
@@ -351,7 +375,10 @@ async function setupSuperFreteWebhookInternal(
 
   try {
     const webhookSecret = decrypt(webhookSecretEncrypted, "superfrete")
-    const client = createSuperFreteClient(token)
+    const supabase = getAdminClient()
+    const integration = await getSuperFreteIntegration(supabase, partnerId)
+    const environment = resolveSuperFreteEnvironment((integration?.config as SuperFreteConfig)?.environment)
+    const client = createSuperFreteClient(token, undefined, environment)
 
     // Check if a webhook is already registered
     const existingWebhooks = await client.listWebhooks()

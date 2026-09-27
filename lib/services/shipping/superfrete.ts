@@ -1,10 +1,21 @@
 import { createHash, createHmac } from "crypto"
 
-const SUPERFRETE_BASE_URL =
-  process.env.SUPERFRETE_BASE_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "https://api.superfrete.com"
-    : "https://sandbox.superfrete.com")
+export type SuperFreteEnvironment = "sandbox" | "production"
+
+const SUPERFRETE_ENV_URLS: Record<SuperFreteEnvironment, string> = {
+  sandbox: "https://sandbox.superfrete.com",
+  production: "https://api.superfrete.com",
+}
+
+export function superfreteBaseUrl(environment?: SuperFreteEnvironment): string {
+  if (process.env.SUPERFRETE_BASE_URL) {
+    return process.env.SUPERFRETE_BASE_URL.replace(/\/+$/, "")
+  }
+  if (environment === "sandbox" || environment === "production") {
+    return SUPERFRETE_ENV_URLS[environment]
+  }
+  return SUPERFRETE_ENV_URLS[process.env.NODE_ENV === "production" ? "production" : "sandbox"]
+}
 
 export const USER_AGENT_TEMPLATE = (email?: string) =>
   email ? `Dudit/1.0 (${email})` : "Dudit/1.0 (integracao@superfrete.com)"
@@ -194,7 +205,11 @@ export interface SuperFreteCreateLabelParams {
 }
 
 class SuperFreteClient {
-  constructor(private token: string, private userEmail?: string) {}
+  constructor(
+    private token: string,
+    private userEmail?: string,
+    private environment?: SuperFreteEnvironment,
+  ) {}
 
   private get userAgent(): string {
     return USER_AGENT_TEMPLATE(this.userEmail)
@@ -205,7 +220,7 @@ class SuperFreteClient {
     path: string,
     body?: unknown,
   ): Promise<unknown> {
-    const url = `${SUPERFRETE_BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
+    const url = `${superfreteBaseUrl(this.environment)}/${path.replace(/^\/+/, "")}`
     let res: Response
     try {
       res = await fetch(url, {
@@ -332,8 +347,12 @@ class SuperFreteClient {
   }
 }
 
-export function createSuperFreteClient(token: string, userEmail?: string): SuperFreteClient {
-  return new SuperFreteClient(token, userEmail)
+export function createSuperFreteClient(
+  token: string,
+  userEmail?: string,
+  environment?: SuperFreteEnvironment,
+): SuperFreteClient {
+  return new SuperFreteClient(token, userEmail, environment)
 }
 
 export function verifySuperFreteWebhookSignature(
