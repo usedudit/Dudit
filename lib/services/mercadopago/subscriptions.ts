@@ -16,6 +16,7 @@ import {
   invalidatePartnerPlanCache,
 } from "@/lib/services/subscription.service"
 import type { Plan } from "@/lib/services/subscription.service"
+import { planTierIndex } from "@/lib/subscription/plan-tier"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -555,7 +556,7 @@ export async function updateMpSubscription(
   }
 
   const currentPlan = currentSub.plan
-  const isUpgrade = newPlan.price > currentPlan.price
+  const isUpgrade = planTierIndex(newPlan.slug) > planTierIndex(currentPlan.slug)
 
   if (isUpgrade) {
     // ── UPGRADE: Cancel current + create new immediately ──

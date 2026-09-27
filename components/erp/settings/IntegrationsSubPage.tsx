@@ -573,16 +573,16 @@ export const IntegrationsSubPage = ({
 
     const SF_KNOW_MORE_STEPS: { title: string; description?: string; list?: string[] }[] = [
         {
-            title: "O que é o SuperFrete?",
-            description: "O SuperFrete é uma plataforma de logística que permite gerar etiquetas de envio com Correios, JadLog, Loggi, J&T e outras transportadoras.\n\nCom ele, você oferece frete grátis ou calculado automaticamente na hora do checkout.\n\nTudo isso com diversas transportadoras em um só lugar.",
+            title: "O que é a SuperFrete?",
+            description: "A SuperFrete é uma plataforma de logística que permite gerar etiquetas de envio com Correios, JadLog, Loggi, J&T e outras transportadoras.\n\nCom ela, você oferece frete grátis ou calculado automaticamente na hora do checkout.\n\nTudo isso com diversas transportadoras em um só lugar.",
         },
         {
             title: "Como funciona?",
-            description: "A integração é rápida e prática. Conecte sua conta informando o token de API gerado no painel do SuperFrete.\n\nDepois, configure o CEP de origem e as dimensões padrão dos seus produtos.\n\nAs etiquetas são geradas automaticamente quando o cliente finaliza a compra.",
+            description: "A integração é rápida e prática. Conecte sua conta informando o token de API gerado no painel da SuperFrete.\n\nDepois, configure o CEP de origem e as dimensões padrão dos seus produtos.\n\nAs etiquetas são geradas automaticamente quando o cliente finaliza a compra.",
         },
         {
             title: "Como configurar?",
-            description: "Clique em Conectar e cole o token de API gerado no painel do SuperFrete (sandbox.superfrete.com ou web.superfrete.com).\n\nEscolha entre sandbox (teste) e produção, e configure o CEP de origem e dimensões padrão para que os fretes sejam calculados corretamente.",
+            description: "Clique em Conectar e cole o token de API gerado no painel da SuperFrete (sandbox.superfrete.com ou web.superfrete.com).\n\nEscolha entre sandbox (teste) e produção, e configure o CEP de origem e dimensões padrão para que os fretes sejam calculados corretamente.",
         },
     ]
 
@@ -869,17 +869,15 @@ export const IntegrationsSubPage = ({
                                                     <Badge variant="gray"></Badge>
                                                 )}
                                             </div>
-                                            {(sfStatus?.connected || superfreteConnected) && (
-                                                <a
-                                                    href="https://www.superfrete.com.br"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-brand-blue dark:text-blue-400 hover:underline w-max mt-1 font-medium block"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    superfrete.com.br
-                                                </a>
-                                            )}
+                                            <a
+                                                href="https://www.superfrete.com.br"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-brand-green hover:underline w-max mt-1 font-medium block"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                superfrete.com.br
+                                            </a>
                                         </div>
                                     </div>
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
@@ -1188,7 +1186,7 @@ export const IntegrationsSubPage = ({
                 >
                     <div className="flex flex-col min-h-[500px]">
                         <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
-                            <img src="https://img.dudit.com.br/static/icons/brands/SuperfreteLogo.png" alt="SuperFrete" className="w-full h-full object-contain" />
+                            <img src="https://img.dudit.com.br/static/icons/brands/SuperfreteLogo.png" alt="" className="w-full h-full object-contain" />
                         </div>
 
                         <div className="p-8 flex-1 flex flex-col">

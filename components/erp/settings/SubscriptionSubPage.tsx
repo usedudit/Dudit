@@ -1097,9 +1097,13 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                     }
                 >
                     <div className="space-y-4 py-2">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma rápida e segura.
-                        </p>
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                            imageAlt="Mercado Pago"
+                            title="Pagamento Seguro via Mercado Pago"
+                            subtitle="Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit."
+                        />
 
                         <Input
                             label="Email de faturamento"
@@ -1118,12 +1122,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 <AlertTriangleIcon size={14} className="shrink-0" /> {emailError}
                             </p>
                         )}
-
-                        <InfoCard
-                            color="blue"
-                            title="Pagamento Seguro via Mercado Pago"
-                            message="Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit."
-                        />
                     </div>
                 </DefaultModal>
 
