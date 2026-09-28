@@ -33,7 +33,7 @@ export interface CommunityVideoItem {
   published_at: string | null
   created_at: string
   linked_collection_short_id?: string | null
-   partner?: { name?: string; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
+   partner?: { name?: string; store_image_url?: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
 }
 
 export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
