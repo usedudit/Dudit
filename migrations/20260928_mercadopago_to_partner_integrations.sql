@@ -25,6 +25,11 @@
 -- integration row, and statement 2 only copies secrets forward when partners
 -- holds a NEWER token (compared by expiry). Once the new code is live, partners
 -- stops being written and statement 2 becomes a no-op.
+--
+-- SUPERSEDED by 20260930_drop_mercadopago_legacy_columns.sql: after that file
+-- this script errors on purpose (the partners.mp_* columns it reads are gone).
+-- Run 20260928 + 20260929 BEFORE deploying the build that dropped the
+-- dual-write, then 20260930.
 -- ============================================================================
 
 INSERT INTO public.integration_providers (slug, category, name)

@@ -17,6 +17,11 @@
 --
 -- Never touches secrets: access_token_encrypted, credentials and metadata are
 -- owned by the integration row since 20260928 and are left untouched here.
+--
+-- MUST RUN BEFORE the build that removed the dual-write goes live: after it,
+-- partners.mp_* is frozen, so this file can no longer tell an old disconnect
+-- apart from a new connect and is unsafe to run (it would revert one of them).
+-- 20260930_drop_mercadopago_legacy_columns.sql drops the columns afterwards.
 -- ============================================================================
 
 -- ─── Connected: mirror the connection state onto the integration row ────────

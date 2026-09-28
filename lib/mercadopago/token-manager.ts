@@ -151,31 +151,6 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
             // Even if update fails, we can still return the new token for this request to succeed and not block the user.
         }
 
-        // Status fields are still read from partners (legacy path) until the
-        // follow-up migration moves them into partner_integrations.config.
-        const legacyStatusPayload: Record<string, unknown> = {
-            mp_token_expires_at: newExpiresAt?.toISOString() ?? null,
-        }
-        if (typeof tokenData.live_mode === "boolean") {
-            legacyStatusPayload.mp_live_mode = tokenData.live_mode
-        }
-        if (tokenData.public_key) {
-            legacyStatusPayload.mp_public_key = tokenData.public_key
-        }
-
-        const { error: legacyStatusError } = await supabase
-            .from("partners")
-            .update(legacyStatusPayload)
-            .eq("id", partnerId)
-
-        if (legacyStatusError) {
-            console.error({
-                event: "mercadopago_status_update_failed",
-                partnerId,
-                error: legacyStatusError.message
-            })
-        }
-
         return tokenData.access_token
 
     } catch (err) {

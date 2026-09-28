@@ -102,25 +102,6 @@ export async function disconnectMercadoPagoAction() {
     return { error: error.message }
   }
 
-  // Dual-write: partners keeps the legacy columns in sync so the previous
-  // build can still be deployed over this one (see the rollback script).
-  const { error: statusError } = await supabase
-    .from("partners")
-    .update({
-      mp_user_id: null,
-      mp_access_token_encrypted: null,
-      mp_refresh_token_encrypted: null,
-      mp_public_key: null,
-      mp_live_mode: null,
-      mp_token_expires_at: null,
-      mp_connected_at: null,
-    })
-    .eq("id", ctx.partnerId)
-
-  if (statusError) {
-    return { error: statusError.message }
-  }
-
   await supabase
     .from("finance_accounts")
     .update({
@@ -199,6 +180,7 @@ export async function refreshMercadoPagoTokenAction() {
 
   const ctx = await getCurrentPartnerContext()
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
+
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
   const { data: partner } = await supabase.from("partners").select("id").eq("id", ctx.partnerId).single()
@@ -267,13 +249,6 @@ export async function refreshMercadoPagoTokenAction() {
       return { error: error.message }
     }
 
-    // Status fields are still the read path for the app; they move into
-    // partner_integrations.config in the follow-up migration.
-    await supabase
-      .from("partners")
-      .update({ mp_token_expires_at: expiresAt?.toISOString() })
-      .eq("id", partner.id)
-
     revalidateTag(`mp-status-${partner.id}`, "max")
     revalidatePath("/erp/configuracoes")
     return { success: true }
@@ -291,7 +266,6 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
   await requireRateLimit(RateLimitCategory.PAYMENT)
 
   const user = await requireUser()
-  const supabase = await getSupabaseServerClient()
 
   const ctx = await getCurrentPartnerContext()
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
@@ -323,17 +297,6 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
 
   if (error) {
     return { error: error.message }
-  }
-
-  // Dual-write: partners keeps the legacy column until it is dropped, so the
-  // previous build can still be deployed over this one.
-  const { error: legacyError } = await supabase
-    .from("partners")
-    .update({ mp_accepted_payment_methods: sanitized })
-    .eq("id", ctx.partnerId)
-
-  if (legacyError) {
-    return { error: legacyError.message }
   }
 
   revalidateTag(`mp-status-${ctx.partnerId}`, "max")

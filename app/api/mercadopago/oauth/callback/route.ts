@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error")
   const errorDescription = searchParams.get("error_description")
 
-  // ✅ BASE URL SEGURA (sem depender do request)
+  // ✅ BASE URL SEGURA (usa APP_URL em runtime, não NEXT_PUBLIC_APP_URL que é inlined no build)
   const appUrl = normalizeBaseUrl(
-    process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+    process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
   )
 
   if (error) {
@@ -156,6 +156,10 @@ export async function GET(request: NextRequest) {
         event: "oauth_token_exchange_failed",
         status: tokenResponse.status,
         code: errorData?.error,
+        error_description: errorData?.error_description,
+        error_data: errorData,
+        redirect_uri: redirectUri,
+        client_id: process.env.MP_CLIENT_ID,
       })
 
       return NextResponse.redirect(
@@ -233,26 +237,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Status fields below are still the read path for the app; they move into
-    // partner_integrations.config in the follow-up migration.
-    const { error: updateError } = await supabase
-      .from("partners")
-      .update({
-        mp_user_id: mpUserId,
-        mp_public_key: publicKey,
-        mp_live_mode: tokenData.live_mode ?? null,
-        mp_token_expires_at: expiresAt?.toISOString(),
-        mp_connected_at: connectedAt,
-      })
-      .eq("id", partnerId)
-
-    if (updateError) {
-      console.error("Error saving MP tokens:", updateError)
-
-      return NextResponse.redirect(
-        `${appUrl}/erp/configuracoes?mp_error=save_failed`
-      )
-    }
+    // Status fields (mp_user_id, mp_public_key, mp_live_mode, mp_connected_at,
+    // mp_token_expires_at) now live only in partner_integrations: status,
+    // account_id, connected_at, config and metadata above.
 
     // Ensure dedicated Mercado Pago finance account exists and is locked while connected.
     let { data: existingMpAccount } = await supabase

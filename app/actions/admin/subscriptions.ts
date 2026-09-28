@@ -253,24 +253,6 @@ export async function forceCancelSubscription(
         return { success: false, error: integrationError.message }
     }
 
-    // Dual-write: partners keeps the legacy columns in sync so the previous
-    // build can still be deployed over this one (see the rollback script).
-    const { error: updateError } = await supabase
-        .from("partners")
-        .update({
-            mp_user_id: null,
-            mp_access_token_encrypted: null,
-            mp_refresh_token_encrypted: null,
-            mp_public_key: null,
-            mp_token_expires_at: null,
-            mp_connected_at: null,
-        })
-        .eq("id", partnerId)
-
-    if (updateError) {
-        return { success: false, error: updateError.message }
-    }
-
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.SUBSCRIPTION_CANCEL,

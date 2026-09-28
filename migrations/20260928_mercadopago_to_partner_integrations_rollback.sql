@@ -1,13 +1,20 @@
 -- ============================================================================
 -- ROLLBACK for 20260928_mercadopago_to_partner_integrations.sql
 --
+-- *** OBSOLETE after 20260930_drop_mercadopago_legacy_columns.sql ***
+-- The partners.mp_* columns this script writes no longer exist, so it fails
+-- by design. Rolling back is only possible before that drop: re-deploy the
+-- previous build and re-run 20260928 + 20260929 to put partner_integrations
+-- back in sync. After the drop, restoring a connection means reconnecting
+-- Mercado Pago.
+--
 -- Restores the pre-migration state of the Mercado Pago columns on partners so
 -- that an older application build (which reads partners.mp_*) keeps working.
 -- Secrets are copied verbatim: encryption context is identical
 -- (cryptoService "mercadopago" == provider slug), no re-encryption needed.
 --
 -- Run this ONLY when rolling the application back to a build that predates the
--- partner_integrations read path.
+-- partner_integrations read path AND before 20260930 has been applied.
 -- ============================================================================
 
 -- Connections: restore every mp_* field from the integration row.
