@@ -6,6 +6,7 @@ import Portal from "@/components/Portal"
 import { XIcon, SparklesIcon, CheckIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
+import { useModalLayer } from "@/lib/modal-stack"
 import { Button } from "@/components/reusable/Button"
 
 interface NcmSuggestion {
@@ -76,6 +77,9 @@ export default function NcmSelectionModal({
   const [isAnimating, setIsAnimating] = useState(false)
   const isMobile = useMediaQuery("(max-width: 1023px)")
   const safeSuggestions = suggestions || []
+
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   useEffect(() => {
     if (isOpen) {
@@ -198,7 +202,7 @@ export default function NcmSelectionModal({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ zIndex }}>
         <div
           className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
           onClick={handleClose}

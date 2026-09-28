@@ -37,6 +37,7 @@ import {
 import { DepositReceiptsSection } from '@/components/erp/payments/shared/DepositReceiptsSection';
 import { BalancePaymentCollector } from '@/components/erp/payments/BalancePaymentCollector';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
+import { useModalLayer } from '@/lib/modal-stack';
 import type { PaymentBreakdownLeg } from '@/components/erp/payments/shared/payment-utils';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { ReceiptScallopEdge } from '../POSComponents';
@@ -169,6 +170,10 @@ export default function PaymentStatusModal({
     onSuccess
 }: PaymentStatusModalProps) {
     const { toast } = useToast();
+
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen);
+
     const [isAnimating, setIsAnimating] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
     const [errorMessage, setErrorMessage] = useState('');
@@ -510,7 +515,7 @@ export default function PaymentStatusModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ zIndex }}>
             <div
                 className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
                 onClick={handleSafeClose}

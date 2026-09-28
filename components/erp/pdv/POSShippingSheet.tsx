@@ -10,6 +10,7 @@ import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { useModalLayer } from "@/lib/modal-stack"
 
 type ShippingCustomerDetails = {
     id: string
@@ -91,6 +92,7 @@ export default function POSShippingSheet({
     onApply,
 }: POSShippingSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
     const [shippingInput, setShippingInput] = useState(Number(currentShippingFee || 0))
     const [shippingFree, setShippingFree] = useState(currentShippingFee <= 0)
     const [isCustomShipping, setIsCustomShipping] = useState(false)
@@ -116,6 +118,10 @@ export default function POSShippingSheet({
     const [longitude, setLongitude] = useState<number | null>(null)
 
     const [useOrderAddress, setUseOrderAddress] = useState(false)
+
+    // z-index dinâmico: cada sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+    const addressZIndex = useModalLayer(isAddressSheetOpen)
 
     const hasOrderAddress = !!(deliveryAddress && (deliveryAddress.street || deliveryAddress.zipCode))
     const activeAddress = (useOrderAddress && hasOrderAddress) ? deliveryAddress : customerDetails?.address
@@ -524,6 +530,7 @@ export default function POSShippingSheet({
             <Portal>
                 <div
                     className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex }}
                     onClick={onClose}
                 >
                     <div
@@ -542,6 +549,7 @@ export default function POSShippingSheet({
             <Portal>
                 <div
                     className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isAddressSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex: addressZIndex }}
                     onClick={handleCloseAddressSheet}
                 >
                     <div

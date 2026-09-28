@@ -16,6 +16,7 @@ import { ShareModal } from "./ShareModal"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
+import { useModalLayer } from "@/lib/modal-stack"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -65,6 +66,9 @@ export function PlanDetailsPageClient({
     const lightboxJustOpened = useRef(false)
     const touchStartX = useRef(0)
     const galleryContainerRef = useRef<HTMLDivElement>(null)
+
+    // z-index dinâmico: o viewer de imagens em tela cheia abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isLightboxOpen)
 
     const zoomOriginX = useMotionValue(50)
     const zoomOriginY = useMotionValue(50)
@@ -680,6 +684,7 @@ export function PlanDetailsPageClient({
                                 exit={{ opacity: 0, scale: 0.98 }}
                                 transition={{ duration: 0.25, ease: "easeOut" }}
                                 className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
+                                style={{ zIndex }}
                             >
                                 {/* Mobile top bar */}
                                 <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">

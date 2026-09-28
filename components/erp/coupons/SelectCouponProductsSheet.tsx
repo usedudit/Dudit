@@ -6,6 +6,7 @@ import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils/formatters"
 
@@ -52,6 +53,9 @@ export default function SelectCouponProductsSheet({
   const [search, setSearch] = useState("")
   const [tempSelected, setTempSelected] = useState<Set<string>>(new Set())
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   useEffect(() => {
     if (isOpen) {
@@ -226,6 +230,7 @@ export default function SelectCouponProductsSheet({
     <Portal>
       <Div
         className={`fixed inset-0 z-[80] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        style={{ zIndex }}
         onClick={onClose}
       >
         <Div

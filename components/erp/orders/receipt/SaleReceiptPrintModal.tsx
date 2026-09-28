@@ -6,6 +6,7 @@ import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem, RadioButton } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { useStore } from "@/lib/store-context"
 import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
@@ -32,6 +33,9 @@ export type SaleReceiptPrintModalProps = {
 export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: SaleReceiptPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { selectedStore } = useStore()
+
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     const [activeTab, setActiveTab] = useState("Opções")
     const [format, setFormat] = useState<SaleReceiptFormat>("thermal")
@@ -157,6 +161,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                 {isOpen && (
                     <motion.div
                         className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+                        style={{ zIndex }}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

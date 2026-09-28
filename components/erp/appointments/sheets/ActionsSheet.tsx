@@ -15,6 +15,7 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, SearchIcon, CalendarIcon } from '@/lib/icons';
 import { useRef } from 'react';
+import { useModalLayer, useMountedModalLayer } from '@/lib/modal-stack';
 
 const emojis = ["⏰", "☕", "🍴", "🍽️", "🤝", "💻", "📞", "📅", "🚫", "💤", "🚗", "🚶", "🏢", "🏠", "⚠️", "💡", "🛠️", "🩺", "✂️", "🧘", "🚿", "🏋️", "🍕", "🧴", "🧼"];
 
@@ -141,6 +142,11 @@ export const AddUnavailableSheet = ({
     // TYPE DELETION STATE
     const [isDeleteTypeModalOpen, setIsDeleteTypeModalOpen] = useState(false);
     const [typeToDelete, setTypeToDelete] = useState<any>(null);
+
+    // z-index dinâmico: cada camada abre acima de todas as que já estavam abertas.
+    // A sheet principal só é renderizada enquanto está aberta → camada montada.
+    const mainZIndex = useMountedModalLayer();
+    const newTypeZIndex = useModalLayer(isNewTypeSheetOpen);
 
     // Horizontal Scroll Ref
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -546,6 +552,7 @@ export const AddUnavailableSheet = ({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 bg-black/50"
+                    style={{ zIndex: mainZIndex }}
                     onClick={onClose}
                 >
                     <motion.div
@@ -554,6 +561,7 @@ export const AddUnavailableSheet = ({
                         exit={{ x: '100%' }}
                         transition={{ type: "spring", stiffness: 400, damping: 40 }}
                         className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                        style={{ zIndex: mainZIndex }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {SheetBody}

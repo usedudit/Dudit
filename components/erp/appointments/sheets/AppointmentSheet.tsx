@@ -28,6 +28,7 @@ import { createServiceAction } from '@/app/actions/erp/servicos';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { useCSRFToken } from '@/hooks/use-csrf-token';
 import { normalizeOpeningHours } from '@/lib/utils/opening-hours';
+import { useModalLayer, useMountedModalLayer } from '@/lib/modal-stack';
 
 export const AppointmentSheet = ({
     onClose,
@@ -469,6 +470,17 @@ export const AppointmentSheet = ({
     const [serviceNameError, setServiceNameError] = useState<string | null>(null);
     const [servicePriceError, setServicePriceError] = useState<string | null>(null);
     const [serviceDurationError, setServiceDurationError] = useState<string | null>(null);
+
+    // z-index dinâmico: cada camada abre acima de todas as que já estavam abertas.
+    // O modal principal só é renderizado enquanto está aberto → camada montada.
+    const mainZIndex = useMountedModalLayer();
+    const newServiceZIndex = useModalLayer(isNewServiceSheetOpen);
+    const editServiceZIndex = useModalLayer(isEditServiceOpen);
+    const newClientZIndex = useModalLayer(isNewClientOpen);
+    const clientOverlayZIndex = useModalLayer(isClientOverlayOpen);
+    const historyOverlayZIndex = useModalLayer(isHistoryOverlayOpen);
+    const notesOverlayZIndex = useModalLayer(isNotesOverlayOpen);
+    const recurrenceOverlayZIndex = useModalLayer(isRecurrenceOverlayOpen);
 
     const handleCreateService = async (payload: { name: string; price: number; duration: number }) => {
         if (!partnerId) {
@@ -3230,6 +3242,7 @@ export const AppointmentSheet = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 bg-black/50"
+                        style={{ zIndex: mainZIndex }}
                         onClick={handleCloseAttempt}
                     >
                         <motion.div
@@ -3265,6 +3278,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: newServiceZIndex }}
                                 onClick={() => { if (!isCreatingService) setIsNewServiceSheetOpen(false); }}
                             >
                                 <motion.div
@@ -3296,6 +3310,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: editServiceZIndex }}
                                 onClick={() => setIsEditServiceOpen(false)}
                             >
                                 <motion.div
@@ -3327,6 +3342,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: newClientZIndex }}
                                 onClick={() => { if (!isCreatingCustomer) setIsNewClientOpen(false); }}
                             >
                                 <motion.div
@@ -3358,6 +3374,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: clientOverlayZIndex }}
                                 onClick={() => setIsClientOverlayOpen(false)}
                             >
                                 <motion.div
@@ -3389,6 +3406,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: historyOverlayZIndex }}
                                 onClick={() => setIsHistoryOverlayOpen(false)}
                             >
                                 <motion.div
@@ -3420,6 +3438,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: notesOverlayZIndex }}
                                 onClick={() => setIsNotesOverlayOpen(false)}
                             >
                                 <motion.div
@@ -3451,6 +3470,7 @@ export const AppointmentSheet = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 z-[60] bg-black/50"
+                                style={{ zIndex: recurrenceOverlayZIndex }}
                                 onClick={() => setIsRecurrenceOverlayOpen(false)}
                             >
                                 <motion.div

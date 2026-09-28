@@ -1,12 +1,14 @@
 "use client"
 
-import React, { type ReactNode } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import React, { useEffect, useState, type ReactNode } from "react"
+import { motion, AnimatePresence, useMotionValue } from "framer-motion"
 import Portal from "@/components/Portal"
 import { XIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { Button } from "@/components/reusable"
 import { cn } from "@/lib/utils"
+import { useModalLayer } from "@/lib/modal-stack"
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss"
 
 interface DefaultModalProps {
     isOpen: boolean
@@ -39,6 +41,23 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
         onClose()
     }
 
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
+    // Off-screen inicial da variante mobile (sheet que sobe de baixo).
+    const [initialY, setInitialY] = useState(() =>
+        typeof window !== "undefined" ? window.innerHeight : 800
+    )
+
+    useEffect(() => {
+        setInitialY(window.innerHeight)
+    }, [])
+
+    const y = useMotionValue(initialY)
+
+    // Arrastar pelo handle para fechar (só na variante mobile).
+    const swipe = useSwipeToDismiss({ y, onDismiss: handleClose, armKey: isOpen })
+
     const maxWidthClasses = {
         sm: "max-w-sm",
         md: "max-w-md",
@@ -59,6 +78,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                             "fixed inset-0 z-[110] flex p-0 lg:p-4",
                             isMobile ? "items-end" : "items-center justify-center"
                         )}
+                        style={{ zIndex }}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -75,12 +95,17 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                                     "relative bg-white dark:bg-dark-surface shadow-xl w-full flex flex-col overflow-hidden rounded-t-3xl max-h-[85vh]",
                                     className
                                 )}
-                                initial={{ y: "100%" }}
+                                style={{ y }}
+                                initial={{ y: initialY }}
                                 animate={{ y: 0 }}
-                                exit={{ y: "100%" }}
+                                exit={{ y: initialY }}
                                 transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                                {...swipe.layerProps}
                             >
-                                <div className="shrink-0 flex justify-center pt-3 pb-1">
+                                <div
+                                    {...swipe.handleProps}
+                                    className="shrink-0 flex justify-center pt-3 pb-1 cursor-grab active:cursor-grab select-none touch-none"
+                                >
                                     <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
                                 </div>
 

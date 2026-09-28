@@ -9,6 +9,7 @@ import {
     linkProductSuppliersBatchAction,
 } from "@/app/actions/erp/products"
 import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
+import BottomSheet from "@/components/BottomSheet"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatUnit } from "@/lib/utils"
@@ -378,6 +379,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                 return
             }
             setSelectedSupplierId(id)
+            setPurchasesPage(1)
             if (productId) {
                 loadOverview(id, 1)
             }
@@ -551,6 +553,151 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     // Check if side panel should be shown: only when a supplier is selected and not in mobile/tablet mode
     const showSidePanel = !isTabletOrMobile && Boolean(selectedSupplier)
 
+    // On tablet/mobile the details are shown inside a BottomSheet instead of the side panel
+    const showDetailsSheet = isTabletOrMobile && Boolean(selectedSupplier)
+
+    const handleCloseDetails = useCallback(() => setSelectedSupplierId(null), [])
+
+    // Keeps the last selected supplier around so the BottomSheet content stays
+    // visible while the close animation runs
+    const lastSelectedSupplierRef = useRef<ProductSupplierWithDetails | null>(null)
+    useEffect(() => {
+        if (selectedSupplier) {
+            lastSelectedSupplierRef.current = selectedSupplier
+        }
+    }, [selectedSupplier])
+    const displaySupplier = selectedSupplier || lastSelectedSupplierRef.current
+
+    // Details content (SidebarCard on desktop / FormSection on tablet-mobile)
+    // shared between the desktop side panel and the mobile BottomSheet
+    const detailsContent = displaySupplier ? (
+        <>
+            {/* Última Compra */}
+            <SidebarCard hasSeparator title="Última Compra"
+                headerRight={
+                    <button
+                        onClick={handleCloseDetails}
+                        className="p-1 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text transition-colors"
+                        title="Fechar detalhes"
+                        aria-label="Fechar detalhes"
+                    >
+                        <XIcon size={16} />
+                    </button>
+                }
+            >
+                <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
+                    <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
+                        <Package size={18} className="text-brand-green" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {displaySupplier.supplier_name}
+                        </p>
+                        <p className="text-xs text-brand-inactive-text truncate">
+                            {displaySupplier.last_purchase_date
+                                ? new Date(displaySupplier.last_purchase_date).toLocaleDateString("pt-BR")
+                                : "Nenhuma compra registrada"}
+                        </p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Último Custo</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                            {displaySupplier.last_purchase_price != null
+                                ? formatCurrency(displaySupplier.last_purchase_price)
+                                : displaySupplier.cost_price != null
+                                ? formatCurrency(displaySupplier.cost_price)
+                                : "-"}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-brand-inactive-text font-medium">Custo Atual</p>
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                            {displaySupplier.cost_price != null
+                                ? formatCurrency(displaySupplier.cost_price)
+                                : "-"}
+                        </p>
+                    </div>
+                </div>
+            </SidebarCard>
+
+            {/* Histórico de Custos */}
+            <SidebarCard hasSeparator title="Histórico de Custos">
+                {costHistoryLoading ? (
+                    <div className="flex justify-center py-4">
+                        <Spinner size={20} />
+                    </div>
+                ) : costHistory.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-8">
+                        <IconPlaceholder
+                            icon={ClockIcon}
+                            title="Nenhum histórico encontrado"
+                            subtitle="Não foram encontrados eventos para este fornecedor."
+                        />
+                    </div>
+                ) : (
+                    <div className="space-y-6 relative">
+                        {costHistory.length > 1 && (
+                            <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                        )}
+                        {costHistory.map((h: any) => (
+                            <TimelineItem
+                                key={h.id}
+                                icon={TagIcon}
+                                time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
+                                title={formatCurrency(h.new_cost)}
+                                subtitle={h.supplier_name}
+                            />
+                        ))}
+                    </div>
+                )}
+            </SidebarCard>
+
+            {/* Compras Recentes */}
+            <SidebarCard hasSeparator title="Compras Recentes">
+                {purchasesLoading ? (
+                    <div className="flex justify-center py-4">
+                        <Spinner size={20} />
+                    </div>
+                ) : purchases.length === 0 ? (
+                    <p className="text-sm text-brand-inactive-text text-center py-4">
+                        Nenhuma compra encontrada
+                    </p>
+                ) : (
+                    <div className="space-y-6 relative">
+                        {purchases.length > 1 && (
+                            <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                        )}
+                        {purchases.map((p: any) => (
+                            <TimelineItem
+                                key={p.id}
+                                icon={Package}
+                                time={new Date(p.date).toLocaleDateString("pt-BR")}
+                                title={p.supplier_name}
+                                subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
+                                    productData?.unit
+                                )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
+                            />
+                        ))}
+                    </div>
+                )}
+                {purchasesTotalPages > 1 && (
+                    <div className="mt-4">
+                        <Pagination
+                            currentPage={purchasesPage}
+                            totalPages={purchasesTotalPages}
+                            onPageChange={(page) => {
+                                setPurchasesPage(page)
+                                loadOverview(displaySupplier.supplier_id, page)
+                            }}
+                        />
+                    </div>
+                )}
+            </SidebarCard>
+        </>
+    ) : null
+
     return (
         <div className="w-full">
             <div className={showSidePanel ? "grid grid-cols-12 gap-y-8 md:gap-y-0" : "w-full"}>
@@ -704,134 +851,21 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                 </div>
 
                 {/* Right Side Panel (Visible ONLY when a supplier is selected on desktop) */}
-                {showSidePanel && selectedSupplier && (
+                {showSidePanel && detailsContent && (
                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-8 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                        {/* Última Compra */}
-                        <SidebarCard hasSeparator title="Última Compra"
-                            headerRight={
-                                <button
-                                    onClick={() => setSelectedSupplierId(null)}
-                                    className="p-1 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text transition-colors"
-                                    title="Fechar detalhes"
-                                    aria-label="Fechar detalhes"
-                                >
-                                    <XIcon size={16} />
-                                </button>
-                            }
-                        >
-                            <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
-                                <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
-                                    <Package size={18} className="text-brand-green" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                        {selectedSupplier.supplier_name}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text truncate">
-                                        {selectedSupplier.last_purchase_date
-                                            ? new Date(selectedSupplier.last_purchase_date).toLocaleDateString("pt-BR")
-                                            : "Nenhuma compra registrada"}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 mt-3">
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text font-medium">Último Custo</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {selectedSupplier.last_purchase_price != null
-                                            ? formatCurrency(selectedSupplier.last_purchase_price)
-                                            : selectedSupplier.cost_price != null
-                                            ? formatCurrency(selectedSupplier.cost_price)
-                                            : "-"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-brand-inactive-text font-medium">Custo Atual</p>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {selectedSupplier.cost_price != null
-                                            ? formatCurrency(selectedSupplier.cost_price)
-                                            : "-"}
-                                    </p>
-                                </div>
-                            </div>
-                        </SidebarCard>
-
-                        {/* Histórico de Custos */}
-                        <SidebarCard hasSeparator title="Histórico de Custos">
-                            {costHistoryLoading ? (
-                                <div className="flex justify-center py-4">
-                                    <Spinner size={20} />
-                                </div>
-                            ) : costHistory.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center text-center py-8">
-                                    <IconPlaceholder
-                                        icon={ClockIcon}
-                                        title="Nenhum histórico encontrado"
-                                        subtitle="Não foram encontrados eventos para este fornecedor."
-                                    />
-                                </div>
-                            ) : (
-                                <div className="space-y-6 relative">
-                                    {costHistory.length > 1 && (
-                                        <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
-                                    )}
-                                    {costHistory.map((h: any) => (
-                                        <TimelineItem
-                                            key={h.id}
-                                            icon={TagIcon}
-                                            time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
-                                            title={formatCurrency(h.new_cost)}
-                                            subtitle={h.supplier_name}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </SidebarCard>
-
-                        {/* Compras Recentes */}
-                        <SidebarCard hasSeparator title="Compras Recentes">
-                            {purchasesLoading ? (
-                                <div className="flex justify-center py-4">
-                                    <Spinner size={20} />
-                                </div>
-                            ) : purchases.length === 0 ? (
-                                <p className="text-sm text-brand-inactive-text text-center py-4">
-                                    Nenhuma compra encontrada
-                                </p>
-                            ) : (
-                                <div className="space-y-6 relative">
-                                    {purchases.length > 1 && (
-                                        <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
-                                    )}
-                                    {purchases.map((p: any) => (
-                                        <TimelineItem
-                                            key={p.id}
-                                            icon={Package}
-                                            time={new Date(p.date).toLocaleDateString("pt-BR")}
-                                            title={p.supplier_name}
-                                            subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
-                                                productData?.unit
-                                            )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            {purchasesTotalPages > 1 && (
-                                <div className="mt-4">
-                                    <Pagination
-                                        currentPage={purchasesPage}
-                                        totalPages={purchasesTotalPages}
-                                        onPageChange={(page) => {
-                                            setPurchasesPage(page)
-                                            loadOverview(selectedSupplierId, page)
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </SidebarCard>
+                        {detailsContent}
                     </div>
                 )}
             </div>
+
+            {/* Supplier details in BottomSheet (tablet/mobile) */}
+            <BottomSheet
+                isOpen={showDetailsSheet}
+                onClose={handleCloseDetails}
+                title={displaySupplier?.supplier_name || "Detalhes do Fornecedor"}
+            >
+                {detailsContent && <div className="pt-1">{detailsContent}</div>}
+            </BottomSheet>
 
             {/* Select Supplier Sheet */}
             <SelectSupplierSheet

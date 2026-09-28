@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
+import { useMountedModalLayer } from "@/lib/modal-stack"
 
 interface AddItemModalProps {
   title: string
@@ -33,6 +34,10 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [promoType, setPromoType] = useState<"percentage" | "fixed">("percentage")
   const [promoValue, setPromoValue] = useState(0)
 
+  // z-index dinâmico: este modal só existe no DOM enquanto está aberto
+  // (não tem prop isOpen — o pai renderiza condicionalmente).
+  const zIndex = useMountedModalLayer()
+
   const handleSave = () => {
     if (type === "promotion") {
       onSave({ name: promoName, type: promoType, value: promoValue })
@@ -45,7 +50,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" style={{ zIndex }}>
       <div className="bg-white dark:bg-dark-surface rounded-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4">{title}</h2>
 

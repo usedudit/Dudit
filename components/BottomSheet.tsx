@@ -2,12 +2,9 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Portal from "@/components/Portal";
-import {
-    motion,
-    AnimatePresence,
-    useMotionValue,
-    animate
-} from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { useModalLayer, useBodyScrollLock } from "@/lib/modal-stack";
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 
 interface BottomSheetProps {
     children: React.ReactNode;
@@ -33,48 +30,30 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     // y=windowHeight → sheet fora da tela (embaixo)
     const y = useMotionValue(windowHeight);
 
+    // z-index dinâmico: esta sheet fica acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen);
+
+    // Trava o scroll do body só enquanto houver sheet aberta (compartilhado
+    // entre várias: fechar uma não destrava a outra que ainda está aberta).
+    useBodyScrollLock(isOpen);
+
     useEffect(() => {
         setWindowHeight(window.innerHeight);
         setIsMounted(true);
     }, []);
 
-    useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = "hidden";
-        } else {
-            document.body.style.overflow = "auto";
-        }
-
-        return () => {
-            document.body.style.overflow = "auto";
-        };
-    }, [isOpen]);
-
-    const maxDrag = windowHeight * 0.4;
-
-    const handleDragEnd = (_: any, info: any) => {
-        const currentY = y.get();
-
-        // Fecha se arrastou mais de 120px pra baixo OU velocidade alta pra baixo
-        // Só considera fechar se o arraste foi deliberado (fora da animação de entrada)
-        if (currentY > 120 || info.velocity.y > 500) {
-            onClose();
-        } else {
-            // Volta pro topo (y=0 = totalmente visível)
-            animate(y, 0, {
-                type: "spring",
-                stiffness: 300,
-                damping: 35
-            });
-        }
-    };
+    // Arrastar pelo handle para fechar (gesto nativo de bottom sheet).
+    const swipe = useSwipeToDismiss({ y, onDismiss: onClose, armKey: isOpen });
 
     return (
         <Portal>
             <AnimatePresence>
 
                 {isOpen && isMounted && (
-                    <div className="fixed inset-0 z-[100] flex items-end pointer-events-none">
+                    <div
+                        className="fixed inset-0 z-[100] flex items-end pointer-events-none"
+                        style={{ zIndex }}
+                    >
 
                         {/* Overlay (backdrop click-to-close) */}
                         <motion.div
@@ -89,12 +68,6 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                         <motion.div
                             ref={sheetRef}
                             style={{ y }}
-                            drag="y"
-                            // Permite arrastar pra baixo livremente (até 40% da tela) para fechar
-                            // Impede arrastar muito pra cima (protege contra scroll acidental pra cima)
-                            dragConstraints={{ top: -10, bottom: maxDrag }}
-                            dragElastic={{ top: 0.05, bottom: 0.8 }}
-                            onDragEnd={handleDragEnd}
                             initial={{ y: windowHeight }}
                             animate={{ y: 0 }}
                             exit={{ y: windowHeight }}
@@ -103,11 +76,15 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                 stiffness: 260,
                                 damping: 30
                             }}
+                            {...swipe.layerProps}
                             className="relative w-full bg-white dark:bg-dark-background rounded-t-3xl shadow-2xl flex flex-col max-h-[90vh] pointer-events-auto"
                         >
 
-                            {/* Handle - área de drag, não permite scroll aqui */}
-                            <div className="shrink-0 p-4 cursor-grab active:cursor-grabbing">
+                            {/* Handle - só aqui inicia o arrasto, o conteúdo rola normal */}
+                            <div
+                                {...swipe.handleProps}
+                                className="shrink-0 p-4 cursor-grab active:cursor-grab select-none touch-none"
+                            >
 
                                 <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full mx-auto mb-3" />
 
@@ -122,7 +99,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                             {/* Conteúdo scrollável - overflow-y-auto cuida do resto */}
                             <div
                                 ref={contentRef}
-                                // onPointerDown para o evento aqui pra não competir com o drag da sheet
+                                // onPointerDown para o evento aqui não subir até a sheet
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
                                 className="flex-1 overflow-y-auto px-4 pb-6 custom-scrollbar"

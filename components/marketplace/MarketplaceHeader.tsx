@@ -25,6 +25,7 @@ import { getCitiesData } from "@/lib/data/cities-loader"
 import { IconPlaceholder } from "../reusable"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
+import { useModalLayer } from "@/lib/modal-stack"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -519,6 +520,11 @@ const Header: React.FC<HeaderProps> = ({
     const showSearchDropdown = isSearchInputFocused && searchValue.length > 0 && filteredSuggestions.length > 0
     const showOverlay = isSearchInputFocused || isUserMenuOpen
 
+    // z-index dinâmico: a busca mobile em tela cheia abre acima de tudo que já estava aberto.
+    // (o backdrop z-[90] fica de propósito ATRÁS do <header> z-[100] — ele escurece a página
+    // enquanto o dropdown de busca/menu está aberto — por isso não recebe z-index dinâmico)
+    const zIndex = useModalLayer(isMobileSearchOpen)
+
     useEffect(() => {
         let ticking = false
 
@@ -886,7 +892,10 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Mobile Full-Screen Search Overlay */}
             {isMobileSearchOpen && (
-                <div className="lg:hidden fixed inset-0 z-[200] bg-white dark:bg-dark-surface flex flex-col">
+                <div
+                    className="lg:hidden fixed inset-0 z-[200] bg-white dark:bg-dark-surface flex flex-col"
+                    style={{ zIndex }}
+                >
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
                         <button
                             onClick={() => {

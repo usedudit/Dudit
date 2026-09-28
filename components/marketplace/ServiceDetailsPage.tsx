@@ -48,6 +48,7 @@ import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
+import { useModalLayer } from "@/lib/modal-stack"
 import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import {
     prepareServiceBookingCheckoutAction,
@@ -195,6 +196,9 @@ export function ServiceDetailsPageClient({
     const zoomScale = useMotionValue(1)
     const smoothScale = useSpring(zoomScale, { stiffness: 180, damping: 22 })
     const transformOrigin = useTransform([zoomOriginX, zoomOriginY], ([x, y]) => `${x}% ${y}%`)
+
+    // z-index dinâmico: o viewer de imagens em tela cheia abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isLightboxOpen)
 
     useEffect(() => {
         if (!service?.id) return
@@ -1963,6 +1967,7 @@ export function ServiceDetailsPageClient({
                             exit={{ opacity: 0, scale: 0.98 }}
                             transition={{ duration: 0.2 }}
                             className="fixed inset-0 z-[9999] bg-black/95 flex flex-col"
+                            style={{ zIndex }}
                         >
                             <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
                                 <button onClick={() => setIsLightboxOpen(false)}

@@ -11,6 +11,7 @@ import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { BoxIcon, XIcon, SearchIcon, FilterIcon, ArrowUpDownIcon, MoneyIcon, InfoIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -45,6 +46,9 @@ type Props = {
 export default function SelectProductVariantSheet({ isOpen, product, onClose, onConfirm }: Props) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { error: notifyError } = useNotification()
+
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     // Variants and Addons detection
     const rawVariants = useMemo<any[]>(() => {
@@ -855,6 +859,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             <Portal>
                 <div
                     className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex }}
                     onClick={onClose}
                 >
                     <div

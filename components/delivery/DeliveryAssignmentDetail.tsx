@@ -21,6 +21,7 @@ import {
 } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
+import { useModalLayer } from "@/lib/modal-stack"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -98,6 +99,12 @@ export default function DeliveryAssignmentDetail({
     const [orderDeliveredMap, setOrderDeliveredMap] = useState<Record<string, boolean>>({})
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<any>(null)
+
+    // z-index dinâmico: a sheet desktop de detalhes do pedido abre acima de
+    // tudo que já estava aberto (a variante mobile usa BottomSheet, que já
+    // registra a própria camada).
+    const orderDetailZIndex = useModalLayer(isOrderDetailSheetOpen && !!selectedOrderForDetail)
+
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     const [activeTab, setActiveTab] = useState("resumo")
@@ -1235,6 +1242,7 @@ export default function DeliveryAssignmentDetail({
                                 {isOpen && (
                                     <motion.div
                                         className="fixed inset-0 z-[110] bg-black/50"
+                                        style={{ zIndex: orderDetailZIndex }}
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}

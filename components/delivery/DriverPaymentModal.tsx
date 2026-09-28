@@ -21,6 +21,7 @@ import { formatCurrency } from "@/lib/utils"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
 import QRCode from "qrcode"
 import { useToast } from "@/components/ui/use-toast"
+import { useModalLayer } from "@/lib/modal-stack"
 
 import type { PartnerPaymentMethod } from "@/components/erp/payments/shared/payment-utils"
 
@@ -107,6 +108,9 @@ export default function DriverPaymentModal({
   const [generatingPix, setGeneratingPix] = useState(false)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   const orderTotal = useMemo(() => Number(order?.total_amount || 0), [order])
   const orderPaid = useMemo(() => Number(order?.paid_amount || 0), [order])
@@ -343,11 +347,13 @@ export default function DriverPaymentModal({
     <>
       <div
         className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
+        style={{ zIndex }}
         onClick={handleSafeClose}
       />
 
       <div
         className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-200 ease-out ${isAnimating ? "opacity-100" : "opacity-0"}`}
+        style={{ zIndex }}
       >
         <div className={`
           relative bg-white dark:bg-dark-surface w-full h-full

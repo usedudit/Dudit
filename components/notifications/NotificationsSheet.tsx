@@ -7,6 +7,7 @@ import { Button } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { NotificationPanel } from "./NotificationPanel"
 import type { NotificationsController } from "@/hooks/use-notifications"
 
@@ -36,6 +37,9 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
   } = notifications
 
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // z-index dinâmico: abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   // Enter-settle guard: a sheet aberta ainda está executando a animação de
   // slide-in (spring ~300-400ms). Um toque/drag nesse janela vence o backdrop
@@ -116,6 +120,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
         {isOpen && (
           <motion.div
             className="fixed inset-0 z-[110] bg-black/50"
+            style={{ zIndex }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

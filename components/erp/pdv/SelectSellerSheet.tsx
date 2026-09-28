@@ -7,6 +7,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import {
   fetchPartnerTeamMembersBucket,
   type PartnerTeamMemberBucketItem,
@@ -38,6 +39,9 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   useEffect(() => {
     if (isOpen) {
@@ -206,6 +210,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
     <Portal>
       <div
         className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        style={{ zIndex }}
         onClick={onClose}
       >
         <div

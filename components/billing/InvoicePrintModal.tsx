@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { downloadPdf } from "@/lib/pdf/download"
 import { toast } from "@/hooks/use-notification"
 import { InvoicePreview } from "./InvoicePreview"
+import { useModalLayer } from "@/lib/modal-stack"
 import type { InvoiceData } from "@/lib/billing/types"
 
 export type InvoicePrintModalProps = {
@@ -19,6 +20,9 @@ export type InvoicePrintModalProps = {
 
 export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: InvoicePrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     const [isVisible, setIsVisible] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
@@ -64,7 +68,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
 
     return (
         <Portal>
-            <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
+            <div className="fixed inset-0 z-[130] flex flex-col bg-black/60" style={{ zIndex }}>
                 <div
                     className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
                         }`}

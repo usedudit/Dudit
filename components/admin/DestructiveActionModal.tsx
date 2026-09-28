@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button, Checkbox } from '@/components/reusable';
+import { useModalLayer } from '@/lib/modal-stack';
 
 interface DestructiveActionModalProps {
     isOpen: boolean;
@@ -30,6 +31,9 @@ const DestructiveActionModal = ({
     const [reason, setReason] = useState('');
     const [isConfirmed, setIsConfirmed] = useState(false);
 
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen);
+
     if (!isOpen) return null;
 
     const handleConfirm = () => {
@@ -41,7 +45,7 @@ const DestructiveActionModal = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" style={{ zIndex }}>
             <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-red-200 dark:border-red-900/30 animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="bg-red-50 dark:bg-red-900/20 p-6 flex items-start gap-4 border-b border-red-100 dark:border-red-900/30">

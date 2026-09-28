@@ -20,6 +20,7 @@ import type {
 } from "@/lib/admin/types"
 import { formatDate } from "@/lib/utils"
 import Pagination from "@/components/reusable/Pagination"
+import { useModalLayer } from "@/lib/modal-stack"
 
 import ModerationList from "./ModerationList"
 
@@ -66,6 +67,9 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
     const [videoToReject, setVideoToReject] = useState<any>(null)
     const [rejectReason, setRejectReason] = useState("")
     const [videoSearch, setVideoSearch] = useState("")
+
+    // z-index dinâmico: o modal de rejeição abre acima de tudo que já estava aberto.
+    const rejectVideoZIndex = useModalLayer(!!videoToReject)
 
     const VIDEO_ITEMS_PER_PAGE = 12
 
@@ -505,7 +509,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
 
             {/* Reject Video Modal */}
             {videoToReject && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setVideoToReject(null); setRejectReason("") }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" style={{ zIndex: rejectVideoZIndex }} onClick={() => { setVideoToReject(null); setRejectReason("") }}>
                     <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Rejeitar vídeo</h3>
                         <p className="text-sm text-brand-inactive-text mb-4">

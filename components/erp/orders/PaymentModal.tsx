@@ -36,6 +36,7 @@ import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from '@/lib/permission-context';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
+import { useModalLayer } from '@/lib/modal-stack';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 import { calculatePaymentAmounts } from '@/lib/payments/calculation';
 
@@ -449,6 +450,10 @@ const PaymentModal = ({
     const userManuallyChangedRef = useRef(false);
     const [installments, setInstallments] = useState<string>('1');
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+
+    // z-index dinâmico: este modal/painel abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen);
+    const receiptZIndex = useModalLayer(isReceiptOpen);
 
     // Payment Status State
     const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
@@ -2577,7 +2582,7 @@ const PaymentModal = ({
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ zIndex }}>
             <div
                 className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
                 onClick={handleSafeClose}
@@ -3859,6 +3864,7 @@ const PaymentModal = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="fixed inset-0 bg-black/60 z-[70] md:hidden"
+                                style={{ zIndex: receiptZIndex }}
                                 onClick={() => setIsReceiptOpen(false)}
                             />
                             <motion.div
@@ -3867,6 +3873,7 @@ const PaymentModal = ({
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                                 className="fixed bottom-0 left-0 right-0 h-[85vh] bg-white dark:bg-dark-surface z-[80] rounded-t-3xl flex flex-col overflow-hidden md:hidden shadow-2xl"
+                                style={{ zIndex: receiptZIndex }}
                             >
                                 <div className="flex justify-between items-center p-6 border-b border-brand-border dark:border-dark-border">
                                     <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>

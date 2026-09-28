@@ -6,6 +6,7 @@ import { XIcon, AlertCircleIcon, CheckCircleIcon, AlertTriangleIcon, InfoIcon } 
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable/Button"
+import { useModalLayer } from "@/lib/modal-stack"
 
 // Tipos de variantes para mudar a cor do ícone/botão
 type AlertVariant = "danger" | "success" | "warning" | "info"
@@ -107,6 +108,9 @@ const AlertModal: React.FC<AlertModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isMobile = useMediaQuery("(max-width: 1023px)")
   const displayMessage = description || message || ""
+
+  // z-index dinâmico: a variante desktop abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   const effectiveVariant = isDestructive ? "danger" : variant || "danger"
   const isConfirmation = !!onConfirm
@@ -229,7 +233,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{ zIndex }}>
         {/* Backdrop com transição de opacidade */}
         <div
           className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"

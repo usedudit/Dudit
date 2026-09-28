@@ -7,6 +7,7 @@ import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { searchSuppliersAction } from "@/app/actions/erp/products"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -41,6 +42,9 @@ export function SupplierSelectorSheet({
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<SupplierResult | null>(null)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   const fetchSuppliers = useCallback(async (term: string) => {
     setLoading(true)
@@ -165,7 +169,7 @@ export function SupplierSelectorSheet({
   return (
     <Portal>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ zIndex }}>
           <div className="absolute inset-0 bg-black/30" onClick={onClose} />
           <div className="relative bg-white dark:bg-dark-surface rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
             {content}

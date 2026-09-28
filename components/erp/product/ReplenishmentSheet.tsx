@@ -6,6 +6,7 @@ import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, Ta
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import {
     getReplenishmentSuggestionsAction,
     getStagnantProductsAction,
@@ -88,6 +89,10 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
     const [isDiscountSheetOpen, setIsDiscountSheetOpen] = useState(false)
     const [promoPriceInput, setPromoPriceInput] = useState<number>(0)
     const [isSavingPromo, setIsSavingPromo] = useState(false)
+
+    // z-index dinâmico: cada sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+    const discountZIndex = useModalLayer(isDiscountSheetOpen)
 
     const fetchSuggestions = useCallback(() => {
         setLoadingSuggestions(true)
@@ -577,6 +582,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 <div
                     className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"
                         }`}
+                    style={{ zIndex }}
                     onClick={onClose}
                 >
                     <div
@@ -597,6 +603,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 <div
                     className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isDiscountSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"
                         }`}
+                    style={{ zIndex: discountZIndex }}
                     onClick={() => setIsDiscountSheetOpen(false)}
                 >
                     <div

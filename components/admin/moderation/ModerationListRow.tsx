@@ -15,6 +15,7 @@ import {
     UserIcon,
 } from "@/lib/icons"
 import { usePartnerTimezone } from "@/lib/store-context"
+import { useModalLayer } from "@/lib/modal-stack"
 import type { ModerationItem } from "@/lib/admin/types"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -237,12 +238,15 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
     currentIndex: number
     onNavigate: (dir: 1 | -1) => void
 }) {
+    // z-index dinâmico: o lightbox abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
     if (!isOpen || images.length === 0) return null
 
     const currentImage = images[currentIndex]
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" style={{ zIndex }} onClick={onClose}>
             <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
                 <img
                     src={currentImage}

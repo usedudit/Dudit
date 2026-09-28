@@ -11,6 +11,7 @@ import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -157,6 +158,10 @@ VariantImageUpload.displayName = "VariantImageUpload"
 const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, product, onSaveSuccess, onSavePendingVariants }) => {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
+
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
     const [isSaving, setIsSaving] = useState(false)
     const [savingStatusText, setSavingStatusText] = useState("Salvando variações...")
     const [variants, setVariants] = useState<VariantCard[]>([
@@ -1184,7 +1189,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
     return (
         <Portal>
-            <div className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={onClose}>
+            <div
+                className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                style={{ zIndex }}
+                onClick={onClose}
+            >
                 <div className={`fixed right-4 top-4 bottom-4 w-full md:w-[850px] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`} onClick={(e) => e.stopPropagation()}>
                     {content}
                 </div>

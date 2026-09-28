@@ -9,6 +9,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { Accordion } from "./Accordion"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { XIcon } from "@/lib/icons"
 import { DATE_PERIOD_PRESETS, EMPTY_DATE_PERIOD, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
@@ -55,6 +56,9 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
 }) => {
     const [localFilters, setLocalFilters] = useState<Record<string, any>>(filters)
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
+    // z-index dinâmico: a variante desktop abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     // Sincroniza estado local ao abrir
     useEffect(() => {
@@ -297,6 +301,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
         <Portal>
             <div
                 className={`fixed inset-0 bg-black/50 ${zIndexClass || "z-50"} transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div

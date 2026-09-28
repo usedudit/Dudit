@@ -6,8 +6,10 @@ import { Button, Input, FormDropdown } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useMotionValue } from "framer-motion"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss"
 
 const RADIUS_OPTIONS = [
     { value: "", label: "Toda a cidade (sem limite)" },
@@ -80,6 +82,23 @@ export function ExplorarFiltersBottomSheet({
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
 }: ExplorarFiltersBottomSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
+    // z-index dinâmico: abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
+    // Off-screen inicial da sheet mobile (sobe de baixo).
+    const [initialY, setInitialY] = useState(() =>
+        typeof window !== "undefined" ? window.innerHeight : 800
+    )
+
+    useEffect(() => {
+        setInitialY(window.innerHeight)
+    }, [])
+
+    const y = useMotionValue(initialY)
+
+    // Arrastar pelo handle para fechar (gesto nativo de bottom sheet).
+    const swipe = useSwipeToDismiss({ y, onDismiss: onClose, armKey: isOpen })
 
     const [draftType, setDraftType] = useState(currentType)
     const [draftCategories, setDraftCategories] = useState<string[]>(selectedCategories)
@@ -346,6 +365,7 @@ export function ExplorarFiltersBottomSheet({
                         <>
                             <motion.div
                                 className="fixed inset-0 z-[100] bg-black/50"
+                                style={{ zIndex }}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
@@ -353,13 +373,18 @@ export function ExplorarFiltersBottomSheet({
                             />
                             <motion.div
                                 className="fixed bottom-0 left-0 right-0 z-[101] bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden rounded-t-3xl max-h-[85vh]"
-                                initial={{ y: "100%" }}
+                                style={{ y }}
+                                initial={{ y: initialY }}
                                 animate={{ y: 0 }}
-                                exit={{ y: "100%" }}
+                                exit={{ y: initialY }}
                                 transition={{ type: "spring", stiffness: 260, damping: 30 }}
                                 onClick={(e) => e.stopPropagation()}
+                                {...swipe.layerProps}
                             >
-                                <div className="shrink-0 flex justify-center pt-3 pb-1">
+                                <div
+                                    {...swipe.handleProps}
+                                    className="shrink-0 flex justify-center pt-3 pb-1 cursor-grab active:cursor-grab select-none touch-none"
+                                >
                                     <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
                                 </div>
                                 <header className="shrink-0 border-b border-brand-border p-6 flex justify-between items-center">
@@ -386,10 +411,12 @@ export function ExplorarFiltersBottomSheet({
                 <>
                     <div
                         className={`fixed inset-0 z-[100] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                        style={{ zIndex }}
                         onClick={onClose}
                     />
                     <div
                         className={`fixed right-4 top-4 bottom-4 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col z-[101] ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                        style={{ zIndex }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <header className="border-b border-brand-border p-6 flex justify-between items-center shrink-0">

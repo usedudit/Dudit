@@ -11,6 +11,7 @@ import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { useNotification } from "@/hooks/use-notification"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { usePermissions } from "@/lib/permission-context"
@@ -98,10 +99,14 @@ function DesktopPOSSheet({
     children: React.ReactNode
     widthClassName?: string
 }) {
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
     return (
         <Portal>
             <div
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div

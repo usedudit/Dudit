@@ -6,6 +6,7 @@ import { Badge, Button, Input, IconPlaceholder, ThreeDotsLoader, Tooltip } from 
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { listCouponsAction } from "@/app/actions/shared/coupons"
 import { formatCurrency } from "@/lib/utils"
 
@@ -51,6 +52,9 @@ const SelectCouponSheet = ({
   const [coupons, setCoupons] = useState<CouponItem[]>([])
   const [loading, setLoading] = useState(false)
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   // Fetch coupons when sheet opens
   const fetchCoupons = useCallback(async () => {
@@ -251,6 +255,7 @@ const SelectCouponSheet = ({
     <Portal>
       <div
         className={`fixed inset-0 z-[80] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        style={{ zIndex }}
         onClick={onClose}
       >
         <div

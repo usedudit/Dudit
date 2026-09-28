@@ -35,6 +35,7 @@ import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
+import { useModalLayer } from "@/lib/modal-stack"
 import { getStoreUrl, getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createCategorySlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -178,6 +179,8 @@ export function ProductDetailsPageClient({
     const [loading, setLoading] = useState(false)
     const [isLightboxOpen, setIsLightboxOpen] = useState(false)
     const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
+    // z-index dinâmico: o viewer de imagens em tela cheia abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isLightboxOpen)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
@@ -2490,6 +2493,7 @@ export function ProductDetailsPageClient({
                                 exit={{ opacity: 0, scale: 0.98 }}
                                 transition={{ duration: 0.25, ease: "easeOut" }}
                                 className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
+                                style={{ zIndex }}
                             >
                                 {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
                                 <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">

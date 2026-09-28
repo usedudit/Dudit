@@ -40,6 +40,7 @@ import { useTransition } from "react"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
+import { useModalLayer } from "@/lib/modal-stack"
 
 const getStatusMeta = (status: string) => {
     switch (status) {
@@ -609,12 +610,15 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
     currentIndex: number
     onNavigate: (dir: 1 | -1) => void
 }) {
+    // z-index dinâmico: o lightbox abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+
     if (!isOpen || images.length === 0) return null
 
     const currentImage = images[currentIndex]
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" style={{ zIndex }} onClick={onClose}>
             <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
                 <img
                     src={currentImage}

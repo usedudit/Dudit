@@ -6,6 +6,7 @@ import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import type { ScopeCategory } from "@/lib/types/coupon"
 
 const Div = (props: any) => React.createElement("div", props)
@@ -47,6 +48,9 @@ export default function SelectCouponCategoriesSheet({
   const [search, setSearch] = useState("")
   const [tempSelected, setTempSelected] = useState<Set<string>>(new Set())
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   useEffect(() => {
     if (isOpen) {

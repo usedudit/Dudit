@@ -6,6 +6,7 @@ import { Button, Input, MoneyInput } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 
 type QuickProductPayload = {
   name: string
@@ -30,6 +31,9 @@ export default function POSQuickProductSheet({
   const [name, setName] = useState("")
   const [price, setPrice] = useState(0)
   const [stockQuantity, setStockQuantity] = useState(0)
+
+  // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   const handleCreate = async () => {
     await onCreate({ name: name.trim(), price, stockQuantity })
@@ -92,6 +96,7 @@ export default function POSQuickProductSheet({
     <Portal>
       <div
         className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        style={{ zIndex }}
         onClick={onClose}
       >
         <div

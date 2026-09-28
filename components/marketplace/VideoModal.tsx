@@ -10,6 +10,7 @@ import { XIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStoreUrl } from "@/lib/utils/url-generator"
+import { useModalLayer } from "@/lib/modal-stack"
 
 interface VideoData {
   id: string
@@ -39,6 +40,9 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const [linkedItem, setLinkedItem] = useState<LinkedItemData | null>(null)
   const [linkedItemLoading, setLinkedItemLoading] = useState(false)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   useEffect(() => {
     setMounted(true)
@@ -110,6 +114,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="fixed inset-0 z-[9999] bg-black select-none overflow-hidden"
+          style={{ zIndex }}
           onClick={onClose}
         >
           {/* Close Button (Top Right) */}

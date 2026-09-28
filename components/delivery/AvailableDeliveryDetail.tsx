@@ -38,6 +38,7 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
+import { useModalLayer } from "@/lib/modal-stack"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
@@ -84,6 +85,12 @@ export default function AvailableDeliveryDetail({
     const [itemsPage, setItemsPage] = useState(1)
     const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<any | null>(null)
     const [isOrderDetailSheetOpen, setIsOrderDetailSheetOpen] = useState(false)
+
+    // z-index dinâmico: a sheet desktop de detalhes do pedido abre acima de
+    // tudo que já estava aberto (a variante mobile usa BottomSheet, que já
+    // registra a própria camada).
+    const orderDetailZIndex = useModalLayer(isOrderDetailSheetOpen && !!selectedOrderForDetail)
+
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     const [isScrolled, setIsScrolled] = useState(false)
@@ -832,6 +839,7 @@ export default function AvailableDeliveryDetail({
                                     {isOpen && (
                                         <motion.div
                                             className="fixed inset-0 z-[110] bg-black/50"
+                                            style={{ zIndex: orderDetailZIndex }}
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}

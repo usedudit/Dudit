@@ -6,6 +6,7 @@ import { Button, Input, FormDropdown, ThreeDotsLoader, FormTextarea, Badge } fro
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { XIcon, ChevronDownIcon, ChevronUpIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
@@ -39,6 +40,9 @@ type Props = {
 export default function QuickStockMovementSheet({ isOpen, product, variant, onClose, onSaveSuccess }: Props) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
+
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     const currentStock = variant ? Number(variant.stock || 0) : Number(product.stock || 0)
     const displayName = product.name + (variant ? ` - ${variant.name}` : '')
@@ -379,6 +383,7 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
         <Portal>
             <div
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div
