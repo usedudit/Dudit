@@ -34,6 +34,7 @@ import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-ful
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 export type MarketplaceCartPageData = {
   itemsByPartner: Record<string, any>
@@ -138,8 +139,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       partners(
         id,
         user_id,
-        mp_user_id,
-        mp_public_key,
+        partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
         is_showcase_active
       )
     `)
@@ -273,7 +273,8 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
     const store = storeId ? storesMap[storeId] || null : null
 
     if (!acc[storeKey]) {
-      const partner = item.partners ? { ...item.partners } : null
+      // mp_* status fields are sourced from partner_integrations.
+      const partner = item.partners ? withMpPartnerFields(item.partners) : null
       if (partner) {
         partner.addresses = partnerAddresses[partnerId] || []
       }
