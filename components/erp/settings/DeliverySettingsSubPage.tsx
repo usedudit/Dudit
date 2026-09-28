@@ -280,24 +280,20 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                             </div>
 
                                             <div className="pt-2">
-                                                <label className="flex items-center gap-3 cursor-pointer select-none">
-                                                    <Checkbox
-                                                        checked={chargeByDistance}
-                                                        onChange={(checked) => {
-                                                            if (!advancedEnabled) {
-                                                                openPlanUpgrade("escalar")
-                                                                return
-                                                            }
-                                                            setChargeByDistance(Boolean(checked))
-                                                        }}
-                                                    />
-                                                    <span className="flex items-center gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        Cobrar por quilometragem adicional
-                                                        {!advancedEnabled && (
-                                                            <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                                        )}
-                                                    </span>
-                                                </label>
+                                                <Checkbox
+                                                    label="Cobrar por quilometragem adicional"
+                                                    checked={chargeByDistance}
+                                                    onChange={(checked) => {
+                                                        if (!advancedEnabled) {
+                                                            openPlanUpgrade("escalar")
+                                                            return
+                                                        }
+                                                        setChargeByDistance(Boolean(checked))
+                                                    }}
+                                                />
+                                                {!advancedEnabled && (
+                                                    <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                )}
                                             </div>
 
                                             {chargeByDistance && (

@@ -194,12 +194,33 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
         () => paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined),
         [paymentBreakdown]
     )
-    const breakdownFeeFieldTotal = useMemo(() => {
-        if (!hasDetailedBreakdownFees) return 0
-        return paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
+    const breakdownTotals = useMemo(() => {
+        if (!hasDetailedBreakdownFees) return { customerInterest: 0, customerFee: 0, customerFixedFee: 0 }
+        const totals = { customerInterest: 0, customerFee: 0, customerFixedFee: 0 }
+        paymentBreakdown.forEach((e: any) => {
+            const feeBearer = String(e?.feeBearer || "merchant").toLowerCase().trim()
+            const installmentFeeBearer = String(e?.installmentFeeBearer || "merchant").toLowerCase().trim()
+            const isCustomerFeeBearer = feeBearer === "customer" || feeBearer === "buyer"
+            const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+            const entryInterest = Number(e.interestAmount || 0)
+            const entryInstallmentCost = Number(e.installmentCostAmount || 0)
+            const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+            const entryFee = Number(e.feeAmount || 0)
+            const entryFixedFee = Number(e.fixedFeeAmount || 0)
+            if (isCustomerFeeBearer) {
+                totals.customerInterest += entryFixedInterest
+                totals.customerFee += entryFee
+                totals.customerFixedFee += entryFixedFee
+            }
+            if (isCustomerInstallmentBearer) {
+                totals.customerInterest += entryInstallmentCost
+            }
+        })
+        return totals
     }, [hasDetailedBreakdownFees, paymentBreakdown])
+    const customerVisibleFeeTotal = breakdownTotals.customerInterest + breakdownTotals.customerFee + breakdownTotals.customerFixedFee
     const effectivePaymentMethodExtraAmount = hasDetailedBreakdownFees
-        ? (breakdownFeeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+        ? (customerVisibleFeeTotal > 0.009 ? paymentMethodExtraAmount : 0)
         : paymentMethodExtraAmount
     const friendlyMethod = useMemo(() => {
         const methodEntries = paymentBreakdown.filter((e: any) => e?.method)

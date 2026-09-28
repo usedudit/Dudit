@@ -120,7 +120,7 @@ const OrderListItem = React.memo(
                                         if (pmLabel && methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
                                             pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`
                                         }
-                                        return <PaymentMethodIndicator label={pmLabel} provider={order.payment_provider} simplify />
+                                        return <PaymentMethodIndicator label={pmLabel} provider={order.payment_provider} simplify compact />
                                     })()}
                                 </div>
                             </div>

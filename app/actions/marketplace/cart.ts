@@ -1138,12 +1138,10 @@ export async function checkoutCartAction(
   }
 
   // Entrega por transportadora exige pagamento online via Mercado Pago —
-  // exceto no fluxo WhatsApp (pedido fechado no chat, pagamento manual) e
-  // pagamentos já adiantados por crédito (vale-compra / assinatura).
+  // exceto pagamentos já adiantados por crédito (vale-compra / assinatura).
   if (
     carrierApplied &&
     !useMercadoPago &&
-    !isWhatsappFlow &&
     paymentMethod !== "Vale-compra" &&
     paymentMethod !== "Assinatura (Créditos)"
   ) {

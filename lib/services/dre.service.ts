@@ -194,7 +194,7 @@ async function computeDrePeriod(
     .from("orders")
     .select(`
       id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at,
-      payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_discount_amount,
+       payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_interest_amount, payment_method_discount_amount,
       order_items (id, product_id, variant_id, product_name, quantity, product_price, unit_cost, subtotal)
     `)
     .eq("partner_id", partnerId)
@@ -371,7 +371,7 @@ async function computeDrePeriod(
     }
 
     orderDiscounts += totalOrderDiscount
-    orderFees += Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
+    orderFees += Number(o.payment_method_interest_amount || 0) + Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
     orderCount++
   }
 

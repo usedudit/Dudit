@@ -633,7 +633,7 @@ export const IntegrationsSubPage = ({
                             />
                         )}
 
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Pagamentos</h3>
+                        <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Pagamentos</h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
@@ -755,7 +755,8 @@ export const IntegrationsSubPage = ({
                             </div>
                         </DefaultModal>
 
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Mensagens</h3>
+                        <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4 mt-8">Mensagens</h3>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
                                 <div>
@@ -843,7 +844,7 @@ export const IntegrationsSubPage = ({
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Logística</h3>
+                        <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4 mt-8">Logística</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
                                 <div>

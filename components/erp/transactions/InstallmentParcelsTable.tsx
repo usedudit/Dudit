@@ -101,7 +101,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                                 Parcela {row.installmentNumber}/{row.totalCount}
                                             </span>
                                             <div className="mt-1 flex" onClick={(e) => e.stopPropagation()}>
-                                                <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} />
+                                                <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} compact />
                                             </div>
                                         </div>
                                     </td>
@@ -153,7 +153,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                         Parcela {row.installmentNumber}/{row.totalCount}
                                     </span>
                                     <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                                        <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} />
+                                        <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} compact />
                                     </div>
                                 </div>
                                 <div className="text-right">

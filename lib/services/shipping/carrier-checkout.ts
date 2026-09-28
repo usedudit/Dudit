@@ -53,6 +53,26 @@ export function carrierReasonMessage(reason: CarrierUnavailableReason): string {
   }
 }
 
+// Cotação SuperFrete é a parte mais lenta do checkout (roundtrip à API).
+// Cache em memória por parceiro + CEPs + parâmetros do pacote torna
+// instantâneas as repetições: troca de serviço (PAC/SEDEX), recálculo de
+// totais, reabertura do checkout e submit. Sucesso apenas — falhas
+// (API instável, sem opções) tentam de novo na próxima.
+const CARRIER_QUOTE_TTL_MS = 10 * 60 * 1000
+const CARRIER_QUOTE_CACHE_MAX = 100
+const carrierQuoteCache = new Map<string, { at: number; result: CarrierQuoteResult }>()
+
+function pruneCarrierQuoteCache(now: number): void {
+  for (const [key, entry] of carrierQuoteCache) {
+    if (now - entry.at > CARRIER_QUOTE_TTL_MS) carrierQuoteCache.delete(key)
+  }
+  while (carrierQuoteCache.size > CARRIER_QUOTE_CACHE_MAX) {
+    const oldest = carrierQuoteCache.keys().next().value
+    if (oldest === undefined) break
+    carrierQuoteCache.delete(oldest)
+  }
+}
+
 async function loadCarrierContext(
   supabase: SupabaseClient,
   partnerId: string,
@@ -124,19 +144,28 @@ export async function quoteCarrierFreightOptions(
       ? config.services
       : ([1, 2] as SuperFreteServiceId[])
 
+  const requestParams = {
+    fromPostalCode,
+    toPostalCode,
+    services,
+    package: buildSuperFreteVolumes(config),
+    options: {
+      own_hand: Boolean(config.ownHand),
+      receipt: Boolean(config.receipt),
+      insurance_value: Number(config.insuranceValue || 0),
+      use_insurance_value: Number(config.insuranceValue || 0) > 0,
+    },
+  }
+
+  const cacheKey = `${input.partnerId}|${JSON.stringify(requestParams)}`
+  const now = Date.now()
+  const cached = carrierQuoteCache.get(cacheKey)
+  if (cached && now - cached.at <= CARRIER_QUOTE_TTL_MS) {
+    return cached.result
+  }
+
   try {
-    const quotes = await client.calculateFreight({
-      fromPostalCode,
-      toPostalCode,
-      services,
-      package: buildSuperFreteVolumes(config),
-      options: {
-        own_hand: Boolean(config.ownHand),
-        receipt: Boolean(config.receipt),
-        insurance_value: Number(config.insuranceValue || 0),
-        use_insurance_value: Number(config.insuranceValue || 0) > 0,
-      },
-    })
+    const quotes = await client.calculateFreight(requestParams)
 
     const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
       .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
@@ -152,7 +181,11 @@ export async function quoteCarrierFreightOptions(
       .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
 
     if (options.length === 0) return { available: false, reason: "no_options" }
-    return { available: true, options, fromPostalCode }
+    const result: CarrierQuoteResult = { available: true, options, fromPostalCode }
+    pruneCarrierQuoteCache(Date.now())
+    carrierQuoteCache.delete(cacheKey)
+    carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
+    return result
   } catch (err) {
     captureError(err, {
       module: "shipping",

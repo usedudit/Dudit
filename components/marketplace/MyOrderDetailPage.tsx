@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon, MotorbikeIcon, ReturnIcon } from '@/lib/icons';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, 
+WhatsappIcon, TruckIcon, ReturnIcon } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -26,6 +27,12 @@ import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
 import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal, type OrderDepositSummary } from '@/lib/payments/order-financial-state';
+import {
+    DeliveryStatusTimeline,
+    DeliveryDriverSection,
+    DeliverySummarySection,
+    type DeliveryDriverInfo,
+} from "@/components/erp/shared/DeliveryTabContent"
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -914,9 +921,31 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     // Effective payment fees: prefer breakdown explicit fields over stale column
     const breakdownEntries = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown.filter((e: any) => e?.method && !e?.checkoutPricing) : [];
     const hasDetailedBreakdownFees = breakdownEntries.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
-    const paymentMethodInterestVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
-    const paymentMethodFeeVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodFee || 0));
-    const paymentMethodFixedFeeVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
+    const customerVisibleTotals = hasDetailedBreakdownFees
+        ? breakdownEntries.reduce((acc: any, e: any) => {
+            const feeBearer = String(e?.feeBearer || "merchant").toLowerCase().trim()
+            const installmentFeeBearer = String(e?.installmentFeeBearer || "merchant").toLowerCase().trim()
+            const isCustomerFeeBearer = feeBearer === "customer" || feeBearer === "buyer"
+            const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+            const entryInterest = Number(e.interestAmount || 0)
+            const entryInstallmentCost = Number(e.installmentCostAmount || 0)
+            const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+            const entryFee = Number(e.feeAmount || 0)
+            const entryFixedFee = Number(e.fixedFeeAmount || 0)
+            if (isCustomerFeeBearer) {
+                acc.interest += entryFixedInterest
+                acc.fee += entryFee
+                acc.fixedFee += entryFixedFee
+            }
+            if (isCustomerInstallmentBearer) {
+                acc.interest += entryInstallmentCost
+            }
+            return acc
+        }, { interest: 0, fee: 0, fixedFee: 0 })
+        : { interest: 0, fee: 0, fixedFee: 0 }
+    const paymentMethodInterestVal = hasDetailedBreakdownFees ? customerVisibleTotals.interest : Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
+    const paymentMethodFeeVal = hasDetailedBreakdownFees ? customerVisibleTotals.fee : Math.max(0, Number(pricingSnapshot?.paymentMethodFee || 0));
+    const paymentMethodFixedFeeVal = hasDetailedBreakdownFees ? customerVisibleTotals.fixedFee : Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
 
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => {
@@ -2249,34 +2278,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         {isDelivery && (
                             <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
                                 <div className="space-y-6">
-                                    {/* Status da Entrega */}
-                                    <FormSection title="Status da Entrega">
-                                        {(() => {
-                                            const ds = getDeliveryStatusLabel(order.delivery_status);
-                                            const isPickup = order.delivery_type === "pickup";
-                                            return (
-                                                <ListItem
-                                                    icon={<MotorbikeIcon />}
-                                                    title={isPickup ? "Retirada no estabelecimento" : ds.label}
-                                                    description={
-                                                        isPickup
-                                                            ? "Seu pedido está pronto para ser retirado na loja."
-                                                            : order.delivery_status === "delivered"
-                                                                ? "Seu pedido foi entregue com sucesso."
-                                                                : order.delivery_status === "sent" ||
-                                                                    order.delivery_status === "out_for_delivery"
-                                                                    ? "Seu pedido está a caminho."
-                                                                    : order.delivery_status === "preparing"
-                                                                        ? "O vendedor está preparando seu pedido para envio."
-                                                                        : order.delivery_status === "delivery_failed"
-                                                                            ? "Houve uma falha na entrega do seu pedido."
-                                                                            : "Aguardando preparação para entrega."
-                                                    }
-                                                />
-
-                                            );
-                                        })()}
-                                    </FormSection>
+                                    {/* Status da Entrega (Timeline) */}
+                                    <DeliveryStatusTimeline
+                                        deliveryStatus={order.delivery_status || ""}
+                                        isPickup={order.delivery_type === "pickup"}
+                                        isPaid={["paid", "partially_paid"].includes(order.situation)}
+                                        orderCreatedAt={order.created_at}
+                                        orderUpdatedAt={order.updated_at}
+                                    />
 
                                     {/* Rastreio do envio (transportadora) */}
                                     {trackedShipment?.tracking_number && (
@@ -2309,76 +2318,50 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         </FormSection>
                                     )}
 
-                                    {/* Card do Entregador */}
-                                    {order.delivery_driver ? (
-                                        <FormSection title="Entregador">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
-                                                    {order.delivery_driver.avatarUrl ? (
-                                                        <img
-                                                            src={order.delivery_driver.avatarUrl}
-                                                            alt={order.delivery_driver.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <TruckIcon size={22} className="text-brand-dark dark:text-dark-heading" />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                            {order.delivery_driver.name}
-                                                        </span>
-                                                        {order.delivery_driver.isPlatformDriver ? (
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
-                                                                Dudit
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body">
-                                                                Loja
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                                        {order.delivery_driver.isPlatformDriver ? (
-                                                            <>
-                                                                {order.delivery_driver.totalDeliveries > 0 && (
-                                                                    <span>{order.delivery_driver.totalDeliveries} entregas realizadas</span>
-                                                                )}
-                                                                {order.delivery_driver.vehicleType && (
-                                                                    <span>{order.delivery_driver.vehicleType}</span>
-                                                                )}
-                                                                {order.delivery_driver.status && (
-                                                                    <span className="text-xs">• {getAssignmentStatusLabel(order.delivery_driver.status)}</span>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <span>Entrega própria do estabelecimento</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                {order.delivery_driver.phone && ["sent", "out_for_delivery", "assigned", "accepted"].includes(order.delivery_driver.status || order.delivery_status) && (
-                                                    <a
-                                                        href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, '')}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="shrink-0 p-2.5 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                                        title="Conversar no WhatsApp"
-                                                    >
-                                                        <WhatsappIcon size={16} className="text-[#25D366]" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </FormSection>
-                                    ) : (
-                                        <FormSection title="Entregador" hasSeparator>
-                                            <ListItem
-                                                icon={<TruckIcon />}
-                                                title="Entrega própria"
-                                                description="Ainda não há um entregador atribuído a este pedido."
-                                                className="px-4 py-3"
-                                            />
-                                        </FormSection>
+                                    {/* Entregador */}
+                                    {order.delivery_type === "delivery" && (
+                                        (() => {
+                                            const marketplaceDriverInfo: DeliveryDriverInfo = order.delivery_driver
+                                                ? order.delivery_driver.isPlatformDriver
+                                                    ? {
+                                                        type: "platform",
+                                                        name: order.delivery_driver.name,
+                                                        avatarUrl: order.delivery_driver.avatarUrl,
+                                                        isPlatformDriver: true,
+                                                        totalDeliveries: order.delivery_driver.totalDeliveries,
+                                                        vehicleType: order.delivery_driver.vehicleType,
+                                                        driverStatus: order.delivery_driver.status,
+                                                        phone: order.delivery_driver.phone,
+                                                        platformDriverData: {
+                                                            id: order.delivery_driver.id || order.delivery_driver.userId || order.delivery_driver.driverId,
+                                                            fullName: order.delivery_driver.name,
+                                                            phone: order.delivery_driver.phone,
+                                                            avatarUrl: order.delivery_driver.avatarUrl,
+                                                            vehicleType: order.delivery_driver.vehicleType,
+                                                            totalDeliveries: order.delivery_driver.totalDeliveries,
+                                                            status: order.delivery_driver.status,
+                                                            isPlatformDriver: true,
+                                                            isPendingAcceptance: order.delivery_driver.isPendingAcceptance,
+                                                            acceptedAt: order.delivery_driver.accepted_at,
+                                                            pickedUpAt: order.delivery_driver.picked_up_at,
+                                                        },
+                                                    }
+                                                    : {
+                                                        type: "store",
+                                                        name: order.delivery_driver.name,
+                                                        avatarUrl: null,
+                                                        isPlatformDriver: false,
+                                                    }
+                                                : { type: "none", name: "Entrega própria", isPlatformDriver: false }
+
+                                            return (
+                                                <DeliveryDriverSection
+                                                    driverInfo={marketplaceDriverInfo}
+                                                    deliveryStatus={order.delivery_status || ""}
+                                                    formatCurrency={formatCurrency}
+                                                />
+                                            )
+                                        })()
                                     )}
 
                                     {/* Timeline da Entrega */}
@@ -2405,35 +2388,34 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         );
                                     })()}
 
-                                    {/* Resumo da Entrega */}
-                                    <FormSection title="Resumo da Entrega" hasSeparator>
-                                        <div className="space-y-3">
-                                            <DetailRow label="Tipo de entrega" value={
-                                                order.delivery_type === "pickup" ? "Retirada" : (
-                                                    order.delivery_driver?.isPlatformDriver ? "Dudit Rede" : "Entrega própria"
-                                                )
-                                            } />
-                                            {order.delivery_address && order.delivery_type === "delivery" && (
-                                                <DetailRow label="Endereço" value={
-                                                    <span className="text-sm truncate inline-block">{order.delivery_address}</span>
-                                                } />
-                                            )}
-                                            {order.delivery_fee > 0 && (
-                                                <DetailRow label="Taxa de entrega" value={formatCurrency(order.delivery_fee)} />
-                                            )}
-                                            {order.delivery_driver?.estimatedHours != null && order.delivery_driver.estimatedHours > 0 && (
-                                                <DetailRow label="Tempo estimado" value={`${order.delivery_driver.estimatedHours} h`} />
-                                            )}
-                                            {order.delivery_driver?.distanceKm != null && (
-                                                <DetailRow label="Distância" value={`${order.delivery_driver.distanceKm} km`} />
-                                            )}
-                                            {order.delivery_type === "pickup" && store?.addresses && (
-                                                <DetailRow label="Local de retirada" value={
-                                                    <span className="text-sm truncate inline-block">{formatPartnerAddress(store.addresses)}</span>
-                                                } />
-                                            )}
-                                        </div>
-                                    </FormSection>
+                                    <DeliverySummarySection
+                                        order={order}
+                                        driverInfo={(() => {
+                                            if (!order.delivery_driver) {
+                                                return { type: "none" as const, name: "Entrega própria", isPlatformDriver: false }
+                                            }
+                                            if (order.delivery_driver.isPlatformDriver) {
+                                                return {
+                                                    type: "platform" as const,
+                                                    name: order.delivery_driver.name,
+                                                    avatarUrl: order.delivery_driver.avatarUrl,
+                                                    isPlatformDriver: true,
+                                                    totalDeliveries: order.delivery_driver.totalDeliveries,
+                                                    vehicleType: order.delivery_driver.vehicleType,
+                                                    driverStatus: order.delivery_driver.status,
+                                                    phone: order.delivery_driver.phone,
+                                                }
+                                            }
+                                            return {
+                                                type: "store" as const,
+                                                name: order.delivery_driver.name,
+                                                avatarUrl: null,
+                                                isPlatformDriver: false,
+                                            }
+                                        })()}
+                                        formatCurrency={formatCurrency}
+                                        formatPartnerAddress={formatPartnerAddress}
+                                    />
                                 </div>
                             </TabsContent>
                         )}

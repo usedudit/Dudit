@@ -38,6 +38,34 @@ const getStatusConfig = (status: string) => {
     }
 };
 
+// Ícone da transportadora usado na badge quando o pedido é enviado via SuperFrete
+const CARRIER_BRAND_ICON = "https://img.dudit.com.br/static/icons/brands/Superfrete.png";
+
+// Status de transportadora (order_shipments.status) exibidos na badge do card.
+// Cores seguem a mesma paleta das badges de status tradicionais.
+const CARRIER_SHIPMENT_BADGES: Record<string, { label: string; color: string; bg: string; border: string; dotBg: string }> = {
+    pending: { label: "Aguardando postagem", color: "text-brand-orange", bg: "bg-orange-100", border: "border-orange-200", dotBg: "bg-brand-orange" },
+    released: { label: "Aguardando postagem", color: "text-brand-orange", bg: "bg-orange-100", border: "border-orange-200", dotBg: "bg-brand-orange" },
+    posted: { label: "Postado", color: "text-brand-blue", bg: "bg-blue-100", border: "border-blue-200", dotBg: "bg-blue-500" },
+    in_transit: { label: "Em trânsito", color: "text-brand-blue", bg: "bg-blue-100", border: "border-blue-200", dotBg: "bg-blue-500" },
+    delivered: { label: "Entregue", color: "text-brand-green", bg: "bg-green-100", border: "border-green-200", dotBg: "bg-green-500" },
+    cancelled: { label: "Envio cancelado", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", dotBg: "bg-red-500" },
+    failed: { label: "Falha no envio", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", dotBg: "bg-red-500" },
+};
+
+// Situações em que o status da transportadora pode assumir o texto/cor da badge.
+// Pagamento pendente ou terminal continua mandando na badge.
+const CARRIER_BADGE_SITUATIONS = ["paid", "shipped", "delivered", "in_process", "partially_paid", "completed"];
+
+const getOutboundCarrierShipment = (order: any) => {
+    const shipments = Array.isArray(order?.order_shipments) ? order.order_shipments : [];
+    const outbound = shipments.filter((s: any) => s && s.kind !== "return");
+    if (outbound.length === 0) return null;
+    return outbound.reduce((latest: any, s: any) =>
+        !latest || String(s.created_at || "") > String(latest.created_at || "") ? s : latest,
+    null);
+};
+
 const formatProductQuantity = (qty: number, unit?: string | null) => {
     return formatQuantityWithUnit(qty, unit);
 };
@@ -331,7 +359,13 @@ export function MyOrdersListClient({
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
                                         <BatchOrderStatusSyncOnLoad orders={orders} />
                                         {paginatedOrders.map((order: any) => {
-                                            const statusConfig = getStatusConfig(order.situation);
+                                            const carrierShipment = getOutboundCarrierShipment(order);
+                                            const orderIsCarrier = Boolean(carrierShipment) || order?.delivery_breakdown?.source === "superfrete";
+                                            const baseStatusConfig = getStatusConfig(order.situation);
+                                            const shipmentBadge = orderIsCarrier && carrierShipment && CARRIER_BADGE_SITUATIONS.includes(order.situation)
+                                                ? CARRIER_SHIPMENT_BADGES[carrierShipment.status]
+                                                : undefined;
+                                            const statusConfig = shipmentBadge ? { ...baseStatusConfig, ...shipmentBadge } : baseStatusConfig;
                                             const StatusIcon = statusConfig.icon;
                                             const storeObj = Array.isArray(order.stores) ? order.stores[0] : order.stores;
                                             const sellerName = storeObj?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
@@ -395,7 +429,17 @@ export function MyOrdersListClient({
 
                                                         {/* Right side: Status as plain colored text */}
                                                         <div className={`flex items-center gap-1.5 text-xs font-bold ${statusConfig.color}`}>
-                                                            <StatusIcon size={14} />
+                                                            {orderIsCarrier ? (
+                                                                <Tooltip text="Entrega por transportadora">
+                                                                    <img
+                                                                        src={CARRIER_BRAND_ICON}
+                                                                        alt="Entrega por transportadora"
+                                                                        className="w-3.5 h-3.5 object-contain shrink-0 cursor-help"
+                                                                    />
+                                                                </Tooltip>
+                                                            ) : (
+                                                                <StatusIcon size={14} />
+                                                            )}
                                                             <span>{statusConfig.label}</span>
                                                         </div>
                                                     </div>

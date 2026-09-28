@@ -129,23 +129,32 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
       totalBreakdownMethodDiscount += pmDiscount
     }
 
-    // Only merchant-borne fees/interest are costs for the business
-    if (isCustomerBearer) continue
-
+    // Only merchant-borne fees/interest are costs for the business.
+    // Fees (feeAmount, fixedFeeAmount) follow feeBearer; installment cost follows installmentFeeBearer.
+    const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
+    const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
     const pFee = Math.max(0, Number(entry.feeAmount || 0))
     const fFee = Math.max(0, Number(entry.fixedFeeAmount || 0))
-    const intFee = Math.max(0, Number(entry.interestAmount || 0))
+    const entryInterest = Math.max(0, Number(entry.interestAmount || 0))
+    const entryInstallmentCost = Math.max(0, Number(entry.installmentCostAmount || 0))
+    const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
 
-    if (pFee > 0) {
-      totalPercentageFees += pFee
-      feeLines.push({ method, fee: pFee })
+    // Merchant absorbs fees only when feeBearer is merchant
+    if (!isCustomerBearer) {
+      if (pFee > 0) {
+        totalPercentageFees += pFee
+        feeLines.push({ method, fee: pFee })
+      }
+      if (fFee > 0) {
+        totalFixedFees += fFee
+        fixedFeeLines.push({ method, fee: fFee })
+      }
+      totalInterest += entryFixedInterest
     }
-    if (fFee > 0) {
-      totalFixedFees += fFee
-      fixedFeeLines.push({ method, fee: fFee })
-    }
-    if (intFee > 0) {
-      totalInterest += intFee
+
+    // Merchant absorbs installment cost only when installmentFeeBearer is merchant
+    if (!isCustomerInstallmentBearer) {
+      totalInterest += entryInstallmentCost
     }
   }
 

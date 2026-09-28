@@ -9,8 +9,6 @@ import {
     ClockIcon,
     ReturnIcon,
     CalendarIcon,
-    TruckIcon,
-    MapPinIcon
 } from "@/lib/icons"
 import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet"
 import {
@@ -54,6 +52,12 @@ import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financ
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
 import { hasReceivedMpPayment, getOrderDepositSummary, DEPOSIT_STATUS_LABELS, shouldShowSinal, canPaySinal } from '@/lib/payments/order-financial-state'
 import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
+import {
+    DeliveryStatusTimeline,
+    DeliveryDriverSection,
+    DeliverySummarySection,
+    type DeliveryDriverInfo,
+} from "@/components/erp/shared/DeliveryTabContent"
 
 const MERCADO_PAGO_ICON = "https://img.dudit.com.br/static/icons/payments/MercadoPago.png";
 const PIX_ICON_URL = "https://img.dudit.com.br/static/icons/payments/Pix.png";
@@ -558,22 +562,48 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const hasDetailedAmounts = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined)
     // When legs carry explicit fee fields (even zeros), trust those sums and ignore
     // a stale payment_method_extra_amount column (e.g. wrongly set to the sinal amount).
-    const breakdownFeeFieldTotal = hasDetailedAmounts
-        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
-        : 0
+    const breakdownTotals = hasDetailedAmounts
+        ? paymentBreakdown.reduce((acc: any, e: any) => {
+            const feeBearer = String(e?.feeBearer || "merchant").toLowerCase().trim()
+            const installmentFeeBearer = String(e?.installmentFeeBearer || "merchant").toLowerCase().trim()
+            const isCustomerFeeBearer = feeBearer === "customer" || feeBearer === "buyer"
+            const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+            const entryInterest = Number(e.interestAmount || 0)
+            const entryInstallmentCost = Number(e.installmentCostAmount || 0)
+            const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+            const entryFee = Number(e.feeAmount || 0)
+            const entryFixedFee = Number(e.fixedFeeAmount || 0)
+
+            // Customer-visible portions
+            if (isCustomerFeeBearer) {
+                acc.customerInterest += entryFixedInterest
+                acc.customerFee += entryFee
+                acc.customerFixedFee += entryFixedFee
+            } else {
+                acc.merchantInterest += entryFixedInterest
+                acc.merchantFee += entryFee
+                acc.merchantFixedFee += entryFixedFee
+            }
+            if (isCustomerInstallmentBearer) {
+                acc.customerInterest += entryInstallmentCost
+            } else {
+                acc.merchantInterest += entryInstallmentCost
+            }
+            return acc
+        }, { customerInterest: 0, merchantInterest: 0, customerFee: 0, merchantFee: 0, customerFixedFee: 0, merchantFixedFee: 0 })
+        : { customerInterest: 0, merchantInterest: 0, customerFee: 0, merchantFee: 0, customerFixedFee: 0, merchantFixedFee: 0 }
+    const customerVisibleFeeTotal = breakdownTotals.customerInterest + breakdownTotals.customerFee + breakdownTotals.customerFixedFee
     const effectivePaymentMethodExtraAmount = hasDetailedAmounts
-        ? (breakdownFeeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+        ? (customerVisibleFeeTotal > 0.009 ? paymentMethodExtraAmount : 0)
         : paymentMethodExtraAmount
 
-    const detailedInterestAmount = hasDetailedAmounts
-        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0)
-        : effectivePaymentMethodExtraAmount
-    const detailedFeeAmount = hasDetailedAmounts
-        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0)
-        : 0
-    const detailedFixedFeeAmount = hasDetailedAmounts
-        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0)
-        : 0
+    const detailedInterestAmount = breakdownTotals.customerInterest
+    const detailedFeeAmount = breakdownTotals.customerFee
+    const detailedFixedFeeAmount = breakdownTotals.customerFixedFee
+    const absorbedInterestAmount = breakdownTotals.merchantInterest
+    const absorbedFeeAmount = breakdownTotals.merchantFee
+    const absorbedFixedFeeAmount = breakdownTotals.merchantFixedFee
+    const hasAbsorbedCosts = absorbedInterestAmount > 0.009 || absorbedFeeAmount > 0.009 || absorbedFixedFeeAmount > 0.009
     const subtotalValue = Number(order.subtotal_value || 0) > 0
         ? Number(order.subtotal_value || 0)
         : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - effectivePaymentMethodExtraAmount
@@ -599,6 +629,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const canEdit = order.situation !== "cancelled"
     const isPickupOrder = order.delivery_type === "pickup"
+    const isPaidOrder = ["paid", "partially_paid"].includes(order.situation)
 
     const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store" || order.order_source === "Vitrine Online"
 
@@ -988,8 +1019,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                                 <div className="text-xs text-dark-body dark:text-brand-dark space-y-0.5">
                                                                                                                     <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
                                                                                                                     <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
-                                                                <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
-                                                                {Number(ret.refund_amount || 0) > 0 && (
+                                                                                                                    <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
+                                                                                                                    {Number(ret.refund_amount || 0) > 0 && (
                                                                                                                         <p><strong>Valor reembolsado:</strong> {formatCurrency(Number(ret.refund_amount))}</p>
                                                                                                                     )}
                                                                                                                     {Number(ret.store_credit_amount || 0) > 0 && (
@@ -1285,6 +1316,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <PaymentRow
                                                                     label="Custo do Método"
                                                                     value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
+                                                            )}
+                                                            {hasAbsorbedCosts && (
+                                                                <PaymentRow
+                                                                    label="Taxas Absorvidas"
+                                                                    value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedInterestAmount + absorbedFeeAmount + absorbedFixedFeeAmount)}</span>} />
+                                                            )}
+                                                            {hasAbsorbedCosts && absorbedInterestAmount > 0.009 && (
+                                                                <PaymentRow
+                                                                    label="Juros Absorvido"
+                                                                    value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedInterestAmount)}</span>} />
+                                                            )}
+                                                            {hasAbsorbedCosts && absorbedFeeAmount > 0.009 && (
+                                                                <PaymentRow
+                                                                    label="Taxa Absorvida"
+                                                                    value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedFeeAmount)}</span>} />
+                                                            )}
+                                                            {hasAbsorbedCosts && absorbedFixedFeeAmount > 0.009 && (
+                                                                <PaymentRow
+                                                                    label="Custo Fixo Absorvido"
+                                                                    value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedFixedFeeAmount)}</span>} />
                                                             )}
                                                             {changeAmount > 0.009 && (
                                                                 <PaymentRow
@@ -1762,6 +1813,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Custo do Método"
                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedFixedFeeAmount)}</span>} />
                                                         )}
+                                                        {hasAbsorbedCosts && (
+                                                            <PaymentRow
+                                                                label="Taxas Absorvidas"
+                                                                value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedInterestAmount + absorbedFeeAmount + absorbedFixedFeeAmount)}</span>} />
+                                                        )}
+                                                        {hasAbsorbedCosts && absorbedInterestAmount > 0.009 && (
+                                                            <PaymentRow
+                                                                label="Juros Absorvido"
+                                                                value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedInterestAmount)}</span>} />
+                                                        )}
+                                                        {hasAbsorbedCosts && absorbedFeeAmount > 0.009 && (
+                                                            <PaymentRow
+                                                                label="Taxa Absorvida"
+                                                                value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedFeeAmount)}</span>} />
+                                                        )}
+                                                        {hasAbsorbedCosts && absorbedFixedFeeAmount > 0.009 && (
+                                                            <PaymentRow
+                                                                label="Custo Fixo Absorvido"
+                                                                value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(absorbedFixedFeeAmount)}</span>} />
+                                                        )}
                                                         {changeAmount > 0.009 && (
                                                             <PaymentRow
                                                                 label="Troco"
@@ -1816,166 +1887,63 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             {(() => {
                                                 const ds = deliverySummary
                                                 const isPickup = order.delivery_type === "pickup"
-                                                const hasDeliveryRecord = ds && ds.id
-                                                const statusLabel = (() => {
-                                                    const s = String(ds?.status || order?.delivery_status || "").trim().toLowerCase()
-                                                    if (s === "preparing") return "Em preparo"
-                                                    if (s === "sent") return "Saiu para entrega"
-                                                    if (s === "delivered") return "Entregue"
-                                                    if (s === "delivery_failed") return "Falha na entrega"
-                                                    if (s === "cancelled") return "Cancelada"
-                                                    if (s === "pickup_available") return "Pronto para retirada"
-                                                    if (s === "pending" || s === "not_sent") return "Pendente"
-                                                    return "Aguardando preparação para entrega"
-                                                })()
 
-                                                const customerAddressObj = order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0]
-                                                const deliveryAddressStr = order.delivery_address || customerAddressObj ? (typeof order.delivery_address === "string" ? order.delivery_address : (customerAddressObj?.street ? [customerAddressObj.street, customerAddressObj.number].filter(Boolean).join(", ") + ", " + [customerAddressObj.neighborhood, customerAddressObj.city, customerAddressObj.state].filter(Boolean).join(" - ") : "")) : null
-                                                const deliveryCoords = customerAddressObj?.latitude && customerAddressObj?.longitude
-                                                    ? { lat: Number(customerAddressObj.latitude), lng: Number(customerAddressObj.longitude) }
-                                                    : null
-                                                const mapsUrl = deliveryCoords
-                                                    ? `https://www.google.com/maps/search/?api=1&query=${deliveryCoords.lat},${deliveryCoords.lng}`
-                                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliveryAddressStr || "")}`
+                                                const erpDriverInfo: DeliveryDriverInfo = order.platform_driver?.isPlatformDriver
+                                                    ? {
+                                                        type: "platform",
+                                                        name: order.platform_driver.fullName || order.platform_driver.name || "Entregador",
+                                                        avatarUrl: order.platform_driver.avatarUrl || order.platform_driver.avatar_url || null,
+                                                        isPlatformDriver: true,
+                                                        totalDeliveries: order.platform_driver.totalDeliveries ?? order.platform_driver.total_deliveries,
+                                                        vehicleType: order.platform_driver.vehicleType || order.platform_driver.vehicle_type,
+                                                        driverStatus: order.platform_driver.status,
+                                                        phone: order.platform_driver.phone,
+                                                        platformDriverData: {
+                                                            id: order.platform_driver.id || order.platform_driver_id,
+                                                            fullName: order.platform_driver.fullName || order.platform_driver.name || "Entregador",
+                                                            phone: order.platform_driver.phone,
+                                                            avatarUrl: order.platform_driver.avatarUrl || order.platform_driver.avatar_url || null,
+                                                            vehicleType: order.platform_driver.vehicleType || order.platform_driver.vehicle_type,
+                                                            totalDeliveries: order.platform_driver.totalDeliveries ?? order.platform_driver.total_deliveries,
+                                                            status: order.platform_driver.status,
+                                                            isPlatformDriver: true,
+                                                            isPendingAcceptance: order.platform_driver.isPendingAcceptance,
+                                                        },
+                                                    }
+                                                    : ds?.driverName
+                                                        ? {
+                                                            type: "store",
+                                                            name: ds.driverName,
+                                                            avatarUrl: null,
+                                                            isPlatformDriver: false,
+                                                        }
+                                                        : { type: "none", name: "Entrega própria", isPlatformDriver: false }
 
                                                 return (
                                                     <div className="space-y-6">
-                                                        <FormSection title="Status da Entrega">
-                                                            <ListItem
-                                                                icon={<TruckIcon />}
-                                                                title={isPickup ? "Retirada no estabelecimento" : statusLabel}
-                                                                description={
-                                                                    isPickup
-                                                                        ? "Seu pedido está pronto para ser retirado na loja."
-                                                                        : ds?.status === "delivered"
-                                                                            ? "O pedido foi entregue com sucesso."
-                                                                            : ds?.status === "sent"
-                                                                                ? "O pedido saiu para entrega e está a caminho."
-                                                                                : ds?.status === "preparing"
-                                                                                    ? "O pedido está sendo preparado para entrega."
-                                                                                    : ds?.status === "delivery_failed"
-                                                                                        ? "Houve uma falha na entrega do pedido."
-                                                                                        : order?.delivery_status === "delivered"
-                                                                                            ? "O pedido foi entregue com sucesso."
-                                                                                            : order?.delivery_status === "sent"
-                                                                                                ? "O pedido saiu para entrega e está a caminho."
-                                                                                                : order?.delivery_status === "preparing"
-                                                                                                    ? "O pedido está sendo preparado para entrega."
-                                                                                                    : order?.delivery_status === "delivery_failed"
-                                                                                                        ? "Houve uma falha na entrega do pedido."
-                                                                                                        : "Aguardando preparação para entrega."
-                                                                }
-                                                                className="px-4 py-3"
+                                                        <DeliveryStatusTimeline
+                                                            deliveryStatus={ds?.status || order.delivery_status || ""}
+                                                            isPickup={isPickup}
+                                                            isPaid={isPaidOrder}
+                                                            orderCreatedAt={order.created_at}
+                                                            orderUpdatedAt={order.updated_at}
+                                                        />
+
+                                                        {!isPickup && (
+                                                            <DeliveryDriverSection
+                                                                driverInfo={erpDriverInfo}
+                                                                deliveryStatus={order.delivery_status || ""}
+                                                                formatCurrency={formatCurrency}
                                                             />
-                                                        </FormSection>
-
-                                                        {!isPickup && ds?.driverName && (
-                                                            <FormSection title="Entregador">
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
-                                                                        <TruckIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
-                                                                            {ds.driverName}
-                                                                        </span>
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                            Entrega própria do estabelecimento
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            </FormSection>
-                                                        )}
-
-                                                        {!isPickup && (ds?.driverName || !hasDeliveryRecord) && (
-                                                            <FormSection title="Entregador">
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-inactive-text dark:text-dark-body">
-                                                                        <TruckIcon size={20} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
-                                                                            {ds?.driverName || "Entrega própria"}
-                                                                        </span>
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                            {ds?.driverName ? "Entrega própria do estabelecimento" : "Ainda não há um entregador atribuído a este pedido."}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            </FormSection>
                                                         )}
 
                                                         {!isPickup && (
-                                                            <FormSection title="Detalhes da Entrega">
-                                                                <div className="space-y-3 text-sm">
-                                                                    {ds?.deliveryNumber && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Nº Entrega</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">#{ds.deliveryNumber}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="flex justify-between">
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds?.status || order?.delivery_status || "Não informado"}</span>
-                                                                    </div>
-                                                                    {ds?.driverName && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entregador</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.driverName}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {ds?.departureTime && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Saída</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(ds.departureTime)}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {ds?.completedAt && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entregue em</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(ds.completedAt)}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {deliveryAddressStr && (
-                                                                        <div className="flex justify-between items-center">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Endereço de entrega</span>
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading truncate max-w-[200px]">{deliveryAddressStr}</span>
-                                                                                <button
-                                                                                    onClick={() => window.open(mapsUrl, "_blank")}
-                                                                                    className="shrink-0 p-1 rounded-lg border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors"
-                                                                                    title="Abrir no mapa"
-                                                                                >
-                                                                                    <MapPinIcon size={16} className="text-brand-inactive-text dark:text-dark-body" />
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {ds?.distanceKm != null && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Distância</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.distanceKm} km</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {ds?.estimatedHours != null && ds?.estimatedHours > 0 && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Tempo estimado</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.estimatedHours} h</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {ds?.routeStep && ds?.orderCount && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Rota</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.routeStep}/{ds.orderCount}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {!hasDeliveryRecord && ds?.error && (
-                                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                            {ds.error}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </FormSection>
+                                                            <DeliverySummarySection
+                                                                order={order}
+                                                                driverInfo={erpDriverInfo}
+                                                                formatCurrency={formatCurrency}
+                                                                deliveryNumber={ds?.deliveryNumber}
+                                                            />
                                                         )}
                                                     </div>
                                                 )

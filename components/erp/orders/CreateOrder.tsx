@@ -1985,11 +1985,28 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                                                         {(() => {
                                                             const hasDetailedFees = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
-                                                            const feeFieldTotal = hasDetailedFees
-                                                                ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
-                                                                : 0;
+                                                            let customerVisibleTotal = 0;
+                                                            if (hasDetailedFees) {
+                                                                paymentBreakdown.forEach((e: any) => {
+                                                                    const feeBearer = String(e?.feeBearer || "merchant").toLowerCase().trim()
+                                                                    const installmentFeeBearer = String(e?.installmentFeeBearer || "merchant").toLowerCase().trim()
+                                                                    const isCustomerFeeBearer = feeBearer === "customer" || feeBearer === "buyer"
+                                                                    const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+                                                                    const entryInterest = Number(e.interestAmount || 0)
+                                                                    const entryInstallmentCost = Number(e.installmentCostAmount || 0)
+                                                                    const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+                                                                    const entryFee = Number(e.feeAmount || 0)
+                                                                    const entryFixedFee = Number(e.fixedFeeAmount || 0)
+                                                                    if (isCustomerFeeBearer) {
+                                                                        customerVisibleTotal += entryFixedInterest + entryFee + entryFixedFee
+                                                                    }
+                                                                    if (isCustomerInstallmentBearer) {
+                                                                        customerVisibleTotal += entryInstallmentCost
+                                                                    }
+                                                                })
+                                                            }
                                                             const extraAmount = hasDetailedFees
-                                                                ? (feeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+                                                                ? (customerVisibleTotal > 0.009 ? paymentMethodExtraAmount : 0)
                                                                 : paymentMethodExtraAmount;
                                                             return extraAmount > 0 ? (
                                                                 <div className="flex justify-between items-start text-[14px] gap-4">

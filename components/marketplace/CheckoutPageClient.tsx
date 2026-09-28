@@ -699,7 +699,8 @@ export function CheckoutPageClient() {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
             // Só força o modo manual quando nada foi escolhido ainda — nunca
             // sobrescrever uma seleção explícita (ex.: créditos de assinatura).
-            if (paymentOption === null) setPaymentOption("traditional")
+            // Com entrega por transportadora ativa, o pagamento é online (MP).
+            if (paymentOption === null && !carrierDeliveryActive) setPaymentOption("traditional")
             return
         }
         if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null && !isPickupRequiringOnline) {
@@ -708,15 +709,16 @@ export function CheckoutPageClient() {
     }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow])
 
     // Entrega por transportadora (SuperFrete) deve ser paga online via Mercado Pago
-    // — igual ao sinal: só faz sentido quando o MP está conectado (o corte de
-    // cotação já exige mpConnected). No fluxo WhatsApp o pagamento continua manual.
+    // — em qualquer fluxo (inclusive WhatsApp, onde sem transportadora o pedido
+    // continua fechado no chat com pagamento manual). O corte de cotação já exige
+    // mpConnected.
     useEffect(() => {
-        if (isWhatsappFlow || !carrierDeliveryActive) return
+        if (!carrierDeliveryActive) return
         if (paymentOption === "traditional" || paymentOption === null) {
             setPaymentOption("mercadopago")
             setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
         }
-    }, [isWhatsappFlow, carrierDeliveryActive, paymentOption])
+    }, [carrierDeliveryActive, paymentOption])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -1038,9 +1040,9 @@ export function CheckoutPageClient() {
         requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
     )))
-    // Entrega por transportadora exige pagamento online (Mercado Pago) — exceto
-    // no fluxo WhatsApp, onde o pedido é fechado no chat e o pagamento é manual.
-    const showManualPaymentOption = showTraditionalPaymentOption && (isWhatsappFlow || !carrierDeliveryActive)
+    // Entrega por transportadora exige pagamento online (Mercado Pago) — oculta a
+    // opção manual em qualquer fluxo enquanto a transportadora estiver ativa.
+    const showManualPaymentOption = showTraditionalPaymentOption && !carrierDeliveryActive
 
     const schedulingLines = useMemo(
         () =>
@@ -1850,7 +1852,7 @@ export function CheckoutPageClient() {
                         <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
                                 ? "Grátis"
-                                : deliveryQuoteLoading
+                                : deliveryQuoteLoading && selectedCarrierServiceId == null
                                     ? "Calculando..."
                                     : (deliveryFee === 0 && (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold))
                                         ? (
@@ -1986,7 +1988,7 @@ export function CheckoutPageClient() {
                         ? "Direcionando..."
                         : paymentPreviewLoading
                             ? "Calculando pagamento..."
-                            : checkoutContext?.partner?.orderFlow === "whatsapp"
+                            : isWhatsappFlow && paymentOption !== "mercadopago"
                                 ? `Fazer pedido via WhatsApp - ${formatCurrency(checkoutTotalToCharge)}`
                                 : `Finalizar pedido - ${formatCurrency(checkoutTotalToCharge)}`
                     }
@@ -2378,7 +2380,10 @@ export function CheckoutPageClient() {
         }
 
         try {
-            if (checkoutContext?.partner?.orderFlow === "whatsapp") {
+            // Fluxo WhatsApp só fecha o pedido no chat quando o pagamento é manual —
+            // com Mercado Pago (ex.: entrega por transportadora) segue o fluxo normal
+            // de preferência/pagamento online.
+            if (isWhatsappFlow && paymentOption !== "mercadopago") {
                 const message = buildWhatsAppMessage()
                 const phone = checkoutContext?.partner?.phone || partnerInfo.phone
                 let cleanPhone = phone ? phone.replace(/\D/g, "") : ""
@@ -3024,7 +3029,7 @@ export function CheckoutPageClient() {
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
-                                    ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
+                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierDeliveryActive) ? (
                                         <>
                                             <div className="space-y-1 mb-4">
                                                 <ListItem
@@ -3551,7 +3556,7 @@ export function CheckoutPageClient() {
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
-                                    ) : partnerInfo.mpConnected && checkoutContext?.partner.orderFlow !== "whatsapp" ? (
+                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierDeliveryActive) ? (
                                         <div className="space-y-1">
                                             <ListItem
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
@@ -3621,6 +3626,14 @@ export function CheckoutPageClient() {
                                                         />
                                                     }
                                                 />
+                                            )}
+                                            {carrierDeliveryActive && (
+                                                <div className="ml-8 mt-2">
+                                                    <InfoCard
+                                                        message="Entrega por transportadora: o pagamento deve ser feito online pelo Mercado Pago."
+                                                        color="orange"
+                                                    />
+                                                </div>
                                             )}
                                             {paymentOption === "traditional" && checkoutContext?.deposit.available && (
                                                 <div className="ml-8 mt-2">
@@ -3844,7 +3857,7 @@ export function CheckoutPageClient() {
                                             <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                                                 {isPickup
                                                     ? "Grátis"
-                                                    : deliveryQuoteLoading
+                                                    : deliveryQuoteLoading && selectedCarrierServiceId == null
                                                         ? "Calculando..."
                                                         : deliveryFee > 0
                                                             ? formatCurrency(deliveryFee)
@@ -3926,7 +3939,7 @@ export function CheckoutPageClient() {
                                         disabled={disableCheckoutSubmit}
                                         className="flex-1 h-12"
                                     >
-                                        {checkoutContext?.partner?.orderFlow === "whatsapp"
+                                        {isWhatsappFlow && paymentOption !== "mercadopago"
                                             ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
                                             : `Finalizar • ${formatCurrency(checkoutTotalToCharge)}`
                                         }
@@ -4001,7 +4014,7 @@ export function CheckoutPageClient() {
                         >
                             {isLoading
                                 ? "Processando..."
-                                : checkoutContext?.partner?.orderFlow === "whatsapp"
+                                : isWhatsappFlow && paymentOption !== "mercadopago"
                                     ? "Fazer pedido via WhatsApp"
                                     : "Fazer pedido"
                             }
@@ -4426,10 +4439,11 @@ export function CheckoutPageClient() {
                             const carrierActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
                             const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
                             const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
-                            // Fluxo WhatsApp: sempre pagamento manual. Fora dele, a
-                            // entrega por transportadora exige Mercado Pago (sem tab manual).
-                            const showTraditionalTab = isWhatsappTabFlow || ((!isPickup || canPayUponPickup) && !carrierActive)
-                            const showMercadoPagoTab = partnerInfo.mpConnected && !isWhatsappTabFlow
+                            // Entrega por transportadora exige Mercado Pago (sem tab
+                            // manual) em qualquer fluxo. Sem transportadora, o fluxo
+                            // WhatsApp fica apenas com o pagamento manual.
+                            const showTraditionalTab = !carrierActive && (isWhatsappTabFlow || !isPickup || canPayUponPickup)
+                            const showMercadoPagoTab = partnerInfo.mpConnected && (!isWhatsappTabFlow || carrierActive)
                             const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
                         if (!hasAnyPaymentMethod) {
