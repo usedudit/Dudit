@@ -150,8 +150,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
         const s = (item.store_id ? storeByIdMap.get(item.store_id) : null) || storeByPartnerMap.get(item.partner_id)
         const storeName = s?.name || "Loja parceira"
         item.partner = {
-            name: storeName,
-            store_name: storeName,
+             name: storeName,
             store_image_url: s?.logo_url || null,
             short_id: s?.short_id || null,
             id: s?.id || null,
