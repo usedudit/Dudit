@@ -6,7 +6,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { encrypt } from "@/lib/cryptoService"
-import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
+import { MERCADOPAGO_PROVIDER, findMercadoPagoIntegration } from "@/lib/services/payments/mercadopago-integration"
 import { validateOAuthState } from "@/lib/security/oauth-state"
 
 function normalizeBaseUrl(rawUrl: string): string {
@@ -189,6 +189,25 @@ export async function GET(request: NextRequest) {
     // Secrets and connection state live in partner_integrations. That table has
     // no write policy for authenticated users, so it needs the service-role client.
     const admin = getAdminClient()
+    const existingIntegration = await findMercadoPagoIntegration(admin, partnerId)
+
+    // JSONB columns are replaced as a whole: merge with the existing row so a
+    // reconnect keeps the seller's accepted payment methods and any other
+    // stored setting.
+    const integrationConfig = { ...(existingIntegration?.config || {}) }
+    integrationConfig.public_key = publicKey
+    integrationConfig.live_mode = tokenData.live_mode ?? null
+
+    const integrationCredentials = tokenData.refresh_token
+      ? { refresh_token_encrypted: encrypt(tokenData.refresh_token, MERCADOPAGO_PROVIDER) }
+      : { ...(existingIntegration?.credentials || {}) }
+
+    const integrationMetadata = { ...(existingIntegration?.metadata || {}) }
+    if (expiresAt) {
+      integrationMetadata.token_expires_at = expiresAt.toISOString()
+    } else {
+      delete integrationMetadata.token_expires_at
+    }
 
     const { error: integrationError } = await admin.from("partner_integrations").upsert(
       {
@@ -197,11 +216,9 @@ export async function GET(request: NextRequest) {
         status: "connected",
         account_id: mpUserId,
         access_token_encrypted: encrypt(tokenData.access_token, MERCADOPAGO_PROVIDER),
-        credentials: tokenData.refresh_token
-          ? { refresh_token_encrypted: encrypt(tokenData.refresh_token, MERCADOPAGO_PROVIDER) }
-          : {},
-        config: { public_key: publicKey, live_mode: tokenData.live_mode ?? null },
-        metadata: expiresAt ? { token_expires_at: expiresAt.toISOString() } : {},
+        credentials: integrationCredentials,
+        config: integrationConfig,
+        metadata: integrationMetadata,
         connected_at: connectedAt,
         disconnected_at: null,
       },
