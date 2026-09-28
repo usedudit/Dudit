@@ -31,6 +31,8 @@ import {
     DeliveryStatusTimeline,
     DeliveryDriverSection,
     DeliverySummarySection,
+    getOutboundCarrierShipment,
+    isCarrierDeliveryOrder,
     type DeliveryDriverInfo,
 } from "@/components/erp/shared/DeliveryTabContent"
 
@@ -369,6 +371,51 @@ const getClientTimelineSteps = (order: any) => {
 };
 
 const getDeliveryTimelineSteps = (order: any) => {
+    const carrierShipment = getOutboundCarrierShipment(order);
+    const isCarrierOrder = order.delivery_breakdown?.source === "superfrete" || !!carrierShipment;
+    if (isCarrierOrder) {
+        const fmtStep = (iso?: string | null) => (iso ? { date: formatFullDate(iso), time: formatTime(iso), iso } : {});
+        const steps: { label: string; active: boolean; date?: string; time?: string; iso?: string; subLabel?: string }[] = [];
+        const shipmentStatus = carrierShipment?.status || "";
+        const isPaid = ["paid", "partially_paid", "delivered"].includes(order.situation);
+        const postedActive = ["posted", "in_transit", "delivered"].includes(shipmentStatus);
+        const transitActive = ["in_transit", "delivered"].includes(shipmentStatus);
+        const deliveredActive = shipmentStatus === "delivered";
+
+        steps.push({ label: "Pedido realizado", active: true, ...fmtStep(order.created_at) });
+        steps.push({
+            label: isPaid ? "Pago" : "Aguardando pagamento",
+            active: true,
+            ...fmtStep(order.updated_at || order.created_at),
+        });
+
+        if (shipmentStatus === "cancelled" || shipmentStatus === "failed") {
+            steps.push({
+                label: shipmentStatus === "failed" ? "Falha no envio" : "Envio cancelado",
+                active: true,
+                ...fmtStep(carrierShipment?.updated_at || carrierShipment?.created_at),
+            });
+            return steps;
+        }
+
+        steps.push({
+            label: "Postado",
+            active: postedActive,
+            ...fmtStep(postedActive ? carrierShipment?.paid_at || carrierShipment?.updated_at || carrierShipment?.created_at : null),
+        });
+        steps.push({
+            label: "Em trânsito",
+            active: transitActive,
+            ...fmtStep(transitActive ? carrierShipment?.updated_at : null),
+        });
+        steps.push({
+            label: "Pedido entregue",
+            active: deliveredActive,
+            ...fmtStep(deliveredActive ? carrierShipment?.delivered_at : null),
+        });
+        return steps;
+    }
+
     const driver = order.delivery_driver;
     if (!driver) return [];
 
@@ -656,6 +703,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         )
         return shipments.find((s: any) => s.tracking_number) || null
     })()
+
+    const outboundShipment = getOutboundCarrierShipment(order)
+    const carrierDelivery = isCarrierDeliveryOrder(order)
+    const carrierInfo = carrierDelivery
+        ? { shipment: outboundShipment, breakdown: order.delivery_breakdown }
+        : null
 
     useEffect(() => {
         if (!activeReturnRequest) {
@@ -2285,6 +2338,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         isPaid={["paid", "partially_paid"].includes(order.situation)}
                                         orderCreatedAt={order.created_at}
                                         orderUpdatedAt={order.updated_at}
+                                        carrier={carrierInfo}
                                     />
 
                                     {/* Rastreio do envio (transportadora) */}
@@ -2359,6 +2413,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     driverInfo={marketplaceDriverInfo}
                                                     deliveryStatus={order.delivery_status || ""}
                                                     formatCurrency={formatCurrency}
+                                                    carrier={carrierInfo}
                                                 />
                                             )
                                         })()
@@ -2415,6 +2470,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         })()}
                                         formatCurrency={formatCurrency}
                                         formatPartnerAddress={formatPartnerAddress}
+                                        carrier={carrierInfo}
                                     />
                                 </div>
                             </TabsContent>

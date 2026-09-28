@@ -330,7 +330,7 @@ export async function updatePartnerAction(
   // Verify this partner exists and user has permission
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, last_seo_update_at")
+    .select("user_id")
     .eq("id", partnerId)
     .single()
 
@@ -350,7 +350,7 @@ export async function updatePartnerAction(
   // Get current store and address from stores table
   const { data: currentStore } = await supabase
     .from("stores")
-    .select("name, addresses(*)")
+    .select("name, last_seo_update_at, addresses(*)")
     .eq("partner_id", partnerId)
     .order("is_headquarters", { ascending: false })
     .limit(1)
@@ -366,22 +366,20 @@ export async function updatePartnerAction(
     (data.state !== undefined && data.state !== storeAddress?.state)
 
   if (isSeoSensitiveChange) {
-    if (partnerCheck.last_seo_update_at) {
-      const lastUpdate = new Date(partnerCheck.last_seo_update_at)
+    if (currentStore?.last_seo_update_at) {
+      const lastUpdate = new Date(currentStore.last_seo_update_at)
       const daysSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24)
-      if (daysSinceUpdate < 30) {
-        return { error: `Você só pode alterar o nome e a cidade da loja a cada 30 dias. Próxima alteração permitida em: ${new Date(lastUpdate.getTime() + 30 * 24 * 3600 * 1000).toLocaleDateString('pt-BR')}` }
+      if (daysSinceUpdate < 15) {
+        return { error: `Você só pode alterar o nome e a cidade da loja a cada 15 dias. Próxima alteração permitida em: ${new Date(lastUpdate.getTime() + 15 * 24 * 3600 * 1000).toLocaleDateString('pt-BR')}` }
       }
     }
   }
 
-  const updateData: any = {}
-  if (isSeoSensitiveChange) {
-    updateData.last_seo_update_at = new Date().toISOString()
-  }
-
   // Handle store updates (headquarters store) - all fiscal fields moved per-store
   const storeUpdateData: Record<string, any> = {}
+  if (isSeoSensitiveChange) {
+    storeUpdateData.last_seo_update_at = new Date().toISOString()
+  }
   if (data.storeName) storeUpdateData.name = data.storeName
   if (data.storeDescription !== undefined) storeUpdateData.description = data.storeDescription
   if (data.openingHours !== undefined) storeUpdateData.opening_hours = normalizeOpeningHours(data.openingHours)
@@ -430,6 +428,8 @@ export async function updatePartnerAction(
       await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
     }
   }
+
+  const updateData: any = {}
 
   if (data.offeringType !== undefined) {
     updateData.business_info = {

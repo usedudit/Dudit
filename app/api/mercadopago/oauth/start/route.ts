@@ -11,9 +11,9 @@ function normalizeBaseUrl(rawUrl: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  // ✅ base URL segura
+  // ✅ base URL segura (usa APP_URL em runtime, não NEXT_PUBLIC_APP_URL que é inlined no build)
   const appUrl = normalizeBaseUrl(
-    process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+    process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
   )
 
   try {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/auth/login`)
     }
 
-    const clientId = process.env.NEXT_PUBLIC_MP_CLIENT_ID
+    const clientId = process.env.MP_CLIENT_ID
 
     if (!clientId) {
       return NextResponse.redirect(

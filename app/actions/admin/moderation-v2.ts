@@ -894,8 +894,6 @@ export async function saveModerationChanges(params: {
         // 1. Apply field changes
         for (const { field, value } of params.changes) {
             const dbField = field === "tags" ? "tags" : field
-            const updateData: any = {}
-            updateData[dbField] = value === "" ? null : value
 
             const tableMap: Record<string, string> = {
                 product: "products",
@@ -904,7 +902,24 @@ export async function saveModerationChanges(params: {
                 partner: "partners",
             }
             const table = tableMap[params.type]
-            if (table) {
+
+            if (params.type === "partner") {
+                const storeFieldMap: Record<string, string> = {
+                    store_name: "name",
+                    store_description: "description",
+                    store_image_url: "logo_url",
+                }
+                const actualField = storeFieldMap[dbField] || dbField
+                const isStoreField = ["name", "description", "logo_url", "banner_url", "gallery", "opening_hours", "phone", "risk_score", "rating", "marketplace_reputation"].includes(actualField)
+
+                if (isStoreField) {
+                    await fetchAdmin.from("stores").update({ [actualField]: value === "" ? null : value }).eq("partner_id", params.targetId)
+                } else {
+                    await fetchAdmin.from("partners").update({ [dbField]: value === "" ? null : value }).eq("id", params.targetId)
+                }
+            } else if (table) {
+                const updateData: any = {}
+                updateData[dbField] = value === "" ? null : value
                 await fetchAdmin.from(table as any).update(updateData).eq("id", params.targetId)
             }
         }

@@ -2412,6 +2412,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                     *,
                     order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock, unit), product_variants(id, variant_name, sku, stock_quantity, stock_available), services(id, name, images)),
                     stores(name),
+                    order_shipments(id, status, kind, carrier, provider_slug, service_code, service_name, price, tracking_number, tracking_url, label_url, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
                     coupons(*),
                     appointments(*),
                     return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, created_at, return_items!return_items_return_request_id_fkey(*))

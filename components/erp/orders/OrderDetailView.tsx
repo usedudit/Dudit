@@ -56,6 +56,8 @@ import {
     DeliveryStatusTimeline,
     DeliveryDriverSection,
     DeliverySummarySection,
+    getOutboundCarrierShipment,
+    isCarrierDeliveryOrder,
     type DeliveryDriverInfo,
 } from "@/components/erp/shared/DeliveryTabContent"
 
@@ -1364,12 +1366,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
                                                     )}
 
-                                                    <OrderShippingSection
-                                                        orderId={orderId}
-                                                        partnerId={partnerId}
-                                                        order={order}
-                                                        onRefresh={refreshOrder}
-                                                    />
                                                 </div>
 
                                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
@@ -1860,12 +1856,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
                                                 )}
 
-                                                <OrderShippingSection
-                                                    orderId={orderId}
-                                                    partnerId={partnerId}
-                                                    order={order}
-                                                    onRefresh={refreshOrder}
-                                                />
                                             </div>
                                         </FadeIn>
                                     </TabsContent>
@@ -1887,6 +1877,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             {(() => {
                                                 const ds = deliverySummary
                                                 const isPickup = order.delivery_type === "pickup"
+                                                const outboundShipment = getOutboundCarrierShipment(order)
+                                                const carrierDelivery = isCarrierDeliveryOrder(order)
+                                                const carrier = carrierDelivery
+                                                    ? { shipment: outboundShipment, breakdown: order.delivery_breakdown }
+                                                    : null
 
                                                 const erpDriverInfo: DeliveryDriverInfo = order.platform_driver?.isPlatformDriver
                                                     ? {
@@ -1927,6 +1922,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             isPaid={isPaidOrder}
                                                             orderCreatedAt={order.created_at}
                                                             orderUpdatedAt={order.updated_at}
+                                                            carrier={carrier}
                                                         />
 
                                                         {!isPickup && (
@@ -1934,6 +1930,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 driverInfo={erpDriverInfo}
                                                                 deliveryStatus={order.delivery_status || ""}
                                                                 formatCurrency={formatCurrency}
+                                                                carrier={carrier}
+                                                            />
+                                                        )}
+
+                                                        {!isPickup && carrierDelivery && (
+                                                            <OrderShippingSection
+                                                                orderId={orderId}
+                                                                partnerId={partnerId}
+                                                                order={order}
+                                                                onRefresh={refreshOrder}
                                                             />
                                                         )}
 
@@ -1943,6 +1949,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 driverInfo={erpDriverInfo}
                                                                 formatCurrency={formatCurrency}
                                                                 deliveryNumber={ds?.deliveryNumber}
+                                                                carrier={carrier}
                                                             />
                                                         )}
                                                     </div>

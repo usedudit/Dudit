@@ -820,14 +820,16 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
       .eq("provider_slug", SUPERFRETE_PROVIDER)
       .maybeSingle(),
     supabase
-      .from("partners")
-      .select("store_name")
-      .eq("id", partnerId)
+      .from("stores")
+      .select("name")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("orders")
       .select(
-        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, delivery_address, stores(name), order_items(product_name, quantity, product_price, products(name), services(name))",
+        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, delivery_address, delivery_breakdown, stores(name), order_items(product_name, quantity, product_price, products(name), services(name))",
       )
       .eq("id", orderId)
       .eq("partner_id", partnerId)
@@ -872,7 +874,7 @@ async function resolveOriginAddress(
   }
   if (!row) return null
   return {
-    name: order.stores?.name || partner?.store_name || "Remetente",
+    name: order.stores?.name || partner?.name || "Remetente",
     address: row.street || "",
     number: row.number || undefined,
     complement: row.complement || undefined,
@@ -1038,7 +1040,7 @@ export async function getOrderShippingQuoteAction(payload: { orderId: string }):
 
 export async function createOrderShippingLabelAction(payload: {
   orderId: string
-  service: SuperFreteServiceId
+  service?: SuperFreteServiceId
 }): Promise<{
   success: true
   label: { id: string; price: number; status: string; serviceId: number }
@@ -1075,9 +1077,14 @@ export async function createOrderShippingLabelAction(payload: {
     const client = createClientFromIntegration(integration)
     if (!client) return { success: false, error: "SuperFrete não conectado." }
 
+    const requestedService = Number(payload.service || (order as any)?.delivery_breakdown?.serviceId || 0)
+    if (!requestedService) {
+      return { success: false, error: "Este pedido não tem um serviço de frete selecionado." }
+    }
+
     const volumes = buildVolumes(config)
     const label = await client.createOrder({
-      service: payload.service,
+      service: requestedService as SuperFreteServiceId,
       from: {
         name: origin.name,
         address: origin.address,
@@ -1112,7 +1119,7 @@ export async function createOrderShippingLabelAction(payload: {
       tags: [{ tag: `Dudit ${order.order_number || order.id}` }],
     })
 
-    const serviceId = label.service_id || payload.service
+    const serviceId = label.service_id || requestedService
 
     await supabase.from("order_shipments").insert({
       order_id: payload.orderId,
@@ -1121,14 +1128,14 @@ export async function createOrderShippingLabelAction(payload: {
       provider_slug: SUPERFRETE_PROVIDER,
       status: label.status || "pending",
       service_code: String(serviceId),
-      service_name: SERVICE_LABELS[serviceId] || SERVICE_LABELS[payload.service],
+      service_name: SERVICE_LABELS[serviceId] || SERVICE_LABELS[requestedService],
       carrier: "SuperFrete",
       external_label_id: label.id,
       price: typeof label.price === "number" ? label.price : null,
       tracking_number: label.tracking || null,
       label_url: label.print?.url || null,
       requested_at: new Date().toISOString(),
-      payload: { service: payload.service, service_id: serviceId, response_status: label.status },
+      payload: { service: requestedService, service_id: serviceId, response_status: label.status },
     })
 
     revalidateOrders(ctx.partnerId)

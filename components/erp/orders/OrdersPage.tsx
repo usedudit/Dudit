@@ -115,7 +115,7 @@ interface FilterState {
     datePeriod: DatePeriodFilterValue
 }
 
-type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel" | "tracking";
+type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel";
 type SortDirection = "asc" | "desc";
 
 const INITIAL_FILTERS: FilterState = {
@@ -131,7 +131,6 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "date", label: "Data", align: "left", width: "150px" },
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "80px" },
-    { id: "tracking", label: "Rastreio", align: "left", width: "170px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -511,8 +510,8 @@ export default function OrdersPage({
                     case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
                     case "customer": aVal = a.customer_name; bVal = b.customer_name; break
                     case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
-                    case "channel": aVal = a.order_source; bVal = b.order_source; break
-                    case "tracking": aVal = a.tracking_number || ""; bVal = b.tracking_number || ""; break
+            case "channel": aVal = a.order_source; bVal = b.order_source; break
+
                     default: return 0
                 }
 

@@ -14,10 +14,71 @@ import {
 } from "@/lib/icons"
 import { FormSection, ListItem, Badge, Button, DefaultModal } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
-import { formatDayMonth, formatTime, formatDateTime, formatFullDate } from "@/lib/utils"
+import { formatDayMonth, formatTime, formatDateTime, formatFullDate, formatDeliveryDaysRange } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import DuditDriverDetailsModal from "@/components/erp/deliveries/DuditDriverDetailsModal"
 import { DuditPlatformDriver } from "@/components/erp/deliveries/types"
+
+export interface CarrierShipment {
+    id?: string
+    status?: string | null
+    carrier?: string | null
+    provider_slug?: string | null
+    service_code?: string | null
+    service_name?: string | null
+    tracking_number?: string | null
+    tracking_url?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+    paid_at?: string | null
+    delivered_at?: string | null
+}
+
+export interface CarrierInfo {
+    shipment?: CarrierShipment | null
+    breakdown?: any
+}
+
+const CARRIER_STATUS_LABELS: Record<string, string> = {
+    pending: "Aguardando pagamento da etiqueta",
+    released: "Aguardando postagem",
+    posted: "Postado",
+    in_transit: "Em trânsito",
+    delivered: "Entregue",
+    cancelled: "Envio cancelado",
+    failed: "Falha no envio",
+}
+
+export function getOutboundCarrierShipment(order: any): CarrierShipment | null {
+    const list: CarrierShipment[] = Array.isArray(order?.order_shipments)
+        ? order.order_shipments.filter((s: any) => s?.kind !== "return")
+        : []
+    if (list.length === 0) return null
+    list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    return list[0]
+}
+
+export function isCarrierDeliveryOrder(order: any): boolean {
+    return order?.delivery_breakdown?.source === "superfrete" || !!getOutboundCarrierShipment(order)
+}
+
+function getCarrierTitle(carrier?: CarrierInfo | null): string {
+    const shipment = carrier?.shipment
+    const breakdown = carrier?.breakdown
+    const company = breakdown?.companyName || shipment?.carrier || breakdown?.carrier || null
+    const service = shipment?.service_name || breakdown?.serviceName || null
+    if (company && service) return `${company} • ${service}`
+    return company || service || "Transportadora"
+}
+
+function getCarrierDescription(carrier?: CarrierInfo | null): string {
+    const shipment = carrier?.shipment
+    if (!shipment) return "Etiqueta ainda não gerada."
+    const statusLabel = CARRIER_STATUS_LABELS[shipment.status || ""] || "Envio registrado"
+    if (shipment.tracking_number) return `Rastreio ${shipment.tracking_number} • ${statusLabel}`
+    return statusLabel
+}
 
 export interface DeliveryTimelineStep {
     label: string
@@ -32,7 +93,8 @@ export function getDeliveryTimelineSteps(
     isPickup: boolean,
     isPaid: boolean,
     orderCreatedAt: string | Date,
-    orderUpdatedAt?: string | Date
+    orderUpdatedAt?: string | Date,
+    shipment?: CarrierShipment | null
 ): DeliveryTimelineStep[] {
     const baseDate = formatDayMonth(orderCreatedAt || new Date())
     const baseTime = formatTime(orderCreatedAt || new Date())
@@ -58,6 +120,68 @@ export function getDeliveryTimelineSteps(
             { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
             { label: isPaid ? "Pago" : "Aguardando pagamento", date: baseDate, time: baseTime, active: true },
             { label: "Cancelado", date: cancelledDate, time: cancelledTime, active: true },
+        ]
+    }
+
+    if (shipment && !isPickup) {
+        const shipmentStatus = shipment.status || ""
+        const fmtWhen = (iso?: string | null) =>
+            iso
+                ? { date: formatDayMonth(iso), time: formatTime(iso) }
+                : { date: undefined as string | undefined, time: undefined as string | undefined }
+        const postedActive = ["posted", "in_transit", "delivered"].includes(shipmentStatus)
+        const transitActive = ["in_transit", "delivered"].includes(shipmentStatus)
+        const deliveredActive = shipmentStatus === "delivered"
+
+        if (shipmentStatus === "cancelled" || shipmentStatus === "failed") {
+            const failedMeta = fmtWhen(shipment.updated_at || shipment.created_at)
+            return [
+                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                {
+                    label: isPaid ? "Pago" : "Aguardando pagamento",
+                    date: isPaid ? paymentMeta.date : baseDate,
+                    time: isPaid ? paymentMeta.time : baseTime,
+                    active: true,
+                },
+                {
+                    label: shipmentStatus === "failed" ? "Falha no envio" : "Envio cancelado",
+                    date: failedMeta.date,
+                    time: failedMeta.time,
+                    active: true,
+                },
+            ]
+        }
+
+        const postedMeta = fmtWhen(shipment.paid_at || shipment.updated_at || shipment.created_at)
+        const transitMeta = fmtWhen(shipment.updated_at)
+        const deliveredShipmentMeta = fmtWhen(shipment.delivered_at)
+
+        return [
+            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+            {
+                label: isPaid ? "Pago" : "Aguardando pagamento",
+                date: isPaid ? paymentMeta.date : baseDate,
+                time: isPaid ? paymentMeta.time : baseTime,
+                active: true,
+            },
+            {
+                label: "Postado",
+                date: postedActive ? postedMeta.date : undefined,
+                time: postedActive ? postedMeta.time : undefined,
+                active: postedActive,
+            },
+            {
+                label: "Em trânsito",
+                date: transitActive ? transitMeta.date : undefined,
+                time: transitActive ? transitMeta.time : undefined,
+                active: transitActive,
+            },
+            {
+                label: "Entregue",
+                date: deliveredActive ? deliveredShipmentMeta.date : undefined,
+                time: deliveredActive ? deliveredShipmentMeta.time : undefined,
+                active: deliveredActive,
+            },
         ]
     }
 
@@ -132,6 +256,7 @@ interface DeliveryStatusTimelineProps {
     isPaid: boolean
     orderCreatedAt: string | Date
     orderUpdatedAt?: string | Date
+    carrier?: CarrierInfo | null
 }
 
 export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
@@ -140,6 +265,7 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
     isPaid,
     orderCreatedAt,
     orderUpdatedAt,
+    carrier,
 }) => {
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
 
@@ -148,7 +274,8 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
         isPickup,
         isPaid,
         orderCreatedAt,
-        orderUpdatedAt
+        orderUpdatedAt,
+        carrier?.shipment ?? null
     )
 
     const isFailed = deliveryStatus === "delivery_failed"
@@ -362,14 +489,46 @@ interface DeliveryDriverSectionProps {
     driverInfo: DeliveryDriverInfo | null
     deliveryStatus: string
     formatCurrency: (value: number) => string
+    carrier?: CarrierInfo | null
 }
 
 export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
     driverInfo,
     deliveryStatus,
     formatCurrency,
+    carrier,
 }) => {
     const [isDuditDriverModalOpen, setIsDuditDriverModalOpen] = useState(false)
+
+    if (carrier) {
+        return (
+            <FormSection title="Transportadora">
+                <ListItem
+                    title={getCarrierTitle(carrier)}
+                    description={getCarrierDescription(carrier)}
+                    className="px-4 py-3"
+                    left={
+                        <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                            <img src={getCarrierBrandIcon(carrier?.breakdown?.companyName, carrier?.shipment?.carrier)} alt="Transportadora" className="w-7 h-7 object-contain" />
+                        </div>
+                    }
+                    right={
+                        carrier.shipment?.tracking_url ? (
+                            <a
+                                href={carrier.shipment.tracking_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                Rastrear
+                            </a>
+                        ) : null
+                    }
+                />
+            </FormSection>
+        )
+    }
 
     if (!driverInfo || driverInfo.type === "none") {
         return (
@@ -526,6 +685,7 @@ interface DeliverySummarySectionProps {
     formatCurrency: (value: number) => string
     formatPartnerAddress?: (addresses: any) => string
     deliveryNumber?: number | string | null
+    carrier?: CarrierInfo | null
 }
 
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -541,6 +701,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
     formatCurrency,
     formatPartnerAddress,
     deliveryNumber,
+    carrier,
 }) => {
     const isPickup = order.delivery_type === "pickup"
     const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
@@ -549,6 +710,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
 
     const getFulfillmentType = () => {
         if (isPickup) return "Retirada"
+        if (carrier) return "Transportadora"
         if (driverInfo?.type === "platform") return "Entregador da Rede Dudit"
         return "Entrega própria"
     }
@@ -557,6 +719,20 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
         <FormSection title="Resumo da Entrega" hasSeparator>
             <div className="space-y-3">
                 <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
+                {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
+                {carrier?.breakdown &&
+                    (carrier.breakdown.deliveryMinDays != null || carrier.breakdown.deliveryMaxDays != null) && (
+                        <DetailRow
+                            label="Prazo estimado"
+                            value={formatDeliveryDaysRange(
+                                carrier.breakdown.deliveryMinDays,
+                                carrier.breakdown.deliveryMaxDays
+                            )}
+                        />
+                    )}
+                {carrier?.shipment?.tracking_number && (
+                    <DetailRow label="Código de rastreamento" value={carrier.shipment.tracking_number} />
+                )}
                 {order.delivery_address && !isPickup && (
                     <DetailRow
                         label="Endereço"

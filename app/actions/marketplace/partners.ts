@@ -713,11 +713,25 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     const admin = getAdminClient()
     const { data: hqStore } = await admin
       .from("stores")
-      .select("id")
+      .select("id, name, last_seo_update_at")
       .eq("partner_id", partnerId)
       .order("is_headquarters", { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // SEO cooldown: store name can only be changed every 15 days
+    if (data.storeName && hqStore?.name && data.storeName !== hqStore.name) {
+      if (hqStore.last_seo_update_at) {
+        const lastUpdate = new Date(hqStore.last_seo_update_at)
+        const daysSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24)
+        if (daysSinceUpdate < 15) {
+          const nextAllowed = new Date(lastUpdate.getTime() + 15 * 24 * 3600 * 1000)
+          return { error: `Você só pode alterar o nome da loja a cada 15 dias. Próxima alteração permitida em: ${nextAllowed.toLocaleDateString('pt-BR')}` }
+        }
+      }
+      storeUpdateData.last_seo_update_at = new Date().toISOString()
+    }
+
     if (hqStore?.id) {
       await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
     }

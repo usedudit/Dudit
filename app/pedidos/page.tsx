@@ -28,7 +28,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     partners(id, is_active, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
-    order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_name, created_at),
+    order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
       products(id, short_id, name, images, video_thumbnail, unit),
@@ -44,7 +44,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     partners(id, is_active, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
-    order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_name, created_at),
+    order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       services(id, short_id, name, images),
       recurring_plans(id, short_id, name))

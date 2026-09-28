@@ -5,17 +5,14 @@ import {
     AlertModal,
     Badge,
     Button,
-    DefaultModal,
     FormSection,
     ListItem,
-    ThreeDotsLoader,
 } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
 import { TruckIcon } from "@/lib/icons"
 import {
     getOrderShippingGateAction,
-    getOrderShippingQuoteAction,
     createOrderShippingLabelAction,
     checkoutSuperFreteLabelAction,
     printSuperFreteLabelAction,
@@ -23,7 +20,6 @@ import {
     getOrderShipmentAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
-import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 
 const SHIPPING_STATUS_META: Record<string, { label: string; variant: "green" | "red" | "orange" | "blue" | "gray" }> = {
     pending: { label: "Aguardando pagamento", variant: "orange" },
@@ -47,10 +43,6 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [gateLoaded, setGateLoaded] = useState(false)
     const [shipment, setShipment] = useState<OrderShipmentSummary | null>(null)
     const [shipmentLoaded, setShipmentLoaded] = useState(false)
-    const [quoteOpen, setQuoteOpen] = useState(false)
-    const [quotes, setQuotes] = useState<any[]>([])
-    const [quoting, setQuoting] = useState(false)
-    const [selectedService, setSelectedService] = useState<number | null>(null)
     const [creating, setCreating] = useState(false)
     const [paying, setPaying] = useState(false)
     const [printing, setPrinting] = useState(false)
@@ -95,42 +87,18 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const statusMeta = SHIPPING_STATUS_META[shippingStatus || ""] || (shippingStatus ? { label: shippingStatus, variant: "gray" as const } : null)
     const canGenerate = Boolean(gate?.connected && gate?.planAllowed)
 
-    const openQuoteModal = async () => {
-        setQuoteOpen(true)
-        setQuoting(true)
-        setQuotes([])
-        setSelectedService(null)
-        try {
-            const res = await getOrderShippingQuoteAction({ orderId })
-            if (res.success) {
-                setQuotes(res.quotes || [])
-                if ((res.quotes || []).length === 0) {
-                    toast.error("Nenhuma opção de frete encontrada para o CEP informado.")
-                    setQuoteOpen(false)
-                }
-            } else {
-                toast.error(res.error || "Erro ao cotar frete.")
-                setQuoteOpen(false)
-            }
-        } catch {
-            toast.error("Erro ao cotar frete.")
-            setQuoteOpen(false)
-        } finally {
-            setQuoting(false)
-        }
-    }
-
     const handleCreate = async () => {
-        if (selectedService === null) return
         setCreating(true)
         try {
-            const res = await createOrderShippingLabelAction({
-                orderId,
-                service: selectedService as SuperFreteServiceId,
-            })
+            const res = await createOrderShippingLabelAction({ orderId })
             if (res.success) {
-                toast.success(`Etiqueta criada por ${formatCurrency(res.label.price)}. Aguarde o pagamento para imprimi-la.`)
-                setQuoteOpen(false)
+                const payRes = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: res.label.id })
+                if (payRes.success) {
+                    toast.success(`Etiqueta gerada e paga por ${formatCurrency(res.label.price)}.`)
+                } else {
+                    toast.success(`Etiqueta criada por ${formatCurrency(res.label.price)}.`)
+                    toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
+                }
                 await refresh()
             } else {
                 toast.error(res.error || "Erro ao gerar etiqueta.")
@@ -224,7 +192,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                             )}
                         </div>
                     </div>
-                    <Button type="button" onClick={openQuoteModal} leftIcon={<TruckIcon className="w-4 h-4" />}>
+                    <Button type="button" onClick={handleCreate} isLoading={creating} leftIcon={<TruckIcon className="w-4 h-4" />}>
                         Gerar etiqueta de frete
                     </Button>
                 </div>
@@ -295,63 +263,6 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                     </div>
                 </div>
             )}
-
-            <DefaultModal
-                isOpen={quoteOpen}
-                onClose={() => {
-                    if (!creating) setQuoteOpen(false)
-                }}
-                title="Cotação de frete — SuperFrete"
-                maxWidth="md"
-                footer={
-                    <div className="flex justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={() => setQuoteOpen(false)} disabled={creating}>
-                            Fechar
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={handleCreate}
-                            disabled={selectedService === null || creating}
-                            isLoading={creating}
-                        >
-                            Gerar etiqueta
-                        </Button>
-                    </div>
-                }
-            >
-                {quoting ? (
-                    <ThreeDotsLoader />
-                ) : (
-                    <div className="space-y-2">
-                        {quotes.map((quote) => {
-                            const isSelected = selectedService === quote.id
-                            const days = quote.delivery_range?.max ?? quote.delivery_time
-                            return (
-                                <ListItem
-                                    key={quote.id}
-                                    onClick={() => setSelectedService(quote.id)}
-                                    className={
-                                        isSelected
-                                            ? "rounded-lg border border-brand-blue bg-brand-blue/5 dark:bg-blue-900/20 dark:border-blue-500"
-                                            : "rounded-lg border border-brand-border dark:border-dark-border"
-                                    }
-                                    title={quote.name || `Serviço ${quote.id}`}
-                                    description={
-                                        days
-                                            ? `Entrega em ${days} dia(s)${quote.company?.name ? ` • ${quote.company.name}` : ""}`
-                                            : quote.company?.name
-                                    }
-                                    right={
-                                        <span className="font-bold text-md text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(quote.price)}
-                                        </span>
-                                    }
-                                />
-                            )
-                        })}
-                    </div>
-                )}
-            </DefaultModal>
 
             <AlertModal
                 isOpen={cancelOpen}

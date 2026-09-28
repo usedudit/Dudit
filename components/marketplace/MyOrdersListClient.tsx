@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand";
 
 const ORDERS_PER_PAGE = 10
 
@@ -37,9 +38,6 @@ const getStatusConfig = (status: string) => {
         default: return { label: status || 'Desconhecido', color: 'text-gray-700 dark:text-dark-body', bg: 'bg-gray-100 dark:bg-dark-border/50', icon: AlertCircleIcon, border: 'border-gray-200 dark:border-dark-border', dotBg: 'bg-gray-500' };
     }
 };
-
-// Ícone da transportadora usado na badge quando o pedido é enviado via SuperFrete
-const CARRIER_BRAND_ICON = "https://img.dudit.com.br/static/icons/brands/Superfrete.png";
 
 // Status de transportadora (order_shipments.status) exibidos na badge do card.
 // Cores seguem a mesma paleta das badges de status tradicionais.
@@ -432,7 +430,7 @@ export function MyOrdersListClient({
                                                             {orderIsCarrier ? (
                                                                 <Tooltip text="Entrega por transportadora">
                                                                     <img
-                                                                        src={CARRIER_BRAND_ICON}
+                                                                        src={getCarrierBrandIcon(order?.delivery_breakdown?.companyName, carrierShipment?.carrier)}
                                                                         alt="Entrega por transportadora"
                                                                         className="w-3.5 h-3.5 object-contain shrink-0 cursor-help"
                                                                     />

@@ -556,32 +556,32 @@ export function CheckoutPageClient() {
         let completed = false
         carrierQuoteKeyRef.current = dedupeKey
         setCarrierQuoteLoading(true)
-        ;(async () => {
-            try {
-                const res = await quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
-                if (!active) return
-                if (res.success && res.options.length > 0) {
-                    setCarrierOptions(res.options)
-                    setCarrierError(null)
-                    setSelectedCarrierServiceId(res.options[0].serviceId)
-                    setShowOutsideRadiusModal(false)
-                } else {
-                    setCarrierOptions([])
-                    setSelectedCarrierServiceId(null)
-                    setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
-                    // Modal de "Entrega Indisponível" só quando realmente não há
-                    // opção de transporte. Motivos de configuração (plano, CEP de
-                    // origem, erro de cotação) ficam visíveis no card inline.
-                    setShowOutsideRadiusModal(!res.success && res.reason === "no_options")
+            ; (async () => {
+                try {
+                    const res = await quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+                    if (!active) return
+                    if (res.success && res.options.length > 0) {
+                        setCarrierOptions(res.options)
+                        setCarrierError(null)
+                        setSelectedCarrierServiceId(res.options[0].serviceId)
+                        setShowOutsideRadiusModal(false)
+                    } else {
+                        setCarrierOptions([])
+                        setSelectedCarrierServiceId(null)
+                        setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
+                        // Modal de "Entrega Indisponível" só quando realmente não há
+                        // opção de transporte. Motivos de configuração (plano, CEP de
+                        // origem, erro de cotação) ficam visíveis no card inline.
+                        setShowOutsideRadiusModal(!res.success && res.reason === "no_options")
+                    }
+                } catch {
+                    if (!active) return
+                    setCarrierError("Não foi possível calcular o frete agora.")
+                } finally {
+                    completed = true
+                    if (active) setCarrierQuoteLoading(false)
                 }
-            } catch {
-                if (!active) return
-                setCarrierError("Não foi possível calcular o frete agora.")
-            } finally {
-                completed = true
-                if (active) setCarrierQuoteLoading(false)
-            }
-        })()
+            })()
         return () => {
             active = false
             if (!completed) carrierQuoteKeyRef.current = null
@@ -1897,7 +1897,7 @@ export function CheckoutPageClient() {
                                 className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${selectedCarrierServiceId === opt.serviceId
                                     ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
                                     : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
-                                }`}
+                                    }`}
                             >
                                 <span className="flex flex-col">
                                     <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -3101,14 +3101,6 @@ export function CheckoutPageClient() {
                                                         }
                                                     />
                                                 )}
-                                                {carrierDeliveryActive && (
-                                                    <div className="ml-8 mt-2">
-                                                        <InfoCard
-                                                            message="Entrega por transportadora: o pagamento deve ser feito online pelo Mercado Pago."
-                                                            color="orange"
-                                                        />
-                                                    </div>
-                                                )}
                                                 {paymentOption === "traditional" && checkoutContext?.deposit.available && (
                                                     <div className="ml-8 mt-2">
                                                         <InfoCard
@@ -3626,14 +3618,6 @@ export function CheckoutPageClient() {
                                                         />
                                                     }
                                                 />
-                                            )}
-                                            {carrierDeliveryActive && (
-                                                <div className="ml-8 mt-2">
-                                                    <InfoCard
-                                                        message="Entrega por transportadora: o pagamento deve ser feito online pelo Mercado Pago."
-                                                        color="orange"
-                                                    />
-                                                </div>
                                             )}
                                             {paymentOption === "traditional" && checkoutContext?.deposit.available && (
                                                 <div className="ml-8 mt-2">
@@ -4433,18 +4417,18 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="pb-4">
-                        {(() => {
-                            const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
-                            const isWhatsappTabFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
-                            const carrierActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
-                            const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
-                            const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
-                            // Entrega por transportadora exige Mercado Pago (sem tab
-                            // manual) em qualquer fluxo. Sem transportadora, o fluxo
-                            // WhatsApp fica apenas com o pagamento manual.
-                            const showTraditionalTab = !carrierActive && (isWhatsappTabFlow || !isPickup || canPayUponPickup)
-                            const showMercadoPagoTab = partnerInfo.mpConnected && (!isWhatsappTabFlow || carrierActive)
-                            const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
+                    {(() => {
+                        const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+                        const isWhatsappTabFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
+                        const carrierActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
+                        const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
+                        const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
+                        // Entrega por transportadora exige Mercado Pago (sem tab
+                        // manual) em qualquer fluxo. Sem transportadora, o fluxo
+                        // WhatsApp fica apenas com o pagamento manual.
+                        const showTraditionalTab = !carrierActive && (isWhatsappTabFlow || !isPickup || canPayUponPickup)
+                        const showMercadoPagoTab = partnerInfo.mpConnected && (!isWhatsappTabFlow || carrierActive)
+                        const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
                         if (!hasAnyPaymentMethod) {
                             return (
@@ -4456,7 +4440,7 @@ export function CheckoutPageClient() {
                             )
                         }
 
-                            if (mustPayOnline && !partnerInfo.mpConnected && !isWhatsappTabFlow) {
+                        if (mustPayOnline && !partnerInfo.mpConnected && !isWhatsappTabFlow) {
                             return (
                                 <div className="p-6 text-center">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
@@ -4469,16 +4453,16 @@ export function CheckoutPageClient() {
                         const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
 
                         return (
-                                <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => {
-                                    setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")
-                                    // Mantém formData.paymentMethod consistente com a tab ativa —
-                                    // evita preview de pagamento com "mercadopago" em modo tradicional.
-                                    setFormData(prev => {
-                                        if (val === "mercadopago") return { ...prev, paymentMethod: "mercadopago", installments: 1 }
-                                        if (val === "traditional" && prev.paymentMethod === "mercadopago") return { ...prev, paymentMethod: "", installments: 1 }
-                                        return prev
-                                    })
-                                }}>
+                            <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => {
+                                setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")
+                                // Mantém formData.paymentMethod consistente com a tab ativa —
+                                // evita preview de pagamento com "mercadopago" em modo tradicional.
+                                setFormData(prev => {
+                                    if (val === "mercadopago") return { ...prev, paymentMethod: "mercadopago", installments: 1 }
+                                    if (val === "traditional" && prev.paymentMethod === "mercadopago") return { ...prev, paymentMethod: "", installments: 1 }
+                                    return prev
+                                })
+                            }}>
                                 {(showMercadoPagoTab || showTraditionalTab || hasSubscriptionCreditsForCheckout) ? (
                                     <TabsList className="mb-4">
                                         {hasSubscriptionCreditsForCheckout && <TabsTrigger value="subscription_credits">Usar Créditos</TabsTrigger>}

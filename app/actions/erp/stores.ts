@@ -292,9 +292,39 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
 
         const admin = createAdminClient()
         const supabase = await getSupabaseServerClient()
+
+        // SEO cooldown: store name, city, and state can only be changed every 15 days
+        const { data: currentStore } = await admin
+            .from("stores")
+            .select("name, last_seo_update_at, addresses(city, state)")
+            .eq("id", input.storeId)
+            .maybeSingle()
+
+        const currentAddress = currentStore?.addresses?.[0] || {}
+        const isSeoSensitiveChange =
+            (input.name !== undefined && currentStore?.name && input.name !== currentStore.name) ||
+            (input.city !== undefined && input.city !== currentAddress?.city) ||
+            (input.state !== undefined && input.state !== currentAddress?.state)
+
+        if (isSeoSensitiveChange) {
+            if (currentStore?.last_seo_update_at) {
+                const lastUpdate = new Date(currentStore.last_seo_update_at)
+                const daysSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24)
+                if (daysSinceUpdate < 15) {
+                    const nextAllowed = new Date(lastUpdate.getTime() + 15 * 24 * 3600 * 1000)
+                    return { success: false, error: `Você só pode alterar o nome, cidade e estado da loja a cada 15 dias. Próxima alteração permitida em: ${nextAllowed.toLocaleDateString('pt-BR')}` }
+                }
+            }
+        }
+
         const updateData: Record<string, unknown> = {}
 
         if (input.name !== undefined) updateData.name = sanitizeInput(input.name, 150)
+
+        // Set last_seo_update_at when SEO-sensitive fields are changed
+        if (isSeoSensitiveChange) {
+            updateData.last_seo_update_at = new Date().toISOString()
+        }
         if (input.slug !== undefined) updateData.slug = input.slug
         if (input.description !== undefined) updateData.description = input.description
         if (input.phone !== undefined) {
