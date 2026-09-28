@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { captureError } from "@/lib/monitoring/sentry"
@@ -367,26 +368,27 @@ async function processWebhookWithRetry(
 
     if (!partnerId) {
       console.log("[WEBHOOK] Partner ID not found in order, searching partners...")
-      const { data: partners } = await supabase
-        .from("partners")
-        .select("id")
-        .not("mp_access_token_encrypted", "is", null)
+      const { data: mpConnections } = await supabase
+        .from("partner_integrations")
+        .select("partner_id")
+        .eq("provider_slug", MERCADOPAGO_PROVIDER)
+        .not("access_token_encrypted", "is", null)
 
-      for (const partner of partners || []) {
+      for (const connection of mpConnections || []) {
         try {
-          const partnerToken = await getValidMercadoPagoAccessToken(partner.id)
+          const partnerToken = await getValidMercadoPagoAccessToken(connection.partner_id)
           const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
             headers: { Authorization: `Bearer ${partnerToken}` },
           })
 
           if (mpResponse.ok) {
             paymentInfo = await mpResponse.json()
-            partnerId = partner.id
+            partnerId = connection.partner_id
             console.log(`[WEBHOOK] Payment data fetched via partner ${partnerId}, MP status: ${paymentInfo.status}`)
             break
           }
         } catch (err: any) {
-          console.warn(`[WEBHOOK] Failed to fetch via partner ${partner.id}:`, err.message)
+          console.warn(`[WEBHOOK] Failed to fetch via partner ${connection.partner_id}:`, err.message)
           continue
         }
       }

@@ -3,8 +3,10 @@ import { type NextRequest, NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser, requireMinimumPlan } from "@/lib/auth/authorization"
 import { encrypt } from "@/lib/cryptoService"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { validateOAuthState } from "@/lib/security/oauth-state"
 
 function normalizeBaseUrl(rawUrl: string): string {
@@ -181,21 +183,49 @@ export async function GET(request: NextRequest) {
       ? new Date(Date.now() + tokenData.expires_in * 1000)
       : null
 
+    const connectedAt = new Date().toISOString()
+    const mpUserId = tokenData.user_id?.toString() ?? null
+
+    // Secrets and connection state live in partner_integrations. That table has
+    // no write policy for authenticated users, so it needs the service-role client.
+    const admin = getAdminClient()
+
+    const { error: integrationError } = await admin.from("partner_integrations").upsert(
+      {
+        partner_id: partnerId,
+        provider_slug: MERCADOPAGO_PROVIDER,
+        status: "connected",
+        account_id: mpUserId,
+        access_token_encrypted: encrypt(tokenData.access_token, MERCADOPAGO_PROVIDER),
+        credentials: tokenData.refresh_token
+          ? { refresh_token_encrypted: encrypt(tokenData.refresh_token, MERCADOPAGO_PROVIDER) }
+          : {},
+        config: { public_key: publicKey, live_mode: tokenData.live_mode ?? null },
+        metadata: expiresAt ? { token_expires_at: expiresAt.toISOString() } : {},
+        connected_at: connectedAt,
+        disconnected_at: null,
+      },
+      { onConflict: "partner_id,provider_slug" },
+    )
+
+    if (integrationError) {
+      console.error("Error saving MP integration:", integrationError)
+
+      return NextResponse.redirect(
+        `${appUrl}/erp/configuracoes?mp_error=save_failed`
+      )
+    }
+
+    // Status fields below are still the read path for the app; they move into
+    // partner_integrations.config in the follow-up migration.
     const { error: updateError } = await supabase
       .from("partners")
       .update({
-        mp_user_id: tokenData.user_id?.toString(),
-        mp_access_token_encrypted: encrypt(
-          tokenData.access_token,
-          "mercadopago"
-        ),
-        mp_refresh_token_encrypted: tokenData.refresh_token
-          ? encrypt(tokenData.refresh_token, "mercadopago")
-          : null,
+        mp_user_id: mpUserId,
         mp_public_key: publicKey,
         mp_live_mode: tokenData.live_mode ?? null,
         mp_token_expires_at: expiresAt?.toISOString(),
-        mp_connected_at: new Date().toISOString(),
+        mp_connected_at: connectedAt,
       })
       .eq("id", partnerId)
 

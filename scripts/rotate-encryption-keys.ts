@@ -70,6 +70,7 @@ const CONTEXT_INFO: Record<string, string> = {
   cpf: "cpf-encryption",
   mercadopago: "mercadopago-token-encryption",
   whatsapp: "whatsapp-token-encryption",
+  superfrete: "superfrete-token-encryption",
 }
 
 type KeyVersion = "v1" | "v2"
@@ -194,7 +195,16 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 interface ColumnMigration {
   table: string
   column: string
-  context: string
+  /** Contexto de criptografia fixo (cryptoService) */
+  context?: string
+  /**
+   * Coluna cujo valor define o contexto de criptografia de cada linha.
+   * Usado em tabelas multi-provedor (partner_integrations.provider_slug guarda
+   * tokens de mercadopago, superfrete, etc).
+   */
+  contextColumn?: string
+  /** Chave dentro de uma coluna JSONB (ex: credentials.refresh_token_encrypted) */
+  jsonbKey?: string
   /** Filtros extras (ex: { pix_key_type: "cpf" }) */
   filters?: Record<string, string>
   /** Nome amigável para exibição */
@@ -220,9 +230,28 @@ const MIGRATIONS: ColumnMigration[] = [
     label: "Chaves PIX (tipo CPF)",
   },
 
-  // Mercado Pago
-  { table: "partners", column: "mp_access_token_encrypted", context: "mercadopago", label: "Access Token MP" },
-  { table: "partners", column: "mp_refresh_token_encrypted", context: "mercadopago", label: "Refresh Token MP" },
+  // Integrações por parceiro (segredos do Mercado Pago, SuperFrete, etc)
+  // Desde a migração 20260928 os tokens do Mercado Pago vivem aqui, não mais
+  // em partners.mp_*.
+  {
+    table: "partner_integrations",
+    column: "access_token_encrypted",
+    contextColumn: "provider_slug",
+    label: "Access token das integrações",
+  },
+  {
+    table: "partner_integrations",
+    column: "webhook_secret_encrypted",
+    contextColumn: "provider_slug",
+    label: "Webhook secret das integrações",
+  },
+  {
+    table: "partner_integrations",
+    column: "credentials",
+    jsonbKey: "refresh_token_encrypted",
+    contextColumn: "provider_slug",
+    label: "Refresh token MP (JSONB)",
+  },
 
   // WhatsApp
   { table: "partner_whatsapp_connections", column: "access_token_encrypted", context: "whatsapp", label: "Access Token WhatsApp" },
@@ -245,12 +274,15 @@ interface Stats {
 // ────────────────────────────────────────────────────────────
 
 async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersion): Promise<Stats> {
-  const { table, column, context, filters, label } = migration
+  const { table, column, context, contextColumn, jsonbKey, filters, label } = migration
   const stats: Stats = { total: 0, migrated: 0, skipped: 0, errors: 0 }
 
   // Descobre qual prefixo é "antigo" (dados que PRECISAM ser migrados)
   const versionNum = parseInt(activeVersion[1])
   const oldPrefix = versionNum > 1 ? `v${versionNum - 1}:` : null
+
+  // Valor filtrado: dentro de JSONB o filtro usa a sintaxe `coluna->>chave`
+  const filterColumn = jsonbKey ? `${column}->>${jsonbKey}` : column
 
   process.stdout.write(`\n📦 ${label} (${table}.${column})... `)
 
@@ -264,7 +296,7 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
     // Busca registros com dados na versão antiga
     let query = supabase
       .from(table)
-      .select(`id, ${column}`)
+      .select(`id, ${column}${contextColumn ? `, ${contextColumn}` : ""}`)
 
     // Filtros adicionais (ex: pix_key_type = 'cpf')
     if (filters) {
@@ -274,7 +306,7 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
     }
 
     // Filtra apenas registros com prefixo da versão ANTERIOR
-    query = query.like(column, `${oldPrefix}%`)
+    query = query.like(filterColumn, `${oldPrefix}%`)
 
     const { data: records, error } = await query
 
@@ -304,7 +336,11 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
       const updates: { id: string;[key: string]: any }[] = []
 
       for (const record of batch) {
-        const oldValue = (record as any)[column]
+        const rowContext = contextColumn ? (record as any)[contextColumn] : context
+        const oldValue = jsonbKey
+          ? (record as any)?.[column]?.[jsonbKey]
+          : (record as any)[column]
+
         if (!oldValue) {
           stats.skipped++
           continue
@@ -316,9 +352,19 @@ async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersi
           continue
         }
 
+        if (!rowContext) {
+          stats.errors++
+          console.error(`\n⚠  Contexto de criptografia ausente em ${table} id=${record.id}`)
+          continue
+        }
+
         try {
-          const newValue = reEncryptWithActiveVersion(oldValue, context, activeVersion)
-          updates.push({ id: record.id, [column]: newValue })
+          const newValue = reEncryptWithActiveVersion(oldValue, rowContext, activeVersion)
+          updates.push(
+            jsonbKey
+              ? { id: record.id, [column]: { ...((record as any)[column] || {}), [jsonbKey]: newValue } }
+              : { id: record.id, [column]: newValue },
+          )
         } catch (err) {
           stats.errors++
           console.error(`\n⚠  Erro ao re-criptografar ${table}.${column} id=${record.id}: ${err}`)
@@ -392,7 +438,8 @@ async function main() {
   console.log("📋 Colunas que serão migradas:")
   console.log("─".repeat(60))
   for (const m of MIGRATIONS) {
-    console.log(`   ${m.table}.${m.column} → contexto "${m.context}"`)
+    const contextLabel = m.contextColumn ? `coluna "${m.contextColumn}"` : `contexto "${m.context}"`
+    console.log(`   ${m.table}.${m.column} → ${contextLabel}`)
   }
   console.log("─".repeat(60))
   console.log()

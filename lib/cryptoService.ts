@@ -246,13 +246,13 @@ export function decrypt(data: string, context: CryptoContext): string {
  *
  * Example migration usage:
  * ```ts
- * // For each partner in the database:
- * const newToken = reEncryptWithActiveVersion(partner.mp_access_token_encrypted, "mercadopago")
- * await supabase.from("partners").update({ mp_access_token_encrypted: newToken }).eq("id", partner.id)
+ * // For each integration row in the database:
+ * const newToken = reEncryptWithActiveVersion(integration.access_token_encrypted, "mercadopago")
+ * await supabase.from("partner_integrations").update({ access_token_encrypted: newToken }).eq("id", integration.id)
  * ```
  *
  * @param data    - The versioned encrypted string to re-encrypt
- * @param context - "cpf" or "mercadopago"
+ * @param context - "cpf", "mercadopago", "whatsapp" or "superfrete"
  * @returns       - Newly encrypted string under ACTIVE_KEY_VERSION with fresh IV
  */
 export function reEncryptWithActiveVersion(data: string, context: CryptoContext): string {

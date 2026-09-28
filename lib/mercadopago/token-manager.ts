@@ -1,6 +1,12 @@
 import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
 import { encrypt, decrypt } from "@/lib/cryptoService"
+import {
+    MERCADOPAGO_PROVIDER,
+    findMercadoPagoIntegration,
+    getMpTokenExpiresAt,
+    getMpRefreshTokenEncrypted,
+} from "@/lib/services/payments/mercadopago-integration"
 
 const refreshPromises = new Map<string, Promise<string>>()
 
@@ -23,24 +29,20 @@ export async function getValidMercadoPagoAccessToken(partnerId: string): Promise
 async function performTokenRefreshOrReturnValid(partnerId: string): Promise<string> {
     const supabase = createAdminClient()
 
-    const { data: partner, error } = await supabase
-        .from("partners")
-        .select("mp_access_token_encrypted, mp_refresh_token_encrypted, mp_token_expires_at")
-        .eq("id", partnerId)
-        .single()
+    const integration = await findMercadoPagoIntegration(supabase, partnerId)
 
-    if (error || !partner || !partner.mp_access_token_encrypted) {
+    if (!integration?.access_token_encrypted) {
         throw new Error("Partner or encrypted access token not found")
     }
 
-    const expiresAt = partner.mp_token_expires_at ? new Date(partner.mp_token_expires_at) : null
+    const expiresAt = getMpTokenExpiresAt(integration)
 
     // Add a 5 minute buffer to avoid using a token that is about to expire mid-flight
     const BUFFER_MS = 5 * 60 * 1000
 
     if (expiresAt && (expiresAt.getTime() - BUFFER_MS > Date.now())) {
         try {
-            return decrypt(partner.mp_access_token_encrypted, "mercadopago")
+            return decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
         } catch (err) {
             console.error({ event: "mercadopago_token_decrypt_error", partnerId, error: err })
             throw new Error("Failed to decrypt current access token")
@@ -48,14 +50,15 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
     }
 
     // Token is expired or about to expire. We need to refresh it.
-    if (!partner.mp_refresh_token_encrypted) {
+    const refreshTokenEncrypted = getMpRefreshTokenEncrypted(integration)
+    if (!refreshTokenEncrypted) {
         console.error({ event: "mercadopago_missing_refresh_token", partnerId })
         throw new Error("Refresh token not found for partner")
     }
 
     let decryptedRefreshToken: string
     try {
-        decryptedRefreshToken = decrypt(partner.mp_refresh_token_encrypted, "mercadopago")
+        decryptedRefreshToken = decrypt(refreshTokenEncrypted, MERCADOPAGO_PROVIDER)
     } catch (err) {
         console.error({ event: "mercadopago_refresh_token_decrypt_error", partnerId, error: err })
         throw new Error("Failed to decrypt refresh token")
@@ -114,30 +117,30 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
 
         const newExpiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null
 
-        // Prepare update payload
-        const updatePayload: any = {
-            mp_access_token_encrypted: encrypt(tokenData.access_token, "mercadopago"),
-            mp_token_expires_at: newExpiresAt?.toISOString(),
+        // Secrets live in partner_integrations. JSONB columns are replaced as a
+        // whole, so they are merged with the values read before the refresh.
+        const metadata = { ...(integration.metadata || {}) }
+        if (newExpiresAt) {
+            metadata.token_expires_at = newExpiresAt.toISOString()
+        } else {
+            delete metadata.token_expires_at
         }
 
+        const credentials = { ...(integration.credentials || {}) }
         // MercadoPago typically rotates the refresh token, store the new one if provided
         if (tokenData.refresh_token) {
-            updatePayload.mp_refresh_token_encrypted = encrypt(tokenData.refresh_token, "mercadopago")
+            credentials.refresh_token_encrypted = encrypt(tokenData.refresh_token, MERCADOPAGO_PROVIDER)
         }
 
-        // Keep environment metadata in sync on every refresh
-        if (typeof tokenData.live_mode === "boolean") {
-            updatePayload.mp_live_mode = tokenData.live_mode
-        }
-        if (tokenData.public_key) {
-            updatePayload.mp_public_key = tokenData.public_key
-        }
-
-        // Store the updated tokens
         const { error: updateError } = await supabase
-            .from("partners")
-            .update(updatePayload)
-            .eq("id", partnerId)
+            .from("partner_integrations")
+            .update({
+                access_token_encrypted: encrypt(tokenData.access_token, MERCADOPAGO_PROVIDER),
+                credentials,
+                metadata,
+            })
+            .eq("partner_id", partnerId)
+            .eq("provider_slug", MERCADOPAGO_PROVIDER)
 
         if (updateError) {
             console.error({
@@ -146,6 +149,31 @@ async function performTokenRefreshOrReturnValid(partnerId: string): Promise<stri
                 error: updateError.message
             })
             // Even if update fails, we can still return the new token for this request to succeed and not block the user.
+        }
+
+        // Status fields are still read from partners (legacy path) until the
+        // follow-up migration moves them into partner_integrations.config.
+        const legacyStatusPayload: Record<string, unknown> = {
+            mp_token_expires_at: newExpiresAt?.toISOString() ?? null,
+        }
+        if (typeof tokenData.live_mode === "boolean") {
+            legacyStatusPayload.mp_live_mode = tokenData.live_mode
+        }
+        if (tokenData.public_key) {
+            legacyStatusPayload.mp_public_key = tokenData.public_key
+        }
+
+        const { error: legacyStatusError } = await supabase
+            .from("partners")
+            .update(legacyStatusPayload)
+            .eq("id", partnerId)
+
+        if (legacyStatusError) {
+            console.error({
+                event: "mercadopago_status_update_failed",
+                partnerId,
+                error: legacyStatusError.message
+            })
         }
 
         return tokenData.access_token

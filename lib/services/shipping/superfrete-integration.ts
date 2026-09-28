@@ -5,24 +5,11 @@ import {
   type SuperFreteClient,
   type SuperFreteEnvironment,
 } from "@/lib/services/shipping/superfrete"
+import type { PartnerIntegrationRow } from "@/lib/services/integrations/types"
 
 export const SUPERFRETE_PROVIDER = "superfrete"
 
-export interface PartnerIntegrationRow {
-  id: string
-  partner_id: string
-  provider_slug: string
-  status: "connected" | "disconnected" | "pending" | "error"
-  account_id: string | null
-  account_email: string | null
-  access_token_encrypted: string | null
-  webhook_secret_encrypted: string | null
-  webhook_id: string | null
-  config: Record<string, any>
-  credentials: Record<string, any>
-  metadata: Record<string, any>
-  connected_at: string | null
-}
+export type { PartnerIntegrationRow }
 
 export function resolveSuperFreteEnvironment(
   explicit: unknown,

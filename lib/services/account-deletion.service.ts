@@ -2,6 +2,7 @@ import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { cancelMpSubscription } from "@/lib/services/mercadopago/subscriptions"
 import { decrypt } from "@/lib/cryptoService"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3"
 import { getR2ServerConfig } from "@/lib/r2/r2-server-config"
 import { SecureLogger } from "@/lib/secure-logger"
@@ -342,14 +343,15 @@ export class AccountDeletionService {
       }
 
       // Find decrypted token of the partner
-      const { data: partner } = await admin
-        .from("partners")
-        .select("mp_access_token_encrypted")
-        .eq("id", partnerId)
-        .single()
+      const { data: integration } = await admin
+        .from("partner_integrations")
+        .select("access_token_encrypted")
+        .eq("partner_id", partnerId)
+        .eq("provider_slug", MERCADOPAGO_PROVIDER)
+        .maybeSingle()
 
-      if (partner?.mp_access_token_encrypted) {
-        const storeAccessToken = decrypt(partner.mp_access_token_encrypted, "mercadopago")
+      if (integration?.access_token_encrypted) {
+        const storeAccessToken = decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
 
         for (const sub of subs) {
           if (sub.mp_preapproval_id) {

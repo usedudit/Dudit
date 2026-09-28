@@ -4,6 +4,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache"
 import { encrypt, decrypt } from "@/lib/cryptoService"
+import {
+  MERCADOPAGO_PROVIDER,
+  findMercadoPagoIntegration,
+  getMpRefreshTokenEncrypted,
+} from "@/lib/services/payments/mercadopago-integration"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -37,25 +42,19 @@ export async function disconnectMercadoPagoAction() {
 
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
-  const { data: partner } = await supabase
-    .from("partners")
-    .select("id, mp_access_token_encrypted, mp_refresh_token_encrypted")
-    .eq("id", ctx.partnerId)
-    .single()
-
-  if (!partner) {
-    return { error: "Parceiro não encontrado" }
-  }
+  const admin = getAdminClient()
+  const integration = await findMercadoPagoIntegration(admin, ctx.partnerId)
 
   // Revoga o token no Mercado Pago antes de limpar localmente
   try {
     addMonitoringBreadcrumb({ domain: "payment", message: "mercadopago.disconnect.started", metadata: { partnerId: ctx.partnerId } })
-    const accessToken = partner.mp_access_token_encrypted
-      ? decrypt(partner.mp_access_token_encrypted, "mercadopago")
+    const accessToken = integration?.access_token_encrypted
+      ? decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
       : null
 
-    const refreshToken = partner.mp_refresh_token_encrypted
-      ? decrypt(partner.mp_refresh_token_encrypted, "mercadopago")
+    const refreshTokenEncrypted = getMpRefreshTokenEncrypted(integration)
+    const refreshToken = refreshTokenEncrypted
+      ? decrypt(refreshTokenEncrypted, MERCADOPAGO_PROVIDER)
       : null
 
     const tokenToRevoke = refreshToken || accessToken
@@ -76,12 +75,32 @@ export async function disconnectMercadoPagoAction() {
     captureError(err, {
       module: "payments",
       action: "mercadopago_token_revoke",
-      partnerId: partner.id,
+      partnerId: ctx.partnerId,
     })
-    console.error({ event: "mercadopago_token_revoke_error", partnerId: partner.id, error: err })
+    console.error({ event: "mercadopago_token_revoke_error", partnerId: ctx.partnerId, error: err })
   }
 
-  const { error } = await supabase
+  const { error } = await admin
+    .from("partner_integrations")
+    .update({
+      status: "disconnected",
+      account_id: null,
+      access_token_encrypted: null,
+      credentials: {},
+      metadata: {},
+      connected_at: null,
+      disconnected_at: new Date().toISOString(),
+    })
+    .eq("partner_id", ctx.partnerId)
+    .eq("provider_slug", MERCADOPAGO_PROVIDER)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Status fields are still the read path for the app; they move into
+  // partner_integrations.config in the follow-up migration.
+  const { error: statusError } = await supabase
     .from("partners")
     .update({
       mp_user_id: null,
@@ -92,10 +111,10 @@ export async function disconnectMercadoPagoAction() {
       mp_token_expires_at: null,
       mp_connected_at: null,
     })
-    .eq("id", partner.id)
+    .eq("id", ctx.partnerId)
 
-  if (error) {
-    return { error: error.message }
+  if (statusError) {
+    return { error: statusError.message }
   }
 
   await supabase
@@ -106,10 +125,10 @@ export async function disconnectMercadoPagoAction() {
       is_active: false,
       updated_at: new Date().toISOString(),
     })
-    .eq("partner_id", partner.id)
+    .eq("partner_id", ctx.partnerId)
     .eq("integration_source", "mercadopago")
 
-  revalidateTag(`mp-status-${partner.id}`, "max")
+  revalidateTag(`mp-status-${ctx.partnerId}`, "max")
   revalidatePath("/erp/configuracoes")
   return { success: true }
 }
@@ -179,12 +198,20 @@ export async function refreshMercadoPagoTokenAction() {
 
   const { data: partner } = await supabase.from("partners").select("*").eq("id", ctx.partnerId).single()
 
-  if (!partner || !partner.mp_refresh_token_encrypted) {
+  if (!partner) {
+    return { error: "Parceiro não encontrado" }
+  }
+
+  const admin = getAdminClient()
+  const integration = await findMercadoPagoIntegration(admin, ctx.partnerId)
+  const refreshTokenEncrypted = getMpRefreshTokenEncrypted(integration)
+
+  if (!refreshTokenEncrypted) {
     return { error: "Mercado Pago não conectado" }
   }
 
   try {
-    const refreshToken = decrypt(partner.mp_refresh_token_encrypted, "mercadopago")
+    const refreshToken = decrypt(refreshTokenEncrypted, MERCADOPAGO_PROVIDER)
 
     const tokenResponse = await fetch("https://api.mercadopago.com/oauth/token", {
       method: "POST",
@@ -208,20 +235,39 @@ export async function refreshMercadoPagoTokenAction() {
 
     const expiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null
 
-    const { error } = await supabase
-      .from("partners")
+    // JSONB columns are replaced as a whole, so merge with what was read above.
+    const metadata = { ...(integration?.metadata || {}) }
+    if (expiresAt) {
+      metadata.token_expires_at = expiresAt.toISOString()
+    } else {
+      delete metadata.token_expires_at
+    }
+
+    const credentials = { ...(integration?.credentials || {}) }
+    if (tokenData.refresh_token) {
+      credentials.refresh_token_encrypted = encrypt(tokenData.refresh_token, MERCADOPAGO_PROVIDER)
+    }
+
+    const { error } = await admin
+      .from("partner_integrations")
       .update({
-        mp_access_token_encrypted: encrypt(tokenData.access_token, "mercadopago"),
-        mp_refresh_token_encrypted: tokenData.refresh_token
-          ? encrypt(tokenData.refresh_token, "mercadopago")
-          : partner.mp_refresh_token_encrypted,
-        mp_token_expires_at: expiresAt?.toISOString(),
+        access_token_encrypted: encrypt(tokenData.access_token, MERCADOPAGO_PROVIDER),
+        credentials,
+        metadata,
       })
-      .eq("id", partner.id)
+      .eq("partner_id", ctx.partnerId)
+      .eq("provider_slug", MERCADOPAGO_PROVIDER)
 
     if (error) {
       return { error: error.message }
     }
+
+    // Status fields are still the read path for the app; they move into
+    // partner_integrations.config in the follow-up migration.
+    await supabase
+      .from("partners")
+      .update({ mp_token_expires_at: expiresAt?.toISOString() })
+      .eq("id", partner.id)
 
     revalidateTag(`mp-status-${partner.id}`, "max")
     revalidatePath("/erp/configuracoes")

@@ -11,6 +11,7 @@ import {
   createMpPreapproval,
   getMpPreapprovalDetails,
 } from "@/lib/services/mercadopago/partner-preapproval"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 
 interface CreatePreapprovalInput {
   partnerId: string
@@ -34,7 +35,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     // 1. Fetch partner OAuth to confirm ownership before executing API requests
     const { data: partner, error: partnerErr } = await admin
       .from("partners")
-      .select("id, user_id, mp_access_token_encrypted")
+      .select("id, user_id, partner_integrations(provider_slug, access_token_encrypted)")
       .eq("id", input.partnerId)
       .single()
 
@@ -42,7 +43,11 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       return { success: false, error: "Parceiro não encontrado ou sem credenciais Mercado Pago." }
     }
 
-    if (!partner.mp_access_token_encrypted) {
+    const mpIntegration = ((partner as any).partner_integrations || []).find(
+      (row: { provider_slug: string }) => row.provider_slug === MERCADOPAGO_PROVIDER,
+    )
+
+    if (!mpIntegration?.access_token_encrypted) {
       return { success: false, error: "Parceiro não possui integração ativa com Mercado Pago." }
     }
 

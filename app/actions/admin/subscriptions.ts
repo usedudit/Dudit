@@ -8,6 +8,8 @@
  */
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -175,7 +177,7 @@ export async function forceCancelSubscription(
     // Anti-IDOR: re-fetch
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, user_id, mp_user_id, mp_access_token_encrypted")
+        .select("id, user_id, mp_user_id")
         .eq("id", partnerId)
         .single()
 
@@ -197,9 +199,30 @@ export async function forceCancelSubscription(
         return { success: false, error: "Parceiro não possui conexão com Mercado Pago" }
     }
 
-    // SECURITY: Clear MP tokens from the database.
+    // SECURITY: Clear MP connection from the database.
     // We don't call the MP API to revoke since that would require decrypting,
     // and the token may already be expired. Instead we clear it locally.
+    // partner_integrations has no write policy for authenticated users.
+    const { error: integrationError } = await getAdminClient()
+        .from("partner_integrations")
+        .update({
+            status: "disconnected",
+            account_id: null,
+            access_token_encrypted: null,
+            credentials: {},
+            metadata: {},
+            connected_at: null,
+            disconnected_at: new Date().toISOString(),
+        })
+        .eq("partner_id", partnerId)
+        .eq("provider_slug", MERCADOPAGO_PROVIDER)
+
+    if (integrationError) {
+        return { success: false, error: integrationError.message }
+    }
+
+    // Status fields are still the read path for the app; they move into
+    // partner_integrations.config in the follow-up migration.
     const { error: updateError } = await supabase
         .from("partners")
         .update({
