@@ -120,7 +120,7 @@ type PosPaymentResolveResult =
     | {
         ok: true
         totalAmount: number
-        adjustedBreakdown: Array<{ method: string; amount: number; paymentMethodId: string | null; installmentNumber: number }>
+        adjustedBreakdown: Array<{ method: string; amount: number; paymentMethodId: string | null; installmentNumber: number; installmentCostAmount?: number; installmentFeeBearer?: string | null; feeBearer?: string | null; interestAmount?: number; feeAmount?: number; fixedFeeAmount?: number; paymentMethodDiscountAmount?: number }>
     }
 
 async function resolvePosFinalTotalWithPaymentMethod(params: {
@@ -206,8 +206,10 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
         effectiveAmount: s.effectiveAmount,
         netAmount: s.netAmount,
         feeBearer: s.feeBearer,
+        installmentFeeBearer: s.installmentFeeBearer,
         paymentMethodDiscountAmount: s.paymentMethodDiscountAmount ?? 0,
         interestAmount: s.interestAmount,
+        installmentCostAmount: s.installmentCostAmount,
         feeAmount: s.feeAmount,
         fixedFeeAmount: s.fixedFeeAmount,
         paymentMethodId: s.paymentMethodId,
@@ -220,9 +222,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     const baseDiscount = recalculated.paymentMethodDiscountAmount
 
     const isPartial = sumBase < baseTotal - 0.005
-    const finalTotal = isPartial
-        ? Math.max(0, safeMoney(baseTotal + recalculated.feeAmount + recalculated.fixedFeeAmount + recalculated.interestAmount - baseDiscount))
-        : recalculated.finalTotal
+    const finalTotal = recalculated.finalTotal
 
     return {
         ok: true,
@@ -381,18 +381,42 @@ async function syncPosSaleToOrders(params: {
     let paymentMethodInterestAmount = 0
     let paymentMethodFeeAmount = 0
     let paymentMethodFixedFeeAmount = 0
+    let customerExtraFees = 0
     if (params.paymentBreakdown && params.paymentBreakdown.length > 0) {
         for (const entry of params.paymentBreakdown) {
             const pmDiscount = entry.paymentMethodDiscountAmount !== undefined
                 ? Math.max(0, Number(entry.paymentMethodDiscountAmount || 0))
                 : (entry.adjustmentType === 'discount' ? Math.max(0, Number(entry.adjustmentAmount || 0)) : 0)
             paymentMethodDiscountAmount = safeMoney(paymentMethodDiscountAmount + pmDiscount)
-            paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + Number(entry.interestAmount || 0))
-            paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + Number(entry.feeAmount || 0))
-            paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
+            const entryInterest = Number(entry.interestAmount || 0)
+            const entryInstallmentCost = Number(entry.installmentCostAmount || 0)
+            const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+            const entryFeeAmount = Number(entry.feeAmount || 0)
+            const entryFixedFeeAmount = Number(entry.fixedFeeAmount || 0)
+            const isCustomerFeeBearer = String(entry.feeBearer || "merchant").toLowerCase() === "customer"
+            const isCustomerInstallmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase() === "customer"
+
+            // Merchant-absorbed amounts
+            if (!isCustomerFeeBearer) {
+                paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + entryFixedInterest)
+                if (!isCustomerInstallmentFeeBearer) {
+                    paymentMethodInterestAmount = safeMoney(paymentMethodInterestAmount + entryInstallmentCost)
+                } else {
+                    customerExtraFees = safeMoney(customerExtraFees + entryInstallmentCost)
+                }
+                paymentMethodFeeAmount = safeMoney(paymentMethodFeeAmount + entryFeeAmount)
+                paymentMethodFixedFeeAmount = safeMoney(paymentMethodFixedFeeAmount + entryFixedFeeAmount)
+            } else {
+                // Customer pays all relevant costs
+                customerExtraFees = safeMoney(customerExtraFees + entryFixedInterest)
+                if (isCustomerInstallmentFeeBearer) {
+                    customerExtraFees = safeMoney(customerExtraFees + entryInstallmentCost)
+                }
+                customerExtraFees = safeMoney(customerExtraFees + entryFeeAmount + entryFixedFeeAmount)
+            }
         }
     }
-    const paymentMethodExtraAmount = safeMoney(paymentMethodInterestAmount + paymentMethodFeeAmount + paymentMethodFixedFeeAmount)
+    const paymentMethodExtraAmount = safeMoney(customerExtraFees)
     const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
     let deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
     if (params.isPendingDelivery) {
@@ -1277,8 +1301,10 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             effectiveAmount: safeMoney(Number(row.effectiveAmount ?? row.amount ?? 0)),
             netAmount: safeMoney(Number(row.netAmount ?? row.effectiveAmount ?? row.amount ?? 0)),
             feeBearer: row.feeBearer || null,
+            installmentFeeBearer: row.installmentFeeBearer || null,
             paymentMethodDiscountAmount: Math.max(0, Number(row.paymentMethodDiscountAmount || 0)),
             interestAmount: Math.max(0, Number(row.interestAmount || 0)),
+            installmentCostAmount: Math.max(0, Number(row.installmentCostAmount || 0)),
             feeAmount: Math.max(0, Number(row.feeAmount || 0)),
             fixedFeeAmount: Math.max(0, Number(row.fixedFeeAmount || 0)),
             paymentMethodId: row.paymentMethodId || null,

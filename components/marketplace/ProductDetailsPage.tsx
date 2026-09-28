@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, Checkbox, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
-import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit, formatDeliveryDaysRange } from "@/lib/utils"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
@@ -198,7 +198,7 @@ export function ProductDetailsPageClient({
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
     const [carrierSelectedServiceId, setCarrierSelectedServiceId] = useState<number | null>(null)
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
-    const [carrierQuoteKey, setCarrierQuoteKey] = useState<string | null>(null)
+    const carrierQuoteKeyRef = useRef<string | null>(null)
     const [carrierError, setCarrierError] = useState<string | null>(null)
     const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
@@ -799,21 +799,27 @@ export function ProductDetailsPageClient({
         return digits.length === 8 ? digits : ""
     }, [userId, selectedAddress?.zip_code, cep])
 
-    // Quote carrier options once own delivery reports no coverage ("raio")
+    // Quote carrier options once own delivery reports no coverage ("raio").
+    // The dedupe key lives in a ref so this effect never re-runs on its own
+    // updates — otherwise the cleanup would cancel the in-flight request.
     useEffect(() => {
         const targetPartnerId = partner.partner_id || partner.id
-        if (!carrierDestinationCep || !targetPartnerId) {
+        if (!carrierDestinationCep || !targetPartnerId || !partner.mp_user_id) {
             setCarrierOptions([])
             setCarrierSelectedServiceId(null)
-            setCarrierQuoteKey(null)
+            carrierQuoteKeyRef.current = null
             setCarrierError(null)
             return
         }
-        if (deliveryLoading || !deliveryError || !deliveryError.toLowerCase().includes("raio")) return
+        if (deliveryLoading || !deliveryError || !deliveryError.toLowerCase().includes("raio")) {
+            if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) carrierQuoteKeyRef.current = null
+            return
+        }
         const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}`
-        if (carrierQuoteKey === dedupeKey) return
+        if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
-        setCarrierQuoteKey(dedupeKey)
+        let completed = false
+        carrierQuoteKeyRef.current = dedupeKey
         setCarrierQuoteLoading(true)
         ;(async () => {
             try {
@@ -832,11 +838,15 @@ export function ProductDetailsPageClient({
                 if (!active) return
                 setCarrierError("Não foi possível calcular o frete agora.")
             } finally {
+                completed = true
                 if (active) setCarrierQuoteLoading(false)
             }
         })()
-        return () => { active = false }
-    }, [carrierDestinationCep, deliveryError, deliveryLoading, partner.partner_id, partner.id, carrierQuoteKey])
+        return () => {
+            active = false
+            if (!completed) carrierQuoteKeyRef.current = null
+        }
+    }, [carrierDestinationCep, deliveryError, deliveryLoading, partner.partner_id, partner.id, partner.mp_user_id])
 
     // Apply the selected carrier option as delivery fee whenever own quote failed
     useEffect(() => {
@@ -1929,11 +1939,9 @@ export function ProductDetailsPageClient({
                                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
                                                             {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
                                                         </span>
-                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                            {opt.deliveryMinDays != null && opt.deliveryMaxDays != null
-                                                                ? `Entrega em ${opt.deliveryMinDays} a ${opt.deliveryMaxDays} dias`
-                                                                : "Prazo a confirmar"}
-                                                        </span>
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
+                                                            </span>
                                                     </span>
                                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(Number(opt.price))}

@@ -13,7 +13,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { getServiceUrl } from "@/lib/utils/url-generator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
@@ -522,7 +522,7 @@ export function CheckoutPageClient() {
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
     const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
-    const [carrierQuoteKey, setCarrierQuoteKey] = useState<string | null>(null)
+    const carrierQuoteKeyRef = useRef<string | null>(null)
     const [carrierError, setCarrierError] = useState<string | null>(null)
 
     const destinationCep = useMemo(() => {
@@ -536,17 +536,25 @@ export function CheckoutPageClient() {
     useEffect(() => {
         setCarrierOptions([])
         setSelectedCarrierServiceId(null)
-        setCarrierQuoteKey(null)
+        carrierQuoteKeyRef.current = null
         setCarrierError(null)
     }, [destinationCep])
 
-    // Quote carrier options once own delivery reports no coverage ("raio")
+    // Quote carrier options once own delivery reports no coverage ("raio").
+    // NOTE: the dedupe key lives in a ref (not state) so this effect never
+    // re-runs on its own updates — otherwise the cleanup below would cancel
+    // the in-flight request and discard its results.
     useEffect(() => {
-        if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep) return
-        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
-        if (carrierQuoteKey === destinationCep) return
+        if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep || !partnerInfo.mpConnected) return
+        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) {
+            carrierQuoteKeyRef.current = null
+            return
+        }
+        const dedupeKey = `${partnerId}:${destinationCep}`
+        if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
-        setCarrierQuoteKey(destinationCep)
+        let completed = false
+        carrierQuoteKeyRef.current = dedupeKey
         setCarrierQuoteLoading(true)
         ;(async () => {
             try {
@@ -570,11 +578,15 @@ export function CheckoutPageClient() {
                 if (!active) return
                 setCarrierError("Não foi possível calcular o frete agora.")
             } finally {
+                completed = true
                 if (active) setCarrierQuoteLoading(false)
             }
         })()
-        return () => { active = false }
-    }, [deliveryError, destinationCep, partnerId, formData.deliveryType, carrierQuoteKey])
+        return () => {
+            active = false
+            if (!completed) carrierQuoteKeyRef.current = null
+        }
+    }, [deliveryError, destinationCep, partnerId, formData.deliveryType, partnerInfo.mpConnected])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)
@@ -681,15 +693,30 @@ export function CheckoutPageClient() {
     // Auto-set paymentOption to "traditional" for non-MP stores (only if pickup payment is allowed or not in pickup mode)
     const pickupPolicyFromContext = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
+    const isWhatsappFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
+    const carrierDeliveryActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
     useEffect(() => {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
-            setPaymentOption("traditional")
+            // Só força o modo manual quando nada foi escolhido ainda — nunca
+            // sobrescrever uma seleção explícita (ex.: créditos de assinatura).
+            if (paymentOption === null) setPaymentOption("traditional")
             return
         }
         if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null && !isPickupRequiringOnline) {
             setPaymentOption("traditional")
         }
     }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow])
+
+    // Entrega por transportadora (SuperFrete) deve ser paga online via Mercado Pago
+    // — igual ao sinal: só faz sentido quando o MP está conectado (o corte de
+    // cotação já exige mpConnected). No fluxo WhatsApp o pagamento continua manual.
+    useEffect(() => {
+        if (isWhatsappFlow || !carrierDeliveryActive) return
+        if (paymentOption === "traditional" || paymentOption === null) {
+            setPaymentOption("mercadopago")
+            setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+        }
+    }, [isWhatsappFlow, carrierDeliveryActive, paymentOption])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -1011,6 +1038,9 @@ export function CheckoutPageClient() {
         requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
     )))
+    // Entrega por transportadora exige pagamento online (Mercado Pago) — exceto
+    // no fluxo WhatsApp, onde o pedido é fechado no chat e o pagamento é manual.
+    const showManualPaymentOption = showTraditionalPaymentOption && (isWhatsappFlow || !carrierDeliveryActive)
 
     const schedulingLines = useMemo(
         () =>
@@ -1153,7 +1183,8 @@ export function CheckoutPageClient() {
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
         paymentOption === "traditional" &&
-        formData.paymentMethod
+        formData.paymentMethod &&
+        formData.paymentMethod !== "mercadopago"
     )
     const couponItems = useMemo(() => {
         return (sessionData?.source === "cart" && sessionData.cartItems?.length)
@@ -1871,9 +1902,7 @@ export function CheckoutPageClient() {
                                         {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
                                     </span>
                                     <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        {opt.deliveryMinDays != null && opt.deliveryMaxDays != null
-                                            ? `Entrega em ${opt.deliveryMinDays} a ${opt.deliveryMaxDays} dias`
-                                            : "Prazo a confirmar"}
+                                        {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
                                     </span>
                                 </span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -3028,7 +3057,7 @@ export function CheckoutPageClient() {
                                                     }
                                                 />
 
-                                                {showTraditionalPaymentOption && (
+                                                {showManualPaymentOption && (
                                                     <ListItem
                                                         icon={MoneyIcon}
                                                         title={traditionalPaymentLabel}
@@ -3066,6 +3095,14 @@ export function CheckoutPageClient() {
                                                             />
                                                         }
                                                     />
+                                                )}
+                                                {carrierDeliveryActive && (
+                                                    <div className="ml-8 mt-2">
+                                                        <InfoCard
+                                                            message="Entrega por transportadora: o pagamento deve ser feito online pelo Mercado Pago."
+                                                            color="orange"
+                                                        />
+                                                    </div>
                                                 )}
                                                 {paymentOption === "traditional" && checkoutContext?.deposit.available && (
                                                     <div className="ml-8 mt-2">
@@ -3183,10 +3220,52 @@ export function CheckoutPageClient() {
                                         </>
                                     ) : (
                                         <>
-                                            <div className="flex gap-3 mb-6">
-                                                <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
-                                            </div>
+                                            {showManualPaymentOption ? (
+                                                <div className="space-y-1 mb-4">
+                                                    <ListItem
+                                                        icon={MoneyIcon}
+                                                        title={traditionalPaymentLabel}
+                                                        description={
+                                                            requirements?.hasPayOnService
+                                                                ? "Reserve e combine o pagamento com a loja."
+                                                                : "Pague na entrega ou retirada."
+                                                        }
+                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                        onClick={() => {
+                                                            if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                return
+                                                            }
+                                                            setPaymentOption("traditional")
+                                                            if (formData.paymentMethod === "mercadopago") {
+                                                                setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                            }
+                                                        }}
+                                                        right={
+                                                            <RadioButton
+                                                                name="paymentOptionDesktop"
+                                                                value="traditional"
+                                                                checked={paymentOption === "traditional"}
+                                                                onChange={() => {
+                                                                    if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                        setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                        return
+                                                                    }
+                                                                    setPaymentOption("traditional")
+                                                                    if (formData.paymentMethod === "mercadopago") {
+                                                                        setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                                    }
+                                                                }}
+                                                            />
+                                                        }
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-3 mb-6">
+                                                    <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
+                                                </div>
+                                            )}
                                             <div className="mb-6">
                                                 {!formData.paymentMethod ? (
                                                     <ListItem
@@ -3504,7 +3583,7 @@ export function CheckoutPageClient() {
                                                 }
                                             />
 
-                                            {showTraditionalPaymentOption && (
+                                            {showManualPaymentOption && (
                                                 <ListItem
                                                     icon={MoneyIcon}
                                                     title={traditionalPaymentLabel}
@@ -3553,14 +3632,56 @@ export function CheckoutPageClient() {
                                             )}
                                         </div>
                                     ) : (
-                                        <div className="flex gap-2.5 pb-2">
-                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {requirements?.hasPayOnService
-                                                    ? "Pagamento direto com o vendedor (reserva / pagar no atendimento)."
-                                                    : "Pagamento direto com o vendedor."}
-                                            </p>
-                                        </div>
+                                        showManualPaymentOption ? (
+                                            <div className="space-y-1">
+                                                <ListItem
+                                                    icon={MoneyIcon}
+                                                    title={traditionalPaymentLabel}
+                                                    description={
+                                                        requirements?.hasPayOnService
+                                                            ? "Reserve e combine o pagamento com a loja."
+                                                            : "Pague ao receber ou retirar."
+                                                    }
+                                                    className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                                    onClick={() => {
+                                                        if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                            setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                            return
+                                                        }
+                                                        setPaymentOption("traditional")
+                                                        if (formData.paymentMethod === "mercadopago") {
+                                                            setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                        }
+                                                    }}
+                                                    right={
+                                                        <RadioButton
+                                                            name="paymentOptionMobile"
+                                                            value="traditional"
+                                                            checked={paymentOption === "traditional"}
+                                                            onChange={() => {
+                                                                if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                    setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                    return
+                                                                }
+                                                                setPaymentOption("traditional")
+                                                                if (formData.paymentMethod === "mercadopago") {
+                                                                    setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                                }
+                                                            }}
+                                                        />
+                                                    }
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-2.5 pb-2">
+                                                <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    {requirements?.hasPayOnService
+                                                        ? "Pagamento direto com o vendedor (reserva / pagar no atendimento)."
+                                                        : "Pagamento direto com o vendedor."}
+                                                </p>
+                                            </div>
+                                        )
                                     )}
 
                                     {paymentOption === "traditional" && (
@@ -4299,13 +4420,17 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="pb-4">
-                    {(() => {
-                        const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
-                        const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
-                        const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
-                        const showTraditionalTab = !isPickup || canPayUponPickup
-                        const showMercadoPagoTab = partnerInfo.mpConnected
-                        const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
+                        {(() => {
+                            const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+                            const isWhatsappTabFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
+                            const carrierActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
+                            const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
+                            const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
+                            // Fluxo WhatsApp: sempre pagamento manual. Fora dele, a
+                            // entrega por transportadora exige Mercado Pago (sem tab manual).
+                            const showTraditionalTab = isWhatsappTabFlow || ((!isPickup || canPayUponPickup) && !carrierActive)
+                            const showMercadoPagoTab = partnerInfo.mpConnected && !isWhatsappTabFlow
+                            const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
                         if (!hasAnyPaymentMethod) {
                             return (
@@ -4317,7 +4442,7 @@ export function CheckoutPageClient() {
                             )
                         }
 
-                        if (mustPayOnline && !partnerInfo.mpConnected) {
+                            if (mustPayOnline && !partnerInfo.mpConnected && !isWhatsappTabFlow) {
                             return (
                                 <div className="p-6 text-center">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
@@ -4330,7 +4455,16 @@ export function CheckoutPageClient() {
                         const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
 
                         return (
-                            <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")}>
+                                <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => {
+                                    setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")
+                                    // Mantém formData.paymentMethod consistente com a tab ativa —
+                                    // evita preview de pagamento com "mercadopago" em modo tradicional.
+                                    setFormData(prev => {
+                                        if (val === "mercadopago") return { ...prev, paymentMethod: "mercadopago", installments: 1 }
+                                        if (val === "traditional" && prev.paymentMethod === "mercadopago") return { ...prev, paymentMethod: "", installments: 1 }
+                                        return prev
+                                    })
+                                }}>
                                 {(showMercadoPagoTab || showTraditionalTab || hasSubscriptionCreditsForCheckout) ? (
                                     <TabsList className="mb-4">
                                         {hasSubscriptionCreditsForCheckout && <TabsTrigger value="subscription_credits">Usar Créditos</TabsTrigger>}

@@ -458,3 +458,34 @@ export function humanizeTimelineChangeLine(line: string): string {
 }
 
 
+
+/**
+ * Formats a delivery estimate range in pt-BR.
+ * - Same min/max (or a single value): "Entrega em 10 dias" / "Entrega em 1 dia"
+ * - Different range: "Entrega em 8 a 10 dias"
+ * - Nothing available: "Prazo a confirmar"
+ */
+export function formatDeliveryDaysRange(
+  minDays: number | null | undefined,
+  maxDays: number | null | undefined
+): string {
+  const toInt = (v: number | null | undefined): number | null => {
+    if (v == null || !Number.isFinite(Number(v))) return null
+    return Math.round(Number(v))
+  }
+  let min = toInt(minDays)
+  let max = toInt(maxDays)
+  if (min != null && max != null && min > max) {
+    const tmp = min
+    min = max
+    max = tmp
+  }
+  if (min != null && max != null && min !== max) {
+    return `Entrega em ${min} a ${max} dias`
+  }
+  const single = min ?? max
+  if (single != null) {
+    return `Entrega em ${single} ${single === 1 ? "dia" : "dias"}`
+  }
+  return "Prazo a confirmar"
+}

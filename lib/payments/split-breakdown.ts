@@ -84,6 +84,7 @@ export type RecalculatedSplitRow = SplitInputRow & {
     effectiveAmount?: number
     netAmount?: number
     installmentCostAmount?: number
+    installmentFeeBearer?: "merchant" | "customer" | null
 }
 
 /**
@@ -205,6 +206,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                     effectiveAmount: engine.effectiveAmount,
                     netAmount: engine.netAmount,
                     installmentCostAmount: engine.installmentCostAmount,
+                    installmentFeeBearer: engine.installmentFeeBearer,
                     feeBearer: engine.feeBearer,
                 },
             ],
@@ -277,6 +279,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             effectiveAmount: engine.effectiveAmount,
             netAmount: engine.netAmount,
             installmentCostAmount: engine.installmentCostAmount,
+            installmentFeeBearer: engine.installmentFeeBearer,
             feeBearer: engine.feeBearer,
         })
         finalTotal = round2(finalTotal + legAmount)
@@ -314,6 +317,7 @@ export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): PaymentB
         effectiveAmount: r.effectiveAmount ?? r.finalAmount,
         netAmount: r.netAmount ?? r.finalAmount,
         installmentCostAmount: r.installmentCostAmount ?? 0,
+        installmentFeeBearer: r.installmentFeeBearer ?? null,
         paymentMethodId: r.paymentMethodId,
         installmentNumber: r.installmentNumber,
     }))

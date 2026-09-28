@@ -1803,6 +1803,8 @@ export async function confirmServiceOrderPaymentAction(payload: {
     interestAmount?: number
     feeAmount?: number
     fixedFeeAmount?: number
+    installmentCostAmount?: number
+    installmentFeeBearer?: string
   }>
   paymentProvider?: string | null
   mpPaymentId?: string | null
@@ -1858,6 +1860,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
     let paymentMethodDiscountAmount = 0
     let paymentMethodExtraAmount = 0
     let interestAmount = 0
+    let customerVisibleInterest = 0
     let feeAmount = 0
     let originalAmount = 0
 
@@ -1867,16 +1870,30 @@ export async function confirmServiceOrderPaymentAction(payload: {
         const received = Number(entry.amountReceived ?? entry.amount ?? 0)
         originalAmount += received
         paymentMethodDiscountAmount += Number(entry.paymentMethodDiscountAmount ?? 0)
-        interestAmount += Number(entry.interestAmount ?? 0)
+
+        const entryInterest = Number(entry.interestAmount ?? 0)
+        interestAmount += entryInterest
+        const entryInstallmentCost = Number(entry.installmentCostAmount ?? 0)
+        const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+        const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
+        const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
         const entryFee = Number(entry.feeAmount ?? 0) + Number(entry.fixedFeeAmount ?? 0)
-        const bearer = entry.feeBearer || "merchant"
-        if (bearer === "merchant") {
-          feeAmount += entryFee
-        } else {
+        const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
+        const isCustomerBearer = bearer === "customer" || bearer === "buyer"
+
+        if (isCustomerBearer) {
+          customerVisibleInterest += entryFixedInterest
+        }
+        if (isCustomerInstallmentBearer) {
+          customerVisibleInterest += entryInstallmentCost
+        }
+        if (isCustomerBearer) {
           customerFeeAmount += entryFee
+        } else {
+          feeAmount += entryFee
         }
       }
-      paymentMethodExtraAmount = interestAmount + customerFeeAmount
+      paymentMethodExtraAmount = customerVisibleInterest + customerFeeAmount
     } else {
       originalAmount = payload.paidAmount
     }

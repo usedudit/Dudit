@@ -1135,6 +1135,19 @@ export async function checkoutCartAction(
       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
     }
   }
+
+  // Entrega por transportadora exige pagamento online via Mercado Pago —
+  // exceto no fluxo WhatsApp (pedido fechado no chat, pagamento manual) e
+  // pagamentos já adiantados por crédito (vale-compra / assinatura).
+  if (
+    carrierApplied &&
+    !useMercadoPago &&
+    !isWhatsappFlow &&
+    paymentMethod !== "Vale-compra" &&
+    paymentMethod !== "Assinatura (Créditos)"
+  ) {
+    return { error: "Entrega por transportadora: o pagamento deve ser feito online pelo Mercado Pago." }
+  }
   // ── Resolve payment method first (before engine call) ──
   let bestMethod: any = methodResult.data
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
@@ -1203,10 +1216,19 @@ export async function checkoutCartAction(
      }
    }
 
-  totalAmount = pricingResult.finalAmountWithPayment
-  couponDiscountAmount = pricingResult.couponDiscountAmount
-  const paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
-  const paymentMethodExtraAmount = pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount
+   totalAmount = pricingResult.finalAmountWithPayment
+   couponDiscountAmount = pricingResult.couponDiscountAmount
+   const paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
+   const isCustomerFeeBearer = pmtConfig?.feeBearer !== "merchant"
+   const isCustomerInstallmentFeeBearer = pmtConfig?.installmentFeeBearer !== "merchant"
+   const totalInterest = pricingResult.paymentMethodInterestAmount || 0
+   const installmentCost = pricingResult.paymentMethodInstallmentCostAmount || 0
+   const fixedInterest = Math.max(0, totalInterest - installmentCost)
+   const customerInterest = (isCustomerFeeBearer ? fixedInterest : 0)
+         + (isCustomerInstallmentFeeBearer ? installmentCost : 0)
+   const customerFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFeeAmount || 0) : 0
+   const customerFixedFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFixedFeeAmount || 0) : 0
+   const paymentMethodExtraAmount = customerInterest + customerFee + customerFixedFee
 
   // Handle gift items insertion
   const giftProductIds = pricingResult.appliedGiftProductIds || []
@@ -1246,9 +1268,9 @@ export async function checkoutCartAction(
     subtotal: persistedSubtotal,
     couponDiscount: persistedCouponDiscount,
     paymentMethodDiscount: persistedPaymentMethodDiscount,
-    paymentMethodInterest: pricingResult.paymentMethodInterestAmount || 0,
-    paymentMethodFee: pricingResult.paymentMethodFeeAmount || 0,
-    paymentMethodFixedFee: pricingResult.paymentMethodFixedFeeAmount || 0,
+    paymentMethodInterest: customerInterest,
+    paymentMethodFee: customerFee,
+    paymentMethodFixedFee: customerFixedFee,
     deliveryFee: persistedDeliveryFee,
     finalTotal: persistedTotal,
   }
@@ -1261,7 +1283,7 @@ export async function checkoutCartAction(
         subtotal: pricingResult.subtotal,
         couponDiscount: couponDiscountAmount,
         paymentMethodDiscount: pricingResult.paymentMethodDiscountAmount,
-        paymentMethodExtra: pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount,
+        paymentMethodExtra: paymentMethodExtraAmount,
         deliveryFee,
         finalTotal: pricingResult.finalAmountWithPayment,
       },
@@ -1401,12 +1423,19 @@ export async function checkoutCartAction(
       installmentNumber: Math.max(1, Number(installments || 1)),
       checkoutPricing: persistedCheckoutPricing,
       feeBearer: pmtConfig?.feeBearer || "merchant",
+      installmentFeeBearer: pmtConfig?.installmentFeeBearer || "merchant",
       interestAmount: pricingResult.paymentMethodInterestAmount || 0,
+      installmentCostAmount: pricingResult.paymentMethodInstallmentCostAmount || 0,
       feeAmount: pricingResult.paymentMethodFeeAmount || 0,
       fixedFeeAmount: pricingResult.paymentMethodFixedFeeAmount || 0,
       effectiveAmount: remainingBalanceToPay,
       netAmount: pmtConfig?.feeBearer === "merchant"
-        ? Math.max(0, remainingBalanceToPay - (pricingResult.paymentMethodInterestAmount || 0) - (pricingResult.paymentMethodFeeAmount || 0) - (pricingResult.paymentMethodFixedFeeAmount || 0))
+        ? Math.max(0, remainingBalanceToPay
+            - (isCustomerFeeBearer ? 0 : fixedInterest)
+            - (isCustomerInstallmentFeeBearer ? 0 : installmentCost)
+            - (pricingResult.paymentMethodFeeAmount || 0)
+            - (pricingResult.paymentMethodFixedFeeAmount || 0)
+          )
         : remainingBalanceToPay,
       ...(payDepositOnly ? (() => {
         const serviceDepositTotal = resolvedLines

@@ -362,6 +362,8 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
                 fixedFeeAmount: Math.max(0, Number(entry?.fixedFeeAmount || 0)),
                 paymentMethodId: entry?.paymentMethodId || null,
                 installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
+                installmentCostAmount: Math.max(0, Number(entry?.installmentCostAmount || 0)),
+                installmentFeeBearer: entry?.installmentFeeBearer || null,
             }
         })
 
@@ -1934,13 +1936,29 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             )
         )
 
+        const entryInterest = Number(entry.interestAmount || 0)
+        const entryInstallmentCost = Number(entry.installmentCostAmount || 0)
+        const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+        const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
+        const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+
         if (!isCustomerBearer) {
-            paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + Number(entry.interestAmount || 0))
+            paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + entryFixedInterest)
+            if (!isCustomerInstallmentBearer) {
+                paymentMethodInterestAmount = Math.max(0, paymentMethodInterestAmount + entryInstallmentCost)
+            }
             paymentMethodFeeAmount = Math.max(0, paymentMethodFeeAmount + Number(entry.feeAmount || 0))
             paymentMethodFixedFeeAmount = Math.max(0, paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
             breakdownPaymentMethodDiscountAmount = Math.max(0, breakdownPaymentMethodDiscountAmount + pmDisc)
+            if (isCustomerInstallmentBearer) {
+                customerExtraFees = Math.max(0, customerExtraFees + entryInstallmentCost)
+            }
         } else {
-            customerExtraFees = Math.max(0, customerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
+            customerExtraFees = Math.max(0, customerExtraFees + entryFixedInterest)
+            if (isCustomerInstallmentBearer) {
+                customerExtraFees = Math.max(0, customerExtraFees + entryInstallmentCost)
+            }
+            customerExtraFees = Math.max(0, customerExtraFees + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }
         if (m === "store_credit" || m === "store-credit" || m.includes("vale-compra") || m.includes("vale_compra") || m.includes("crédito")) {
             paymentMethodStoreCreditAmount = Math.max(0, paymentMethodStoreCreditAmount + Number(entry.amount || entry.effectiveAmount || 0))
@@ -3188,13 +3206,29 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             )
         )
 
+        const entryInterest = Number(entry.interestAmount || 0)
+        const entryInstallmentCost = Number(entry.installmentCostAmount || 0)
+        const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
+        const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
+        const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
+
         if (!isCustomerBearer) {
-            updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + Number(entry.interestAmount || 0))
+            updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + entryFixedInterest)
+            if (!isCustomerInstallmentBearer) {
+                updatePaymentMethodInterestAmount = Math.max(0, updatePaymentMethodInterestAmount + entryInstallmentCost)
+            }
             updatePaymentMethodFeeAmount = Math.max(0, updatePaymentMethodFeeAmount + Number(entry.feeAmount || 0))
             updatePaymentMethodFixedFeeAmount = Math.max(0, updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0))
             updateBreakdownPaymentMethodDiscountAmount = Math.max(0, updateBreakdownPaymentMethodDiscountAmount + pmDisc)
+            if (isCustomerInstallmentBearer) {
+                updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + entryInstallmentCost)
+            }
         } else {
-            updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + Number(entry.interestAmount || 0) + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
+            updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + entryFixedInterest)
+            if (isCustomerInstallmentBearer) {
+                updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + entryInstallmentCost)
+            }
+            updateCustomerExtraFees = Math.max(0, updateCustomerExtraFees + Number(entry.feeAmount || 0) + Number(entry.fixedFeeAmount || 0))
         }
     }
 

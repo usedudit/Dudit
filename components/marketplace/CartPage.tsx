@@ -15,7 +15,7 @@ import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal, Badge, Inp
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
-import { formatCurrency, formatDateToBR } from "@/lib/utils"
+import { formatCurrency, formatDateToBR, formatDeliveryDaysRange } from "@/lib/utils"
 import { parseTimeToMinutes } from "@/lib/utils/opening-hours"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
@@ -741,6 +741,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
             const quote = deliveryQuotes[storeKey]
             if (!quote || quote.loading || !quote.error || !quote.error.toLowerCase().includes("raio")) return
+            // Frete nacional só é liberado com Mercado Pago conectado (igual ao sinal)
+            if (!data.partner?.mp_user_id) return
 
             const partnerId = data.partnerId || data.partner?.id || storeKey
             const dedupeKey = `${partnerId}:${destinationCep}`
@@ -814,9 +816,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                 {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
                             </span>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                {opt.deliveryMinDays != null && opt.deliveryMaxDays != null
-                                    ? `Entrega em ${opt.deliveryMinDays} a ${opt.deliveryMaxDays} dias`
-                                    : "Prazo a confirmar"}
+                                {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
                             </span>
                         </span>
                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">

@@ -31,6 +31,8 @@ export type PaymentLineDetails = {
   fixedFeeAmount: number
   /** Custo de parcelamento (juros das parcelas), segue installmentFeeBearer */
   installmentCostAmount: number
+  /** @deprecated Use installmentCostAmount + installmentFeeBearer for precise breakdown */
+  installmentFeeBearer: "merchant" | "customer" | null
 }
 
 export type PaymentBreakdownLine = {
@@ -51,6 +53,7 @@ export type PaymentBreakdownLine = {
   feeAmount?: number
   fixedFeeAmount?: number
   installmentCostAmount?: number
+  installmentFeeBearer?: "merchant" | "customer" | null
 }
 
 export type PaymentBreakdownEntry = {
@@ -71,6 +74,7 @@ export type PaymentBreakdownEntry = {
   feeAmount?: number
   fixedFeeAmount?: number
   installmentCostAmount?: number
+  installmentFeeBearer?: "merchant" | "customer" | null
   /** Mercado Pago specific fields */
   provider?: string
   paymentTypeId?: string | null
@@ -201,6 +205,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
     feeAmount,
     fixedFeeAmount,
     installmentCostAmount,
+    installmentFeeBearer: onlyDiscount ? null : installmentFeeBearer,
   }
 }
 
@@ -232,6 +237,7 @@ export function computePaymentBreakdown(input: {
       feeAmount: details.feeAmount,
       fixedFeeAmount: details.fixedFeeAmount,
       installmentCostAmount: details.installmentCostAmount,
+      installmentFeeBearer: details.installmentFeeBearer,
     }
   })
 
