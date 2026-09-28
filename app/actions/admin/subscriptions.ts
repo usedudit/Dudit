@@ -7,9 +7,12 @@
  * forceCancelSubscription requires step-up re-auth.
  */
 
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
+import {
+    MERCADOPAGO_PROVIDER,
+    mapToMpPartnerFields,
+    pickMercadoPagoIntegration,
+} from "@/lib/services/payments/mercadopago-integration"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -29,19 +32,27 @@ export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStat
     await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    const supabase = await getSupabaseServerClient()
+    // partner_integrations is only readable by its own partner members, and
+    // admins act on other partners: use the service-role client here.
+    const supabase = getAdminClient()
 
-    const [totalRes, connectedRes, disconnectedRes, suspendedRes] = await Promise.all([
+    const [totalRes, connectedRes, suspendedRes] = await Promise.all([
         supabase.from("partners").select("id", { count: "exact", head: true }),
-        supabase.from("partners").select("id", { count: "exact", head: true }).not("mp_user_id", "is", null),
-        supabase.from("partners").select("id", { count: "exact", head: true }).is("mp_user_id", null),
+        supabase
+            .from("partner_integrations")
+            .select("id", { count: "exact", head: true })
+            .eq("provider_slug", MERCADOPAGO_PROVIDER)
+            .eq("status", "connected"),
         supabase.from("partners").select("id", { count: "exact", head: true }).not("suspended_at", "is", null),
     ])
 
+    const total = totalRes.count || 0
+    const connected = connectedRes.count || 0
+
     return {
-        total: totalRes.count || 0,
-        connected: connectedRes.count || 0,
-        disconnected: disconnectedRes.count || 0,
+        total,
+        connected,
+        disconnected: Math.max(total - connected, 0),
         suspended: suspendedRes.count || 0,
     }
 }
@@ -56,21 +67,20 @@ export async function getSubscriptions(
     const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    const supabase = await getSupabaseServerClient()
+    // partner_integrations is only readable by its own partner members, and
+    // admins act on other partners: use the service-role client here.
+    const supabase = getAdminClient()
     const pageSize = Math.min(limit, 50)
 
     let query = supabase
         .from("partners")
         .select(
-            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
+            "id, user_id, is_active, suspended_at, erp_disabled, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), stores(name)"
         )
 
-    // Filter by connection status
-    if (statusFilter === "connected") {
-        query = query.not("mp_user_id", "is", null)
-    } else if (statusFilter === "disconnected") {
-        query = query.is("mp_user_id", null)
-    } else if (statusFilter === "suspended") {
+    // Connection status lives in partner_integrations, which cannot be used as
+    // an anti-join here, so it is applied to the scanned page below.
+    if (statusFilter === "suspended") {
         query = query.not("suspended_at", "is", null)
     }
 
@@ -88,27 +98,38 @@ export async function getSubscriptions(
     }
 
     const hasMore = (partners?.length || 0) > pageSize
-    const items = (partners || []).slice(0, pageSize)
+    const scanned = (partners || []).slice(0, pageSize)
 
-    const mapped: SubscriptionEntry[] = items.map((p: any) => ({
-        partner_id: p.id,
-        store_name: p.stores?.[0]?.name || "Loja",
-        user_id: p.user_id,
-        user_email: "",
-        is_active: p.is_active,
-        mp_user_id: p.mp_user_id,
-        mp_connected_at: p.mp_connected_at,
-        mp_public_key: p.mp_public_key,
-        mp_live_mode: p.mp_live_mode,
-        mp_token_expires_at: p.mp_token_expires_at,
-        suspended_at: p.suspended_at,
-        erp_disabled: p.erp_disabled,
-        created_at: p.created_at,
-    }))
+    const wantsConnected = statusFilter === "connected" || statusFilter === "disconnected"
+    const items = wantsConnected
+        ? scanned.filter((p: any) => {
+            const isConnected = !!mapToMpPartnerFields(p.partner_integrations).mp_user_id
+            return statusFilter === "connected" ? isConnected : !isConnected
+        })
+        : scanned
+
+    const mapped: SubscriptionEntry[] = items.map((p: any) => {
+        const mp = mapToMpPartnerFields(p.partner_integrations)
+        return {
+            partner_id: p.id,
+            store_name: p.stores?.[0]?.name || "Loja",
+            user_id: p.user_id,
+            user_email: "",
+            is_active: p.is_active,
+            mp_user_id: mp.mp_user_id,
+            mp_connected_at: mp.mp_connected_at,
+            mp_public_key: mp.mp_public_key,
+            mp_live_mode: mp.mp_live_mode,
+            mp_token_expires_at: mp.mp_token_expires_at,
+            suspended_at: p.suspended_at,
+            erp_disabled: p.erp_disabled,
+            created_at: p.created_at,
+        }
+    })
 
     return {
         data: mapped,
-        nextCursor: hasMore && items.length > 0 ? items[items.length - 1].created_at : null,
+        nextCursor: hasMore && scanned.length > 0 ? scanned[scanned.length - 1].created_at : null,
         prevCursor: cursor || null,
         hasMore,
     }
@@ -122,13 +143,15 @@ export async function getSubscriptionDetail(
     const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    const supabase = await getSupabaseServerClient()
+    // partner_integrations is only readable by its own partner members, and
+    // admins act on other partners: use the service-role client here.
+    const supabase = getAdminClient()
 
     // Anti-IDOR: re-fetch
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
         .select(
-            "id, user_id, is_active, mp_user_id, mp_connected_at, mp_public_key, mp_live_mode, mp_token_expires_at, suspended_at, erp_disabled, created_at, stores(name)"
+            "id, user_id, is_active, suspended_at, erp_disabled, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), stores(name)"
         )
         .eq("id", partnerId)
         .single()
@@ -136,6 +159,8 @@ export async function getSubscriptionDetail(
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    const mp = mapToMpPartnerFields(partner.partner_integrations)
 
     return {
         success: true,
@@ -145,11 +170,11 @@ export async function getSubscriptionDetail(
             user_id: partner.user_id,
             user_email: "",
             is_active: partner.is_active,
-            mp_user_id: partner.mp_user_id,
-            mp_connected_at: partner.mp_connected_at,
-            mp_public_key: partner.mp_public_key,
-            mp_live_mode: partner.mp_live_mode,
-            mp_token_expires_at: partner.mp_token_expires_at,
+            mp_user_id: mp.mp_user_id,
+            mp_connected_at: mp.mp_connected_at,
+            mp_public_key: mp.mp_public_key,
+            mp_live_mode: mp.mp_live_mode,
+            mp_token_expires_at: mp.mp_token_expires_at,
             suspended_at: partner.suspended_at,
             erp_disabled: partner.erp_disabled,
             created_at: partner.created_at,
@@ -172,18 +197,23 @@ export async function forceCancelSubscription(
         return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
     }
 
-    const supabase = await getSupabaseServerClient()
+    // partner_integrations is only readable by its own partner members, and
+    // admins act on other partners: use the service-role client here.
+    const supabase = getAdminClient()
 
     // Anti-IDOR: re-fetch
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, user_id, mp_user_id")
+        .select("id, user_id, partner_integrations(provider_slug, status, account_id, config)")
         .eq("id", partnerId)
         .single()
 
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    const mpIntegration = pickMercadoPagoIntegration(partner.partner_integrations)
+    const mp = mapToMpPartnerFields(mpIntegration)
 
     // Get store name from stores table
     const { data: hqStore } = await supabase
@@ -195,15 +225,14 @@ export async function forceCancelSubscription(
         .maybeSingle()
     const storeName = hqStore?.name || "Loja"
 
-    if (!partner.mp_user_id) {
+    if (!mp.mp_user_id) {
         return { success: false, error: "Parceiro não possui conexão com Mercado Pago" }
     }
 
     // SECURITY: Clear MP connection from the database.
     // We don't call the MP API to revoke since that would require decrypting,
     // and the token may already be expired. Instead we clear it locally.
-    // partner_integrations has no write policy for authenticated users.
-    const { error: integrationError } = await getAdminClient()
+    const { error: integrationError } = await supabase
         .from("partner_integrations")
         .update({
             status: "disconnected",
@@ -211,6 +240,9 @@ export async function forceCancelSubscription(
             access_token_encrypted: null,
             credentials: {},
             metadata: {},
+            // Connection-scoped settings die with the connection; accepted
+            // payment methods are preferences and stay.
+            config: { ...(mpIntegration?.config || {}), public_key: null, live_mode: null },
             connected_at: null,
             disconnected_at: new Date().toISOString(),
         })
@@ -221,8 +253,8 @@ export async function forceCancelSubscription(
         return { success: false, error: integrationError.message }
     }
 
-    // Status fields are still the read path for the app; they move into
-    // partner_integrations.config in the follow-up migration.
+    // Dual-write: partners keeps the legacy columns in sync so the previous
+    // build can still be deployed over this one (see the rollback script).
     const { error: updateError } = await supabase
         .from("partners")
         .update({
@@ -247,7 +279,7 @@ export async function forceCancelSubscription(
         metadata: {
             reason: reason.trim(),
             storeName,
-            previousMpUserId: partner.mp_user_id,
+            previousMpUserId: mp.mp_user_id,
         },
     })
 

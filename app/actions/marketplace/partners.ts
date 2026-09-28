@@ -18,6 +18,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 // --- CLIENTES ---
 
@@ -36,12 +37,8 @@ const PARTNER_PROFILE_SELECT = `
   is_active,
   created_at,
   updated_at,
-  mp_user_id,
-  mp_public_key,
-  mp_connected_at,
-  mp_accepted_payment_methods,
   mp_search_category_text,
-  mp_live_mode,
+  partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
   business_info,
   is_showcase_active,
   category_id,
@@ -92,6 +89,10 @@ async function _getPartnerProfile(partnerId: string) {
   }
 
   if (!data) return null
+
+  // mp_* status fields now come from partner_integrations (see
+  // lib/services/payments/mercadopago-integration.ts).
+  Object.assign(data, withMpPartnerFields(data))
 
   const { data: store } = await supabase
     .from("stores")
@@ -391,6 +392,8 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
         .single()
 
       if (error || !data) return null
+
+      Object.assign(data, withMpPartnerFields(data))
 
       const { data: store } = await supabase
         .from("stores")

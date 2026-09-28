@@ -13,6 +13,10 @@ import {
   extractPostalCodeFromAddress,
 } from "@/lib/services/shipping/carrier-checkout"
 import { issuePaymentQuote } from "@/lib/mercadopago/payment-quote"
+import {
+  findMercadoPagoIntegration,
+  mapToMpPartnerFields,
+} from "@/lib/services/payments/mercadopago-integration"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -187,7 +191,7 @@ async function handler(request: NextRequest) {
 
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
-      .select("id, mp_accepted_payment_methods")
+      .select("id")
       .eq("id", partnerId)
       .single()
 
@@ -609,7 +613,8 @@ async function handler(request: NextRequest) {
     }
 
     // Filter payment methods based on partner's MP accepted payment methods
-    const acceptedMethods = (partner as any)?.mp_accepted_payment_methods || {}
+    const partnerIntegration = await findMercadoPagoIntegration(adminClient, partnerId)
+    const acceptedMethods = mapToMpPartnerFields(partnerIntegration).mp_accepted_payment_methods || {}
     const excludedPaymentTypes: Array<{ id: string }> = []
     if (acceptedMethods.pix === false) excludedPaymentTypes.push({ id: "pix" })
     if (acceptedMethods.credit_card === false) excludedPaymentTypes.push({ id: "credit_card" })

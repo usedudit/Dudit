@@ -3,6 +3,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { requireUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { MyOrdersListClient } from "@/components/marketplace/MyOrdersListClient"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id,
-    partners(id, is_active, mp_public_key, addresses(city, state)),
+    partners(id, is_active, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_shipments(id, status, tracking_number, tracking_url, kind, created_at),
@@ -40,7 +41,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id,
-    partners(id, is_active, mp_public_key, addresses(city, state)),
+    partners(id, is_active, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_shipments(id, status, tracking_number, tracking_url, kind, created_at),
@@ -85,6 +86,11 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     } else {
       orders = fallbackResult.data || []
     }
+  }
+
+  // mp_* status fields are sourced from partner_integrations.
+  for (const order of orders) {
+    if (order?.partners) order.partners = withMpPartnerFields(order.partners)
   }
 
   if (orders.length > 0) {

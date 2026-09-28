@@ -10,6 +10,7 @@ import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import type { AuditLogRow, CursorPaginatedResult, AdminDashboardStats } from "@/lib/admin/types"
 
 // SECURITY FIX (MED-01): Sanitize wildcard chars in ILIKE queries
@@ -271,9 +272,10 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
         // Active MP connections
         admin
-            .from("partners")
+            .from("partner_integrations")
             .select("id", { count: "exact", head: true })
-            .not("mp_user_id", "is", null),
+            .eq("provider_slug", MERCADOPAGO_PROVIDER)
+            .eq("status", "connected"),
 
         // Recent audit logs
         admin

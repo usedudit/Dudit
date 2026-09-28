@@ -11,6 +11,7 @@ import { startOfDay } from "@/lib/date"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
+import { findMercadoPagoIntegration, isMercadoPagoConnected } from "@/lib/services/payments/mercadopago-integration"
 
 import { 
   type FinanceAccountType, 
@@ -292,12 +293,8 @@ export async function updateFinanceAccountAction(
     if (accErr || !account) throw new Error("Conta não encontrada.")
 
     if (account.is_system_managed && account.integration_source === "mercadopago") {
-      const { data: partner } = await supabase
-        .from("partners")
-        .select("mp_user_id")
-        .eq("id", partnerId)
-        .single()
-      if (partner?.mp_user_id) {
+      const integration = await findMercadoPagoIntegration(supabase, partnerId)
+      if (isMercadoPagoConnected(integration)) {
         throw new Error("A conta Mercado Pago não pode ser editada enquanto a integração estiver conectada.")
       }
     }
@@ -371,12 +368,8 @@ export async function deleteFinanceAccountAction(id: string, partnerId: string) 
     if (accErr || !account) throw new Error("Conta não encontrada.")
 
     if (account.is_system_managed && account.integration_source === "mercadopago") {
-      const { data: partner } = await supabase
-        .from("partners")
-        .select("mp_user_id")
-        .eq("id", partnerId)
-        .single()
-      if (partner?.mp_user_id) {
+      const integration = await findMercadoPagoIntegration(supabase, partnerId)
+      if (isMercadoPagoConnected(integration)) {
         throw new Error("A conta Mercado Pago não pode ser excluída enquanto a integração estiver conectada.")
       }
     }

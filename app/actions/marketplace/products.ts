@@ -7,6 +7,7 @@ import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { resolveProduct } from "@/lib/store-products"
 import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
 import { isUuid } from "@/lib/utils/short-id"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 // --- 1. PRODUTOS DA HOME (LISTAGEM) ---
 // NO unstable_cache - Redis is the single source of truth.
@@ -41,7 +42,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, user_id, created_at, mp_user_id, mp_public_key, mp_accepted_payment_methods, is_showcase_active,
+        id, user_id, created_at, is_showcase_active,
+        partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
         addresses(city, state),
         payment_methods(*)
       ),
@@ -111,6 +113,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
 
     let p: any = data.partners
     if (Array.isArray(p)) p = p[0]
+    // mp_* status fields are sourced from partner_integrations.
+    if (p) Object.assign(p, withMpPartnerFields(p))
 
     // Merge store data over partner data (store fields take precedence)
     const s: any = data.stores

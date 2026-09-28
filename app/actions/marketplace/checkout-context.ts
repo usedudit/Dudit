@@ -18,6 +18,7 @@ import { cachedResolveCheckoutCartLines, cachedListActivePromotionsInBatch } fro
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getCachedAddresses } from "@/app/actions/shared/addresses"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 export type MarketplaceCheckoutDepositConfig = {
   available: boolean
@@ -131,7 +132,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, is_showcase_active, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, business_info, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, is_showcase_active, service_deposit_enabled, service_deposit_percentage, order_flow, business_info, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -195,6 +196,9 @@ export async function getMarketplaceCheckoutContextAction(input: {
       return q
     })(),
   ])
+
+  // mp_* status fields are sourced from partner_integrations.
+  if (partnerRow) Object.assign(partnerRow, withMpPartnerFields(partnerRow))
 
   const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
   const orderAcceptance = await canStoreAcceptOrders(admin, { storeId: targetStoreId || undefined, partnerId: resolved.partnerId })

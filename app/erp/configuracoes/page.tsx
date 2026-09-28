@@ -9,6 +9,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { createAdminClient } from "@/lib/supabase/server"
 import { can } from "@/lib/permissions/can"
 import { decryptCPF } from "@/lib/crypto"
+import { mapToMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 export default async function SettingsPage() {
   await requireUser()
@@ -41,7 +42,7 @@ export default async function SettingsPage() {
 
   const { data: partnerIntegrations } = await supabase
     .from("partner_integrations")
-    .select("provider_slug, status")
+    .select("provider_slug, status, account_id, connected_at, config, metadata")
     .eq("partner_id", context.partnerId)
 
   const superfreteConnected = (partnerIntegrations || []).some(
@@ -49,8 +50,15 @@ export default async function SettingsPage() {
       integration.provider_slug === "superfrete" && integration.status === "connected",
   )
 
+  // mp_* status fields come from partner_integrations; credentials never leave
+  // this server component.
+  const publicPartner: Record<string, any> = { ...rawPartner }
+  delete publicPartner.mp_access_token_encrypted
+  delete publicPartner.mp_refresh_token_encrypted
+
   const partner: any = {
-    ...rawPartner,
+    ...publicPartner,
+    ...mapToMpPartnerFields(partnerIntegrations),
     superfreteConnected,
     store,
     store_name: store?.name,

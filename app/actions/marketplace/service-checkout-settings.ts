@@ -4,6 +4,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser } from "@/lib/auth/authorization"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import {
+  findMercadoPagoIntegration,
+  isMercadoPagoConnected,
+  mapToMpPartnerFields,
+} from "@/lib/services/payments/mercadopago-integration"
 
 export async function getServiceCheckoutSettingsAction(partnerId: string) {
   const user = await requireUser()
@@ -23,11 +28,13 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
 
   const { data, error } = await supabase
     .from("partners")
-    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, mp_user_id")
+    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, partner_integrations(provider_slug, status, account_id)")
     .eq("id", partnerId)
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  const mpFields = mapToMpPartnerFields((data as any)?.partner_integrations)
 
   return {
     success: true,
@@ -36,8 +43,8 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
       depositEnabled: Boolean(data?.service_deposit_enabled),
       depositType: data?.service_deposit_type || "percentage",
       depositPercentage: Number(data?.service_deposit_percentage || 50),
-      depositMpEnabled: Boolean(data?.service_deposit_enabled && data?.mp_user_id),
-      mpConnected: !!data?.mp_user_id,
+      depositMpEnabled: Boolean(data?.service_deposit_enabled && mpFields.mp_user_id),
+      mpConnected: !!mpFields.mp_user_id,
     },
   }
 }
@@ -66,12 +73,8 @@ export async function updateServiceCheckoutSettingsAction(input: {
   }
 
   if (input.depositEnabled) {
-    const { data: partnerRow } = await supabase
-      .from("partners")
-      .select("mp_user_id")
-      .eq("id", input.partnerId)
-      .single()
-    const mpConnected = !!partnerRow?.mp_user_id
+    const partnerIntegration = await findMercadoPagoIntegration(supabase, input.partnerId)
+    const mpConnected = isMercadoPagoConnected(partnerIntegration)
     if (!mpConnected) {
       return { success: false, error: "Para cobrar sinal obrigatório, conecte o Mercado Pago nas integrações." }
     }

@@ -7,6 +7,14 @@ import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
 import { isUuid } from "@/lib/utils/short-id"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+
+// partners.mp_* status fields are sourced from partner_integrations.
+function withPartnerMpFields<T>(store: T): T {
+    const target = store as any
+    if (target?.partners) target.partners = withMpPartnerFields(target.partners)
+    return store
+}
 
 const storeBySlugCacheMap = new Map<string, any>()
 const storeByIdCacheMap = new Map<string, any>()
@@ -27,12 +35,12 @@ export const getCachedStoreBySlug = async (slug: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
                     .maybeSingle()
-                return data
+                return withPartnerMpFields(data)
             },
             [`store-slug-${slug}`],
             { tags: [`store-${slug}`], revalidate: 30 }
@@ -50,12 +58,12 @@ export async function getStoreBySlug(slug: string) {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
         .maybeSingle()
-    return data
+    return withPartnerMpFields(data)
 }
 
 export const getCachedStoreById = async (storeId: string) => {
@@ -72,7 +80,7 @@ export const getCachedStoreById = async (storeId: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
+                        partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                     `)
 
                 if (isIdentifierUuid) {
@@ -91,7 +99,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                             `)
                             .eq("partner_id", storeId)
                             .maybeSingle()
@@ -103,7 +111,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), payment_methods(*))
                             `)
                             .eq("slug", storeId)
                             .maybeSingle()
@@ -113,7 +121,7 @@ export const getCachedStoreById = async (storeId: string) => {
 
                 if (error) console.error("[getCachedStoreById] Erro na query:", error.message, { storeId })
                 if (!data) console.error("[getCachedStoreById] Store nao encontrada:", { storeId })
-                return data
+                return withPartnerMpFields(data)
             },
             [`store-profile-${storeId}`],
             { tags: ["store-profile", TAGS.storeProfile(storeId)], revalidate: 30 }

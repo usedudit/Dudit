@@ -7,6 +7,10 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import {
+  findMercadoPagoIntegration,
+  mapToMpPartnerFields,
+} from "@/lib/services/payments/mercadopago-integration"
 import { createMercadoPagoPayment } from "@/lib/mercadopago/payment-client"
 import { verifyPaymentQuote } from "@/lib/mercadopago/payment-quote"
 
@@ -112,13 +116,9 @@ async function handler(request: NextRequest) {
 
     // Validate payment method against partner's accepted MP methods
     {
-      const { data: partnerMethods } = await adminClient
-        .from("partners")
-        .select("mp_accepted_payment_methods")
-        .eq("id", partnerId)
-        .single()
+      const partnerIntegration = await findMercadoPagoIntegration(adminClient, partnerId)
 
-      const accepted = (partnerMethods?.mp_accepted_payment_methods || {}) as Record<string, boolean>
+      const accepted = mapToMpPartnerFields(partnerIntegration).mp_accepted_payment_methods || ({} as Record<string, boolean>)
       const methodId = String(paymentFormData.payment_method_id || "").toLowerCase()
 
       const methodAllowed = methodId === "pix" ? accepted.pix !== false

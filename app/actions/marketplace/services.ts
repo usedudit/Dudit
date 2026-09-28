@@ -9,6 +9,7 @@ import { filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visi
 import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 import { startOfDay } from "@/lib/date"
 import { isUuid } from "@/lib/utils/short-id"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 // ─── Constants (mirrored from ERP appointments.ts) ─────────────────────────
 const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
@@ -42,9 +43,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         is_active,
         erp_disabled,
         is_showcase_active,
-        mp_user_id,
-        mp_public_key,
-        mp_accepted_payment_methods,
+        partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
         order_flow,
         created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
@@ -97,6 +96,8 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   }
 
   const rawPartner = Array.isArray(data.partners) ? data.partners[0] : data.partners
+  // mp_* status fields are sourced from partner_integrations.
+  if (rawPartner) Object.assign(rawPartner, withMpPartnerFields(rawPartner))
 
   // Merge store data over partner data
   const rawStore: any = Array.isArray(data.stores) ? data.stores[0] : data.stores

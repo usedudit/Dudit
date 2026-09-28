@@ -5,6 +5,7 @@ import { DashboardContext, DashboardLayout } from "./types";
 import { getStoreUrl } from "@/lib/utils/url-generator";
 import { getActiveStoreId } from "@/lib/auth/partner-context";
 import { createSlug } from "@/lib/utils/slugify";
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration";
 import {
   getChecklistItems,
   getCards,
@@ -61,7 +62,7 @@ export async function getDashboardLayout(
     // Parcerias/Dados Gerais
     supabase
       .from("partners")
-      .select("category_id, is_showcase_active, mp_user_id, business_info")
+      .select("category_id, is_showcase_active, business_info, partner_integrations(provider_slug, status, account_id)")
       .eq("id", partnerId)
       .single(),
 
@@ -186,6 +187,8 @@ export async function getDashboardLayout(
   }
 
   const partner = partnerRes.data;
+  // mp_* status fields are sourced from partner_integrations.
+  if (partner) Object.assign(partner, withMpPartnerFields(partner));
   const businessInfo = normalizeBusinessInfo(partner.business_info);
 
   // 2. Determina variáveis auxiliares de Onboarding

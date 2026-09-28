@@ -10,6 +10,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { isUuid } from "@/lib/utils/short-id"
 import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
+import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -345,8 +346,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
         partners!partner_id (
           id,
           user_id,
-          mp_user_id,
-          mp_public_key,
+          partner_integrations(provider_slug, status, account_id, connected_at, config, metadata),
           is_showcase_active,
           created_at,
           addresses (id, street, number, neighborhood, city, state, zip_code),
@@ -403,6 +403,10 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
     }
 
     const rawPartner = data.partners || {}
+    // mp_* status fields are sourced from partner_integrations.
+    if (rawPartner && !Array.isArray(rawPartner)) {
+      Object.assign(rawPartner, withMpPartnerFields(rawPartner))
+    }
     const rawStore = Array.isArray(data.stores) ? data.stores[0] : data.stores
     const isShowcaseActive = (rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true) !== false
     const partner = rawPartner ? {

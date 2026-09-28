@@ -8,6 +8,7 @@ import {
   MERCADOPAGO_PROVIDER,
   findMercadoPagoIntegration,
   getMpRefreshTokenEncrypted,
+  mapToMpPartnerFields,
 } from "@/lib/services/payments/mercadopago-integration"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -88,6 +89,9 @@ export async function disconnectMercadoPagoAction() {
       access_token_encrypted: null,
       credentials: {},
       metadata: {},
+      // Connection-scoped settings die with the connection; accepted payment
+      // methods are preferences and stay.
+      config: { ...(integration?.config || {}), public_key: null, live_mode: null },
       connected_at: null,
       disconnected_at: new Date().toISOString(),
     })
@@ -98,8 +102,8 @@ export async function disconnectMercadoPagoAction() {
     return { error: error.message }
   }
 
-  // Status fields are still the read path for the app; they move into
-  // partner_integrations.config in the follow-up migration.
+  // Dual-write: partners keeps the legacy columns in sync so the previous
+  // build can still be deployed over this one (see the rollback script).
   const { error: statusError } = await supabase
     .from("partners")
     .update({
@@ -136,26 +140,27 @@ export async function disconnectMercadoPagoAction() {
 const getCachedMercadoPagoStatus = (partnerId: string) => unstable_cache(
   async () => {
     const supabase = getAdminClient()
-    const { data: partner } = await supabase
-      .from("partners")
-      .select("mp_user_id, mp_connected_at, mp_public_key, mp_live_mode, mp_accepted_payment_methods")
-      .eq("id", partnerId)
-      .single()
+    const [{ data: partner }, integration] = await Promise.all([
+      supabase.from("partners").select("id").eq("id", partnerId).single(),
+      findMercadoPagoIntegration(supabase, partnerId),
+    ])
 
     if (!partner) {
       throw new Error("Parceiro não encontrado")
     }
 
+    const fields = mapToMpPartnerFields(integration)
+
     const acceptedPaymentMethods: MpAcceptedPaymentMethods = {
       ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
-      ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
+      ...(fields.mp_accepted_payment_methods || {}),
     }
 
     return {
-      connected: !!partner.mp_user_id,
-      connectedAt: partner.mp_connected_at,
-      publicKey: partner.mp_public_key,
-      liveMode: partner.mp_live_mode ?? null,
+      connected: !!fields.mp_user_id,
+      connectedAt: fields.mp_connected_at,
+      publicKey: fields.mp_public_key,
+      liveMode: fields.mp_live_mode ?? null,
       acceptedPaymentMethods,
     }
   },
@@ -196,7 +201,7 @@ export async function refreshMercadoPagoTokenAction() {
   if (!ctx) return { error: "Contexto de ERP não encontrado" }
   await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
 
-  const { data: partner } = await supabase.from("partners").select("*").eq("id", ctx.partnerId).single()
+  const { data: partner } = await supabase.from("partners").select("id").eq("id", ctx.partnerId).single()
 
   if (!partner) {
     return { error: "Parceiro não encontrado" }
@@ -302,13 +307,33 @@ export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPa
     mercado_pago_wallet: Boolean(methods.mercado_pago_wallet),
   }
 
-  const { error } = await supabase
+  // partner_integrations has no write policy for authenticated users.
+  const admin = getAdminClient()
+  const integration = await findMercadoPagoIntegration(admin, ctx.partnerId)
+
+  // JSONB columns are replaced as a whole: read-merge-write the config.
+  const { error } = await admin.from("partner_integrations").upsert(
+    {
+      partner_id: ctx.partnerId,
+      provider_slug: MERCADOPAGO_PROVIDER,
+      config: { ...(integration?.config || {}), accepted_payment_methods: sanitized },
+    },
+    { onConflict: "partner_id,provider_slug" },
+  )
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Dual-write: partners keeps the legacy column until it is dropped, so the
+  // previous build can still be deployed over this one.
+  const { error: legacyError } = await supabase
     .from("partners")
     .update({ mp_accepted_payment_methods: sanitized })
     .eq("id", ctx.partnerId)
 
-  if (error) {
-    return { error: error.message }
+  if (legacyError) {
+    return { error: legacyError.message }
   }
 
   revalidateTag(`mp-status-${ctx.partnerId}`, "max")
