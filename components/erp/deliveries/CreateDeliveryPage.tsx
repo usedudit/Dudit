@@ -11,6 +11,7 @@ import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { parseAddressString } from "../orders/CreateOrder"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import {
     Badge,
@@ -170,6 +171,8 @@ export default function CreateDeliveryPage({
     const [planAccess, setPlanAccess] = useState<{ allowed: boolean; maxOrders: number; planSlug: string; message?: string | null } | null>(null)
     const [infoOrder, setInfoOrder] = useState<OrderPickerItem | null>(null)
     const [activeOrder, setActiveOrder] = useState<OrderPickerItem | null>(null)
+    // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
+    const infoSheetZIndex = useModalLayer(!!infoOrder)
 
     useEffect(() => {
         if (infoOrder) {
@@ -1172,6 +1175,7 @@ export default function CreateDeliveryPage({
                     <Portal>
                         <div
                             className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            style={{ zIndex: infoSheetZIndex }}
                             onClick={handleClose}
                         >
                             <div

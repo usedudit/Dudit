@@ -43,6 +43,7 @@ import { consultarCNPJ } from "@/lib/fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validateBrazilMobile, validateBrazilLandline, validateURL, validateCEP } from "@/lib/input-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { IMAGE_MIME_TO_EXT } from "@/lib/r2/config"
 
 interface NewCustomerPageProps {
     onBack: () => void;
@@ -246,7 +247,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         try {
             const response = await fetch(croppedImageDataUrl)
             const blob = await response.blob()
-            const extension = blob.type === "image/png" ? "png" : "jpg"
+            const extFromMime = IMAGE_MIME_TO_EXT[blob.type]
+            const extension = extFromMime || "jpg"
             const file = new File([blob], `customer-image.${extension}`, { type: blob.type })
             setImageFile(file)
             setImagePreview(croppedImageDataUrl)

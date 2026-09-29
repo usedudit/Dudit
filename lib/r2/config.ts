@@ -158,6 +158,7 @@ export const R2_PREFIXES = {
   products: "products/",
   services: "services/",
   partners: "partners/",
+  suppliers: "suppliers/",
   customers: "customers/",
   orders: "orders/",
   temp: "temp/",

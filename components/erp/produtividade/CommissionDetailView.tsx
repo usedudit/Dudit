@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { XIcon, MoneyIcon, ClockIcon } from "@/lib/icons"
 import { Button, Tabs, TabsList, TabsTrigger, SkeletonLoader, ListItem, IconPlaceholder } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -82,9 +83,9 @@ function HistoryTab({ partnerUserId, partnerId }: { partnerUserId: string; partn
 export default function CommissionDetailView({ isOpen, seller, partnerId, onClose, onPay }: Props) {
   const [activeTab, setActiveTab] = useState("general")
   const isCompact = useMediaQuery("(max-width: 1024px)")
-
   const sellerData = seller
-
+  // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen && !!sellerData)
   const rows = useMemo(() => {
     if (!sellerData) return []
     return [
@@ -170,14 +171,15 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
   return (
     <AnimatePresence>
       {isOpen && sellerData && (
-        <Portal>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/50"
-            onClick={onClose}
-          />
+          <Portal>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/50"
+              style={{ zIndex }}
+              onClick={onClose}
+            />
 
           <motion.div
             initial={{ x: "120%" }}

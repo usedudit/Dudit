@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { MoneyInput } from "@/components/reusable"
+import { useModalLayer } from "@/lib/modal-stack"
 
 export interface ERPOnboardingWizardProps {
   isOpen: boolean
@@ -71,6 +72,9 @@ export function ERPOnboardingWizard({
   const isDesapego = businessMode === "desapego"
   const isERP = businessMode === "erp"
   const isVitrine = !isDesapego && !isERP
+
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   // Objetivos principais derivados das props (para envio na ação)
   const goals = React.useMemo(() => {
@@ -258,6 +262,7 @@ export function ERPOnboardingWizard({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[130] flex h-screen w-screen bg-[#022C2B] p-3 md:p-6 items-stretch overflow-hidden font-sans"
+            style={{ zIndex }}
           >
             <div className="absolute inset-0 opacity-5 pointer-events-none" />
 

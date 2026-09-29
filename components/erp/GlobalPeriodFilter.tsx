@@ -10,6 +10,7 @@ import { useDashboard } from "./dashboard/DashboardContext"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 
 function DashboardInsight({ message, color }: { message: string; color: string }) {
   const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
@@ -36,6 +37,8 @@ export function GlobalPeriodFilter() {
   const { insights, exportHandler } = useDashboard()
   const [insightSheetOpen, setInsightSheetOpen] = useState(false)
   const isMobile = useMediaQuery("(max-width: 1023px)")
+  // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
+  const insightSheetZIndex = useModalLayer(insightSheetOpen)
 
   const period = (searchParams.get("period") as Period) || "monthly"
   const compare = (searchParams.get("compare") as CompareMode) || "none"
@@ -96,6 +99,7 @@ export function GlobalPeriodFilter() {
             <Portal>
               <div
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${insightSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex: insightSheetZIndex }}
                 onClick={() => setInsightSheetOpen(false)}
               >
                 <div

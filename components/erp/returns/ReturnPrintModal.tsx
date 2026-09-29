@@ -6,6 +6,7 @@ import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { useStore } from "@/lib/store-context"
 import { getReturnRequestDetailsAction } from "@/app/actions/erp/returns"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
@@ -28,6 +29,8 @@ export type ReturnPrintModalProps = {
 
 export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId, storeId }: ReturnPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
     const { selectedStore } = useStore()
 
     const [activeTab, setActiveTab] = useState("Opções")
@@ -117,6 +120,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                 {isOpen && (
                     <motion.div
                         className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+                        style={{ zIndex }}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

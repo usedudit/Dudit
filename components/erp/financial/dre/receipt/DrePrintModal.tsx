@@ -7,6 +7,7 @@ import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/co
 import { Switch } from "@/components/reusable/Switch"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { downloadPdf } from "@/lib/pdf/download"
 import { toast } from "@/hooks/use-notification"
 import { formatDateToBR } from "@/lib/utils"
@@ -37,6 +38,8 @@ export function DrePrintModal({
   storeName,
 }: DrePrintModalProps) {
   const isMobile = useMediaQuery("(max-width: 1023px)")
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(isOpen)
 
   const [activeTab, setActiveTab] = useState("Opções")
   const [isDownloading, setIsDownloading] = useState(false)
@@ -136,8 +139,9 @@ export function DrePrintModal({
     <Portal>
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+            <motion.div
+              className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+              style={{ zIndex }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

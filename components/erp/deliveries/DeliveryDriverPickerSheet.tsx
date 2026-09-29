@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { Button, FormTextarea, ThreeDotsLoader, Badge, InfoCard } from "@/components/reusable"
 import {
     TruckIcon,
@@ -56,6 +57,8 @@ export default function DeliveryDriverPickerSheet({
     onSelect,
 }: DeliveryDriverPickerSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
     const [notes, setNotes] = useState("")
     const [isLoadingStatus, setIsLoadingStatus] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -346,6 +349,7 @@ export default function DeliveryDriverPickerSheet({
             <div
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"
                     }`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div

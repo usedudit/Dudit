@@ -1,21 +1,22 @@
 ﻿"use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { Button, IconPlaceholder, Spinner, AlertModal, Pagination, SidebarCard } from "@/components/reusable"
-import { TagIcon, TrashIcon, ArrowUpDownIcon, Package, ClockIcon, XIcon } from "@/lib/icons"
+import { Button, IconPlaceholder, AlertModal, Pagination, SkeletonLoader } from "@/components/reusable"
+import { TagIcon, TrashIcon, ArrowUpDownIcon } from "@/lib/icons"
 import {
-    getProductSuppliersOverviewAction,
+    getProductSuppliersAction,
     unlinkProductSupplierAction,
     linkProductSuppliersBatchAction,
 } from "@/app/actions/erp/products"
 import SelectSupplierSheet from "../fornecedores/SelectSupplierSheet"
-import BottomSheet from "@/components/BottomSheet"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { formatCurrency, formatUnit } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { ProductSupplierWithDetails } from "@/lib/types/product"
 import type { PartnerSupplierBucketItem } from "@/app/actions/erp/client-loaders"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { SupplierDetailSheet } from "./SupplierDetailSheet"
 
 interface ProductSuppliersTabProps {
     productData: any
@@ -24,7 +25,7 @@ interface ProductSuppliersTabProps {
     onSavePendingSuppliers?: (suppliers: any[]) => void
 }
 
-type SortKey = "supplier" | "sku" | "cost" | "last_purchase"
+type SortKey = "supplier" | "contact" | "city" | "last_purchase"
 type SortDirection = "asc" | "desc"
 
 interface ColumnDef {
@@ -37,64 +38,26 @@ interface ColumnDef {
 
 const COLUMNS: ColumnDef[] = [
     { id: "supplier", label: "Fornecedor", align: "left", width: "auto", sortable: true },
-    { id: "sku", label: "SKU", align: "left", width: "160px", sortable: true },
-    { id: "cost", label: "Custo", align: "right", width: "140px", sortable: true },
+    { id: "contact", label: "Contato", align: "left", width: "220px", sortable: false },
+    { id: "city", label: "Cidade", align: "left", width: "180px", sortable: true },
     { id: "last_purchase", label: "Última Compra", align: "left", width: "170px", sortable: true },
     { id: "actions", label: "Ações", align: "center", width: "80px", sortable: false },
 ]
 
-const TimelineItem = React.memo(({
-    icon: Icon,
-    time,
-    title,
-    subtitle,
-}: {
-    icon: any
-    time: string
-    title: string
-    subtitle?: string
-}) => (
-    <div className="flex relative z-10 w-full">
-        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex-shrink-0 flex items-center justify-center mr-4 border-[3px] border-white dark:border-dark-surface shadow-[0_0_0_2px_#ffffff] dark:shadow-[0_0_0_2px_rgba(28,28,30,0.5)]">
-            <Icon size={14} className="text-brand-dark dark:text-dark-heading" />
-        </div>
-        <div className="flex flex-col justify-start -mt-0.5 min-w-0 flex-1">
-            <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">
-                {time}
-            </div>
-            <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">
-                {title}
-            </div>
-            {subtitle && (
-                <div className="text-[12px] text-brand-inactive-text mt-0.5 truncate">{subtitle}</div>
-            )}
-        </div>
-    </div>
-))
-TimelineItem.displayName = "TimelineItem"
-
 // Tablet / Mobile GridCard
 const ProductSupplierGridCard = React.memo(({
     supplier,
-    isSelected,
-    isEditing,
     onSelect,
     onRequestRemove,
 }: {
     supplier: ProductSupplierWithDetails
-    isSelected: boolean
-    isEditing: boolean
-    onSelect: () => void
-    onRequestRemove: () => void
+    onSelect: (supplierId: string) => void
+    onRequestRemove: (supplier: ProductSupplierWithDetails) => void
 }) => {
     return (
         <div
-            className={`bg-white dark:bg-dark-surface border rounded-2xl p-4 transition-all duration-200 cursor-pointer group flex flex-col h-full relative ${
-                isSelected
-                    ? "border-brand-green ring-1 ring-brand-green/30"
-                    : "border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
-            }`}
-            onClick={onSelect}
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-colors duration-200 cursor-pointer group flex flex-col h-full relative hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+            onClick={() => onSelect(supplier.supplier_id)}
         >
             <div className="flex items-center gap-3 mb-3">
                 <UserProfileImage
@@ -115,18 +78,32 @@ const ProductSupplierGridCard = React.memo(({
             </div>
 
             <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body block">SKU</span>
-                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate block">
-                            {supplier.supplier_sku || "-"}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cidade</span>
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                            {supplier.supplier_city && supplier.supplier_state
+                                ? `${supplier.supplier_city}, ${supplier.supplier_state}`
+                                : supplier.supplier_city || supplier.supplier_state || "-"}
                         </span>
                     </div>
-                    <div className="text-right">
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body block">Custo</span>
-                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">
-                            {supplier.cost_price != null ? formatCurrency(supplier.cost_price) : "-"}
-                        </span>
+                    <div className="flex flex-col gap-0.5 items-end min-w-0">
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Contato</span>
+                        <div className="flex flex-col items-end min-w-0">
+                            {supplier.supplier_email && (
+                                <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-full">
+                                    {supplier.supplier_email}
+                                </span>
+                            )}
+                            {supplier.supplier_phone && (
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    {formatBrazilPhone(supplier.supplier_phone)}
+                                </span>
+                            )}
+                            {!supplier.supplier_email && !supplier.supplier_phone && (
+                                <span className="text-[13px] text-brand-inactive-text">-</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -140,19 +117,17 @@ const ProductSupplierGridCard = React.memo(({
                             {supplier.last_purchase_price != null && ` (${formatCurrency(supplier.last_purchase_price)})`}
                         </span>
                     </div>
-                    {isEditing && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            <Button
-                                variant="outlinered"
-                                size="icon"
-                                className="h-8 w-8 rounded-full shrink-0"
-                                onClick={onRequestRemove}
-                                title="Remover fornecedor"
-                            >
-                                <TrashIcon size={14} />
-                            </Button>
-                        </div>
-                    )}
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            variant="outlinered"
+                            size="icon"
+                            className="h-8 w-8 rounded-full shrink-0"
+                            onClick={() => onRequestRemove(supplier)}
+                            title="Remover fornecedor"
+                        >
+                            <TrashIcon size={14} />
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -164,26 +139,18 @@ ProductSupplierGridCard.displayName = "ProductSupplierGridCard"
 const SupplierRow = React.memo(({
     supplier,
     columns,
-    isSelected,
-    isEditing,
     onSelect,
     onRequestRemove,
 }: {
     supplier: ProductSupplierWithDetails
     columns: ColumnDef[]
-    isSelected: boolean
-    isEditing: boolean
-    onSelect: () => void
-    onRequestRemove: () => void
+    onSelect: (supplierId: string) => void
+    onRequestRemove: (supplier: ProductSupplierWithDetails) => void
 }) => {
     return (
         <tr
-            className={`group transition-colors cursor-pointer ${
-                isSelected
-                    ? "bg-brand-green/5 dark:bg-brand-green/10 font-medium"
-                    : "hover:bg-brand-gray/60 dark:hover:bg-gray-900/50"
-            }`}
-            onClick={onSelect}
+            className="group transition-colors cursor-pointer hover:bg-brand-gray/60 dark:hover:bg-gray-900/50"
+            onClick={() => onSelect(supplier.supplier_id)}
         >
             {columns.map((col) => {
                 let cellContent: React.ReactNode = null
@@ -209,17 +176,31 @@ const SupplierRow = React.memo(({
                             </div>
                         )
                         break
-                    case "sku":
+                    case "contact":
                         cellContent = (
-                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                {supplier.supplier_sku || "-"}
-                            </span>
+                            <div className="flex flex-col min-w-0">
+                                {supplier.supplier_email && (
+                                    <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
+                                        {supplier.supplier_email}
+                                    </span>
+                                )}
+                                {supplier.supplier_phone && (
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        {formatBrazilPhone(supplier.supplier_phone)}
+                                    </span>
+                                )}
+                                {!supplier.supplier_email && !supplier.supplier_phone && (
+                                    <span className="text-[13px] text-brand-inactive-text">-</span>
+                                )}
+                            </div>
                         )
                         break
-                    case "cost":
+                    case "city":
                         cellContent = (
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                {supplier.cost_price != null ? formatCurrency(supplier.cost_price) : "-"}
+                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                {supplier.supplier_city && supplier.supplier_state
+                                    ? `${supplier.supplier_city}, ${supplier.supplier_state}`
+                                    : supplier.supplier_city || supplier.supplier_state || "-"}
                             </span>
                         )
                         break
@@ -240,19 +221,19 @@ const SupplierRow = React.memo(({
                         )
                         break
                     case "actions":
-                        cellContent = isEditing ? (
+                        cellContent = (
                             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                     variant="outlinered"
                                     size="icon"
                                     className="h-8 w-8 rounded-full"
-                                    onClick={onRequestRemove}
+                                    onClick={() => onRequestRemove(supplier)}
                                     title="Remover fornecedor"
                                 >
                                     <TrashIcon size={14} />
                                 </Button>
                             </div>
-                        ) : null
+                        )
                         break
                     default:
                         cellContent = null
@@ -305,23 +286,15 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     })
 
     const [showSelector, setShowSelector] = useState(false)
-    const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
+    const [detailsSupplierId, setDetailsSupplierId] = useState<string | null>(null)
     const [supplierToDelete, setSupplierToDelete] = useState<ProductSupplierWithDetails | null>(null)
     const [isRemoving, setIsRemoving] = useState(false)
+    const [isLoadingList, setIsLoadingList] = useState(() => Boolean(productData?.id))
 
     // Sorting & Pagination
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
     const ITEMS_PER_PAGE = 8
-
-    // Side panel details
-    const [purchases, setPurchases] = useState<any[]>([])
-    const [purchasesTotal, setPurchasesTotal] = useState(0)
-    const [purchasesPage, setPurchasesPage] = useState(1)
-    const [purchasesLoading, setPurchasesLoading] = useState(false)
-    const [costHistory, setCostHistory] = useState<any[]>([])
-    const [costHistoryLoading, setCostHistoryLoading] = useState(false)
-    const PURCHASES_PER_PAGE = 5
 
     const mountedRef = useRef(true)
 
@@ -331,61 +304,37 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         }
     }, [])
 
-    // Load initial suppliers on mount if productId is present
-    const loadOverview = useCallback(
-        async (targetSupplierId?: string | null, pPage = purchasesPage) => {
-            if (!productId) return
+    // Lista leve (1 query) — os detalhes de compras/custos são carregados
+    // sob demanda dentro da sheet, evitando um fetch pesado ao montar a aba.
+    const loadSuppliers = useCallback(async () => {
+        if (!productId) return
 
-            setPurchasesLoading(true)
-            setCostHistoryLoading(true)
-
-            try {
-                const res = await getProductSuppliersOverviewAction(productId, {
-                    selectedSupplierId: targetSupplierId !== undefined ? targetSupplierId : selectedSupplierId,
-                    purchasesPage: pPage,
-                    purchasesLimit: PURCHASES_PER_PAGE,
-                })
-
-                if (!mountedRef.current) return
-
-                if (!res.error) {
-                    if (res.suppliers) setSuppliers(res.suppliers)
-                    setPurchases(res.purchases || [])
-                    setPurchasesTotal(res.purchasesTotal || 0)
-                    setCostHistory(res.costHistory || [])
-                }
-            } catch (err: any) {
-                console.error("Erro ao carregar dados de fornecedores:", err)
-            } finally {
-                if (mountedRef.current) {
-                    setPurchasesLoading(false)
-                    setCostHistoryLoading(false)
-                }
-            }
-        },
-        [productId, purchasesPage, selectedSupplierId]
-    )
+        setIsLoadingList(true)
+        try {
+            const res = await getProductSuppliersAction(productId)
+            if (!mountedRef.current) return
+            if (!res.error && res.suppliers) setSuppliers(res.suppliers)
+        } catch (err) {
+            console.error("Erro ao carregar fornecedores:", err)
+        } finally {
+            if (mountedRef.current) setIsLoadingList(false)
+        }
+    }, [productId])
 
     useEffect(() => {
         if (!productId) return
-        loadOverview(selectedSupplierId)
-    }, [productId])
+        loadSuppliers()
+    }, [productId, loadSuppliers])
 
-    const handleSelectSupplier = useCallback(
-        (id: string) => {
-            if (selectedSupplierId === id) {
-                // Toggle off if clicking the same supplier
-                setSelectedSupplierId(null)
-                return
-            }
-            setSelectedSupplierId(id)
-            setPurchasesPage(1)
-            if (productId) {
-                loadOverview(id, 1)
-            }
-        },
-        [productId, selectedSupplierId, loadOverview]
-    )
+    const handleSelectSupplier = useCallback((supplierId: string) => {
+        setDetailsSupplierId(supplierId)
+    }, [])
+
+    const handleCloseDetails = useCallback(() => setDetailsSupplierId(null), [])
+
+    const handleRequestRemove = useCallback((supplier: ProductSupplierWithDetails) => {
+        setSupplierToDelete(supplier)
+    }, [])
 
     // Batch Add Suppliers from Sheet
     const handleSaveSelectedSuppliers = useCallback(
@@ -446,9 +395,9 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                     ? "Fornecedor vinculado"
                     : `${formattedNewSuppliers.length} fornecedores vinculados`
             )
-            loadOverview(selectedSupplierId)
+            loadSuppliers()
         },
-        [suppliers, productId, onSavePendingSuppliers, notifySuccess, notifyError, loadOverview, selectedSupplierId]
+        [suppliers, productId, onSavePendingSuppliers, notifySuccess, notifyError, loadSuppliers]
     )
 
     // Confirm Removal
@@ -459,11 +408,10 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         setIsRemoving(true)
 
         // Optimistic local update
+        const snapshot = suppliers
         const updated = suppliers.filter((s) => s.supplier_id !== supplierId)
         setSuppliers(updated)
-        if (selectedSupplierId === supplierId) {
-            setSelectedSupplierId(null)
-        }
+        setDetailsSupplierId((prev) => (prev === supplierId ? null : prev))
         onSavePendingSuppliers?.(updated)
 
         if (!productId) {
@@ -481,13 +429,13 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         if (res.error) {
             notifyError("Erro ao desvincular fornecedor", res.error)
             // Rollback on error
-            setSuppliers(suppliers)
+            setSuppliers(snapshot)
             return
         }
 
         notifySuccess("Fornecedor removido com sucesso")
-        loadOverview(null)
-    }, [supplierToDelete, suppliers, selectedSupplierId, onSavePendingSuppliers, productId, notifySuccess, notifyError, loadOverview])
+        loadSuppliers()
+    }, [supplierToDelete, suppliers, onSavePendingSuppliers, productId, notifySuccess, notifyError, loadSuppliers])
 
     const handleSort = useCallback((key: SortKey) => {
         setSortConfig((prev) => {
@@ -507,9 +455,19 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     )
 
     const selectedSupplier = useMemo(
-        () => activeSuppliers.find((s) => s.supplier_id === selectedSupplierId),
-        [activeSuppliers, selectedSupplierId]
+        () => activeSuppliers.find((s) => s.supplier_id === detailsSupplierId) || null,
+        [activeSuppliers, detailsSupplierId]
     )
+
+    // Mantém o último fornecedor selecionado para a sheet não sumir
+    // durante a animação de fechamento
+    const lastSelectedSupplierRef = useRef<ProductSupplierWithDetails | null>(null)
+    useEffect(() => {
+        if (selectedSupplier) {
+            lastSelectedSupplierRef.current = selectedSupplier
+        }
+    }, [selectedSupplier])
+    const displaySupplier = selectedSupplier || lastSelectedSupplierRef.current
 
     const sortedSuppliers = useMemo(() => {
         if (!sortConfig) return activeSuppliers
@@ -522,12 +480,12 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
             if (key === "supplier") {
                 valA = (a.supplier_name || "").toLowerCase()
                 valB = (b.supplier_name || "").toLowerCase()
-            } else if (key === "sku") {
-                valA = (a.supplier_sku || "").toLowerCase()
-                valB = (b.supplier_sku || "").toLowerCase()
-            } else if (key === "cost") {
-                valA = a.cost_price ?? -1
-                valB = b.cost_price ?? -1
+            } else if (key === "contact") {
+                valA = (a.supplier_email || a.supplier_phone || "").toLowerCase()
+                valB = (b.supplier_email || b.supplier_phone || "").toLowerCase()
+            } else if (key === "city") {
+                valA = (a.supplier_city || "").toLowerCase()
+                valB = (b.supplier_city || "").toLowerCase()
             } else if (key === "last_purchase") {
                 valA = a.last_purchase_date ? new Date(a.last_purchase_date).getTime() : 0
                 valB = b.last_purchase_date ? new Date(b.last_purchase_date).getTime() : 0
@@ -543,329 +501,163 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
     const paginatedSuppliers = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE
         return sortedSuppliers.slice(start, start + ITEMS_PER_PAGE)
-    }, [sortedSuppliers, currentPage, ITEMS_PER_PAGE])
-
-    const purchasesTotalPages = useMemo(
-        () => Math.ceil(purchasesTotal / PURCHASES_PER_PAGE),
-        [purchasesTotal]
-    )
-
-    // Check if side panel should be shown: only when a supplier is selected and not in mobile/tablet mode
-    const showSidePanel = !isTabletOrMobile && Boolean(selectedSupplier)
-
-    // On tablet/mobile the details are shown inside a BottomSheet instead of the side panel
-    const showDetailsSheet = isTabletOrMobile && Boolean(selectedSupplier)
-
-    const handleCloseDetails = useCallback(() => setSelectedSupplierId(null), [])
-
-    // Keeps the last selected supplier around so the BottomSheet content stays
-    // visible while the close animation runs
-    const lastSelectedSupplierRef = useRef<ProductSupplierWithDetails | null>(null)
-    useEffect(() => {
-        if (selectedSupplier) {
-            lastSelectedSupplierRef.current = selectedSupplier
-        }
-    }, [selectedSupplier])
-    const displaySupplier = selectedSupplier || lastSelectedSupplierRef.current
-
-    // Details content (SidebarCard on desktop / FormSection on tablet-mobile)
-    // shared between the desktop side panel and the mobile BottomSheet
-    const detailsContent = displaySupplier ? (
-        <>
-            {/* Última Compra */}
-            <SidebarCard hasSeparator title="Última Compra"
-                headerRight={
-                    <button
-                        onClick={handleCloseDetails}
-                        className="p-1 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text transition-colors"
-                        title="Fechar detalhes"
-                        aria-label="Fechar detalhes"
-                    >
-                        <XIcon size={16} />
-                    </button>
-                }
-            >
-                <div className="flex items-center gap-3 pb-3 border-b border-brand-border dark:border-dark-border">
-                    <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
-                        <Package size={18} className="text-brand-green" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {displaySupplier.supplier_name}
-                        </p>
-                        <p className="text-xs text-brand-inactive-text truncate">
-                            {displaySupplier.last_purchase_date
-                                ? new Date(displaySupplier.last_purchase_date).toLocaleDateString("pt-BR")
-                                : "Nenhuma compra registrada"}
-                        </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Último Custo</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                            {displaySupplier.last_purchase_price != null
-                                ? formatCurrency(displaySupplier.last_purchase_price)
-                                : displaySupplier.cost_price != null
-                                ? formatCurrency(displaySupplier.cost_price)
-                                : "-"}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Custo Atual</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                            {displaySupplier.cost_price != null
-                                ? formatCurrency(displaySupplier.cost_price)
-                                : "-"}
-                        </p>
-                    </div>
-                </div>
-            </SidebarCard>
-
-            {/* Histórico de Custos */}
-            <SidebarCard hasSeparator title="Histórico de Custos">
-                {costHistoryLoading ? (
-                    <div className="flex justify-center py-4">
-                        <Spinner size={20} />
-                    </div>
-                ) : costHistory.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-8">
-                        <IconPlaceholder
-                            icon={ClockIcon}
-                            title="Nenhum histórico encontrado"
-                            subtitle="Não foram encontrados eventos para este fornecedor."
-                        />
-                    </div>
-                ) : (
-                    <div className="space-y-6 relative">
-                        {costHistory.length > 1 && (
-                            <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
-                        )}
-                        {costHistory.map((h: any) => (
-                            <TimelineItem
-                                key={h.id}
-                                icon={TagIcon}
-                                time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
-                                title={formatCurrency(h.new_cost)}
-                                subtitle={h.supplier_name}
-                            />
-                        ))}
-                    </div>
-                )}
-            </SidebarCard>
-
-            {/* Compras Recentes */}
-            <SidebarCard hasSeparator title="Compras Recentes">
-                {purchasesLoading ? (
-                    <div className="flex justify-center py-4">
-                        <Spinner size={20} />
-                    </div>
-                ) : purchases.length === 0 ? (
-                    <p className="text-sm text-brand-inactive-text text-center py-4">
-                        Nenhuma compra encontrada
-                    </p>
-                ) : (
-                    <div className="space-y-6 relative">
-                        {purchases.length > 1 && (
-                            <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
-                        )}
-                        {purchases.map((p: any) => (
-                            <TimelineItem
-                                key={p.id}
-                                icon={Package}
-                                time={new Date(p.date).toLocaleDateString("pt-BR")}
-                                title={p.supplier_name}
-                                subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
-                                    productData?.unit
-                                )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
-                            />
-                        ))}
-                    </div>
-                )}
-                {purchasesTotalPages > 1 && (
-                    <div className="mt-4">
-                        <Pagination
-                            currentPage={purchasesPage}
-                            totalPages={purchasesTotalPages}
-                            onPageChange={(page) => {
-                                setPurchasesPage(page)
-                                loadOverview(displaySupplier.supplier_id, page)
-                            }}
-                        />
-                    </div>
-                )}
-            </SidebarCard>
-        </>
-    ) : null
+    }, [sortedSuppliers, currentPage])
 
     return (
         <div className="w-full">
-            <div className={showSidePanel ? "grid grid-cols-12 gap-y-8 md:gap-y-0" : "w-full"}>
-                {/* Main List Section */}
-                <div
-                    className={
-                        showSidePanel
-                            ? "col-span-12 xl:col-span-8 pr-0 xl:pr-8"
-                            : "w-full"
-                    }
-                >
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Fornecedores Vinculados
-                            <span className="ml-2 text-sm font-medium text-brand-inactive-text">
-                                ({activeSuppliers.length})
-                            </span>
-                        </h3>
-                        {isEditing && (
-                            <Button
-                                variant="link"
-                                className="flex items-center text-sm font-bold"
-                                onClick={() => setShowSelector(true)}
-                            >
-                                + Adicionar
-                            </Button>
-                        )}
-                    </div>
-
-                    {activeSuppliers.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
-                            <IconPlaceholder
-                                icon={TagIcon}
-                                title="Nenhum fornecedor vinculado"
-                                subtitle="Vincule fornecedores a este produto para gerenciar custos e compras."
-                                itemButton={{
-                                    text: "Adicionar fornecedor",
-                                    action: () => setShowSelector(true),
-                                    variant: "outline",
-                                    className: !isEditing ? "opacity-50 pointer-events-none" : "",
-                                }}
-                            />
-                        </div>
-                    ) : isTabletOrMobile ? (
-                        /* Tablet / Mobile Grid View */
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2">
-                                {paginatedSuppliers.map((s) => (
-                                    <ProductSupplierGridCard
-                                        key={s.supplier_id}
-                                        supplier={s}
-                                        isSelected={selectedSupplierId === s.supplier_id}
-                                        isEditing={isEditing}
-                                        onSelect={() => handleSelectSupplier(s.supplier_id)}
-                                        onRequestRemove={() => setSupplierToDelete(s)}
-                                    />
-                                ))}
-                            </div>
-                            {totalPages > 1 && (
-                                <div className="pt-2">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        onPageChange={setCurrentPage}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        /* Desktop Standard ERP Table */
-                        <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full text-left border-separate border-spacing-0 min-w-[700px]">
-                                    <thead>
-                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                            {COLUMNS.map((col, idx) => {
-                                                const isFirst = idx === 0
-                                                const isLast = idx === COLUMNS.length - 1
-                                                const isSorted = sortConfig?.key === col.id
-
-                                                return (
-                                                    <th
-                                                        key={col.id}
-                                                        style={{ width: col.width }}
-                                                        className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${
-                                                            isFirst ? "rounded-l-lg pl-4" : ""
-                                                        } ${isLast ? "rounded-r-lg pr-4" : ""} ${
-                                                            col.sortable
-                                                                ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
-                                                                : ""
-                                                        }`}
-                                                        onClick={() => col.sortable && col.id !== "actions" && handleSort(col.id as SortKey)}
-                                                    >
-                                                        <div
-                                                            className={`flex items-center gap-1.5 ${
-                                                                col.align === "right"
-                                                                    ? "justify-end"
-                                                                    : col.align === "center"
-                                                                    ? "justify-center"
-                                                                    : "justify-start"
-                                                            }`}
-                                                        >
-                                                            <span>{col.label}</span>
-                                                            {col.sortable && (
-                                                                <ArrowUpDownIcon
-                                                                    size={14}
-                                                                    className={`transition-all duration-200 ${
-                                                                        isSorted
-                                                                            ? "text-brand-dark dark:text-dark-heading opacity-100 block"
-                                                                            : "text-brand-inactive-text hidden group-hover:block opacity-40"
-                                                                    } ${
-                                                                        isSorted && sortConfig?.direction === "desc"
-                                                                            ? "rotate-180"
-                                                                            : ""
-                                                                    }`}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </th>
-                                                )
-                                            })}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paginatedSuppliers.map((s) => (
-                                            <SupplierRow
-                                                key={s.supplier_id}
-                                                supplier={s}
-                                                columns={COLUMNS}
-                                                isSelected={selectedSupplierId === s.supplier_id}
-                                                isEditing={isEditing}
-                                                onSelect={() => handleSelectSupplier(s.supplier_id)}
-                                                onRequestRemove={() => setSupplierToDelete(s)}
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {totalPages > 1 && (
-                                <div className="px-6 py-3 border-t border-brand-border dark:border-dark-border">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        onPageChange={setCurrentPage}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Right Side Panel (Visible ONLY when a supplier is selected on desktop) */}
-                {showSidePanel && detailsContent && (
-                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-8 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                        {detailsContent}
-                    </div>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-8">
+                <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
+                    Fornecedores Vinculados
+                </h3>
+                {isEditing && (
+                    <Button
+                        variant="link"
+                        className="flex items-center text-sm font-bold"
+                        onClick={() => setShowSelector(true)}
+                    >
+                        + Adicionar
+                    </Button>
                 )}
             </div>
 
-            {/* Supplier details in BottomSheet (tablet/mobile) */}
-            <BottomSheet
-                isOpen={showDetailsSheet}
+            {isLoadingList && activeSuppliers.length === 0 ? (
+                /* Skeleton while the suppliers list loads */
+                <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                        <div
+                            key={idx}
+                            className="flex items-center gap-3 p-4 border-b border-brand-border dark:border-dark-border last:border-b-0"
+                        >
+                            <SkeletonLoader className="shrink-0" circle width={40} />
+                            <div className="flex-1 space-y-2 min-w-0">
+                                <SkeletonLoader width="34%" height={14} />
+                                <SkeletonLoader width="22%" height={12} />
+                            </div>
+                            <SkeletonLoader className="shrink-0" width={112} height={32} />
+                        </div>
+                    ))}
+                </div>
+            ) : activeSuppliers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
+                    <IconPlaceholder
+                        icon={TagIcon}
+                        title="Nenhum fornecedor vinculado"
+                        subtitle="Vincule fornecedores a este produto para gerenciar custos e compras."
+                        itemButton={{
+                            text: "Adicionar fornecedor",
+                            action: () => setShowSelector(true),
+                            variant: "outline",
+                            className: !isEditing ? "opacity-50 pointer-events-none" : "",
+                        }}
+                    />
+                </div>
+            ) : isTabletOrMobile ? (
+                /* Tablet / Mobile Grid View */
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2">
+                        {paginatedSuppliers.map((s) => (
+                            <ProductSupplierGridCard
+                                key={s.supplier_id}
+                                supplier={s}
+                                onSelect={handleSelectSupplier}
+                                onRequestRemove={handleRequestRemove}
+                            />
+                        ))}
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="pt-2">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                            />
+                        </div>
+                    )}
+                </div>
+            ) : (
+                /* Desktop Standard ERP Table */
+                <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                            <thead>
+                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    {COLUMNS.map((col, idx) => {
+                                        const isFirst = idx === 0
+                                        const isLast = idx === COLUMNS.length - 1
+                                        const isSorted = sortConfig?.key === col.id
+
+                                        return (
+                                            <th
+                                                key={col.id}
+                                                style={{ width: col.width }}
+                                                className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${isFirst ? "rounded-l-lg pl-4" : ""
+                                                    } ${isLast ? "rounded-r-lg pr-4" : ""} ${col.sortable
+                                                        ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                                        : ""
+                                                    }`}
+                                                onClick={() => col.sortable && col.id !== "actions" && handleSort(col.id as SortKey)}
+                                            >
+                                                <div
+                                                    className={`flex items-center gap-1.5 ${col.align === "right"
+                                                        ? "justify-end"
+                                                        : col.align === "center"
+                                                            ? "justify-center"
+                                                            : "justify-start"
+                                                        }`}
+                                                >
+                                                    <span>{col.label}</span>
+                                                    {col.sortable && (
+                                                        <ArrowUpDownIcon
+                                                            size={14}
+                                                            className={`transition-all duration-200 ${isSorted
+                                                                ? "text-brand-dark dark:text-dark-heading opacity-100 block"
+                                                                : "text-brand-inactive-text hidden group-hover:block opacity-40"
+                                                                } ${isSorted && sortConfig?.direction === "desc"
+                                                                    ? "rotate-180"
+                                                                    : ""
+                                                                }`}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </th>
+                                        )
+                                    })}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedSuppliers.map((s) => (
+                                    <SupplierRow
+                                        key={s.supplier_id}
+                                        supplier={s}
+                                        columns={COLUMNS}
+                                        onSelect={handleSelectSupplier}
+                                        onRequestRemove={handleRequestRemove}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="px-6 py-3 border-t border-brand-border dark:border-dark-border">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Detalhes do fornecedor (sheet com accordions) */}
+            <SupplierDetailSheet
+                isOpen={Boolean(selectedSupplier)}
                 onClose={handleCloseDetails}
-                title={displaySupplier?.supplier_name || "Detalhes do Fornecedor"}
-            >
-                {detailsContent && <div className="pt-1">{detailsContent}</div>}
-            </BottomSheet>
+                supplier={displaySupplier}
+                productId={productId}
+                productUnit={productData?.unit}
+            />
 
             {/* Select Supplier Sheet */}
             <SelectSupplierSheet
@@ -884,9 +676,8 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                 title="Remover Fornecedor"
                 message={
                     supplierToDelete
-                        ? `Tem certeza que deseja desvincular o fornecedor "${
-                              supplierToDelete.supplier_name || "este fornecedor"
-                          }" deste produto?`
+                        ? `Tem certeza que deseja desvincular o fornecedor "${supplierToDelete.supplier_name || "este fornecedor"
+                        }" deste produto?`
                         : "Tem certeza que deseja desvincular este fornecedor?"
                 }
                 variant="danger"
@@ -898,6 +689,3 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         </div>
     )
 }
-
-
-

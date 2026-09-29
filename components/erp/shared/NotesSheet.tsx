@@ -6,6 +6,7 @@ import { Button, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 
 function DesktopSheet({
     isOpen,
@@ -18,10 +19,13 @@ function DesktopSheet({
     title: string
     children: React.ReactNode
 }) {
+    // z-index dinâmico: este sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
     return (
         <Portal>
             <div
                 className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div

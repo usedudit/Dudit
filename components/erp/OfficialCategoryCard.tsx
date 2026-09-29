@@ -83,6 +83,7 @@ export const OfficialCategoryCard: React.FC<OfficialCategoryCardProps> = ({
                 title="Categoria Oficial"
                 headerRight={categorizadoBadge}
                 hasSeparator
+                hasTopStrip
             >
                 {isEditing ? (
                     <>

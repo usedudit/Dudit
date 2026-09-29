@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { Button, EmailInput, ThreeDotsLoader } from "@/components/reusable"
 import { XIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
@@ -55,6 +56,8 @@ function PlanUpgradeModalInner({
 }) {
   const isMobile = useMediaQuery("(max-width: 1023px)")
   const [anim, setAnim] = useState(false)
+  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+  const zIndex = useModalLayer(anim)
   const [visible, setVisible] = useState(false)
 
   const [actionLoading, setActionLoading] = useState(false)
@@ -238,8 +241,8 @@ function PlanUpgradeModalInner({
   }
 
   return (
-    <Portal>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <Portal>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{ zIndex }}>
         <div className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${anim ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
         <div
           className={`relative z-10 flex w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl transition-all duration-200 ease-out bg-white dark:bg-dark-surface ${anim ? "scale-100 opacity-100" : "scale-95 opacity-0"

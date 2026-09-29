@@ -6,6 +6,7 @@ import { Button, QuantitySelector } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 
 interface ProductVariant {
     id: string
@@ -39,6 +40,8 @@ function formatCurrency(value: number): string {
 
 export default function SelectVariantSheet({ isOpen, onClose, product, selectedVariantId, onConfirm }: SelectVariantSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
     const [selectedId, setSelectedId] = useState<string | null>(selectedVariantId || null)
 
     const variants = product.variants?.filter((v) => v.is_active) || []
@@ -158,10 +161,12 @@ export default function SelectVariantSheet({ isOpen, onClose, product, selectedV
         <Portal>
             <div
                 className={`fixed inset-0 z-[140] bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div
                     className={`fixed right-4 top-4 bottom-4 w-[400px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                    style={{ zIndex: zIndex ? zIndex + 1 : undefined }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}

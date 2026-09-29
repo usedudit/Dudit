@@ -182,6 +182,8 @@ export interface ProductSupplierWithDetails extends ProductSupplier {
   supplier_phone: string | null
   supplier_document: string | null
   supplier_image_url: string | null
+  supplier_city?: string | null
+  supplier_state?: string | null
   last_purchase_price: number | null
   last_purchase_date: string | null
   last_invoice_key: string | null

@@ -6,6 +6,7 @@ import { Button, Input, IconPlaceholder, EmailInput, PhoneInput, Checkbox, Radio
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import {
@@ -82,6 +83,9 @@ const SelectCustomerSheet = ({
     const listScrollRef = useRef<HTMLDivElement>(null)
     const sentinelRef = useRef<HTMLDivElement>(null)
     const isMobile = useMediaQuery("(max-width: 1023px)")
+    // z-index dinâmico: abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
+    const newSheetZIndex = useModalLayer(isNewCustomerSheetOpen)
     const isCloseLocked = isCreatingCustomer
     const handleSafeClose = useCallback(() => {
         if (isCloseLocked) return
@@ -561,6 +565,7 @@ const SelectCustomerSheet = ({
             <Portal>
                 <div
                     className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex }}
                     onClick={handleSafeClose}
                 >
                     <div
@@ -579,6 +584,7 @@ const SelectCustomerSheet = ({
             <Portal>
                 <div
                     className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewCustomerSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex: newSheetZIndex }}
                     onClick={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }}
                 >
                     <div

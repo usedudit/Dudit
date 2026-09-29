@@ -5,6 +5,7 @@ import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Checkbox, QuantitySelector, IconPlaceholder } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, TrashIcon, Package } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { type LabelPreset, type LabelContentConfig, type PaperSize, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset, PAPER_SIZES } from "@/lib/labels/presets"
 import { LabelSheet, type LabelProduct, type LabelVariant } from "./LabelSheet"
 import { formatCurrency } from "@/lib/utils"
@@ -91,6 +92,8 @@ function getVariantSku(product: ProductBase, variantId?: string): string | null 
 
 export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments }: LabelPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     const [isVisible, setIsVisible] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
@@ -290,7 +293,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
     return (
         <>
             <Portal>
-                <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
+                <div className="fixed inset-0 z-[130] flex flex-col bg-black/60" style={{ zIndex }}>
                     <div
                         className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"}`}
                     >

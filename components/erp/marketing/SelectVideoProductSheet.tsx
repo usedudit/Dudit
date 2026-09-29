@@ -6,6 +6,7 @@ import { Badge, Button, Input, IconPlaceholder, ThreeDotsLoader } from "@/compon
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils/formatters"
 import { getERPProductsPageAction } from "@/app/actions/erp/products"
@@ -39,6 +40,9 @@ export default function SelectVideoProductSheet({
     const [products, setProducts] = useState<ProductItem[]>([])
     const [loading, setLoading] = useState(false)
     const isMobile = useMediaQuery("(max-width: 1023px)")
+
+    // z-index dinâmico: esta sheet abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
 
     useEffect(() => {
         if (isOpen) {
@@ -193,10 +197,12 @@ export default function SelectVideoProductSheet({
         <Portal>
             <div
                 className={`fixed inset-0 z-[80] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{ zIndex }}
                 onClick={onClose}
             >
                 <div
                     className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    style={{ zIndex: zIndex ? zIndex + 1 : undefined }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}

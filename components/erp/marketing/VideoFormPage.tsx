@@ -302,7 +302,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                 </SidebarCard>
 
                                 {/* Sidebar Card: Tags */}
-                                <SidebarCard hasSeparator title="Palavras-chave de busca">
+                                <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
                                         Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca.
                                     </p>

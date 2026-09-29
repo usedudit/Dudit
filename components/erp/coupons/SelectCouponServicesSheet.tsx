@@ -236,6 +236,7 @@ export default function SelectCouponServicesSheet({
       >
         <Div
           className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          style={{ zIndex: zIndex ? zIndex + 1 : undefined }}
           onClick={(e: { stopPropagation: () => any }) => e.stopPropagation()}
         >
           {content}

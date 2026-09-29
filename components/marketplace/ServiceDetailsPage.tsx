@@ -27,6 +27,7 @@ import {
     MapPinIcon,
     FileTextIcon,
     FlagIcon,
+    ShieldIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -2242,7 +2243,55 @@ export function ServiceDetailsPageClient({
                                         {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                     </button>
                                 )}
-                            </FormSection>
+                             </FormSection>
+
+                            {/* Detalhes */}
+                            {(() => {
+                                const detailsList: Array<{
+                                    key: string
+                                    label: string
+                                    value: React.ReactNode
+                                    icon: any
+                                }> = []
+
+                                if (service.category) {
+                                    detailsList.push({
+                                        key: "category",
+                                        label: "Categoria",
+                                        value: service.category,
+                                        icon: TagIcon,
+                                    })
+                                }
+
+                                if (service.warranty) {
+                                    detailsList.push({
+                                        key: "warranty",
+                                        label: "Garantia",
+                                        value: service.warranty,
+                                        icon: ShieldIcon,
+                                    })
+                                }
+
+                                if (detailsList.length === 0) return null
+
+                                return (
+                                    <div className="mb-10">
+                                        <FormSection title="Detalhes" hasSeparator>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 pt-2">
+                                                {detailsList.map((detail) => (
+                                                    <ListItem
+                                                        key={detail.key}
+                                                        icon={detail.icon}
+                                                        title={<span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{detail.label}</span>}
+                                                        description={<span className="text-sm font-semibold text-brand-dark dark:text-dark-heading line-clamp-2">{detail.value}</span>}
+                                                        className="!border-none !bg-transparent !p-0 !shadow-none hover:!bg-transparent hover:!border-none !cursor-default"
+                                                    />
+                                                ))}
+                                            </div>
+                                        </FormSection>
+                                    </div>
+                                )
+                            })()}
 
                             {/* Technical specs */}
                             {Array.isArray(service.technical_details) && service.technical_details.length > 0 && (

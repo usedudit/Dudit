@@ -76,7 +76,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 {/* --- COLUNA ESQUERDA (Principal) --- */}
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* Descrição */}
-                    <FormSection title="Descrição">
+                    <FormSection title="Descrição" className="mb-8">
                         <div className={`relative ${!isDescriptionExpanded ? "max-h-[160px] overflow-hidden" : ""}`}>
                             {productData?.description ? (
                                 <div
@@ -105,7 +105,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     {/* Especificações */}
                     <FormSection hasSeparator title="Especificações">
                         {attributes.length > 0 ? (
-                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden shadow-xs">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                 {attributes.map((spec: any, i: number) => (
                                     <div
                                         key={i}
@@ -208,7 +208,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         isEditing={false}
                     />
 
-                    <SidebarCard hasSeparator title="Palavras-chave de busca">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (

@@ -6,6 +6,7 @@ import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem, RadioButton } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useModalLayer } from "@/lib/modal-stack"
 import { useStore } from "@/lib/store-context"
 import { getPartnerAddressAction, getQuoteDetailsAction } from "@/app/actions/erp/quotes"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -25,6 +26,8 @@ export type QuotePrintModalProps = {
 
 export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }: QuotePrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
+    // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
+    const zIndex = useModalLayer(isOpen)
     const { selectedStore } = useStore()
 
     const [activeTab, setActiveTab] = useState("Visualização")
@@ -140,6 +143,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
                 {isOpen && (
                     <motion.div
                         className="fixed inset-0 z-[130] flex flex-col bg-black/60"
+                        style={{ zIndex }}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

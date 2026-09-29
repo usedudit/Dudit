@@ -1677,6 +1677,30 @@ export async function getProductSuppliersAction(productId: string) {
             supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
             supplier_image_url: ps.supplier?.image_url || null,
         }))
+
+        // Cidade/UF vêm da tabela de endereços (mesma abordagem da listagem de fornecedores)
+        const supplierIds = suppliers.map((s: any) => s.supplier_id).filter(Boolean)
+        if (supplierIds.length > 0) {
+            const { data: addrRows } = await admin
+                .from("addresses")
+                .select("supplier_id, city, state")
+                .in("supplier_id", supplierIds)
+
+            if (addrRows && addrRows.length > 0) {
+                const addrMap = new Map<string, { city: string | null; state: string | null }>()
+                for (const a of addrRows) {
+                    if (!addrMap.has(a.supplier_id)) {
+                        addrMap.set(a.supplier_id, { city: a.city, state: a.state })
+                    }
+                }
+                suppliers.forEach((s: any) => {
+                    const addr = addrMap.get(s.supplier_id)
+                    s.supplier_city = addr?.city || null
+                    s.supplier_state = addr?.state || null
+                })
+            }
+        }
+
         return { suppliers, partnerId: product.partner_id }
     } catch (error: any) {
         return { error: error.message }
@@ -1798,6 +1822,82 @@ export async function getProductSuppliersOverviewAction(
             purchasesTotal: purchasesRes.count || 0,
             costHistory,
             partnerId: product.partner_id
+        }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+/**
+ * Detalhes leves de um fornecedor vinculado ao produto (aba Fornecedores).
+ * Usado pela sheet de detalhes: só compras + histórico de custos daquele
+ * fornecedor específico, sem recarregar a lista de fornecedores.
+ */
+export async function getProductSupplierDetailsAction(
+    productId: string,
+    supplierId: string,
+    options?: { purchasesPage?: number; purchasesLimit?: number }
+) {
+    try {
+        if (!productId || !supplierId) return { error: "Produto ou fornecedor inválido" }
+
+        await fetchProductAndVerifyOwnership(productId, "view")
+        const admin = getAdminClient()
+
+        const purchasesLimit = options?.purchasesLimit || 5
+        const purchasesPage = options?.purchasesPage || 1
+        const offset = (purchasesPage - 1) * purchasesLimit
+
+        const [purchasesRes, costHistoryRes] = await Promise.all([
+            admin
+                .from("xml_import_items")
+                .select(`
+                    id, raw_quantity, raw_unit_cost, raw_total_cost, raw_name, created_at,
+                    xml_import:xml_imports!inner(id, invoice_number, invoice_date, supplier_id)
+                `, { count: "exact" })
+                .not("match_status", "eq", "skipped")
+                .or(`matched_product_id.eq.${productId},created_product_id.eq.${productId}`)
+                .eq("xml_import.supplier_id", supplierId)
+                .order("created_at", { ascending: false })
+                .range(offset, offset + purchasesLimit - 1),
+            admin
+                .from("purchase_cost_history")
+                .select(`id, previous_cost, new_cost, unit_cost_from_xml, changed_at, invoice_key, supplier_id`)
+                .eq("product_id", productId)
+                .eq("supplier_id", supplierId)
+                .order("changed_at", { ascending: false })
+                .limit(20)
+        ])
+
+        if (purchasesRes.error) return { error: purchasesRes.error.message }
+        if (costHistoryRes.error) return { error: costHistoryRes.error.message }
+
+        const purchases = (purchasesRes.data || []).map((item: any) => ({
+            id: item.id,
+            quantity: item.raw_quantity,
+            unit_cost: item.raw_unit_cost,
+            total_cost: item.raw_total_cost,
+            product_name: item.raw_name,
+            date: item.xml_import?.invoice_date || item.created_at,
+            invoice_number: item.xml_import?.invoice_number || null,
+            supplier_id: item.xml_import?.supplier_id,
+            created_at: item.created_at,
+        }))
+
+        const costHistory = (costHistoryRes.data || []).map((h: any) => ({
+            id: h.id,
+            previous_cost: h.previous_cost,
+            new_cost: h.new_cost,
+            unit_cost_from_xml: h.unit_cost_from_xml,
+            changed_at: h.changed_at,
+            invoice_key: h.invoice_key,
+            supplier_id: h.supplier_id,
+        }))
+
+        return {
+            purchases,
+            purchasesTotal: purchasesRes.count || 0,
+            costHistory,
         }
     } catch (error: any) {
         return { error: error.message }
