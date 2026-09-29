@@ -94,7 +94,8 @@ export function getDeliveryTimelineSteps(
     isPaid: boolean,
     orderCreatedAt: string | Date,
     orderUpdatedAt?: string | Date,
-    shipment?: CarrierShipment | null
+    shipment?: CarrierShipment | null,
+    isCarrierOrder?: boolean
 ): DeliveryTimelineStep[] {
     const baseDate = formatDayMonth(orderCreatedAt || new Date())
     const baseTime = formatTime(orderCreatedAt || new Date())
@@ -123,8 +124,8 @@ export function getDeliveryTimelineSteps(
         ]
     }
 
-    if (shipment && !isPickup) {
-        const shipmentStatus = shipment.status || ""
+    if ((shipment || isCarrierOrder) && !isPickup) {
+        const shipmentStatus = shipment?.status || ""
         const fmtWhen = (iso?: string | null) =>
             iso
                 ? { date: formatDayMonth(iso), time: formatTime(iso) }
@@ -134,7 +135,7 @@ export function getDeliveryTimelineSteps(
         const deliveredActive = shipmentStatus === "delivered"
 
         if (shipmentStatus === "cancelled" || shipmentStatus === "failed") {
-            const failedMeta = fmtWhen(shipment.updated_at || shipment.created_at)
+            const failedMeta = fmtWhen(shipment?.updated_at || shipment?.created_at)
             return [
                 { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
                 {
@@ -152,9 +153,9 @@ export function getDeliveryTimelineSteps(
             ]
         }
 
-        const postedMeta = fmtWhen(shipment.paid_at || shipment.updated_at || shipment.created_at)
-        const transitMeta = fmtWhen(shipment.updated_at)
-        const deliveredShipmentMeta = fmtWhen(shipment.delivered_at)
+        const postedMeta = fmtWhen(shipment?.paid_at || shipment?.updated_at || shipment?.created_at)
+        const transitMeta = fmtWhen(shipment?.updated_at)
+        const deliveredShipmentMeta = fmtWhen(shipment?.delivered_at)
 
         return [
             { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
@@ -275,7 +276,8 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
         isPaid,
         orderCreatedAt,
         orderUpdatedAt,
-        carrier?.shipment ?? null
+        carrier?.shipment ?? null,
+        Boolean(carrier)
     )
 
     const isFailed = deliveryStatus === "delivery_failed"

@@ -305,6 +305,8 @@ async function handler(request: NextRequest) {
     // SEGURANÇA: Validar e recalcular preços (NUNCA confiar no frontend)
     let totalAmount = 0
     let deliveryFee = 0
+    let deliveryBreakdown: Record<string, unknown> | null = null
+    let deliveryDistanceKm: number | null = null
     let couponIdToSave: string | null = null
     let couponDiscountAmount = 0
     let checkoutFulfillment: Record<string, unknown> | null = null
@@ -647,8 +649,12 @@ async function handler(request: NextRequest) {
             return NextResponse.json({ error: carrier.error }, { status: 400 })
           }
           deliveryFee = carrier.fee
+          deliveryBreakdown = carrier.breakdown
+          deliveryDistanceKm = null
         } else {
           deliveryFee = Number(deliveryQuote.fee || 0)
+          deliveryBreakdown = (deliveryQuote.breakdown as Record<string, unknown>) ?? null
+          deliveryDistanceKm = deliveryQuote.distanceKm != null ? Number(deliveryQuote.distanceKm) : null
         }
       } else {
         deliveryFee = 0
@@ -1222,6 +1228,8 @@ async function handler(request: NextRequest) {
           payment_method_discount_amount: paymentMethodDiscountAmount,
           payment_method_extra_amount: paymentMethodExtraAmount,
           delivery_fee: deliveryFee,
+          delivery_breakdown: deliveryBreakdown,
+          distance_km: deliveryDistanceKm,
           delivery_payer: effectiveDeliveryPayer,
           seller_commission_amount: sellerCommissionAmount,
           payment_breakdown: [{
