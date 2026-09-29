@@ -14,6 +14,7 @@ import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generat
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { revalidatePath } from "next/cache"
+import { revalidateServices } from "@/lib/utils/revalidation"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { incrementCacheVersion } from "@/lib/cache/invalidation"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -297,6 +298,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         if (insertError) return errorResponse(insertError.message)
 
         if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
+        await revalidateServices(finalPartnerId, inserted?.id)
         revalidatePath("/erp/servicos")
         return successResponse(inserted)
     } catch (error: any) {
@@ -427,6 +429,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
 
         await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
         await incrementCacheVersion()
+        await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {
@@ -473,6 +476,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
             source: "manual"
         })
 
+        await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ deleted: true })
     } catch (error: any) {
@@ -516,6 +520,7 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
             source: "manual"
         })
 
+        await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ restored: true })
     } catch (error: any) {
@@ -556,6 +561,7 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         })
 
         await removeFromExploreRedis(serviceId, "servico")
+        await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ archived: true })
     } catch (error: any) {
@@ -598,6 +604,7 @@ export async function unarchiveServiceAction(serviceId: string): Promise<ActionR
             source: "manual"
         })
 
+        await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ restored: true })
     } catch (error: any) {
@@ -651,6 +658,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
             })
         }
 
+        await revalidateServices(partnerId)
         revalidatePath("/erp/servicos")
         return successResponse({ deletedCount: serviceIds.length })
     } catch (error: any) {
@@ -681,6 +689,7 @@ export async function toggleServicesStatusAction(serviceIds: string[], isActive:
         if (error) return errorResponse(error.message)
 
         await Promise.all(serviceIds.map(id => syncToExploreRedis({ id, type: "servico", data: {}, silent: true })))
+        await revalidateServices(partnerId)
         revalidatePath("/erp/servicos")
         return successResponse({ count: serviceIds.length })
     } catch (error: any) {
@@ -726,6 +735,7 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
         if (firstError) return errorResponse(firstError.error?.message || "Erro no batch update")
 
         await Promise.all(serviceIds.map(id => syncToExploreRedis({ id, type: "servico", data: {}, silent: true })))
+        await revalidateServices(partnerId)
         revalidatePath("/erp/servicos")
         return successResponse({ count: updates.length })
     } catch (error: any) {
@@ -803,6 +813,7 @@ export async function duplicateServiceAction(serviceId: string) {
         }
 
         if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
+        await revalidateServices(service.partner_id, inserted?.id)
         revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })
     } catch (error: any) {

@@ -215,6 +215,82 @@ export class SuperFreteClient {
     return USER_AGENT_TEMPLATE(this.userEmail)
   }
 
+  private static extractErrorText(detail: unknown): string {
+    if (detail == null || detail === "") return "Erro desconhecido"
+    if (typeof detail === "string") return detail
+    if (Array.isArray(detail)) {
+      const parts = detail
+        .map((item) => {
+          if (item == null) return null
+          if (typeof item === "string") return item
+          if (typeof item === "object") {
+            const obj = item as Record<string, unknown>
+            if (typeof obj.message === "string") return obj.message
+            try {
+              return JSON.stringify(obj)
+            } catch {
+              return String(obj)
+            }
+          }
+          return String(item)
+        })
+        .filter(Boolean) as string[]
+      return parts.length ? parts.join(" | ") : "Erro desconhecido"
+    }
+    if (typeof detail === "object") {
+      const d = detail as Record<string, unknown>
+      const parts: string[] = []
+      const errors = d.errors ?? d.error
+      if (errors && typeof errors === "object" && !Array.isArray(errors)) {
+        for (const [field, value] of Object.entries(errors as Record<string, unknown>)) {
+          if (Array.isArray(value)) {
+            const items = value
+              .map((v) => {
+                if (v != null && typeof v === "object") {
+                  const obj = v as Record<string, unknown>
+                  if (typeof obj.message === "string") return obj.message
+                  try {
+                    return JSON.stringify(obj)
+                  } catch {
+                    return String(obj)
+                  }
+                }
+                return String(v)
+              })
+              .filter(Boolean)
+            if (items.length) parts.push(`${field}: ${items.join(", ")}`)
+          } else if (value != null && typeof value === "object") {
+            try {
+              parts.push(`${field}: ${JSON.stringify(value)}`)
+            } catch {
+              parts.push(`${field}: ${String(value)}`)
+            }
+          } else if (value != null) {
+            parts.push(`${field}: ${String(value)}`)
+          }
+        }
+      } else if (errors) {
+        const flattened = SuperFreteClient.extractErrorText(errors)
+        if (flattened) parts.push(flattened)
+      }
+      const message = typeof d.message === "string" ? d.message : null
+      const fallback = typeof d.error_description === "string" ? d.error_description : null
+      const head = message || fallback
+      if (parts.length) {
+        const joined = parts.join(" | ")
+        if (head && !joined.includes(head)) return `${head} → ${joined}`
+        return joined
+      }
+      if (head) return head
+      try {
+        return JSON.stringify(d)
+      } catch {
+        return String(detail)
+      }
+    }
+    return String(detail)
+  }
+
   private async request(
     method: string,
     path: string,
@@ -245,7 +321,7 @@ export class SuperFreteClient {
         errorDetail = JSON.parse(text)
       } catch {}
       const err = new Error(
-        `SuperFrete API ${res.status}: ${errorDetail?.message || errorDetail || "Unknown error"}`,
+        `SuperFrete API ${res.status}: ${SuperFreteClient.extractErrorText(errorDetail)}`,
       ) as any
       err.status = res.status
       err.detail = errorDetail

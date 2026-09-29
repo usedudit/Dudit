@@ -129,6 +129,17 @@ function hashSeed(seed: string, id: string): number {
     return Math.abs(h)
 }
 
+// Boost para itens recém-anunciados: sem ele, um produto/serviço novo nunca
+// aparece ao lado de itens antigos que já acumularam views/vendas.
+function recencyBoost(createdAt?: string | null): number {
+    if (!createdAt) return 0
+    const ageMs = Date.now() - new Date(createdAt).getTime()
+    if (!Number.isFinite(ageMs) || ageMs < 0) return 0
+    const ageDays = ageMs / 86_400_000
+    if (ageDays >= 7) return 0
+    return 12 * (1 - ageDays / 7)
+}
+
 // ─── Normalization helper ───────────────────────────────────────────────────
 
 function normalizeCitySlug(name: string): string {
@@ -658,18 +669,13 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const tagged = applyTierSort(trendingData as RawProduct[], tiers, item => {
         const r = item as RawProduct
         const engagement = (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
-        return engagement > 0 ? engagement : ((r as any).marketplace_score ?? 0)
+        const score = engagement > 0 ? engagement : ((r as any).marketplace_score ?? 0)
+        return score + recencyBoost(r.created_at)
     }, ctx.city, ctx.state)
 
-    // Prefer items with real engagement signals, fallback to top scores if fresh database
-    const withSignals = tagged.filter(item => {
-        const r = item as RawProduct
-        return (r.views_last_30_days ?? 0) > 0
-            || (r.favorites_count ?? 0) > 0
-            || (r.sales_last_30_days ?? 0) > 0
-    })
-
-    const candidates = withSignals.length > 0 ? withSignals : tagged
+    // Mantém todos os candidatos: itens sem sinal de engajamento apenas ranqueiam
+    // abaixo, mas precisam continuar aparecendo (produto novo ainda sem views).
+    const candidates = tagged
 
     const displayScope = determineDisplayScope(candidates, ctx)
     const display = sectionDisplay("trending", ctx, displayScope)

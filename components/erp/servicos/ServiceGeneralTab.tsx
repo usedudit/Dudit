@@ -572,9 +572,9 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 error={fieldErrors?.has("duration_minutes") || Number(serviceData.duration_minutes || 0) > 525600}
                                 errorMessage={
                                     Number(serviceData.duration_minutes || 0) > 525600
-                                        ? "Duração máxima permitida é de 1 ano (525.600 min)"
+                                        ? "Duração máxima permitida é de 1 ano"
                                         : fieldErrors?.has("duration_minutes")
-                                            ? "Duração é obrigatória (máx. 525.600 min)"
+                                            ? "Duração é obrigatória"
                                             : undefined
                                 }
                                 dataField="duration_minutes"

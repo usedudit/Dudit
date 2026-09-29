@@ -12,6 +12,7 @@ import { revalidateOrders, safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
   createSuperFreteClient,
+  type SuperFreteClient,
   type SuperFreteEnvironment,
   type SuperFreteQuoteParams,
   type SuperFreteCreateLabelParams,
@@ -512,13 +513,75 @@ export async function generateSuperFreteLabelAction(payload: {
   }
 }
 
+function isSuperFreteSandboxIntegration(integration: PartnerIntegrationRow | null): boolean {
+  const config = (integration?.config || {}) as Record<string, unknown>
+  return resolveSuperFreteEnvironment(config.environment) === "sandbox"
+}
+
+async function simulateSandboxCheckout(params: {
+  supabase: ReturnType<typeof getAdminClient>
+  client: SuperFreteClient
+  partnerId: string
+  labelId: string
+  reason: string
+}): Promise<{
+  success: true
+  result: { tracking?: string; trackingUrl?: string; printUrl?: string; status: string; simulated: boolean }
+}> {
+  console.warn(
+    `[SuperFrete] SANDBOX SIMULATION — pagamento pulado (${params.reason}). label=${params.labelId} partner=${params.partnerId}`,
+  )
+
+  let printUrl: string | undefined
+  try {
+    const labelPrint = await params.client.getLabelPrintUrl([params.labelId])
+    printUrl = labelPrint?.url
+  } catch (printErr: any) {
+    console.warn("[SuperFrete] Sandbox simulation: impressão indisponível:", printErr?.message)
+  }
+
+  const tracking = `SBX${params.labelId.replace(/[^A-Za-z0-9]/g, "").slice(0, 10).toUpperCase()}`
+  const trackingUrl = `https://rastreio.superfrete.com/#/tracking/${tracking}`
+
+  const { data: shipmentRow } = await params.supabase
+    .from("order_shipments")
+    .select("payload")
+    .eq("partner_id", params.partnerId)
+    .eq("external_label_id", params.labelId)
+    .maybeSingle()
+
+  await params.supabase
+    .from("order_shipments")
+    .update({
+      status: "released",
+      tracking_number: tracking,
+      tracking_url: trackingUrl,
+      label_url: printUrl || null,
+      paid_at: new Date().toISOString(),
+      payload: {
+        ...((shipmentRow?.payload as Record<string, unknown> | null) || {}),
+        payment_simulated: true,
+        simulation_reason: params.reason,
+      },
+    })
+    .eq("partner_id", params.partnerId)
+    .eq("external_label_id", params.labelId)
+
+  revalidateOrders(params.partnerId)
+
+  return {
+    success: true,
+    result: { tracking, trackingUrl, printUrl, status: "released", simulated: true },
+  }
+}
+
 export async function checkoutSuperFreteLabelAction(payload: {
   partnerId: string
   orderId: string
   labelId: string
 }): Promise<{
   success: true
-  result: { tracking?: string; trackingUrl?: string; printUrl?: string; status: string }
+  result: { tracking?: string; trackingUrl?: string; printUrl?: string; status: string; simulated?: boolean }
 } | { success: false; error: string }> {
   const user = await requireUser()
   const ctx = await getCurrentPartnerContext()
@@ -536,6 +599,7 @@ export async function checkoutSuperFreteLabelAction(payload: {
 
   try {
     // Credit check: the seller pays from their own SuperFrete wallet.
+    let sandboxSkipReason: string | null = null
     try {
       const [labelInfo, userInfo] = await Promise.all([
         client.getOrderInfo(payload.labelId),
@@ -544,13 +608,27 @@ export async function checkoutSuperFreteLabelAction(payload: {
       const price = Number(labelInfo.price || 0)
       const balance = Number(userInfo.balance ?? 0)
       if (balance < price) {
-        return {
-          success: false,
-          error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+        if (isSuperFreteSandboxIntegration(integration)) {
+          sandboxSkipReason = `saldo insuficiente: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}`
+        } else {
+          return {
+            success: false,
+            error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+          }
         }
       }
     } catch (checkErr) {
       console.warn("[SuperFrete] Balance pre-check failed (continuing):", checkErr)
+    }
+
+    if (sandboxSkipReason) {
+      return await simulateSandboxCheckout({
+        supabase,
+        client,
+        partnerId: payload.partnerId,
+        labelId: payload.labelId,
+        reason: sandboxSkipReason,
+      })
     }
 
     const checkout = await client.checkoutOrders([payload.labelId])
@@ -605,11 +683,25 @@ export async function checkoutSuperFreteLabelAction(payload: {
     }
   } catch (err: any) {
     if (err.status === 402 || err.message?.includes("insufficient")) {
+      if (isSuperFreteSandboxIntegration(integration)) {
+        return await simulateSandboxCheckout({
+          supabase,
+          client,
+          partnerId: payload.partnerId,
+          labelId: payload.labelId,
+          reason: `API recusou o pagamento: ${err?.message || "saldo insuficiente"}`,
+        })
+      }
       return {
         success: false,
         error: "Saldo insuficiente na carteira SuperFrete. Recarregue em https://sandbox.superfrete.com/#/account/credits",
       }
     }
+    console.error(
+      "[SuperFrete] checkoutSuperFreteLabelAction failed:",
+      err?.message,
+      err?.detail ? JSON.stringify(err.detail) : "",
+    )
     captureError(err, {
       module: "shipping",
       action: "checkout_label_superfrete",
@@ -1082,6 +1174,26 @@ export async function createOrderShippingLabelAction(payload: {
       return { success: false, error: "Este pedido não tem um serviço de frete selecionado." }
     }
 
+    try {
+      const userInfo = await client.getUserInfo()
+      const balance = Number(userInfo.balance ?? 0)
+      const estimated = Number((order as any)?.delivery_fee || 0)
+      if (Number.isFinite(balance) && estimated > 0 && balance < estimated) {
+        if (isSuperFreteSandboxIntegration(integration)) {
+          console.warn(
+            `[SuperFrete] SANDBOX: criando etiqueta com saldo insuficiente (disponível R$ ${balance.toFixed(2)} < estimado R$ ${estimated.toFixed(2)}); pagamento será simulado no checkout.`,
+          )
+        } else {
+          return {
+            success: false,
+            error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário aproximadamente R$ ${estimated.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn("[SuperFrete] Balance pre-check failed (continuing):", checkErr)
+    }
+
     const volumes = buildVolumes(config)
     const label = await client.createOrder({
       service: requestedService as SuperFreteServiceId,
@@ -1150,6 +1262,11 @@ export async function createOrderShippingLabelAction(payload: {
       },
     }
   } catch (err: any) {
+    console.error(
+      "[SuperFrete] createOrderShippingLabelAction failed:",
+      err?.message,
+      err?.detail ? JSON.stringify(err.detail) : "",
+    )
     captureError(err, {
       module: "shipping",
       action: "create_order_shipping_label",

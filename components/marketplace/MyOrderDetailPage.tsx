@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, 
-WhatsappIcon, TruckIcon, ReturnIcon } from '@/lib/icons';
+import {
+    ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon,
+    WhatsappIcon, TruckIcon, ReturnIcon
+} from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -2418,30 +2420,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )
                                         })()
                                     )}
-
-                                    {/* Timeline da Entrega */}
-                                    {(() => {
-                                        const deliverySteps = getDeliveryTimelineSteps(order);
-                                        if (deliverySteps.length === 0) return null;
-
-                                        const activeSteps = deliverySteps.filter(s => s.active);
-                                        const timelineEntries = activeSteps.map((step, idx) => ({
-                                            id: `delivery-step-${idx}`,
-                                            actor_name: step.label,
-                                            change_lines: step.subLabel ? [step.subLabel] : [],
-                                            created_at: step.iso || order.created_at,
-                                            entry_type: "delivery",
-                                        }));
-
-                                        return (
-                                            <FormSection title="Acompanhamento da Entrega">
-                                                <HistoryTimeline
-                                                    entries={timelineEntries}
-                                                    emptyMessage="Nenhum evento de entrega registrado."
-                                                />
-                                            </FormSection>
-                                        );
-                                    })()}
 
                                     <DeliverySummarySection
                                         order={order}

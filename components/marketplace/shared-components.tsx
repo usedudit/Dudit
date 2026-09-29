@@ -30,10 +30,10 @@ const HOME_CATEGORIES = [
     { name: 'Decoração', image: 'https://img.dudit.com.br/static/Placeholder.png' },
 ];
 
-export const HeroBanner: React.FC<{ height?: number }> = () => {
-    return (
-        <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 group flex justify-center w-full">
-            <div className="relative w-full max-w-[1400px] rounded-xl lg:rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[1400/300] dark:bg-dark-border/50 shadow-xs">
+export const HeroBanner: React.FC<{ height?: number; href?: string }> = ({ href }) => {
+    const content = (
+        <>
+            <div className="relative w-full max-w-[1400px] rounded-xl lg:rounded-2xl overflow-hidden select-none transition-all duration-300 bg-gray-100 aspect-[1400/300] dark:bg-dark-border/50 shadow-xs group-hover:shadow-md">
                 <img
                     src="https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png"
                     srcSet="https://img.dudit.com.br/cdn-cgi/image/width=750,format=auto,quality=80/static/banners/Banner-1.png 750w, https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png 1400w"
@@ -46,6 +46,20 @@ export const HeroBanner: React.FC<{ height?: number }> = () => {
                     decoding="async"
                 />
             </div>
+        </>
+    )
+
+    if (!href) return (
+        <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 group flex justify-center w-full">
+            {content}
+        </section>
+    )
+
+    return (
+        <section className="mt-4 sm:mt-6 mb-8 sm:mb-12 px-4 lg:px-0 group flex justify-center w-full">
+            <IntentPrefetchLink href={href} className="cursor-pointer">
+                {content}
+            </IntentPrefetchLink>
         </section>
     );
 };

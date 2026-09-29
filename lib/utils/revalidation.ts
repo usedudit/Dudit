@@ -135,6 +135,25 @@ export async function revalidateEntityTimeline(entityType: string, entityId: str
 }
 
 /**
+ * Revalida dados de SERVIÇOS
+ * (inclusive as seções "Serviços em <cidade>" da home, que usam a tag "services")
+ */
+export async function revalidateServices(partnerId?: string, serviceId?: string) {
+    if (partnerId) {
+        await safeRevalidateTag(TAGS.services(partnerId))
+        await safeRevalidateTag(partnerId)
+        await safeRevalidateTag(`partner-${partnerId}`)
+    }
+
+    if (serviceId) {
+        await safeRevalidateTag(`service-${serviceId}`)
+    }
+
+    await safeRevalidateTag("services")
+    await safeRevalidateTag(TAGS.marketplace)
+}
+
+/**
  * Revalida dados de CLIENTES
  */
 export async function revalidateCustomers(partnerId: string) {

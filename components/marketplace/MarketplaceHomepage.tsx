@@ -572,9 +572,15 @@ export default function MarketplaceHome({
         const vitrineSection = sections.find(s => s.id === "topVitrines")
         const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection)
 
+        const exploreHref = useMemo(() => {
+            if (selectedCityName === "Brasil") return "/explorar/brasil"
+            if (selectedCitySlug) return `/explorar/${selectedCitySlug}`
+            return "/explorar"
+        }, [selectedCitySlug, selectedCityName])
+
         content = (
             <div className="w-full bg-white flex-grow dark:bg-dark-surface pb-28 lg:pb-12">
-                <HeroBanner />
+                <HeroBanner href={exploreHref} />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
                     {/* 1. Seção de Produtos */}

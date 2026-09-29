@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
-import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile } from '@/lib/utils/revalidation'
+import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile, revalidateServices } from '@/lib/utils/revalidation'
 import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
 import { RateLimitCategory } from '@/lib/rate-limiter'
 
@@ -98,6 +98,7 @@ export async function POST(req: Request) {
         }
         if (table === 'services' && partnerId) {
           await revalidatePartnerProfile(partnerId)
+          await revalidateServices(partnerId, id)
         }
         if (table === 'partners' && id) {
           await revalidatePartnerProfile(id)

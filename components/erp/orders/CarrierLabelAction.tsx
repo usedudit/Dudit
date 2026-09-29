@@ -66,7 +66,11 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
             if (res.success) {
                 const payRes = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: res.label.id })
                 if (payRes.success) {
-                    toast.success(`Etiqueta gerada e paga por ${formatCurrency(res.label.price)}.`)
+                    toast.success(
+                        payRes.result.simulated
+                            ? `Etiqueta gerada em modo simulado (sandbox) por ${formatCurrency(res.label.price)}.`
+                            : `Etiqueta gerada e paga por ${formatCurrency(res.label.price)}.`,
+                    )
                 } else {
                     toast.success(`Etiqueta criada por ${formatCurrency(res.label.price)}.`)
                     toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
@@ -88,7 +92,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
         try {
             const res = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: shipment.external_label_id })
             if (res.success) {
-                toast.success("Etiqueta paga com sucesso!")
+                toast.success(res.result.simulated ? "Etiqueta paga em modo simulado (sandbox)." : "Etiqueta paga com sucesso!")
                 await refresh()
             } else {
                 toast.error(res.error || "Erro ao pagar etiqueta.")
