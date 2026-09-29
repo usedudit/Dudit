@@ -158,7 +158,13 @@ const OrderListItem = React.memo(
                                 </Badge>
                             )}
                             {!order.hasOnlyServices && order.situation !== "cancelled" && (
-                                <Badge variant={order.deliveryStatusColor || "gray"} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
+                                <Badge variant={order.deliveryStatusColor || "gray"} icon={
+                                    order.delivery_type === "pickup"
+                                        ? <StoreIcon />
+                                        : order.carrierBrandIcon
+                                            ? <img src={order.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                            : <TruckIcon />
+                                }>
                                     {order.deliveryStatusLabel || "Não informado"}
                                 </Badge>
                             )}

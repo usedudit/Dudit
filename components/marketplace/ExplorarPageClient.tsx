@@ -301,6 +301,19 @@ export function ExplorarPageClient({
         fetchFnMountedRef.current = false
     }, [queryKeyString])
 
+    // Reset moreDistant state when the search context changes (new query, city, type, radius, section).
+    // On client-side navigation the component doesn't remount, so useState initial values won't update.
+    // This syncs the server-provided initialMoreDistant* props into state whenever the search key changes,
+    // preventing stale "more distant" results from a previous search from persisting.
+    const prevQueryKeyRef = useRef(queryKeyString)
+    useEffect(() => {
+        if (prevQueryKeyRef.current !== queryKeyString) {
+            prevQueryKeyRef.current = queryKeyString
+            setMoreDistantSellers(initialMoreDistantSellers)
+            setMoreDistantItems(initialMoreDistantItems)
+        }
+    }, [queryKeyString, initialMoreDistantSellers, initialMoreDistantItems])
+
     const isLandingPage = false
 
     const fetchType = currentType
@@ -1033,7 +1046,10 @@ export function ExplorarPageClient({
                     ? ` no estado de ${formatCitySlug(selectedCitySlug)}`
                     : ` em ${formatCitySlug(selectedCitySlug)}`)
             : ""
-        if (query) return `Resultados para "${query}"${citySuffix}`
+        if (query) {
+            const hasLocalResults = rawItems.length > 0
+            return `Resultados para "${query}"${hasLocalResults ? citySuffix : ""}`
+        }
         if (selectedSection) {
             if (selectedSection === "promos") return `Itens em promoção${citySuffix}`
             if (selectedSection === "best-rated") return `Melhor avaliados${citySuffix}`
@@ -1050,7 +1066,7 @@ export function ExplorarPageClient({
         if (currentType === "em-alta") return `Em alta${citySuffix}`
         if (currentType === "novos-anunciados") return `Novos anunciados${citySuffix}`
         return `Itens${citySuffix}`
-    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName])
+    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName, rawItems.length])
 
     const emptySubtitle = useMemo(() => {
         const cityNameOnly = selectedCitySlug
@@ -1907,6 +1923,38 @@ export function ExplorarPageClient({
                                 </div>
                             ) : (
                                 <>
+                                    {/* Empty state with action buttons when no local results found in city/radius */}
+                                    {rawItems.length === 0 && !isCategoryMode && (
+                                        <div className="py-12 flex flex-col items-center">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                imageAlt="Não temos nada assim ainda!"
+                                                title="Não temos nada assim ainda!"
+                                                subtitle={emptySubtitle}
+                                                buttons={[
+                                                    {
+                                                        text: "Eu vendo",
+                                                        action: () => {
+                                                            router.push(userProfile ? "/erp/inicio" : "/auth/login?mode=partner")
+                                                        },
+                                                        variant: "default"
+                                                    },
+                                                    {
+                                                        text: "Conheço quem vende",
+                                                        action: handleInvite,
+                                                        variant: "outline"
+                                                    },
+                                                    {
+                                                        text: "Estou procurando isso",
+                                                        action: handleOpenDemandModal,
+                                                        variant: "outline"
+                                                    }
+                                                ]}
+                                            />
+                                        </div>
+                                    )}
+
                                     {/* Carrossel de Lojas Locais na Busca */}
                                     {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
                                         <div className="mb-6">
@@ -1956,7 +2004,28 @@ export function ExplorarPageClient({
                                     />
 
 
-                                    {filteredResults.length === 0 && !hasNextPage && moreDistantItems.length === 0 ? (
+                                    {filteredResults.length > 0 ? (
+                                        <div className={viewMode === "grid"
+                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                            : "mt-4"
+                                        }>
+                                            {filteredResults.map((item) => renderListingItem(item))}
+
+                                            {hasNextPage && (
+                                                <div
+                                                    ref={observerTarget}
+                                                    className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
+                                                >
+                                                    {isFetchingNextPage ? (
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <SkeletonLoader height={24} width={180} className="rounded" />
+                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opcoes...</span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : rawItems.length > 0 && !hasNextPage && moreDistantItems.length === 0 ? (
                                         <div className="py-12 flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -1985,28 +2054,7 @@ export function ExplorarPageClient({
                                                 ]}
                                             />
                                         </div>
-                                    ) : (
-                                        <div className={viewMode === "grid"
-                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
-                                            : "mt-4"
-                                        }>
-                                            {filteredResults.map((item) => renderListingItem(item))}
-
-                                            {hasNextPage && (
-                                                <div
-                                                    ref={observerTarget}
-                                                    className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
-                                                >
-                                                    {isFetchingNextPage ? (
-                                                        <div className="flex flex-col items-center gap-2">
-                                                            <SkeletonLoader height={24} width={180} className="rounded" />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opcoes...</span>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                    ) : null}
 
                                     {/* Carrossel de Itens Distantes na Busca */}
                                     {!!query && moreDistantItems.length > 0 && (

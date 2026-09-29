@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
 import { formatDate, formatTime } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { generateCpfLookupHash } from "@/lib/services/cpf-hash"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
@@ -776,6 +777,8 @@ export async function getCustomerOrdersAction(customerId: string) {
       customer_name,
       order_source,
       notes,
+      delivery_breakdown,
+      order_shipments ( id, kind, carrier ),
       order_items ( id, quantity, service_id, line_type )
     `)
     .eq("partner_id", partnerId)
@@ -839,6 +842,15 @@ export async function getCustomerOrdersAction(customerId: string) {
       delivery_type: o.delivery_type || "delivery",
       deliveryStatusLabel: getDeliveryStatusLabelForType(o.delivery_status, o.delivery_type),
       deliveryStatusColor: deliveryInfo.variant,
+      carrierBrandIcon: (() => {
+        const carrierShipments = Array.isArray(o.order_shipments)
+          ? o.order_shipments.filter((s: any) => s.kind !== "return")
+          : []
+        const isCarrier = o.delivery_breakdown?.source === "superfrete" || carrierShipments.length > 0
+        return isCarrier
+          ? getCarrierBrandIcon(o.delivery_breakdown?.companyName, o.delivery_breakdown?.serviceName, carrierShipments[0]?.carrier, o.delivery_breakdown?.carrier)
+          : null
+      })(),
       items: o.order_items ? o.order_items.length : 0,
       items_count: orderItems.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
       customer_name: o.customer_name || "Consumidor final",

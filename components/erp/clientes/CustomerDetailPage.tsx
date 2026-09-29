@@ -994,7 +994,13 @@ const OrdersContent = ({
                                                 {o.statusLabel}
                                             </Badge>
                                             {!o.hasOnlyServices && (
-                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={o.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} className="h-5 text-[10px] px-1.5">
+                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={
+                                                    o.delivery_type === "pickup"
+                                                        ? <StoreIcon />
+                                                        : o.carrierBrandIcon
+                                                            ? <img src={o.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                                            : <TruckIcon />
+                                                } className="h-5 text-[10px] px-1.5">
                                                     {o.deliveryStatusLabel || "Não informado"}
                                                 </Badge>
                                             )}
@@ -1091,7 +1097,13 @@ const OrdersContent = ({
                                                                     {o.statusLabel}
                                                                 </Badge>
                                                                 {!o.hasOnlyServices && (
-                                                                    <Badge variant={o.deliveryStatusColor || "gray"} icon={o.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
+                                                                    <Badge variant={o.deliveryStatusColor || "gray"} icon={
+                                                                        o.delivery_type === "pickup"
+                                                                            ? <StoreIcon />
+                                                                            : o.carrierBrandIcon
+                                                                                ? <img src={o.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                                                                : <TruckIcon />
+                                                                    }>
                                                                         {o.deliveryStatusLabel || "Não informado"}
                                                                     </Badge>
                                                                 )}

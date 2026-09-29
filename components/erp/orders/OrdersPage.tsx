@@ -62,6 +62,7 @@ import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -97,6 +98,7 @@ interface Order {
     paidAmount: number;
     statusIcon?: React.ReactNode;
     deliveryStatusIcon?: React.ReactNode;
+    carrierBrandIcon?: string | null;
     hasOnlyServices?: boolean;
     is_refunded?: boolean;
     refunded_amount?: number;
@@ -435,6 +437,11 @@ export default function OrdersPage({
                 )
                 const trackedShipment = shipments.find((s: any) => s.tracking_number) || null
 
+                const carrierBreakdown = (o.delivery_breakdown as any)?.source === "superfrete"
+                    ? (o.delivery_breakdown as any)
+                    : null
+                const isCarrierDelivery = Boolean(carrierBreakdown) || shipments.length > 0
+
                 return {
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
@@ -447,6 +454,14 @@ export default function OrdersPage({
                     deliveryStatusLabel: getDeliveryStatusLabelForType(o.delivery_status, deliveryType),
                     deliveryStatusColor: deliveryInfo.variant,
                     deliveryStatusIcon: deliveryIconMap[o.delivery_status || "not_sent"] || <BlockedIcon size={12} />,
+                    carrierBrandIcon: isCarrierDelivery
+                        ? getCarrierBrandIcon(
+                            carrierBreakdown?.companyName,
+                            carrierBreakdown?.serviceName,
+                            shipments[0]?.carrier,
+                            carrierBreakdown?.carrier,
+                        )
+                        : null,
                     isUnfulfilled: false,
                     formattedDate: formatDate(o.order_date || o.created_at),
                     formattedTime: formatTime(o.order_date || o.created_at),

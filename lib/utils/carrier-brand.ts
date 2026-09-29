@@ -1,7 +1,7 @@
 export const SUPERFRETE_BRAND_ICON = "https://img.dudit.com.br/static/icons/brands/Superfrete.png"
 
 const CARRIER_BRAND_ICONS: Array<{ match: RegExp; url: string }> = [
-    { match: /correios/i, url: "https://img.dudit.com.br/static/icons/brands/Correios.png" },
+    { match: /correios|\bPAC\b|\bSEDEX\b|Mini Envios/i, url: "https://img.dudit.com.br/static/icons/brands/Correios.png" },
     { match: /jadlog/i, url: "https://img.dudit.com.br/static/icons/brands/Jadlog.png" },
     { match: /loggi/i, url: "https://img.dudit.com.br/static/icons/brands/Loggi.png" },
 ]

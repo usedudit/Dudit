@@ -1128,7 +1128,7 @@ export async function createOrderShippingLabelAction(payload: {
       provider_slug: SUPERFRETE_PROVIDER,
       status: label.status || "pending",
       service_code: String(serviceId),
-      service_name: SERVICE_LABELS[serviceId] || SERVICE_LABELS[requestedService],
+      service_name: SERVICE_LABELS[serviceId] || SERVICE_LABELS[requestedService] || (order as any)?.delivery_breakdown?.serviceName || null,
       carrier: "SuperFrete",
       external_label_id: label.id,
       price: typeof label.price === "number" ? label.price : null,

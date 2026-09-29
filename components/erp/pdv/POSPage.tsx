@@ -2006,59 +2006,19 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         </div>
                     </BottomSheet>
 
-                    <DefaultModal
-                        isOpen={isTypeFilterModalOpen}
-                        onClose={() => setIsTypeFilterModalOpen(false)}
-                        title="Filtrar por Produtos ou Serviços"
-                        maxWidth="sm"
-                    >
-                        <div className="space-y-4 p-1">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                Escolha se deseja visualizar os produtos ou serviços no catálogo e nas categorias do PDV.
-                            </p>
-                            <div className="grid gap-3 pt-1">
-                                <ListItem
-                                    onClick={() => {
-                                        handleItemTypeTabChange("product")
-                                        setIsTypeFilterModalOpen(false)
-                                    }}
-                                    title="Produtos"
-                                    description="Visualizar produtos no catálogo"
-                                    right={
-                                        <RadioButton
-                                            name="itemType"
-                                            value="product"
-                                            checked={itemTypeTab === "product"}
-                                            onChange={() => {
-                                                handleItemTypeTabChange("product")
-                                                setIsTypeFilterModalOpen(false)
-                                            }}
-                                        />
-                                    }
-                                />
-
-                                <ListItem
-                                    onClick={() => {
-                                        handleItemTypeTabChange("service")
-                                        setIsTypeFilterModalOpen(false)
-                                    }}
-                                    title="Serviços"
-                                    description="Visualizar serviços no catálogo"
-                                    right={
-                                        <RadioButton
-                                            name="itemType"
-                                            value="service"
-                                            checked={itemTypeTab === "service"}
-                                            onChange={() => {
-                                                handleItemTypeTabChange("service")
-                                                setIsTypeFilterModalOpen(false)
-                                            }}
-                                        />
-                                    }
-                                />
-                            </div>
+                    <BottomSheet isOpen={isTypeFilterModalOpen} onClose={() => setIsTypeFilterModalOpen(false)} title="Selecione">
+                        <div className="px-5 pb-8">
+                            {[
+                                ...(hasProductsInCatalog ? [{ value: "product" as const, label: "Produtos" }] : []),
+                                ...(hasServicesInCatalog ? [{ value: "service" as const, label: "Serviços" }] : [])
+                            ].map((opt, i, arr) => (
+                                <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
+                                    <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
+                                    <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
+                                </div>
+                            ))}
                         </div>
-                    </DefaultModal>
+                    </BottomSheet>
 
                     <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
                         <div className="space-y-5 px-1 pb-2">

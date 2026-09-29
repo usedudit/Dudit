@@ -63,18 +63,51 @@ export function isCarrierDeliveryOrder(order: any): boolean {
     return order?.delivery_breakdown?.source === "superfrete" || !!getOutboundCarrierShipment(order)
 }
 
-function getCarrierTitle(carrier?: CarrierInfo | null): string {
-    const shipment = carrier?.shipment
+function inferCarrierCompany(service?: string | null): string | null {
+    if (!service) return null
+    if (/\bPAC\b|\bSEDEX\b|Mini Envios/i.test(service)) return "Correios"
+    if (/jadlog/i.test(service)) return "Jadlog"
+    if (/loggi/i.test(service)) return "Loggi"
+    if (/j&t/i.test(service)) return "J&T"
+    return null
+}
+
+function resolveCarrierCompany(carrier?: CarrierInfo | null): string | null {
     const breakdown = carrier?.breakdown
-    const company = breakdown?.companyName || shipment?.carrier || breakdown?.carrier || null
-    const service = shipment?.service_name || breakdown?.serviceName || null
-    if (company && service) return `${company} • ${service}`
-    return company || service || "Transportadora"
+    const shipment = carrier?.shipment
+    const fromBreakdown = breakdown?.companyName || null
+    if (fromBreakdown) return fromBreakdown
+    const fromShipment = shipment?.carrier && !/^superfrete$/i.test(String(shipment.carrier))
+        ? String(shipment.carrier)
+        : null
+    if (fromShipment) return fromShipment
+    return inferCarrierCompany(getCarrierServiceName(carrier))
+}
+
+function getCarrierServiceName(carrier?: CarrierInfo | null): string | null {
+    return carrier?.shipment?.service_name || carrier?.breakdown?.serviceName || null
+}
+
+function getCarrierTitle(carrier?: CarrierInfo | null): string {
+    const service = getCarrierServiceName(carrier)
+    const company = resolveCarrierCompany(carrier)
+    if (company && service && company.toLowerCase() !== service.toLowerCase()) {
+        return `${company} - ${service}`
+    }
+    if (company) return company
+    if (service) return service
+    return "Transportadora"
 }
 
 function getCarrierDescription(carrier?: CarrierInfo | null): string {
     const shipment = carrier?.shipment
-    if (!shipment) return "Etiqueta ainda não gerada."
+    const breakdown = carrier?.breakdown
+    if (!shipment) {
+        if (breakdown?.deliveryMinDays != null || breakdown?.deliveryMaxDays != null) {
+            return `Prazo estimado: ${formatDeliveryDaysRange(breakdown.deliveryMinDays, breakdown.deliveryMaxDays)}`
+        }
+        return "Envio por transportadora."
+    }
     const statusLabel = CARRIER_STATUS_LABELS[shipment.status || ""] || "Envio registrado"
     if (shipment.tracking_number) return `Rastreio ${shipment.tracking_number} • ${statusLabel}`
     return statusLabel
@@ -293,35 +326,28 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                     <div className="hidden lg:block">
                         <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                             <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                <div className="flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                    <span>{isPickup ? "Retirada" : "Entrega"}</span>
-                                </div>
-                                <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                        {currentStep.label}
-                                    </span>
-                                    <Badge variant={isFailed ? "red" : activeCount === steps.length ? "green" : "gray"}>
-                                        {isFailed
-                                            ? "Falha na entrega"
-                                            : activeCount === steps.length
-                                              ? "Concluído"
-                                              : "Em andamento"}
-                                    </Badge>
+                                <div className="flex justify-between items-center flex-wrap gap-2">
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                            {isPickup ? "Retirada" : "Entrega"}
+                                        </span>
+                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                            {currentStep.label}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
                                 <div className="relative px-4">
                                     <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
                                         <div
-                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${
-                                                isFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"
-                                            }`}
+                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"
+                                                }`}
                                             style={{
-                                                width: `${
-                                                    steps.length <= 1
-                                                        ? 0
-                                                        : ((activeCount - 1) / (steps.length - 1)) * 100
-                                                }%`,
+                                                width: `${steps.length <= 1
+                                                    ? 0
+                                                    : ((activeCount - 1) / (steps.length - 1)) * 100
+                                                    }%`,
                                             }}
                                         ></div>
 
@@ -334,33 +360,30 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                                                 >
                                                     <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
                                                         <span
-                                                            className={`text-xs font-medium ${
-                                                                step.active
-                                                                    ? isLastFailed
-                                                                        ? "text-brand-red"
-                                                                        : "text-brand-dark dark:text-dark-heading"
-                                                                    : "text-gray-400 dark:text-dark-body"
-                                                            }`}
+                                                            className={`text-xs font-medium ${step.active
+                                                                ? isLastFailed
+                                                                    ? "text-brand-red"
+                                                                    : "text-brand-dark dark:text-dark-heading"
+                                                                : "text-gray-400 dark:text-dark-body"
+                                                                }`}
                                                         >
                                                             {step.label}
                                                         </span>
                                                     </div>
                                                     <div
-                                                        className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${
-                                                            step.active
-                                                                ? isLastFailed
-                                                                    ? "bg-brand-red border-brand-red"
-                                                                    : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
-                                                                : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
-                                                        }`}
+                                                        className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
+                                                            ? isLastFailed
+                                                                ? "bg-brand-red border-brand-red"
+                                                                : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
+                                                            : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
+                                                            }`}
                                                     >
                                                         {step.active && (
                                                             <div
-                                                                className={`w-1.5 h-1.5 rounded-full ${
-                                                                    isLastFailed
-                                                                        ? "bg-white"
-                                                                        : "bg-white dark:bg-dark-surface"
-                                                                }`}
+                                                                className={`w-1.5 h-1.5 rounded-full ${isLastFailed
+                                                                    ? "bg-white"
+                                                                    : "bg-white dark:bg-dark-surface"
+                                                                    }`}
                                                             ></div>
                                                         )}
                                                     </div>
@@ -398,18 +421,16 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                             onClick={() => setIsStepsSheetOpen(true)}
                             left={
                                 <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                        isFailed
-                                            ? "bg-brand-red/10 text-brand-red"
-                                            : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                    }`}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isFailed
+                                        ? "bg-brand-red/10 text-brand-red"
+                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                        }`}
                                 >
                                     <div
-                                        className={`w-2.5 h-2.5 rounded-full ${
-                                            isFailed
-                                                ? "bg-brand-red"
-                                                : "bg-brand-dark dark:bg-dark-heading"
-                                        }`}
+                                        className={`w-2.5 h-2.5 rounded-full ${isFailed
+                                            ? "bg-brand-red"
+                                            : "bg-brand-dark dark:bg-dark-heading"
+                                            }`}
                                     />
                                 </div>
                             }
@@ -432,13 +453,12 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                                 className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent"
                             >
                                 <div
-                                    className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${
-                                        step.active
-                                            ? isLastFailed
-                                                ? "bg-brand-red border-brand-red"
-                                                : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
-                                            : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
-                                    }`}
+                                    className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
+                                        ? isLastFailed
+                                            ? "bg-brand-red border-brand-red"
+                                            : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
+                                        : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
+                                        }`}
                                 >
                                     {step.active && (
                                         <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>
@@ -446,13 +466,12 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                                 </div>
                                 <div className="flex flex-col text-left">
                                     <span
-                                        className={`text-sm font-semibold ${
-                                            step.active
-                                                ? isLastFailed
-                                                    ? "text-brand-red"
-                                                    : "text-brand-dark dark:text-dark-heading"
-                                                : "text-gray-400 dark:text-dark-body"
-                                        }`}
+                                        className={`text-sm font-semibold ${step.active
+                                            ? isLastFailed
+                                                ? "text-brand-red"
+                                                : "text-brand-dark dark:text-dark-heading"
+                                            : "text-gray-400 dark:text-dark-body"
+                                            }`}
                                     >
                                         {step.label}
                                     </span>
@@ -492,6 +511,7 @@ interface DeliveryDriverSectionProps {
     deliveryStatus: string
     formatCurrency: (value: number) => string
     carrier?: CarrierInfo | null
+    carrierLabelAction?: React.ReactNode
 }
 
 export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
@@ -499,10 +519,17 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
     deliveryStatus,
     formatCurrency,
     carrier,
+    carrierLabelAction,
 }) => {
     const [isDuditDriverModalOpen, setIsDuditDriverModalOpen] = useState(false)
+    const [isCarrierInfoOpen, setIsCarrierInfoOpen] = useState(false)
 
     if (carrier) {
+        const carrierService = getCarrierServiceName(carrier)
+        const carrierCompany = resolveCarrierCompany(carrier)
+        const carrierStatus = carrier.shipment
+            ? CARRIER_STATUS_LABELS[carrier.shipment.status || ""] || "Envio registrado"
+            : null
         return (
             <FormSection title="Transportadora">
                 <ListItem
@@ -511,23 +538,93 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                     className="px-4 py-3"
                     left={
                         <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                            <img src={getCarrierBrandIcon(carrier?.breakdown?.companyName, carrier?.shipment?.carrier)} alt="Transportadora" className="w-7 h-7 object-contain" />
+                            <img
+                                src={getCarrierBrandIcon(carrierCompany, carrierService, carrier?.shipment?.carrier, carrier?.breakdown?.carrier)}
+                                alt="Transportadora"
+                                className="w-7 h-7 object-contain"
+                            />
                         </div>
                     }
                     right={
-                        carrier.shipment?.tracking_url ? (
-                            <a
-                                href={carrier.shipment.tracking_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="shrink-0 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                onClick={(e) => e.stopPropagation()}
+                        carrierLabelAction ?? (
+                            <Button
+                                variant="link"
+                                type="button"
+                                className="shrink-0"
+                                onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation()
+                                    setIsCarrierInfoOpen(true)
+                                }}
                             >
-                                Rastrear
-                            </a>
-                        ) : null
+                                Rastreio
+                            </Button>
+                        )
                     }
                 />
+
+                <DefaultModal
+                    isOpen={isCarrierInfoOpen}
+                    onClose={() => setIsCarrierInfoOpen(false)}
+                    title="Detalhes do envio"
+                    maxWidth="md"
+                >
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                <img
+                                    src={getCarrierBrandIcon(carrierCompany, carrierService, carrier?.shipment?.carrier, carrier?.breakdown?.carrier)}
+                                    alt="Transportadora"
+                                    className="w-7 h-7 object-contain"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {getCarrierTitle(carrier)}
+                                </p>
+                                {carrierStatus && (
+                                    <Badge variant={carrier.shipment?.status === "delivered" ? "green" : carrier.shipment?.status === "failed" || carrier.shipment?.status === "cancelled" ? "red" : "blue"}>
+                                        {carrierStatus}
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2.5">
+                            <div className="flex justify-between items-center text-sm gap-4 py-2 border-b border-brand-border/40 dark:border-dark-border/40">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Código de rastreamento</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                    {carrier.shipment?.tracking_number || "Aguardando postagem"}
+                                </span>
+                            </div>
+                            {(carrier?.breakdown?.deliveryMinDays != null || carrier?.breakdown?.deliveryMaxDays != null) && (
+                                <div className="flex justify-between items-center text-sm gap-4 py-2 border-b border-brand-border/40 dark:border-dark-border/40">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Prazo estimado</span>
+                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                        {formatDeliveryDaysRange(carrier.breakdown.deliveryMinDays, carrier.breakdown.deliveryMaxDays)}
+                                    </span>
+                                </div>
+                            )}
+                            {carrier.shipment?.status && (
+                                <div className="flex justify-between items-center text-sm gap-4 py-2 border-b border-brand-border/40 dark:border-dark-border/40 last:border-0">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status</span>
+                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{carrierStatus}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {carrier.shipment?.tracking_url && (
+                            <Button variant="link" type="button" asChild className="shrink-0">
+                                <a
+                                    href={carrier.shipment.tracking_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Abrir rastreio
+                                </a>
+                            </Button>
+                        )}
+                    </div>
+                </DefaultModal>
             </FormSection>
         )
     }
@@ -612,9 +709,9 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                         }
                         right={
                             driverInfo.phone &&
-                            ["sent", "out_for_delivery", "assigned", "accepted"].includes(
-                                driverInfo.driverStatus || deliveryStatus
-                            ) ? (
+                                ["sent", "out_for_delivery", "assigned", "accepted"].includes(
+                                    driverInfo.driverStatus || deliveryStatus
+                                ) ? (
                                 <a
                                     href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`}
                                     target="_blank"
@@ -665,7 +762,7 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                     </span>
                 </div>
                 {driverInfo.phone &&
-                ["sent", "out_for_delivery"].includes(deliveryStatus) ? (
+                    ["sent", "out_for_delivery"].includes(deliveryStatus) ? (
                     <a
                         href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`}
                         target="_blank"

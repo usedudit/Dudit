@@ -34,7 +34,7 @@ import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
-import { OrderShippingSection } from "./OrderShippingSection"
+import { CarrierLabelAction } from "./CarrierLabelAction"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDateTime, formatTime, formatDayMonth, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -1931,15 +1931,15 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 deliveryStatus={order.delivery_status || ""}
                                                                 formatCurrency={formatCurrency}
                                                                 carrier={carrier}
-                                                            />
-                                                        )}
-
-                                                        {!isPickup && carrierDelivery && (
-                                                            <OrderShippingSection
-                                                                orderId={orderId}
-                                                                partnerId={partnerId}
-                                                                order={order}
-                                                                onRefresh={refreshOrder}
+                                                                carrierLabelAction={
+                                                                    carrierDelivery ? (
+                                                                        <CarrierLabelAction
+                                                                            orderId={orderId}
+                                                                            partnerId={partnerId}
+                                                                            onRefresh={refreshOrder}
+                                                                        />
+                                                                    ) : undefined
+                                                                }
                                                             />
                                                         )}
 

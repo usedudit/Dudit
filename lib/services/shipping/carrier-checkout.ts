@@ -171,7 +171,7 @@ export async function quoteCarrierFreightOptions(
       .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
       .map((q: any) => ({
         serviceId: Number(q.id),
-        serviceName: SERVICE_LABELS[Number(q.id)] || q.name || `Serviço ${q.id}`,
+        serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
         price: Math.round(Number(q.price) * 100) / 100,
         deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
         deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,

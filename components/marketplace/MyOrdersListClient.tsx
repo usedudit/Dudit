@@ -16,7 +16,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
-import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand";
 
 const ORDERS_PER_PAGE = 10
 
@@ -427,17 +426,7 @@ export function MyOrdersListClient({
 
                                                         {/* Right side: Status as plain colored text */}
                                                         <div className={`flex items-center gap-1.5 text-xs font-bold ${statusConfig.color}`}>
-                                                            {orderIsCarrier ? (
-                                                                <Tooltip text="Entrega por transportadora">
-                                                                    <img
-                                                                        src={getCarrierBrandIcon(order?.delivery_breakdown?.companyName, carrierShipment?.carrier)}
-                                                                        alt="Entrega por transportadora"
-                                                                        className="w-3.5 h-3.5 object-contain shrink-0 cursor-help"
-                                                                    />
-                                                                </Tooltip>
-                                                            ) : (
-                                                                <StatusIcon size={14} />
-                                                            )}
+                                                            <StatusIcon size={14} />
                                                             <span>{statusConfig.label}</span>
                                                         </div>
                                                     </div>

@@ -421,6 +421,8 @@ async function handler(request: NextRequest) {
       totalAmount = priced.data.totalAmount
       fullOrderTotal = priced.data.totalAmount
       deliveryFee = priced.data.deliveryFee
+      deliveryBreakdown = priced.data.deliveryBreakdown ?? null
+      deliveryDistanceKm = priced.data.distanceKm ?? null
       couponIdToSave = priced.data.couponId
       couponDiscountAmount = priced.data.couponDiscountAmount
       paymentMethodDiscountAmount = priced.data.pricingResult.paymentMethodDiscountAmount

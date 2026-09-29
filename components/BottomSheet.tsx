@@ -23,8 +23,9 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     const sheetRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
-    const [windowHeight, setWindowHeight] = useState(800);
-    const [isMounted, setIsMounted] = useState(false);
+    const [windowHeight, setWindowHeight] = useState(() =>
+        typeof window !== "undefined" ? window.innerHeight : 800
+    );
 
     // y=0 → sheet colada no bottom, visível por completo
     // y=windowHeight → sheet fora da tela (embaixo)
@@ -39,7 +40,6 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
     useEffect(() => {
         setWindowHeight(window.innerHeight);
-        setIsMounted(true);
     }, []);
 
     // Arrastar pelo handle para fechar (gesto nativo de bottom sheet).
@@ -49,10 +49,14 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         <Portal>
             <AnimatePresence>
 
-                {isOpen && isMounted && (
-                    <div
+                {isOpen && (
+                    <motion.div
                         className="fixed inset-0 z-[100] flex items-end pointer-events-none"
                         style={{ zIndex }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                     >
 
                         {/* Overlay (backdrop click-to-close) */}
@@ -61,6 +65,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.6 }}
                             exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
                             onClick={onClose}
                         />
 
@@ -110,7 +115,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
                         </motion.div>
 
-                    </div>
+                    </motion.div>
                 )}
 
             </AnimatePresence>
