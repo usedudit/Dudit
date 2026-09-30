@@ -1047,7 +1047,8 @@ export function ExplorarPageClient({
                     : ` em ${formatCitySlug(selectedCitySlug)}`)
             : ""
         if (query) {
-            const hasLocalResults = rawItems.length > 0
+            const stateIsSynced = currentType === type && selectedCitySlug === cidade
+            const hasLocalResults = stateIsSynced && rawItems.length > 0
             return `Resultados para "${query}"${hasLocalResults ? citySuffix : ""}`
         }
         if (selectedSection) {
@@ -1066,7 +1067,7 @@ export function ExplorarPageClient({
         if (currentType === "em-alta") return `Em alta${citySuffix}`
         if (currentType === "novos-anunciados") return `Novos anunciados${citySuffix}`
         return `Itens${citySuffix}`
-    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName, rawItems.length])
+    }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName, rawItems.length, type, cidade])
 
     const emptySubtitle = useMemo(() => {
         const cityNameOnly = selectedCitySlug

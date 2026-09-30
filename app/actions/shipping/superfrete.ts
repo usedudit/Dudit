@@ -941,6 +941,22 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
   return { integration: integration as PartnerIntegrationRow, partner, order, config, supabase }
 }
 
+async function resolvePlainCpf(raw: unknown): Promise<string | null> {
+  if (!raw) return null
+  const value = String(raw)
+  if (!/^v\d+:/.test(value.trim())) {
+    const digits = value.replace(/\D/g, "")
+    return digits.length === 11 ? digits : null
+  }
+  try {
+    const plain = (await decryptCPF(value)).replace(/\D/g, "")
+    if (plain.length === 11) return plain
+  } catch {
+    return null
+  }
+  return null
+}
+
 async function resolveOriginAddress(
   supabase: ReturnType<typeof getAdminClient>,
   order: any,
@@ -984,13 +1000,7 @@ async function resolveOriginAddress(
   if (storeCnpj.length === 14) {
     document = storeCnpj
   } else if (docRow?.cpf) {
-    try {
-      const plain = (await decryptCPF(docRow.cpf)).replace(/\D/g, "")
-      if (plain) document = plain
-    } catch {
-      const fallback = String(docRow.cpf).replace(/\D/g, "")
-      if (fallback.length === 11 || fallback.length === 14) document = fallback
-    }
+    document = (await resolvePlainCpf(docRow.cpf)) || undefined
   }
 
   return {
@@ -1024,31 +1034,37 @@ async function resolveDestinationAddress(
   }
 
   let customer: any = null
-  if (customerIds.length > 0) {
+  for (const id of customerIds) {
     const { data } = await supabase
       .from("customers")
       .select("name, email, phone, cpf, cnpj, person_type")
-      .eq("id", customerIds[0])
+      .eq("id", id)
       .maybeSingle()
-    customer = data
+    if (data) {
+      customer = data
+      break
+    }
   }
 
   let customerDocument: string | undefined
   if (customer) {
     const cnpjDigits = String(customer.cnpj || "").replace(/\D/g, "")
-    let cpfDigits = ""
-    if (customer.cpf) {
-      try {
-        cpfDigits = (await decryptCPF(customer.cpf)).replace(/\D/g, "")
-      } catch {
-        const fallback = String(customer.cpf).replace(/\D/g, "")
-        if (fallback.length === 11) cpfDigits = fallback
-      }
-    }
+    const cpfDigits = await resolvePlainCpf(customer.cpf)
     if (customer.person_type === "pj" && cnpjDigits.length === 14) {
       customerDocument = cnpjDigits
     } else {
-      customerDocument = cpfDigits.length === 11 ? cpfDigits : cnpjDigits.length === 14 ? cnpjDigits : undefined
+      customerDocument = cpfDigits || (cnpjDigits.length === 14 ? cnpjDigits : undefined)
+    }
+  }
+  if (!customerDocument && customerIds.length > 0) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("user_id, cpf")
+      .in("user_id", customerIds)
+      .limit(1)
+      .maybeSingle()
+    if (profile) {
+      customerDocument = (await resolvePlainCpf(profile.cpf)) || undefined
     }
   }
 
@@ -1730,7 +1746,19 @@ export async function saveOrderRecipientDocumentAction(payload: {
     .eq("partner_id", payload.partnerId)
     .maybeSingle()
 
-  const customerId = order?.buyer_id || order?.customer_id
+  const candidateIds = [order?.buyer_id, order?.customer_id].filter(Boolean)
+  let customerId: string | null = null
+  for (const id of candidateIds) {
+    const { data } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle()
+    if (data) {
+      customerId = data.id
+      break
+    }
+  }
   if (!customerId) {
     return { success: false, error: "Pedido sem cliente vinculado. Cadastre o cliente do pedido e tente novamente." }
   }
@@ -1751,21 +1779,23 @@ export async function saveOrderRecipientDocumentAction(payload: {
       }
     }
     const encrypted = await encryptCPF(digits)
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("customers")
       .update({ cpf: encrypted, cpf_lookup_hash: lookupHash })
       .eq("id", customerId)
-    if (error) {
-      console.error("[SuperFrete] saveOrderRecipientDocument CPF failed:", error.message)
+      .select("id")
+    if (error || !updated || updated.length === 0) {
+      console.error("[SuperFrete] saveOrderRecipientDocument CPF failed:", error?.message || "no row updated")
       return { success: false, error: "Erro ao salvar o CPF do cliente." }
     }
   } else {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("customers")
       .update({ cnpj: digits })
       .eq("id", customerId)
-    if (error) {
-      console.error("[SuperFrete] saveOrderRecipientDocument CNPJ failed:", error.message)
+      .select("id")
+    if (error || !updated || updated.length === 0) {
+      console.error("[SuperFrete] saveOrderRecipientDocument CNPJ failed:", error?.message || "no row updated")
       return { success: false, error: "Erro ao salvar o CNPJ do cliente." }
     }
   }

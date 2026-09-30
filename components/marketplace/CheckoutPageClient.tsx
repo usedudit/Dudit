@@ -524,6 +524,7 @@ export function CheckoutPageClient() {
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
     const carrierQuoteKeyRef = useRef<string | null>(null)
     const [carrierError, setCarrierError] = useState<string | null>(null)
+    const [carrierReason, setCarrierReason] = useState<string | null>(null)
 
     const destinationCep = useMemo(() => {
         if (formData.deliveryType !== "delivery") return ""
@@ -538,18 +539,18 @@ export function CheckoutPageClient() {
         setSelectedCarrierServiceId(null)
         carrierQuoteKeyRef.current = null
         setCarrierError(null)
+        setCarrierReason(null)
     }, [destinationCep])
 
-    // Quote carrier options once own delivery reports no coverage ("raio").
+    // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
+    // este efeito esperava o erro "raio" — serializando frete próprio
+    // (geocoding) + SuperFrete + uma segunda rodada de totais em 10-15s.
+    // Agora as opções chegam junto com o "raio", tornando a seleção imediata.
     // NOTE: the dedupe key lives in a ref (not state) so this effect never
     // re-runs on its own updates — otherwise the cleanup below would cancel
     // the in-flight request and discard its results.
     useEffect(() => {
         if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep || !partnerInfo.mpConnected) return
-        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) {
-            carrierQuoteKeyRef.current = null
-            return
-        }
         const dedupeKey = `${partnerId}:${destinationCep}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
@@ -563,20 +564,17 @@ export function CheckoutPageClient() {
                     if (res.success && res.options.length > 0) {
                         setCarrierOptions(res.options)
                         setCarrierError(null)
-                        setSelectedCarrierServiceId(res.options[0].serviceId)
-                        setShowOutsideRadiusModal(false)
+                        setCarrierReason(null)
                     } else {
                         setCarrierOptions([])
                         setSelectedCarrierServiceId(null)
                         setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
-                        // Modal de "Entrega Indisponível" só quando realmente não há
-                        // opção de transporte. Motivos de configuração (plano, CEP de
-                        // origem, erro de cotação) ficam visíveis no card inline.
-                        setShowOutsideRadiusModal(!res.success && res.reason === "no_options")
+                        setCarrierReason(!res.success ? res.reason : "no_options")
                     }
                 } catch {
                     if (!active) return
                     setCarrierError("Não foi possível calcular o frete agora.")
+                    setCarrierReason("quote_failed")
                 } finally {
                     completed = true
                     if (active) setCarrierQuoteLoading(false)
@@ -584,9 +582,12 @@ export function CheckoutPageClient() {
             })()
         return () => {
             active = false
-            if (!completed) carrierQuoteKeyRef.current = null
+            if (!completed) {
+                carrierQuoteKeyRef.current = null
+                setCarrierQuoteLoading(false)
+            }
         }
-    }, [deliveryError, destinationCep, partnerId, formData.deliveryType, partnerInfo.mpConnected])
+    }, [destinationCep, partnerId, formData.deliveryType, partnerInfo.mpConnected])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)
@@ -604,6 +605,28 @@ export function CheckoutPageClient() {
         })
         setDeliveryError(null)
     }
+
+    // Apply carrier options once own delivery reports no coverage ("raio").
+    // Runs independently of the fetch effect so it works whether the options
+    // arrive before or after the "raio" error — no visible gap/flash.
+    useEffect(() => {
+        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
+        if (carrierQuoteLoading) return
+        if (carrierOptions.length > 0) {
+            if (selectedCarrierServiceId == null) {
+                handleCarrierSelect(carrierOptions[0])
+            }
+            setShowOutsideRadiusModal(false)
+        } else if (carrierError && carrierReason === "no_options") {
+            // Modal de "Entrega Indisponível" só quando realmente não há
+            // opção de transporte. Motivos de configuração (plano, CEP de
+            // origem, erro de cotação) ficam visíveis no card inline.
+            setShowOutsideRadiusModal(true)
+        }
+        // handleCarrierSelect é recriado a cada render; o efeito só reage ao
+        // estado do fluxo de cotação.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [deliveryError, carrierQuoteLoading, carrierOptions, carrierError, carrierReason, selectedCarrierServiceId])
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
 
@@ -695,30 +718,47 @@ export function CheckoutPageClient() {
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
     const isWhatsappFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
     const carrierDeliveryActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
+    // Modo carrier: frete próprio sem cobertura ("fora do raio") ou transportadora
+    // já selecionada. Enquanto isso, o checkout mostra apenas Mercado Pago.
+    const raioNoCoverage = Boolean(deliveryError && deliveryError.toLowerCase().includes("raio"))
+    const carrierCheckoutEngaged = carrierDeliveryActive || raioNoCoverage
+    // Enquanto "fora do raio" aguarda a cotação da transportadora, esconde o
+    // erro (sem flash) — a seção de transportadora mostra o estado de cálculo.
+    const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
+    const displayDeliveryError = raioNoCoverage && carrierResolving ? null : deliveryError
     useEffect(() => {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
             // Só força o modo manual quando nada foi escolhido ainda — nunca
             // sobrescrever uma seleção explícita (ex.: créditos de assinatura).
             // Com entrega por transportadora ativa, o pagamento é online (MP).
-            if (paymentOption === null && !carrierDeliveryActive) setPaymentOption("traditional")
+            if (paymentOption === null && !carrierCheckoutEngaged) setPaymentOption("traditional")
             return
         }
         if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null && !isPickupRequiringOnline) {
             setPaymentOption("traditional")
         }
-    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow])
+    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow, carrierCheckoutEngaged])
 
     // Entrega por transportadora (SuperFrete) deve ser paga online via Mercado Pago
     // — em qualquer fluxo (inclusive WhatsApp, onde sem transportadora o pedido
     // continua fechado no chat com pagamento manual). O corte de cotação já exige
-    // mpConnected.
+    // mpConnected. "Engaged" cobre também o período em que o frete próprio ainda
+    // não retornou (raio) — assim os métodos manuais não piscam antes do cálculo.
     useEffect(() => {
-        if (!carrierDeliveryActive) return
-        if (paymentOption === "traditional" || paymentOption === null) {
-            setPaymentOption("mercadopago")
-            setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+        if (carrierCheckoutEngaged) {
+            if (paymentOption === "traditional" || paymentOption === null) {
+                setPaymentOption("mercadopago")
+                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+            }
+            return
         }
-    }, [carrierDeliveryActive, paymentOption])
+        // Saiu do modo carrier (ex.: endereço trocou e o frete próprio cobre):
+        // no fluxo WhatsApp sem transportadora selecionada, volta ao modo manual.
+        if (isWhatsappFlow && selectedCarrierServiceId == null && paymentOption === "mercadopago") {
+            setPaymentOption("traditional")
+            setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+        }
+    }, [carrierCheckoutEngaged, paymentOption, isWhatsappFlow, selectedCarrierServiceId])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -1042,7 +1082,7 @@ export function CheckoutPageClient() {
     )))
     // Entrega por transportadora exige pagamento online (Mercado Pago) — oculta a
     // opção manual em qualquer fluxo enquanto a transportadora estiver ativa.
-    const showManualPaymentOption = showTraditionalPaymentOption && !carrierDeliveryActive
+    const showManualPaymentOption = showTraditionalPaymentOption && !carrierCheckoutEngaged
 
     const schedulingLines = useMemo(
         () =>
@@ -1343,7 +1383,6 @@ export function CheckoutPageClient() {
         selectedAddress,
         selectedCarrierServiceId,
         destinationCep,
-        carrierOptions,
     ])
 
     // Effect 2: Payment preview - ONLY recalculate on payment method/installments changes
@@ -1881,42 +1920,6 @@ export function CheckoutPageClient() {
                                 <span>Ajuste horário</span>
                                 <span>{Number(deliveryBreakdown.timeAdjustmentTotal) > 0 ? `+${formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}` : formatCurrency(Number(deliveryBreakdown.timeAdjustmentTotal))}</span>
                             </div>
-                        )}
-                    </div>
-                )}
-                {!isPickup && (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
-                    <div className="space-y-2">
-                        <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                            Entrega por transportadora (SuperFrete)
-                        </p>
-                        {carrierOptions.map((opt) => (
-                            <button
-                                key={opt.serviceId}
-                                type="button"
-                                onClick={() => handleCarrierSelect(opt)}
-                                className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${selectedCarrierServiceId === opt.serviceId
-                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                    : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
-                                    }`}
-                            >
-                                <span className="flex flex-col">
-                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                        {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
-                                    </span>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
-                                    </span>
-                                </span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(Number(opt.price))}
-                                </span>
-                            </button>
-                        ))}
-                        {carrierQuoteLoading && (
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculando opções de entrega...</p>
-                        )}
-                        {carrierError && !carrierQuoteLoading && (
-                            <p className="text-xs text-red-500">{carrierError}</p>
                         )}
                     </div>
                 )}
@@ -2943,7 +2946,12 @@ export function CheckoutPageClient() {
                                     deliveryEnabled={deliveryEnabled}
                                     pickupEnabled={pickupEnabled}
                                     partnerAddressLabel={partnerAddressLabel}
-                                    deliveryError={deliveryError}
+                                    deliveryError={displayDeliveryError}
+                                    carrierOptions={carrierOptions}
+                                    selectedCarrierServiceId={selectedCarrierServiceId}
+                                    carrierQuoteLoading={raioNoCoverage && carrierQuoteLoading}
+                                    carrierError={raioNoCoverage && !carrierQuoteLoading ? carrierError : null}
+                                    onSelectCarrier={handleCarrierSelect}
                                     schedulingLines={schedulingLines}
                                     lines={checkoutContext?.lines || []}
                                     onFulfillmentModesSave={handleBulkFulfillmentModesSave}
@@ -3029,7 +3037,7 @@ export function CheckoutPageClient() {
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
-                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierDeliveryActive) ? (
+                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierCheckoutEngaged) ? (
                                         <>
                                             <div className="space-y-1 mb-4">
                                                 <ListItem
@@ -3414,7 +3422,12 @@ export function CheckoutPageClient() {
                                             deliveryEnabled={deliveryEnabled}
                                             pickupEnabled={pickupEnabled}
                                             partnerAddressLabel={partnerAddressLabel}
-                                            deliveryError={deliveryError}
+                                            deliveryError={displayDeliveryError}
+                                            carrierOptions={carrierOptions}
+                                            selectedCarrierServiceId={selectedCarrierServiceId}
+                                            carrierQuoteLoading={raioNoCoverage && carrierQuoteLoading}
+                                            carrierError={raioNoCoverage && !carrierQuoteLoading ? carrierError : null}
+                                            onSelectCarrier={handleCarrierSelect}
                                             schedulingLines={schedulingLines}
                                             lines={checkoutContext?.lines || []}
                                             onFulfillmentModesSave={handleBulkFulfillmentModesSave}
@@ -3548,7 +3561,7 @@ export function CheckoutPageClient() {
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
                                             </div>
                                         </div>
-                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierDeliveryActive) ? (
+                                    ) : partnerInfo.mpConnected && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierCheckoutEngaged) ? (
                                         <div className="space-y-1">
                                             <ListItem
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
@@ -4420,14 +4433,15 @@ export function CheckoutPageClient() {
                     {(() => {
                         const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
                         const isWhatsappTabFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
-                        const carrierActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
                         const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
                         const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
                         // Entrega por transportadora exige Mercado Pago (sem tab
-                        // manual) em qualquer fluxo. Sem transportadora, o fluxo
-                        // WhatsApp fica apenas com o pagamento manual.
-                        const showTraditionalTab = !carrierActive && (isWhatsappTabFlow || !isPickup || canPayUponPickup)
-                        const showMercadoPagoTab = partnerInfo.mpConnected && (!isWhatsappTabFlow || carrierActive)
+                        // manual) em qualquer fluxo — incluindo enquanto o frete
+                        // próprio ainda reporta "fora do raio" (engaged). Sem
+                        // transportadora, o fluxo WhatsApp fica apenas com o
+                        // pagamento manual.
+                        const showTraditionalTab = !carrierCheckoutEngaged && (isWhatsappTabFlow || !isPickup || canPayUponPickup)
+                        const showMercadoPagoTab = partnerInfo.mpConnected && (!isWhatsappTabFlow || carrierCheckoutEngaged)
                         const hasAnyPaymentMethod = showMercadoPagoTab || storefrontMethods.length > 0
 
                         if (!hasAnyPaymentMethod) {

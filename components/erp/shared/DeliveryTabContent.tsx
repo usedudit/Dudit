@@ -2,19 +2,12 @@
 
 import React, { useState } from "react"
 import {
-    TruckIcon,
     MotorbikeIcon,
-    InfoIcon,
     WhatsappIcon,
-    PhoneIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    AlertCircleIcon,
-    BlockedIcon,
 } from "@/lib/icons"
 import { FormSection, ListItem, Badge, Button, DefaultModal, SidebarCard } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
-import { formatDayMonth, formatTime, formatDateTime, formatFullDate, formatDeliveryDaysRange } from "@/lib/utils"
+import { formatDayMonth, formatTime, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import DuditDriverDetailsModal from "@/components/erp/deliveries/DuditDriverDetailsModal"
@@ -531,7 +524,7 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
             ? CARRIER_STATUS_LABELS[carrier.shipment.status || ""] || "Envio registrado"
             : null
         return (
-            <FormSection title="Transportadora">
+            <FormSection hasSeparator title="Transportadora">
                 <ListItem
                     title={getCarrierTitle(carrier)}
                     description={getCarrierDescription(carrier)}
@@ -817,59 +810,59 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
     }
 
     const content = (
-            <div className="space-y-3">
-                <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
-                {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
-                {carrier?.breakdown &&
-                    (carrier.breakdown.deliveryMinDays != null || carrier.breakdown.deliveryMaxDays != null) && (
-                        <DetailRow
-                            label="Prazo estimado"
-                            value={formatDeliveryDaysRange(
-                                carrier.breakdown.deliveryMinDays,
-                                carrier.breakdown.deliveryMaxDays
-                            )}
-                        />
-                    )}
-                {carrier?.shipment?.tracking_number && (
-                    <DetailRow label="Código de rastreamento" value={carrier.shipment.tracking_number} />
-                )}
-                {order.delivery_address && !isPickup && (
+        <div className="space-y-3">
+            <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
+            {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
+            {carrier?.breakdown &&
+                (carrier.breakdown.deliveryMinDays != null || carrier.breakdown.deliveryMaxDays != null) && (
                     <DetailRow
-                        label="Endereço"
-                        value={
-                            <span className="text-sm truncate inline-block max-w-[200px]">
-                                {order.delivery_address}
-                            </span>
-                        }
+                        label="Prazo estimado"
+                        value={formatDeliveryDaysRange(
+                            carrier.breakdown.deliveryMinDays,
+                            carrier.breakdown.deliveryMaxDays
+                        )}
                     />
                 )}
-                {deliveryNumber && (
-                    <DetailRow label="Nº Entrega" value={`#${deliveryNumber}`} />
-                )}
-                {Number(order.delivery_fee || 0) > 0 && (
-                    <DetailRow label="Taxa de entrega" value={formatCurrency(order.delivery_fee)} />
-                )}
-                {estimatedHours != null && estimatedHours > 0 && (
-                    <DetailRow label="Tempo estimado" value={`${estimatedHours} h`} />
-                )}
-                {distanceKm != null && (
-                    <DetailRow label="Distância" value={`${distanceKm} km`} />
-                )}
-                {isPickup && store?.addresses && formatPartnerAddress && (
-                    <DetailRow
-                        label="Local de retirada"
-                        value={
-                            <span className="text-sm truncate inline-block max-w-[200px]">
-                                {formatPartnerAddress(store.addresses)}
-                            </span>
-                        }
-                    />
-                )}
-            </div>
+            {carrier?.shipment?.tracking_number && (
+                <DetailRow label="Código de rastreamento" value={carrier.shipment.tracking_number} />
+            )}
+            {order.delivery_address && !isPickup && (
+                <DetailRow
+                    label="Endereço"
+                    value={
+                        <span className="text-sm truncate inline-block max-w-[200px]">
+                            {order.delivery_address}
+                        </span>
+                    }
+                />
+            )}
+            {deliveryNumber && (
+                <DetailRow label="Nº Entrega" value={`#${deliveryNumber}`} />
+            )}
+            {Number(order.delivery_fee || 0) > 0 && (
+                <DetailRow label="Taxa de entrega" value={formatCurrency(order.delivery_fee)} />
+            )}
+            {estimatedHours != null && estimatedHours > 0 && (
+                <DetailRow label="Tempo estimado" value={`${estimatedHours} h`} />
+            )}
+            {distanceKm != null && (
+                <DetailRow label="Distância" value={`${distanceKm} km`} />
+            )}
+            {isPickup && store?.addresses && formatPartnerAddress && (
+                <DetailRow
+                    label="Local de retirada"
+                    value={
+                        <span className="text-sm truncate inline-block max-w-[200px]">
+                            {formatPartnerAddress(store.addresses)}
+                        </span>
+                    }
+                />
+            )}
+        </div>
     )
 
     if (variant === "sidebar") {
-        return <SidebarCard title="Resumo da Entrega">{content}</SidebarCard>
+        return <SidebarCard hasTopStrip title="Resumo da Entrega">{content}</SidebarCard>
     }
     if (variant === "card") {
         return (

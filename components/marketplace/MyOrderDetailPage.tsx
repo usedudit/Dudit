@@ -917,10 +917,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         ? (exchangeShortfall > 0 ? "Troca (com diferença)" : "Troca (Quitada)")
         : getPaymentTypeLabel();
     const isMercadoPago = hasReceivedMpPayment(order) || (isExchangeOrder && hasMercadoPagoOnline) || (Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly) && hasMercadoPagoOnline);
-    const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
-    const isBoletoPayment = paymentMethodName.toLowerCase().includes("boleto") || paymentMethodName.toLowerCase().includes("bolbradesco");
+    const paymentMethodKey = `${paymentMethodName} ${order.payment_method || ""}`.toLowerCase();
+    const isPixPayment = isExchangeOrder || paymentMethodKey.includes("pix") || paymentMethodKey.includes("bank_transfer");
+    const isBoletoPayment = paymentMethodKey.includes("boleto") || paymentMethodKey.includes("bolbradesco") || paymentMethodKey.includes("ticket");
+    const hasUnspecifiedMpCharge = paymentMethodKey.includes("mercado pago");
     const isPaymentExpired = Boolean(order.payment_expires_at && new Date(order.payment_expires_at) < new Date());
-    const canRetryPayment = (order.situation === "pending" || order.situation === "payment_failed") && isMercadoPago && (isPixPayment || isBoletoPayment) && !isPaymentExpired;
+    const hasMpChargeEntry = Array.isArray(order.payment_breakdown)
+        ? order.payment_breakdown.some((entry: any) => String(entry?.provider || "").toLowerCase().includes("mercado pago"))
+        : false;
+    const isMpManagedOrder = isMercadoPago || hasMpChargeEntry || order.payment_provider === "Mercado Pago";
+    const canRetryPayment =
+        (order.situation === "pending" || order.situation === "payment_failed") &&
+        isMpManagedOrder &&
+        !isPendingExchangeShortfall &&
+        !isPaymentExpired &&
+        (isPixPayment || isBoletoPayment || hasUnspecifiedMpCharge || order.situation === "payment_failed");
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
@@ -949,6 +960,51 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
         return <div className="flex items-center gap-1.5">{icons}</div>;
     })();
+
+    const renderPaymentExpirationCard = () => {
+        if (isPendingExchangeShortfall) return null;
+        if (!order.payment_expires_at) return null;
+        if (order.situation !== "pending" && order.situation !== "payment_failed") return null;
+        if (!isMpManagedOrder) return null;
+
+        if (!canRetryPayment) {
+            if (!isPaymentExpired) return null;
+            return (
+                <InfoCard
+                    message={`O prazo de pagamento deste pedido expirou em ${formatFullDate(order.payment_expires_at)}. Caso o pagamento não seja realizado, o pedido será cancelado automaticamente.`}
+                    color="red"
+                />
+            );
+        }
+
+        if (order.situation === "payment_failed") {
+            return (
+                <InfoCard
+                    message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
+                    color="red"
+                    rightElement={
+                        <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                            {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
+                            Pagar agora
+                        </Button>
+                    }
+                />
+            );
+        }
+
+        return (
+            <InfoCard
+                message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`}
+                color="orange"
+                rightElement={
+                    <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                        {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
+                        Pagar agora
+                    </Button>
+                }
+            />
+        );
+    };
 
     // Address Type Resolution
     const addressTypeLabel = "Endereço de Entrega";
@@ -1933,7 +1989,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 />
                                             )}
 
-                                            {isPendingExchangeShortfall ? (
+                                            {isPendingExchangeShortfall && (
                                                 hasMercadoPagoOnline ? (
                                                     <InfoCard
                                                         title="Diferença da Troca Pendente"
@@ -1970,19 +2026,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             </Button>
                                                         }
                                                     />
-                                                )
-                                            ) : order.situation === "payment_failed" ? (
-                                                canRetryPayment && order.payment_expires_at && (
-                                                    <InfoCard
-                                                        message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
-                                                        color='red'
-                                                        className="mt-4"
-                                                        rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>}
-                                                    />
-                                                )
-                                            ) : (
-                                                canRetryPayment && order.payment_expires_at && (
-                                                    <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
                                                 )
                                             )}
                                         </div>
@@ -2116,6 +2159,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                             {/* Mobile/Tablet Actions / Buttons */}
                                             <div className="block lg:hidden space-y-4 pt-4">
+                                                {renderPaymentExpirationCard()}
+
                                                 {isPendingExchangeShortfall && (
                                                     <div>
                                                         {hasMercadoPagoOnline ? (
@@ -2209,6 +2254,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Desktop Actions / Buttons */}
                                     <div className="space-y-4 pt-4">
+                                        {renderPaymentExpirationCard()}
+
                                         {isPendingExchangeShortfall && (
                                             <div>
                                                 {hasMercadoPagoOnline ? (

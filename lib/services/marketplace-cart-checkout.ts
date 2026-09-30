@@ -99,20 +99,11 @@ export async function priceMarketplaceCartCheckout(
   const shouldQuoteDelivery = (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) && Boolean(params.deliveryAddress) && params.deliveryType === "delivery"
 
   if (shouldQuoteDelivery) {
-    const quote = await quoteDeliveryFeeAction({
-      partnerId,
-      storeId: targetStoreId,
-      destinationAddress: params.deliveryAddress,
-      destinationCoords: params.destinationCoords,
-      freeDeliveryCoupon: false,
-      orderSubtotal: subtotal,
-    })
-    if (quote.success) {
-      deliveryFee = Number(quote.fee || 0)
-      distanceKm = Number(quote.distanceKm || 0)
-      deliveryBreakdown = quote.breakdown
-    } else if (params.carrierServiceId) {
-      // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+    // Transportadora selecionada (SuperFrete) é a fonte autoritativa do frete —
+    // pula a cotação do frete próprio (geocoding + raio) que tornava o checkout
+    // lento: cada recálculo de totais re-cotava o frete próprio mesmo com o
+    // carrier já escolhido. Fallback para o frete próprio só se o carrier falhar.
+    if (params.carrierServiceId) {
       const cep =
         String(params.destinationPostalCode || "").replace(/\D/g, "") ||
         extractPostalCodeFromAddress(params.deliveryAddress)
@@ -121,13 +112,44 @@ export async function priceMarketplaceCartCheckout(
         toPostalCode: cep,
         serviceId: params.carrierServiceId,
       })
-      if (!carrier.success) return { success: false, error: carrier.error }
-      deliveryFee = carrier.fee
-      distanceKm = null
-      deliveryBreakdown = carrier.breakdown
-      carrierApplied = true
+      if (carrier.success) {
+        deliveryFee = carrier.fee
+        distanceKm = null
+        deliveryBreakdown = carrier.breakdown
+        carrierApplied = true
+      } else {
+        const own = await quoteDeliveryFeeAction({
+          partnerId,
+          storeId: targetStoreId,
+          destinationAddress: params.deliveryAddress,
+          destinationCoords: params.destinationCoords,
+          freeDeliveryCoupon: false,
+          orderSubtotal: subtotal,
+        })
+        if (own.success) {
+          deliveryFee = Number(own.fee || 0)
+          distanceKm = Number(own.distanceKm || 0)
+          deliveryBreakdown = own.breakdown
+        } else {
+          return { success: false, error: carrier.error || own.error || "Erro na cotação de entrega." }
+        }
+      }
     } else {
-      return { success: false, error: quote.error || "Erro na cotação de entrega." }
+      const quote = await quoteDeliveryFeeAction({
+        partnerId,
+        storeId: targetStoreId,
+        destinationAddress: params.deliveryAddress,
+        destinationCoords: params.destinationCoords,
+        freeDeliveryCoupon: false,
+        orderSubtotal: subtotal,
+      })
+      if (quote.success) {
+        deliveryFee = Number(quote.fee || 0)
+        distanceKm = Number(quote.distanceKm || 0)
+        deliveryBreakdown = quote.breakdown
+      } else {
+        return { success: false, error: quote.error || "Erro na cotação de entrega." }
+      }
     }
   }
 
@@ -177,21 +199,24 @@ export async function priceMarketplaceCartCheckout(
     couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping",
   )
   if ((hasDeliveryLines || carrierApplied) && isFreeShippingCoupon) {
-    const quote = await quoteDeliveryFeeAction({
-      partnerId,
-      storeId: targetStoreId,
-      destinationAddress: params.deliveryAddress,
-      destinationCoords: params.destinationCoords,
-      freeDeliveryCoupon: true,
-      orderSubtotal: subtotal,
-    })
-    if (quote.success) {
-      deliveryFee = Number(quote.fee || 0)
-      deliveryBreakdown = quote.breakdown
-    } else if (carrierApplied) {
+    if (carrierApplied) {
+      // Frete do carrier já resolvido — não re-cotar o frete próprio só pra zerar.
       deliveryFee = 0
       if (deliveryBreakdown) {
         deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+      }
+    } else {
+      const quote = await quoteDeliveryFeeAction({
+        partnerId,
+        storeId: targetStoreId,
+        destinationAddress: params.deliveryAddress,
+        destinationCoords: params.destinationCoords,
+        freeDeliveryCoupon: true,
+        orderSubtotal: subtotal,
+      })
+      if (quote.success) {
+        deliveryFee = Number(quote.fee || 0)
+        deliveryBreakdown = quote.breakdown
       }
     }
   }
