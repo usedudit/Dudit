@@ -56,15 +56,18 @@ export function carrierReasonMessage(reason: CarrierUnavailableReason): string {
 // Cotação SuperFrete é a parte mais lenta do checkout (roundtrip à API).
 // Cache em memória por parceiro + CEPs + parâmetros do pacote torna
 // instantâneas as repetições: troca de serviço (PAC/SEDEX), recálculo de
-// totais, reabertura do checkout e submit. Sucesso apenas — falhas
-// (API instável, sem opções) tentam de novo na próxima.
-const CARRIER_QUOTE_TTL_MS = 10 * 60 * 1000
+// totais, reabertura do checkout e submit. Sucesso de até 30min; se a
+// API falhar depois, servimos o último resultado de até 1h (stale-if-error).
+// Requisições concorrentes da mesma chave compartilham um único roundtrip.
+const CARRIER_QUOTE_TTL_MS = 30 * 60 * 1000
+const CARRIER_QUOTE_STALE_MS = 60 * 60 * 1000
 const CARRIER_QUOTE_CACHE_MAX = 100
 const carrierQuoteCache = new Map<string, { at: number; result: CarrierQuoteResult }>()
+const carrierQuoteInflight = new Map<string, Promise<CarrierQuoteResult>>()
 
 function pruneCarrierQuoteCache(now: number): void {
   for (const [key, entry] of carrierQuoteCache) {
-    if (now - entry.at > CARRIER_QUOTE_TTL_MS) carrierQuoteCache.delete(key)
+    if (now - entry.at > CARRIER_QUOTE_STALE_MS) carrierQuoteCache.delete(key)
   }
   while (carrierQuoteCache.size > CARRIER_QUOTE_CACHE_MAX) {
     const oldest = carrierQuoteCache.keys().next().value
@@ -164,35 +167,53 @@ export async function quoteCarrierFreightOptions(
     return cached.result
   }
 
+  const inflight = carrierQuoteInflight.get(cacheKey)
+  if (inflight) return inflight
+
+  const pending = (async (): Promise<CarrierQuoteResult> => {
+    try {
+      const quotes = await client.calculateFreight(requestParams)
+
+      const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
+        .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
+        .map((q: any) => ({
+          serviceId: Number(q.id),
+          serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
+          price: Math.round(Number(q.price) * 100) / 100,
+          deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
+          deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,
+          companyName: q.company?.name || null,
+        }))
+        .filter((o: CarrierFreightOption) => o.serviceId > 0)
+        .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
+
+      const result: CarrierQuoteResult =
+        options.length === 0
+          ? { available: false, reason: "no_options" }
+          : { available: true, options, fromPostalCode }
+      pruneCarrierQuoteCache(Date.now())
+      carrierQuoteCache.delete(cacheKey)
+      carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
+      return result
+    } catch (err) {
+      const stale = carrierQuoteCache.get(cacheKey)
+      if (stale && Date.now() - stale.at <= CARRIER_QUOTE_STALE_MS) {
+        console.warn("[carrier-quote] SuperFrete falhou; servindo cotação stale:", cacheKey)
+        return stale.result
+      }
+      captureError(err, {
+        module: "shipping",
+        action: "quote_carrier_freight",
+        partnerId: input.partnerId,
+      })
+      return { available: false, reason: "quote_failed" }
+    }
+  })()
+  carrierQuoteInflight.set(cacheKey, pending)
   try {
-    const quotes = await client.calculateFreight(requestParams)
-
-    const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
-      .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
-      .map((q: any) => ({
-        serviceId: Number(q.id),
-        serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
-        price: Math.round(Number(q.price) * 100) / 100,
-        deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
-        deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,
-        companyName: q.company?.name || null,
-      }))
-      .filter((o: CarrierFreightOption) => o.serviceId > 0)
-      .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
-
-    if (options.length === 0) return { available: false, reason: "no_options" }
-    const result: CarrierQuoteResult = { available: true, options, fromPostalCode }
-    pruneCarrierQuoteCache(Date.now())
-    carrierQuoteCache.delete(cacheKey)
-    carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
-    return result
-  } catch (err) {
-    captureError(err, {
-      module: "shipping",
-      action: "quote_carrier_freight",
-      partnerId: input.partnerId,
-    })
-    return { available: false, reason: "quote_failed" }
+    return await pending
+  } finally {
+    carrierQuoteInflight.delete(cacheKey)
   }
 }
 

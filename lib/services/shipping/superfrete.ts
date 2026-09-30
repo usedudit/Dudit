@@ -295,6 +295,7 @@ export class SuperFreteClient {
     method: string,
     path: string,
     body?: unknown,
+    timeoutMs = 20_000,
   ): Promise<unknown> {
     const url = `${superfreteBaseUrl(this.environment)}/${path.replace(/^\/+/, "")}`
     let res: Response
@@ -308,8 +309,14 @@ export class SuperFreteClient {
           "User-Agent": this.userAgent,
         },
         body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (e: any) {
+      if (e?.name === "TimeoutError") {
+        throw new Error(
+          `A API SuperFrete não respondeu em ${Math.round(timeoutMs / 1000)}s (timeout). Tente novamente.`,
+        ) as any
+      }
       const cause = e?.cause?.code || e?.cause?.message || e?.message || "erro desconhecido"
       throw new Error(`Falha de conexão com a API SuperFrete (${cause}). Verifique sua rede/proxy e tente novamente.`) as any
     }
@@ -333,7 +340,7 @@ export class SuperFreteClient {
   }
 
   async getUserInfo(): Promise<SuperFreteUserInfo> {
-    return this.request("GET", "api/v0/user") as Promise<SuperFreteUserInfo>
+    return this.request("GET", "api/v0/user", undefined, 10_000) as Promise<SuperFreteUserInfo>
   }
 
   async calculateFreight(params: SuperFreteQuoteParams): Promise<SuperFreteQuote[]> {
@@ -353,7 +360,7 @@ export class SuperFreteClient {
         length: params.package.length,
         weight: params.package.weight,
       },
-    }) as Promise<SuperFreteQuote[]>
+    }, 12_000) as Promise<SuperFreteQuote[]>
   }
 
   async createOrder(params: SuperFreteCreateLabelParams): Promise<SuperFreteLabelOrder> {
@@ -369,16 +376,16 @@ export class SuperFreteClient {
         own_hand: params.options?.own_hand ?? false,
         non_commercial: params.options?.non_commercial ?? true,
         ...(params.options?.invoice ? { invoice: params.options.invoice } : {}),
+        ...(params.tags ? { tags: params.tags } : {}),
       },
       platform: "Dudit ERP",
-      ...(params.tags ? { tags: params.tags } : {}),
-    }) as Promise<SuperFreteLabelOrder>
+    }, 30_000) as Promise<SuperFreteLabelOrder>
   }
 
   async checkoutOrders(orderIds: string[]): Promise<SuperFreteCheckoutResult> {
     return this.request("POST", "api/v0/checkout", {
       orders: orderIds,
-    }) as Promise<SuperFreteCheckoutResult>
+    }, 30_000) as Promise<SuperFreteCheckoutResult>
   }
 
   async getOrderInfo(orderId: string): Promise<SuperFreteOrderInfo> {

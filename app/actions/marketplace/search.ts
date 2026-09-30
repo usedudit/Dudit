@@ -108,6 +108,44 @@ function normalizePlan(item: any) {
 
 const cityCoordsCache = new Map<string, { lat: number; lng: number } | null>()
 
+const normalizePlaceValue = (value: string | null | undefined) =>
+    (value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+/**
+ * A busca por cidade filtra por partner_id (RPC FTS), mas um parceiro pode ter lojas em
+ * varios municipios. Itens publicados na loja de outra cidade voltariam como "locais".
+ * Este filtro mantem apenas itens realmente dentro do escopo (cidade ou raio) buscado.
+ */
+function isItemWithinSearchScope(
+    item: any,
+    scope: {
+        city: string | null
+        state: string | null
+        center: { lat: number; lng: number } | null
+        radius: number | null
+    }
+): boolean {
+    const partner = item?.partners || {}
+    const lat = partner.latitude ?? item?.latitude
+    const lng = partner.longitude ?? item?.longitude
+    const hasCoords = lat !== null && lat !== undefined && lng !== null && lng !== undefined &&
+        Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+
+    if (scope.radius && scope.center && hasCoords) {
+        return calculateDistance(scope.center, { lat: Number(lat), lng: Number(lng) }) <= scope.radius
+    }
+
+    if (scope.city) {
+        const itemCity = normalizePlaceValue(partner.city ?? item?.city)
+        if (!itemCity) return true
+        if (itemCity !== normalizePlaceValue(scope.city)) return false
+        const itemState = normalizePlaceValue(partner.state ?? item?.state)
+        if (itemState && scope.state && itemState !== normalizePlaceValue(scope.state)) return false
+    }
+
+    return true
+}
+
 export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ lat: number; lng: number } | null> {
     if (!cidadeSlug || cidadeSlug === "brasil" || cidadeSlug.startsWith("estado-")) return null
     if (cityCoordsCache.has(cidadeSlug)) {
@@ -221,13 +259,24 @@ export const searchMarketplaceDirectFull = cache(async (
 
     const [localRes, distantRes] = await Promise.all([localPromise, distantPromise])
 
-    const resultsWithDistance = enrichMarketplaceDistance(localRes.results || [], finalCoords)
+    // Escopo local: remove itens cuja loja fica em outra cidade/fora do raio buscado.
+    const localScopeCity = isCity && limits.cidade ? await resolveCityAndStateFromSlug(limits.cidade) : null
+    const localResults = (localRes.results || []).filter((item) =>
+        isItemWithinSearchScope(item, {
+            city: localScopeCity?.city ?? null,
+            state: localScopeCity?.state ?? null,
+            center: finalCoords,
+            radius: limits.radius ?? null,
+        })
+    )
+
+    const resultsWithDistance = enrichMarketplaceDistance(localResults, finalCoords)
 
     let moreDistantSellers: any[] = []
     let moreDistantItems: any[] = []
 
     if (shouldFetchDistant && distantRes.results && distantRes.results.length > 0) {
-        const localIds = new Set(localRes.results.map(r => `${r.itemType}:${r.id}`))
+        const localIds = new Set(localResults.map(r => `${r.itemType}:${r.id}`))
         const distantFiltered = distantRes.results.filter(r => !localIds.has(`${r.itemType}:${r.id}`))
 
         const enrichedDistant = enrichMarketplaceDistance(distantFiltered, finalCoords)

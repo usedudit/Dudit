@@ -859,6 +859,7 @@ export async function setupSuperFreteWebhookAction(): Promise<{ success: boolean
 
 interface ResolvedShippingAddress {
   name: string
+  nameCandidates?: string[]
   address: string
   number?: string
   complement?: string
@@ -1056,15 +1057,19 @@ async function resolveDestinationAddress(
       customerDocument = cpfDigits || (cnpjDigits.length === 14 ? cnpjDigits : undefined)
     }
   }
-  if (!customerDocument && customerIds.length > 0) {
+  let profileFullName: string | undefined
+  if (customerIds.length > 0) {
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("user_id, cpf")
+      .select("user_id, cpf, full_name")
       .in("user_id", customerIds)
       .limit(1)
       .maybeSingle()
     if (profile) {
-      customerDocument = (await resolvePlainCpf(profile.cpf)) || undefined
+      profileFullName = profile.full_name || undefined
+      if (!customerDocument) {
+        customerDocument = (await resolvePlainCpf(profile.cpf)) || undefined
+      }
     }
   }
 
@@ -1084,8 +1089,13 @@ async function resolveDestinationAddress(
     return null
   }
 
+  const nameCandidates = [customer?.name, order.customer_name, profileFullName]
+    .map((value) => collapseSpaces(value))
+    .filter((value) => value.length > 0)
+
   return {
-    name: customer?.name || order.customer_name || "Destinatário",
+    name: nameCandidates[0] || "Destinatário",
+    nameCandidates,
     address: parsed.address,
     number: parsed.number,
     complement: parsed.complement,
@@ -1117,6 +1127,89 @@ function buildVolumes(config: Record<string, any>) {
     width: Number(config.width ?? 10),
     length: Number(config.length ?? 10),
     weight: Number(config.weight ?? 0.5),
+  }
+}
+
+function collapseSpaces(value: unknown): string {
+  return String(value ?? "").replace(/\s+/g, " ").trim()
+}
+
+function truncateField(value: string, max: number): string {
+  return value.length > max ? value.slice(0, max).trim() : value
+}
+
+function countWords(value: string): number {
+  return value.split(" ").filter(Boolean).length
+}
+
+type ResolvedCompleteName = { ok: true; name: string } | { ok: false; error: string }
+
+// A API SuperFrete rejeita nomes com menos de 2 palavras
+// ("O nome do remetente/destinatário deve ser um nome completo").
+// Prefere o primeiro candidato completo; remetente de loja recebe o
+// prefixo oficial "Loja" quando o nome da loja é uma palavra só.
+function resolveCompleteName(
+  candidates: Array<unknown>,
+  opts: { role: "remetente" | "destinatário"; prefixIfSingle?: string },
+): ResolvedCompleteName {
+  const names = candidates.map(collapseSpaces).filter(Boolean)
+  const full = names.find((name) => countWords(name) >= 2)
+  if (full) return { ok: true, name: truncateField(full, 50) }
+  const single = names[0]
+  if (single && opts.prefixIfSingle) {
+    return { ok: true, name: truncateField(`${opts.prefixIfSingle} ${single}`, 50) }
+  }
+  if (single) {
+    return {
+      ok: false,
+      error: `O nome do ${opts.role} está incompleto ("${single}"). Informe nome e sobrenome para gerar a etiqueta.`,
+    }
+  }
+  return {
+    ok: false,
+    error: `Informe o nome completo do ${opts.role} (nome e sobrenome) para gerar a etiqueta.`,
+  }
+}
+
+function normalizePhoneDigits(value: unknown): string | undefined {
+  const digits = String(value ?? "").replace(/\D/g, "")
+  return digits.length === 11 ? digits : undefined
+}
+
+function buildFromAddressPayload(
+  address: ResolvedShippingAddress,
+  name: string,
+): SuperFreteCreateLabelParams["from"] {
+  return {
+    name,
+    address: truncateField(address.address, 50),
+    number: truncateField(collapseSpaces(address.number ?? ""), 10),
+    complement: truncateField(collapseSpaces(address.complement ?? ""), 20),
+    district: truncateField(address.district, 60),
+    city: truncateField(address.city, 50),
+    state_abbr: collapseSpaces(address.state_abbr).toUpperCase(),
+    postal_code: address.postal_code,
+    document: address.document || undefined,
+    phone: normalizePhoneDigits(address.phone),
+  }
+}
+
+function buildToAddressPayload(
+  address: ResolvedShippingAddress,
+  name: string,
+): SuperFreteCreateLabelParams["to"] {
+  return {
+    name,
+    address: truncateField(address.address, 50),
+    number: truncateField(collapseSpaces(address.number ?? ""), 10),
+    complement: truncateField(collapseSpaces(address.complement ?? ""), 20),
+    district: truncateField(address.district, 50),
+    city: truncateField(address.city, 50),
+    state_abbr: collapseSpaces(address.state_abbr).toUpperCase(),
+    postal_code: address.postal_code,
+    email: address.email || undefined,
+    document: address.document || "",
+    phone: normalizePhoneDigits(address.phone),
   }
 }
 
@@ -1266,32 +1359,21 @@ export async function createOrderShippingLabelAction(payload: {
       console.warn("[SuperFrete] Balance pre-check failed (continuing):", checkErr)
     }
 
+    const senderName = resolveCompleteName([origin.name], {
+      role: "remetente",
+      prefixIfSingle: "Loja",
+    })
+    if (!senderName.ok) return { success: false, error: senderName.error }
+    const recipientName = resolveCompleteName(destination.nameCandidates ?? [destination.name], {
+      role: "destinatário",
+    })
+    if (!recipientName.ok) return { success: false, error: recipientName.error }
+
     const volumes = buildVolumes(config)
     const label = await client.createOrder({
       service: requestedService as SuperFreteServiceId,
-      from: {
-        name: origin.name,
-        address: origin.address,
-        number: origin.number,
-        complement: origin.complement,
-        district: origin.district,
-        city: origin.city,
-        state_abbr: origin.state_abbr,
-        postal_code: origin.postal_code,
-      },
-      to: {
-        name: destination.name,
-        address: destination.address,
-        number: destination.number,
-        complement: destination.complement,
-        district: destination.district,
-        city: destination.city,
-        state_abbr: destination.state_abbr,
-        postal_code: destination.postal_code,
-        email: destination.email,
-        phone: destination.phone,
-        document: destination.document,
-      },
+      from: buildFromAddressPayload(origin, senderName.name),
+      to: buildToAddressPayload(destination, recipientName.name),
       products: buildShippingProducts(order),
       volumes,
       options: {
@@ -1631,30 +1713,20 @@ export async function createReturnShippingLabelAction(payload: {
     const quote = chosen || validQuotes.reduce((a: any, b: any) => (Number(a.price) <= Number(b.price) ? a : b))
     const serviceId = Number(quote.id) as SuperFreteServiceId
 
+    const senderName = resolveCompleteName(buyerAddress.nameCandidates ?? [buyerAddress.name], {
+      role: "remetente",
+    })
+    if (!senderName.ok) return { success: false, error: senderName.error }
+    const recipientName = resolveCompleteName(storeAddress.nameCandidates ?? [storeAddress.name], {
+      role: "destinatário",
+      prefixIfSingle: "Loja",
+    })
+    if (!recipientName.ok) return { success: false, error: recipientName.error }
+
     const label = await client.createOrder({
       service: serviceId,
-      from: {
-        name: buyerAddress.name,
-        address: buyerAddress.address,
-        number: buyerAddress.number,
-        complement: buyerAddress.complement,
-        district: buyerAddress.district,
-        city: buyerAddress.city,
-        state_abbr: buyerAddress.state_abbr,
-        postal_code: buyerAddress.postal_code,
-        phone: buyerAddress.phone,
-      },
-      to: {
-        name: storeAddress.name,
-        address: storeAddress.address,
-        number: storeAddress.number,
-        complement: storeAddress.complement,
-        district: storeAddress.district,
-        city: storeAddress.city,
-        state_abbr: storeAddress.state_abbr,
-        postal_code: storeAddress.postal_code,
-        document: storeAddress.document || "",
-      },
+      from: buildFromAddressPayload(buyerAddress, senderName.name),
+      to: buildToAddressPayload(storeAddress, recipientName.name),
       products: buildShippingProducts(order),
       volumes: buildVolumes(config),
       options: {
