@@ -338,22 +338,23 @@ async function setupSuperFreteWebhookInternal(
   token: string,
   webhookSecretEncrypted: string | null,
 ): Promise<void> {
-  if (!webhookSecretEncrypted) return
-
   try {
-    const webhookSecret = decrypt(webhookSecretEncrypted, "superfrete")
     const supabase = getAdminClient()
     const integration = await getSuperFreteIntegration(supabase, partnerId)
     const environment = resolveSuperFreteEnvironment((integration?.config as SuperFreteConfig)?.environment)
     const client = createSuperFreteClient(token, undefined, environment)
 
     // Check if a webhook is already registered
-    const existingWebhooks = await client.listWebhooks()
-    const existing = existingWebhooks.find(
+    const existingWebhooks = await client.listWebhooks().catch(() => [] as any[])
+    const existing = (existingWebhooks || []).find(
       (w: any) => w.url?.includes("api/shipping/superfrete/webhook"),
     )
 
-    if (existing) {
+    let learnedSecret: string | null = null
+    let webhookId: string | null = existing?.id || null
+
+    if (existing && webhookSecretEncrypted) {
+      // Secret já conhecido (fornecido na conexão): apenas sincroniza URL/eventos.
       await client.updateWebhook(existing.id, {
         name: "Dudit ERP Integration",
         url: SUPERFRETE_WEBHOOK_URL,
@@ -361,17 +362,43 @@ async function setupSuperFreteWebhookInternal(
         is_active: true,
       })
     } else {
-      await client.createWebhook("Dudit ERP Integration", SUPERFRETE_WEBHOOK_URL, DEFAULT_SUPERFRETE_EVENTS)
+      // Sem secret armazenado: (re)criar o webhook para capturar o
+      // secret_token retornado pela API — sem ele a rota de eventos
+      // rejeita todas as notificações (401).
+      if (existing) {
+        try {
+          await client.deleteWebhook(existing.id)
+        } catch (delErr) {
+          console.warn("[SuperFrete] Falha ao remover webhook antigo:", delErr)
+        }
+      }
+      const created: any = await client.createWebhook(
+        "Dudit ERP Integration",
+        SUPERFRETE_WEBHOOK_URL,
+        DEFAULT_SUPERFRETE_EVENTS,
+      )
+      if (created?.id) webhookId = String(created.id)
+      if (created?.secret_token) learnedSecret = String(created.secret_token)
     }
 
-    const { error } = await getAdminClient()
+    const patch: Record<string, unknown> = { webhook_id: webhookId || "pending" }
+    if (!webhookSecretEncrypted && learnedSecret) {
+      patch.webhook_secret_encrypted = encrypt(learnedSecret, "superfrete")
+    }
+
+    const { error } = await supabase
       .from("partner_integrations")
-      .update({ webhook_id: existing?.id || "pending" })
+      .update(patch)
       .eq("partner_id", partnerId)
       .eq("provider_slug", SUPERFRETE_PROVIDER)
 
     if (error) {
       console.warn("[SuperFrete] Failed to save webhook ID:", error.message)
+    }
+    if (!webhookSecretEncrypted && !learnedSecret) {
+      console.warn(
+        "[SuperFrete] Webhook criado mas a API não retornou secret_token; reconecte para os eventos serem aceitos.",
+      )
     }
   } catch (err) {
     console.error("[SuperFrete] Webhook setup failed:", err)
@@ -601,16 +628,67 @@ export async function checkoutSuperFreteLabelAction(payload: {
   }
 
   try {
+    const result = await performLabelCheckout(
+      supabase,
+      integration,
+      client,
+      payload.partnerId,
+      payload.labelId,
+    )
+    if (result.success) {
+      await maybeAdvanceReturnRequestAfterPayment(supabase, payload.partnerId, payload.labelId)
+    }
+    return result
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "checkout_label_superfrete",
+      partnerId: payload.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao pagar etiqueta." }
+  }
+}
+
+type PerformCheckoutResult =
+  | {
+      success: true
+      result: {
+        tracking?: string
+        trackingUrl?: string
+        printUrl?: string
+        status: string
+        simulated?: boolean
+      }
+    }
+  | { success: false; error: string }
+
+// Núcleo de pagamento de etiqueta (ida e devolução): checa saldo,
+// finaliza o checkout na SuperFrete e atualiza order_shipments.
+async function performLabelCheckout(
+  supabase: ReturnType<typeof getAdminClient>,
+  integration: PartnerIntegrationRow | null,
+  client: SuperFreteClient,
+  partnerId: string,
+  labelId: string,
+): Promise<PerformCheckoutResult> {
+  try {
     // Credit check: the seller pays from their own SuperFrete wallet.
+    // Preço vem do banco (order_shipments.price) — evita 1 roundtrip
+    // extra com getOrderInfo; saldo continua vindo da API em paralelo.
     let sandboxSkipReason: string | null = null
     try {
-      const [labelInfo, userInfo] = await Promise.all([
-        client.getOrderInfo(payload.labelId),
+      const [{ data: shipmentRow }, userInfo] = await Promise.all([
+        supabase
+          .from("order_shipments")
+          .select("price")
+          .eq("partner_id", partnerId)
+          .eq("external_label_id", labelId)
+          .maybeSingle(),
         client.getUserInfo(),
       ])
-      const price = Number(labelInfo.price || 0)
-      const balance = Number(userInfo.balance ?? 0)
-      if (balance < price) {
+      const price = Number(shipmentRow?.price ?? 0)
+      const balance = Number(userInfo?.balance ?? 0)
+      if (price > 0 && balance < price) {
         if (isSuperFreteSandboxIntegration(integration)) {
           sandboxSkipReason = `saldo insuficiente: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}`
         } else {
@@ -628,15 +706,15 @@ export async function checkoutSuperFreteLabelAction(payload: {
       return await simulateSandboxCheckout({
         supabase,
         client,
-        partnerId: payload.partnerId,
-        labelId: payload.labelId,
+        partnerId,
+        labelId,
         reason: sandboxSkipReason,
       })
     }
 
-    const checkout = await client.checkoutOrders([payload.labelId])
+    const checkout = await client.checkoutOrders([labelId])
 
-    const orderData = checkout.purchase.orders.find((o: any) => o.id === payload.labelId)
+    const orderData = checkout.purchase.orders.find((o: any) => o.id === labelId)
 
     if (!checkout.success || !orderData) {
       return {
@@ -650,7 +728,7 @@ export async function checkoutSuperFreteLabelAction(payload: {
       printUrl = orderData.print.url
     } else {
       try {
-        const labelPrint = await client.getLabelPrintUrl([payload.labelId])
+        const labelPrint = await client.getLabelPrintUrl([labelId])
         printUrl = labelPrint.url
       } catch (err) {
         console.warn("[SuperFrete] Failed to get print URL:", err)
@@ -670,10 +748,10 @@ export async function checkoutSuperFreteLabelAction(payload: {
         label_url: printUrl || null,
         paid_at: new Date().toISOString(),
       })
-      .eq("partner_id", payload.partnerId)
-      .eq("external_label_id", payload.labelId)
+      .eq("partner_id", partnerId)
+      .eq("external_label_id", labelId)
 
-    revalidateOrders(payload.partnerId)
+    revalidateOrders(partnerId)
 
     return {
       success: true,
@@ -690,8 +768,8 @@ export async function checkoutSuperFreteLabelAction(payload: {
         return await simulateSandboxCheckout({
           supabase,
           client,
-          partnerId: payload.partnerId,
-          labelId: payload.labelId,
+          partnerId,
+          labelId,
           reason: `API recusou o pagamento: ${err?.message || "saldo insuficiente"}`,
         })
       }
@@ -701,16 +779,49 @@ export async function checkoutSuperFreteLabelAction(payload: {
       }
     }
     console.error(
-      "[SuperFrete] checkoutSuperFreteLabelAction failed:",
+      "[SuperFrete] performLabelCheckout failed:",
       err?.message,
       err?.detail ? JSON.stringify(err.detail) : "",
     )
     captureError(err, {
       module: "shipping",
       action: "checkout_label_superfrete",
-      partnerId: payload.partnerId,
+      partnerId,
     })
     return { success: false, error: err?.message || "Erro ao pagar etiqueta." }
+  }
+}
+
+// Remessa reversa paga: APPROVED → WAITING_ITEM_RETURN (transição válida
+// no fluxo de devoluções; o webhook posteriormente leva a PROCESSING).
+async function maybeAdvanceReturnRequestAfterPayment(
+  supabase: ReturnType<typeof getAdminClient>,
+  partnerId: string,
+  labelId: string,
+): Promise<void> {
+  try {
+    const { data: shipmentRow } = await supabase
+      .from("order_shipments")
+      .select("kind, return_request_id")
+      .eq("partner_id", partnerId)
+      .eq("external_label_id", labelId)
+      .maybeSingle()
+    if (shipmentRow?.kind !== "return" || !shipmentRow.return_request_id) return
+
+    const { data: returnRequest } = await supabase
+      .from("return_requests")
+      .select("id, status")
+      .eq("id", shipmentRow.return_request_id)
+      .is("deleted_at", null)
+      .maybeSingle()
+    if (returnRequest?.status !== "APPROVED") return
+
+    await supabase
+      .from("return_requests")
+      .update({ status: "WAITING_ITEM_RETURN", updated_at: new Date().toISOString() })
+      .eq("id", returnRequest.id)
+  } catch (err) {
+    console.warn("[SuperFrete] Falha ao avançar return_request:", err)
   }
 }
 
@@ -1311,8 +1422,18 @@ export async function createOrderShippingLabelAction(payload: {
     if ("error" in context && context.error) return { success: false, error: context.error }
     const { integration, partner, order, config, supabase } = context as any
 
-    const origin = await resolveOriginAddress(supabase, order, partner, ctx.partnerId)
-    const destination = await resolveDestinationAddress(supabase, order)
+    const client = createClientFromIntegration(integration)
+    if (!client) return { success: false, error: "SuperFrete não conectado." }
+
+    // Tudo em paralelo: checagem de saldo + origem + destino. Em sandbox a
+    // checagem de saldo é dispensável (nunca bloqueia) — pula 1 roundtrip.
+    const balancePromise = isSuperFreteSandboxIntegration(integration)
+      ? Promise.resolve(undefined)
+      : client.getUserInfo().catch(() => undefined)
+    const [origin, destination] = await Promise.all([
+      resolveOriginAddress(supabase, order, partner, ctx.partnerId),
+      resolveDestinationAddress(supabase, order),
+    ])
 
     if (!origin) {
       return { success: false, error: "Cadastre o endereço da loja (Ficha da Empresa) para gerar etiquetas." }
@@ -1331,32 +1452,21 @@ export async function createOrderShippingLabelAction(payload: {
       }
     }
 
-    const client = createClientFromIntegration(integration)
-    if (!client) return { success: false, error: "SuperFrete não conectado." }
-
     const requestedService = Number(payload.service || (order as any)?.delivery_breakdown?.serviceId || 0)
     if (!requestedService) {
       return { success: false, error: "Este pedido não tem um serviço de frete selecionado." }
     }
 
-    try {
-      const userInfo = await client.getUserInfo()
+    const userInfo = await balancePromise
+    if (userInfo) {
       const balance = Number(userInfo.balance ?? 0)
       const estimated = Number((order as any)?.delivery_fee || 0)
       if (Number.isFinite(balance) && estimated > 0 && balance < estimated) {
-        if (isSuperFreteSandboxIntegration(integration)) {
-          console.warn(
-            `[SuperFrete] SANDBOX: criando etiqueta com saldo insuficiente (disponível R$ ${balance.toFixed(2)} < estimado R$ ${estimated.toFixed(2)}); pagamento será simulado no checkout.`,
-          )
-        } else {
-          return {
-            success: false,
-            error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário aproximadamente R$ ${estimated.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
-          }
+        return {
+          success: false,
+          error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário aproximadamente R$ ${estimated.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
         }
       }
-    } catch (checkErr) {
-      console.warn("[SuperFrete] Balance pre-check failed (continuing):", checkErr)
     }
 
     const senderName = resolveCompleteName([origin.name], {
@@ -1636,6 +1746,9 @@ export async function createReturnShippingLabelAction(payload: {
         tracking: string | null
         labelUrl: string | null
       }
+      paid: boolean
+      paymentError?: string
+      simulated?: boolean
     }
   | { success: false; error: string }
 > {
@@ -1767,6 +1880,25 @@ export async function createReturnShippingLabelAction(payload: {
       },
     })
 
+    // One-click: paga a etiqueta logo em seguida (igual ao fluxo de ida).
+    let paid = false
+    let paymentError: string | undefined
+    let simulated: boolean | undefined
+    let paidTracking: string | null | undefined
+    try {
+      const payRes = await performLabelCheckout(supabase, integration, client, ctx.partnerId, label.id)
+      if (payRes.success) {
+        paid = true
+        simulated = Boolean(payRes.result.simulated)
+        paidTracking = payRes.result.tracking || null
+        await maybeAdvanceReturnRequestAfterPayment(supabase, ctx.partnerId, label.id)
+      } else {
+        paymentError = payRes.error
+      }
+    } catch (payErr: any) {
+      paymentError = payErr?.message || "Erro ao pagar a etiqueta de devolução."
+    }
+
     revalidateOrders(ctx.partnerId)
 
     return {
@@ -1774,11 +1906,14 @@ export async function createReturnShippingLabelAction(payload: {
       label: {
         id: label.id,
         price: typeof label.price === "number" ? label.price : Number(quote.price || 0),
-        status: label.status,
+        status: paid ? "released" : label.status,
         serviceId: labelServiceId,
-        tracking: label.tracking || null,
+        tracking: paidTracking ?? label.tracking ?? null,
         labelUrl: label.print?.url || null,
       },
+      paid,
+      paymentError,
+      simulated,
     }
   } catch (err: any) {
     captureError(err, {

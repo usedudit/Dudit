@@ -395,7 +395,7 @@ export class SuperFreteClient {
   async getLabelPrintUrl(orderIds: string[]): Promise<{ url: string }> {
     return this.request("POST", "api/v0/tag/print", {
       orders: orderIds,
-    }) as Promise<{ url: string }>
+    }, 12_000) as Promise<{ url: string }>
   }
 
   async cancelOrder(orderId: string, description: string): Promise<Record<string, unknown>> {
@@ -510,4 +510,19 @@ export const SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS: Record<string, string> 
   posted: "sent",
   delivered: "delivered",
   cancelled: "cancelled",
+}
+
+// Status crus enviados no payload do webhook SuperFrete → status
+// persistidos em order_shipments (constraint da tabela). "generated"
+// = etiqueta pronta após o pagamento; no Dudit corresponde a "released".
+export const SUPERFRETE_WEBHOOK_STATUS_TO_SHIPMENT_STATUS: Record<string, string> = {
+  pending: "pending",
+  released: "released",
+  generated: "released",
+  posted: "posted",
+  in_transit: "in_transit",
+  delivered: "delivered",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  failed: "failed",
 }

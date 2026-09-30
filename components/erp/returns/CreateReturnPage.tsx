@@ -30,7 +30,7 @@ import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
-import { getReturnShippingStateAction, createReturnShippingLabelAction } from "@/app/actions/shipping/superfrete"
+import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction } from "@/app/actions/shipping/superfrete"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
@@ -215,6 +215,7 @@ export default function CreateReturnPage({
     const [returnShipping, setReturnShipping] = useState<Record<string, any> | null>(null)
     const [returnShippingGate, setReturnShippingGate] = useState<{ canGenerate: boolean; reason: string | null }>({ canGenerate: false, reason: null })
     const [isReturnShippingOpen, setIsReturnShippingOpen] = useState(false)
+    const [isPayingReturnLabel, setIsPayingReturnLabel] = useState(false)
     const [isGeneratingReturnLabel, setIsGeneratingReturnLabel] = useState(false)
     const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
@@ -516,11 +517,51 @@ export default function CreateReturnPage({
                 setReturnShipping(state.shipment)
                 setReturnShippingGate({ canGenerate: state.canGenerate, reason: state.reason })
             }
-            notifySuccess("Etiqueta de devolução gerada com sucesso!")
+            if (res.paid) {
+                notifySuccess(
+                    res.simulated
+                        ? "Etiqueta de devolução gerada e paga em modo simulado (sandbox)!"
+                        : "Etiqueta de devolução gerada e paga com sucesso!",
+                )
+            } else {
+                notifySuccess("Etiqueta de devolução gerada!")
+                notifyError(
+                    res.paymentError
+                        ? `Pagamento da etiqueta falhou: ${res.paymentError}`
+                        : 'Pagamento da etiqueta falhou. Clique em "Pagar etiqueta" para concluir.',
+                )
+            }
         } catch (err: any) {
             notifyError(err?.message || "Erro ao gerar etiqueta de devolução.")
         } finally {
             setIsGeneratingReturnLabel(false)
+        }
+    }
+
+    const handlePayReturnLabel = async () => {
+        if (!returnRequest?.id || !returnShipping?.external_label_id || isPayingReturnLabel) return
+        setIsPayingReturnLabel(true)
+        try {
+            const res = await checkoutSuperFreteLabelAction({
+                partnerId,
+                orderId: returnRequest.orderId || "",
+                labelId: returnShipping.external_label_id,
+            })
+            if (!res.success) throw new Error(res.error)
+            const state = await getReturnShippingStateAction({ returnRequestId: returnRequest.id })
+            if (state.success) {
+                setReturnShipping(state.shipment)
+                setReturnShippingGate({ canGenerate: state.canGenerate, reason: state.reason })
+            }
+            notifySuccess(
+                res.result.simulated
+                    ? "Etiqueta de devolução paga em modo simulado (sandbox)!"
+                    : "Etiqueta de devolução paga com sucesso!",
+            )
+        } catch (err: any) {
+            notifyError(err?.message || "Erro ao pagar a etiqueta de devolução.")
+        } finally {
+            setIsPayingReturnLabel(false)
         }
     }
 
@@ -2302,6 +2343,15 @@ export default function CreateReturnPage({
                                     )}
                                 </div>
                             </div>
+                            {returnShipping.status === "pending" && returnShipping.external_label_id && (
+                                <Button
+                                    onClick={handlePayReturnLabel}
+                                    isLoading={isPayingReturnLabel}
+                                    leftIcon={<TruckIcon size={18} />}
+                                >
+                                    {isPayingReturnLabel ? "Pagando..." : "Pagar etiqueta"}
+                                </Button>
+                            )}
                             <Button
                                 onClick={() => returnShipping.label_url && window.open(returnShipping.label_url, "_blank")}
                                 disabled={!returnShipping.label_url}

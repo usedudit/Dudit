@@ -246,16 +246,8 @@ export function PaymentWrapper({
         setIsClosing(true)
         setTimeout(() => {
             setIsClosing(false)
-            // If we have an actual orderId (not temp), or we are in a success/pending payment state, redirect to orders
-            const isOrderCreated = Boolean((actualOrderId && !actualOrderId.startsWith("temp-")) || (orderId && !orderId.startsWith("temp-")))
-            const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect", "payment_failed"].includes(step)
-
-            if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
-                onClose()
-                router.replace("/pedidos")
-            } else {
-                onClose()
-            }
+            onClose()
+            router.back()
         }, 300)
     }
 
