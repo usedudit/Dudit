@@ -20,6 +20,7 @@ import {
     getOrderShipmentAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
+import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
 
 const SHIPPING_STATUS_META: Record<string, { label: string; variant: "green" | "red" | "orange" | "blue" | "gray" }> = {
     pending: { label: "Aguardando pagamento", variant: "orange" },
@@ -48,6 +49,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [printing, setPrinting] = useState(false)
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelling, setCancelling] = useState(false)
+    const [docModalOpen, setDocModalOpen] = useState(false)
 
     const loadGate = useCallback(async () => {
         try {
@@ -104,6 +106,8 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                     toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
                 }
                 await refresh()
+            } else if (res.code === "missing_document") {
+                setDocModalOpen(true)
             } else {
                 toast.error(res.error || "Erro ao gerar etiqueta.")
             }
@@ -281,6 +285,15 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 variant="danger"
                 isDestructive
                 isLoading={cancelling}
+            />
+
+            <RecipientDocumentModal
+                isOpen={docModalOpen}
+                onClose={() => setDocModalOpen(false)}
+                partnerId={partnerId}
+                orderId={orderId}
+                recipientName={order?.customer_name || undefined}
+                onSaved={handleCreate}
             />
         </FormSection>
     )

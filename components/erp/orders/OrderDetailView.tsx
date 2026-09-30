@@ -1915,42 +1915,47 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         : { type: "none", name: "Entrega própria", isPlatformDriver: false }
 
                                                 return (
-                                                    <div className="space-y-6">
-                                                        <DeliveryStatusTimeline
-                                                            deliveryStatus={ds?.status || order.delivery_status || ""}
-                                                            isPickup={isPickup}
-                                                            isPaid={isPaidOrder}
-                                                            orderCreatedAt={order.created_at}
-                                                            orderUpdatedAt={order.updated_at}
-                                                            carrier={carrier}
-                                                        />
-
-                                                        {!isPickup && (
-                                                            <DeliveryDriverSection
-                                                                driverInfo={erpDriverInfo}
-                                                                deliveryStatus={order.delivery_status || ""}
-                                                                formatCurrency={formatCurrency}
-                                                                carrier={carrier}
-                                                                carrierLabelAction={
-                                                                    carrierDelivery ? (
-                                                                        <CarrierLabelAction
-                                                                            orderId={orderId}
-                                                                            partnerId={partnerId}
-                                                                            onRefresh={refreshOrder}
-                                                                        />
-                                                                    ) : undefined
-                                                                }
-                                                            />
-                                                        )}
-
-                                                        {!isPickup && (
-                                                            <DeliverySummarySection
-                                                                order={order}
-                                                                driverInfo={erpDriverInfo}
-                                                                formatCurrency={formatCurrency}
-                                                                deliveryNumber={ds?.deliveryNumber}
+                                                    <div className="grid grid-cols-12 gap-y-6 lg:gap-y-0">
+                                                        <div className={`col-span-12 ${!isPickup ? "lg:col-span-8 lg:pr-12" : ""} space-y-6`}>
+                                                            <DeliveryStatusTimeline
+                                                                deliveryStatus={ds?.status || order.delivery_status || ""}
+                                                                isPickup={isPickup}
+                                                                isPaid={isPaidOrder}
+                                                                orderCreatedAt={order.created_at}
+                                                                orderUpdatedAt={order.updated_at}
                                                                 carrier={carrier}
                                                             />
+
+                                                            {!isPickup && (
+                                                                <DeliveryDriverSection
+                                                                    driverInfo={erpDriverInfo}
+                                                                    deliveryStatus={order.delivery_status || ""}
+                                                                    formatCurrency={formatCurrency}
+                                                                    carrier={carrier}
+                                                                    carrierLabelAction={
+                                                                        carrierDelivery ? (
+                                                                            <CarrierLabelAction
+                                                                                orderId={orderId}
+                                                                                partnerId={partnerId}
+                                                                                onRefresh={refreshOrder}
+                                                                            />
+                                                                        ) : undefined
+                                                                    }
+                                                                />
+                                                            )}
+                                                        </div>
+
+                                                        {!isPickup && (
+                                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                                                <DeliverySummarySection
+                                                                    order={order}
+                                                                    driverInfo={erpDriverInfo}
+                                                                    formatCurrency={formatCurrency}
+                                                                    deliveryNumber={ds?.deliveryNumber}
+                                                                    carrier={carrier}
+                                                                    variant="sidebar"
+                                                                />
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )

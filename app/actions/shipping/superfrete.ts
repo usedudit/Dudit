@@ -3,6 +3,9 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import { encrypt, decrypt } from "@/lib/cryptoService"
+import { encryptCPF, decryptCPF } from "@/lib/crypto"
+import { validateCPF, validateCNPJ } from "@/lib/input-validator"
+import { generateCpfLookupHash } from "@/lib/services/cpf-hash"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -865,6 +868,7 @@ interface ResolvedShippingAddress {
   postal_code: string
   email?: string
   phone?: string
+  document?: string
 }
 
 function parseDeliveryAddressString(raw: string): Partial<ResolvedShippingAddress> | null {
@@ -913,7 +917,7 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
       .maybeSingle(),
     supabase
       .from("stores")
-      .select("name")
+      .select("name, cnpj, cpf")
       .eq("partner_id", partnerId)
       .order("is_headquarters", { ascending: false })
       .limit(1)
@@ -965,6 +969,30 @@ async function resolveOriginAddress(
     row = data
   }
   if (!row) return null
+
+  let docRow: any = partner
+  if (order.store_id) {
+    const { data } = await supabase
+      .from("stores")
+      .select("cnpj, cpf")
+      .eq("id", order.store_id)
+      .maybeSingle()
+    docRow = data || partner
+  }
+  let document: string | undefined
+  const storeCnpj = String(docRow?.cnpj || "").replace(/\D/g, "")
+  if (storeCnpj.length === 14) {
+    document = storeCnpj
+  } else if (docRow?.cpf) {
+    try {
+      const plain = (await decryptCPF(docRow.cpf)).replace(/\D/g, "")
+      if (plain) document = plain
+    } catch {
+      const fallback = String(docRow.cpf).replace(/\D/g, "")
+      if (fallback.length === 11 || fallback.length === 14) document = fallback
+    }
+  }
+
   return {
     name: order.stores?.name || partner?.name || "Remetente",
     address: row.street || "",
@@ -974,6 +1002,7 @@ async function resolveOriginAddress(
     city: row.city || "",
     state_abbr: (row.state || "").toUpperCase(),
     postal_code: (row.zip_code || "").replace(/\D/g, ""),
+    document,
   }
 }
 
@@ -998,10 +1027,29 @@ async function resolveDestinationAddress(
   if (customerIds.length > 0) {
     const { data } = await supabase
       .from("customers")
-      .select("name, email, phone")
+      .select("name, email, phone, cpf, cnpj, person_type")
       .eq("id", customerIds[0])
       .maybeSingle()
     customer = data
+  }
+
+  let customerDocument: string | undefined
+  if (customer) {
+    const cnpjDigits = String(customer.cnpj || "").replace(/\D/g, "")
+    let cpfDigits = ""
+    if (customer.cpf) {
+      try {
+        cpfDigits = (await decryptCPF(customer.cpf)).replace(/\D/g, "")
+      } catch {
+        const fallback = String(customer.cpf).replace(/\D/g, "")
+        if (fallback.length === 11) cpfDigits = fallback
+      }
+    }
+    if (customer.person_type === "pj" && cnpjDigits.length === 14) {
+      customerDocument = cnpjDigits
+    } else {
+      customerDocument = cpfDigits.length === 11 ? cpfDigits : cnpjDigits.length === 14 ? cnpjDigits : undefined
+    }
   }
 
   const parsed = row
@@ -1031,6 +1079,7 @@ async function resolveDestinationAddress(
     postal_code: parsed.postal_code,
     email: customer?.email || undefined,
     phone: customer?.phone || undefined,
+    document: customerDocument,
   }
 }
 
@@ -1136,7 +1185,7 @@ export async function createOrderShippingLabelAction(payload: {
 }): Promise<{
   success: true
   label: { id: string; price: number; status: string; serviceId: number }
-} | { success: false; error: string }> {
+} | { success: false; error: string; code?: "missing_document" }> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   const user = await requireUser()
   const ctx = await getCurrentPartnerContext()
@@ -1164,6 +1213,13 @@ export async function createOrderShippingLabelAction(payload: {
     }
     if (!destination || !destination.district) {
       return { success: false, error: "O endereço de entrega do pedido está incompleto. Preencha bairro, cidade, estado e CEP." }
+    }
+    if (!destination.document) {
+      return {
+        success: false,
+        error: "Este cliente não tem CPF/CNPJ cadastrado. Informe o documento para gerar a etiqueta.",
+        code: "missing_document",
+      }
     }
 
     const client = createClientFromIntegration(integration)
@@ -1218,7 +1274,7 @@ export async function createOrderShippingLabelAction(payload: {
         postal_code: destination.postal_code,
         email: destination.email,
         phone: destination.phone,
-        document: "",
+        document: destination.document,
       },
       products: buildShippingProducts(order),
       volumes,
@@ -1518,6 +1574,9 @@ export async function createReturnShippingLabelAction(payload: {
     if (!storeAddress || !storeAddress.postal_code || !storeAddress.district || !storeAddress.city || !storeAddress.state_abbr) {
       return { success: false, error: "Cadastre o endereço completo da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
     }
+    if (!storeAddress.document) {
+      return { success: false, error: "Cadastre o CNPJ ou CPF da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
+    }
 
     const client = createClientFromIntegration(integration)
     if (!client) return { success: false, error: "SuperFrete não conectado." }
@@ -1578,7 +1637,7 @@ export async function createReturnShippingLabelAction(payload: {
         city: storeAddress.city,
         state_abbr: storeAddress.state_abbr,
         postal_code: storeAddress.postal_code,
-        document: "",
+        document: storeAddress.document || "",
       },
       products: buildShippingProducts(order),
       volumes: buildVolumes(config),
@@ -1641,4 +1700,75 @@ export async function createReturnShippingLabelAction(payload: {
     })
     return { success: false, error: err?.message || "Erro ao criar etiqueta de devolução." }
   }
+}
+
+export async function saveOrderRecipientDocumentAction(payload: {
+  partnerId: string
+  orderId: string
+  document: string
+}): Promise<{ success: true; customerId: string } | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(payload.partnerId, "orders", "edit", user)
+
+  const digits = String(payload.document || "").replace(/\D/g, "")
+  if (digits.length === 11) {
+    if (!validateCPF(digits)) return { success: false, error: "CPF inválido." }
+  } else if (digits.length === 14) {
+    if (!validateCNPJ(digits)) return { success: false, error: "CNPJ inválido." }
+  } else {
+    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)." }
+  }
+
+  const supabase = getAdminClient()
+  const { data: order } = await supabase
+    .from("orders")
+    .select("customer_id, buyer_id")
+    .eq("id", payload.orderId)
+    .eq("partner_id", payload.partnerId)
+    .maybeSingle()
+
+  const customerId = order?.buyer_id || order?.customer_id
+  if (!customerId) {
+    return { success: false, error: "Pedido sem cliente vinculado. Cadastre o cliente do pedido e tente novamente." }
+  }
+
+  if (digits.length === 11) {
+    const lookupHash = generateCpfLookupHash(digits)
+    if (lookupHash) {
+      const { data: duplicate } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("partner_id", payload.partnerId)
+        .eq("cpf_lookup_hash", lookupHash)
+        .is("deleted_at", null)
+        .neq("id", customerId)
+        .limit(1)
+      if (duplicate && duplicate.length > 0) {
+        return { success: false, error: "Já existe outro cliente cadastrado com este CPF." }
+      }
+    }
+    const encrypted = await encryptCPF(digits)
+    const { error } = await supabase
+      .from("customers")
+      .update({ cpf: encrypted, cpf_lookup_hash: lookupHash })
+      .eq("id", customerId)
+    if (error) {
+      console.error("[SuperFrete] saveOrderRecipientDocument CPF failed:", error.message)
+      return { success: false, error: "Erro ao salvar o CPF do cliente." }
+    }
+  } else {
+    const { error } = await supabase
+      .from("customers")
+      .update({ cnpj: digits })
+      .eq("id", customerId)
+    if (error) {
+      console.error("[SuperFrete] saveOrderRecipientDocument CNPJ failed:", error.message)
+      return { success: false, error: "Erro ao salvar o CNPJ do cliente." }
+    }
+  }
+
+  return { success: true, customerId }
 }

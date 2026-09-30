@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { Button } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
@@ -11,6 +11,7 @@ import {
     getOrderShipmentAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
+import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
 
 interface CarrierLabelActionProps {
     orderId: string
@@ -25,6 +26,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     const [shipmentLoaded, setShipmentLoaded] = useState(false)
     const [creating, setCreating] = useState(false)
     const [paying, setPaying] = useState(false)
+    const [docModalOpen, setDocModalOpen] = useState(false)
 
     const loadGate = useCallback(async () => {
         try {
@@ -76,6 +78,8 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                     toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
                 }
                 await refresh()
+            } else if (res.code === "missing_document") {
+                setDocModalOpen(true)
             } else {
                 toast.error(res.error || "Erro ao gerar etiqueta.")
             }
@@ -106,34 +110,32 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
 
     if (!gateLoaded || !shipmentLoaded) return null
 
-    if (!shipment) {
-        if (!(gate?.connected && gate?.planAllowed)) return null
-        return (
-            <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
-                Gerar etiqueta
-            </Button>
-        )
-    }
+    let content: ReactNode = null
 
-    if (shipment.status === "pending") {
-        return (
+    if (!shipment) {
+        if (gate?.connected && gate?.planAllowed) {
+            content = (
+                <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
+                    Gerar etiqueta
+                </Button>
+            )
+        }
+    } else if (shipment.status === "pending") {
+        content = (
             <Button variant="link" type="button" onClick={handlePay} isLoading={paying} className="shrink-0">
                 Pagar etiqueta
             </Button>
         )
-    }
-
-    if (shipment.status === "cancelled" || shipment.status === "failed") {
-        if (!(gate?.connected && gate?.planAllowed)) return null
-        return (
-            <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
-                Gerar etiqueta
-            </Button>
-        )
-    }
-
-    if (shipment.tracking_url) {
-        return (
+    } else if (shipment.status === "cancelled" || shipment.status === "failed") {
+        if (gate?.connected && gate?.planAllowed) {
+            content = (
+                <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
+                    Gerar etiqueta
+                </Button>
+            )
+        }
+    } else if (shipment.tracking_url) {
+        content = (
             <Button
                 variant="link"
                 type="button"
@@ -145,7 +147,18 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
         )
     }
 
-    return null
+    return (
+        <>
+            {content}
+            <RecipientDocumentModal
+                isOpen={docModalOpen}
+                onClose={() => setDocModalOpen(false)}
+                partnerId={partnerId}
+                orderId={orderId}
+                onSaved={handleCreate}
+            />
+        </>
+    )
 }
 
 export default CarrierLabelAction

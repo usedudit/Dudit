@@ -12,7 +12,7 @@ import {
     AlertCircleIcon,
     BlockedIcon,
 } from "@/lib/icons"
-import { FormSection, ListItem, Badge, Button, DefaultModal } from "@/components/reusable"
+import { FormSection, ListItem, Badge, Button, DefaultModal, SidebarCard } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { formatDayMonth, formatTime, formatDateTime, formatFullDate, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
@@ -785,6 +785,7 @@ interface DeliverySummarySectionProps {
     formatPartnerAddress?: (addresses: any) => string
     deliveryNumber?: number | string | null
     carrier?: CarrierInfo | null
+    variant?: "form" | "sidebar" | "card"
 }
 
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -801,6 +802,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
     formatPartnerAddress,
     deliveryNumber,
     carrier,
+    variant = "form",
 }) => {
     const isPickup = order.delivery_type === "pickup"
     const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
@@ -814,8 +816,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
         return "Entrega própria"
     }
 
-    return (
-        <FormSection title="Resumo da Entrega" hasSeparator>
+    const content = (
             <div className="space-y-3">
                 <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
                 {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
@@ -865,6 +866,24 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
                     />
                 )}
             </div>
+    )
+
+    if (variant === "sidebar") {
+        return <SidebarCard title="Resumo da Entrega">{content}</SidebarCard>
+    }
+    if (variant === "card") {
+        return (
+            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                    Resumo da Entrega
+                </div>
+                <div className="p-6">{content}</div>
+            </div>
+        )
+    }
+    return (
+        <FormSection title="Resumo da Entrega" hasSeparator>
+            {content}
         </FormSection>
     )
 }

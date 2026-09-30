@@ -2332,7 +2332,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                         {isDelivery && (
                             <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
-                                <div className="space-y-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                    <div className="lg:col-span-8 space-y-6">
                                     {/* Status da Entrega (Timeline) */}
                                     <DeliveryStatusTimeline
                                         deliveryStatus={order.delivery_status || ""}
@@ -2420,6 +2421,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )
                                         })()
                                     )}
+                                    </div>
+                                    <div className="lg:col-span-4 pl-0 lg:pl-12 border-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
 
                                     <DeliverySummarySection
                                         order={order}
@@ -2449,7 +2452,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         formatCurrency={formatCurrency}
                                         formatPartnerAddress={formatPartnerAddress}
                                         carrier={carrierInfo}
+                                        variant="card"
                                     />
+                                    </div>
                                 </div>
                             </TabsContent>
                         )}
