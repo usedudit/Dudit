@@ -371,7 +371,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     }, [serviceData.images])
 
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showArchiveModal, setShowArchiveModal] = useState(false)
     const [isSavingService, setIsSavingService] = useState(false)
+    const [isArchivingService, setIsArchivingService] = useState(false)
     const isSubmittingRef = useRef(false)
 
     const handleDeleteService = useCallback(async () => {
@@ -523,31 +525,30 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         toast({ title: "Duplicando serviço", description: "Edite e salve o novo serviço." })
     }, [serviceData, setMode, toast])
 
-    const handleArchiveService = useCallback(async () => {
-        if (!serviceData.id) return
-        setIsSavingService(true)
-        const res = await archiveServiceAction(serviceData.id)
-        setIsSavingService(false)
-        if (!res.success) {
-            toast({ title: "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
-        } else {
-            toast({ title: "Serviço arquivado com sucesso." })
-            onClose?.()
-        }
-    }, [serviceData.id, toast, onClose])
+    const handleArchiveService = useCallback(() => setShowArchiveModal(true), [])
+    const handleUnarchiveService = useCallback(() => setShowArchiveModal(true), [])
 
-    const handleUnarchiveService = useCallback(async () => {
+    const confirmArchiveService = useCallback(async () => {
         if (!serviceData.id) return
-        setIsSavingService(true)
-        const res = await unarchiveServiceAction(serviceData.id)
-        setIsSavingService(false)
-        if (!res.success) {
-            toast({ title: "Erro ao desarquivar", description: (res as any).error, variant: "destructive" })
-        } else {
-            toast({ title: "Serviço desarquivado e reativado." })
-            onClose?.()
+        const isCurrentlyArchived = serviceData.status === "arquivado" || serviceData.status === "archived"
+        setIsArchivingService(true)
+        try {
+            const res = isCurrentlyArchived
+                ? await unarchiveServiceAction(serviceData.id)
+                : await archiveServiceAction(serviceData.id)
+            if (!res.success) {
+                toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
+            } else {
+                toast({ title: isCurrentlyArchived ? "Serviço desarquivado e reativado." : "Serviço arquivado com sucesso." })
+                onClose?.()
+            }
+        } catch (e: any) {
+            toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
+        } finally {
+            setIsArchivingService(false)
+            setShowArchiveModal(false)
         }
-    }, [serviceData.id, toast, onClose])
+    }, [serviceData.id, serviceData.status, toast, onClose])
 
     const dateCreated = serviceData.created_at ? new Date(serviceData.created_at).toLocaleDateString("pt-BR") : "N/A"
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
@@ -832,7 +833,17 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 />
             )}
 
-            <SavingStatusModal isOpen={isSavingService} text="Salvando serviço..." />
+            <AlertModal
+                isOpen={showArchiveModal}
+                onClose={() => setShowArchiveModal(false)}
+                onConfirm={confirmArchiveService}
+                title="Arquivar serviço?"
+                description={`Tem certeza que deseja arquivar "${serviceData.name}"? O serviço será movido para a lista de arquivados.`}
+                confirmText={isArchivingService ? "Arquivando..." : "Arquivar"}
+                variant="warning"
+            />
+
+            <SavingStatusModal isOpen={isSavingService || isArchivingService} text={isArchivingService ? "Arquivando serviço..." : "Salvando serviço..."} />
 
             <AlertModal
                 isOpen={showDeleteModal}

@@ -332,6 +332,7 @@ interface ItemCardProps {
     className?: string
     locationContext?: LocationContext | null
     preferCityLabel?: boolean
+    locationOnly?: boolean
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
@@ -354,7 +355,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null, preferCityLabel = false }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null, preferCityLabel = false, locationOnly = false }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -382,7 +383,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const sellerCategory = (product as any).category as string | null | undefined
     const sellerSubcategory = (product as any).subcategoryName as string | null | undefined
     const sellerLabel = sellerSubcategory || sellerCategory || null
-    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel })
+    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel || locationOnly })
 
     // Resolve distance & delivery estimates
     const storeLat = partner?.latitude ?? (product as any).latitude ?? (product as any).partners?.latitude ?? null
@@ -647,7 +648,13 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                 <p className="text-[11px] md:text-xs text-brand-dark font-semibold truncate leading-tight dark:text-dark-heading">
                                     {sellerName}
                                 </p>
-                                {locationContext?.scope === "country" && locationLabel ? (
+                                {locationOnly ? (
+                                    (metaDistanceLabel || locationLabel) ? (
+                                        <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                            <span className="shrink-0">{metaDistanceLabel || locationLabel}</span>
+                                        </div>
+                                    ) : null
+                                ) : locationContext?.scope === "country" && locationLabel ? (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
                                         {metaDistanceLabel ? (
                                             <span className="shrink-0">{metaDistanceLabel}</span>

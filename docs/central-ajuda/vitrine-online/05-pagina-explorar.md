@@ -43,9 +43,9 @@ Quando você acessa `/explorar` sem nenhum parâmetro de busca, o sistema mostra
 
 | Seção | O que mostra |
 | :--- | :--- |
-| **Grupos de categorias** | Abas **Tudo, Produtos, Serviços, Desapegos e Lojas** acima dos círculos. Cada grupo mostra as categorias dele e ajusta os resultados para aquele tipo (Desapegos = produtos usados). |
-| **Categorias de Produtos** | Cards de todas as categorias principais (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, Outros). |
-| **Categorias de Serviços** | Card único para navegar a todos os serviços cadastrados. |
+| **Categorias de Produtos** | Círculos das categorias principais de produtos (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, Outros). |
+| **Categorias de Serviços** | Círculos das categorias de serviços, em sua própria seção. |
+| **Lojas** | Círculos das categorias de lojas/vitrines, em sua própria seção. |
 
 Clique em qualquer categoria para ver os produtos/serviços relacionados à sua cidade.
 
@@ -151,7 +151,7 @@ Se sua busca por uma cidade específica retornar poucos resultados, o sistema au
 | Seção | O que aparece |
 | :--- | :--- |
 | **Lojas um pouco mais distantes** | Vendedores do seu estado ou região que correspondem à busca |
-| **Produtos um pouco mais distantes** | Itens de cidades próximas ao seu raio de busca |
+| **Um pouco mais distantes do seu raio de busca** | Todos os itens encontrados fora do seu raio, listados direto na página (grade ou lista). Respondem normalmente aos filtros, à ordenação e à troca entre lista/grade. Ao lado de cada item aparece apenas a cidade e o estado do vendedor. |
 
 ## Controles de navegação
 

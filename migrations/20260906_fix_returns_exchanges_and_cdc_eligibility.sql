@@ -461,7 +461,7 @@ BEGIN
     ) VALUES (
       v_request.partner_id,
       'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-      'Refunds',
+      'Reembolso',
       ABS(v_effective_refund_amount),
       NULL,
       CASE WHEN p_refund_status = 'APPROVED' THEN 'paid' ELSE 'pending' END,

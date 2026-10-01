@@ -142,7 +142,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
                 />
             )}
 
-            <SavingStatusModal isOpen={isDeleting} text="Arquivando produto..." />
+            <SavingStatusModal isOpen={isDeleting} text="Excluindo produto..." />
         </>
     )
 }

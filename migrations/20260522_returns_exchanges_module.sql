@@ -988,7 +988,7 @@ BEGIN
     ) VALUES (
       v_request.partner_id,
       'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-      'Refund',
+      'Reembolso',
       ABS(p_refund_amount),
       CURRENT_DATE,
       NOW(),
@@ -1345,7 +1345,7 @@ BEGIN
           ) VALUES (
             v_request.partner_id,
             'Reembolso saldo troca ' || v_exchange_order_number,
-            'Refund',
+            'Reembolso',
             v_exchange_surplus,
             CURRENT_DATE,
             NOW(),

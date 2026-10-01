@@ -171,7 +171,9 @@ export default function CustomersPage({
     const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkInactive: false })
     const [isProcessingBulk, setIsProcessingBulk] = useState(false)
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
+    const [customerToArchive, setCustomerToArchive] = useState<Customer | null>(null)
     const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
+    const [isArchivingCustomer, setIsArchivingCustomer] = useState(false)
 
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -409,39 +411,30 @@ export default function CustomersPage({
     const handleDetailsCustomer = (customer: any) => openEntity('view', customer.originalId || customer.id)
     const handleDeleteCustomer = (customer: any) => setCustomerToDelete(customer)
 
-    const handleArchiveCustomer = async (customer: any) => {
+    const handleArchiveCustomer = (customer: any) => setCustomerToArchive(customer)
+
+    const handleUnarchiveCustomer = (customer: any) => setCustomerToArchive(customer)
+
+    const confirmArchiveCustomer = async () => {
+        if (!customerToArchive) return
+        const isCurrentlyArchived = customerToArchive.status === "arquivado" || customerToArchive.status === "archived"
+        setIsArchivingCustomer(true)
+        const idToArchive = customerToArchive.originalId || customerToArchive.id
         try {
-            setIsDeletingCustomer(true)
-            const idToArchive = customer.originalId || customer.id
-            const res = await archiveCustomerAction(idToArchive)
+            const res = isCurrentlyArchived
+                ? await unarchiveCustomerAction(idToArchive)
+                : await archiveCustomerAction(idToArchive)
             if (res.error) {
-                toast({ title: "Erro ao arquivar", description: res.error, variant: "destructive" })
+                toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: res.error, variant: "destructive" })
             } else {
-                toast({ title: "Cliente arquivado com sucesso." })
+                toast({ title: isCurrentlyArchived ? "Cliente reativado com sucesso." : "Cliente arquivado com sucesso." })
                 afterMutation()
             }
         } catch (e: any) {
             toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
         } finally {
-            setIsDeletingCustomer(false)
-        }
-    }
-
-    const handleUnarchiveCustomer = async (customer: any) => {
-        try {
-            setIsDeletingCustomer(true)
-            const idToUnarchive = customer.originalId || customer.id
-            const res = await unarchiveCustomerAction(idToUnarchive)
-            if (res.error) {
-                toast({ title: "Erro ao desarquivar", description: res.error, variant: "destructive" })
-            } else {
-                toast({ title: "Cliente reativado com sucesso." })
-                afterMutation()
-            }
-        } catch (e: any) {
-            toast({ title: "Erro", description: e.message || "Erro ao desarquivar", variant: "destructive" })
-        } finally {
-            setIsDeletingCustomer(false)
+            setIsArchivingCustomer(false)
+            setCustomerToArchive(null)
         }
     }
     const handleSelectRow = (id: string) => {
@@ -820,6 +813,18 @@ export default function CustomersPage({
             />
 
             <AlertModal
+                isOpen={!!customerToArchive}
+                onClose={() => {
+                    if (!isArchivingCustomer) setCustomerToArchive(null)
+                }}
+                title="Arquivar cliente?"
+                description={`Tem certeza que deseja arquivar ${customerToArchive?.name || "este cliente"}? O cliente será movido para a lista de arquivados.`}
+                confirmText="Arquivar"
+                variant="warning"
+                onConfirm={confirmArchiveCustomer}
+            />
+
+            <AlertModal
                 isOpen={!!customerToDelete}
                 onClose={() => {
                     if (!isDeletingCustomer) setCustomerToDelete(null)
@@ -831,7 +836,7 @@ export default function CustomersPage({
                 onConfirm={confirmDeleteCustomer}
             />
 
-            <SavingStatusModal isOpen={isDeletingCustomer || isProcessingBulk} text={isDeletingCustomer ? "Excluindo cliente..." : "Processando..."} />
+            <SavingStatusModal isOpen={isDeletingCustomer || isArchivingCustomer || isProcessingBulk} text={isArchivingCustomer ? "Arquivando cliente..." : isDeletingCustomer ? "Excluindo cliente..." : "Processando..."} />
 
             <ExportColumnSelectionModal
                 isOpen={columnSelectionModal.isOpen}

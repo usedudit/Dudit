@@ -615,7 +615,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
     }, [productData.images])
 
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showArchiveModal, setShowArchiveModal] = useState(false)
     const [isSavingProduct, setIsSavingProduct] = useState(false)
+    const [isArchivingProduct, setIsArchivingProduct] = useState(false)
     const isSubmittingRef = useRef(false)
 
     const handleDeleteProduct = useCallback(async () => {
@@ -898,36 +900,35 @@ const AddProductPage: FC<AddProductPageProps> = ({
         setShowShareModal(true)
     }, [])
 
-    const handleArchiveProduct = useCallback(async () => {
-        if (!productData.id) return
-        setIsSavingProduct(true)
-        const res = await archiveProductAction(productData.id)
-        setIsSavingProduct(false)
-        if (res.error) {
-            notifyError(res.error)
-        } else {
-            notifySuccess("Produto arquivado com sucesso.")
-            onClose?.()
-        }
-    }, [productData.id, notifySuccess, notifyError, onClose])
+    const handleArchiveProduct = useCallback(() => setShowArchiveModal(true), [])
+    const handleUnarchiveProduct = useCallback(() => setShowArchiveModal(true), [])
 
-    const handleUnarchiveProduct = useCallback(async () => {
+    const confirmArchiveProduct = useCallback(async () => {
         if (!productData.id) return
-        setIsSavingProduct(true)
-        const res = await unarchiveProductAction(productData.id)
-        setIsSavingProduct(false)
-        if (res.error) {
-            if (isPlanLimitReachedError(res.error)) {
-                const target = getNextPlanTarget(planSlug)
-                if (target) openPlanUpgrade(target)
+        const isCurrentlyArchived = productData.status === "arquivado" || productData.status === "archived"
+        setIsArchivingProduct(true)
+        try {
+            const res = isCurrentlyArchived
+                ? await unarchiveProductAction(productData.id)
+                : await archiveProductAction(productData.id)
+            if (res.error) {
+                if (isCurrentlyArchived && isPlanLimitReachedError(res.error)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                } else {
+                    notifyError(res.error)
+                }
             } else {
-                notifyError(res.error)
+                notifySuccess(isCurrentlyArchived ? "Produto desarquivado e reativado." : "Produto arquivado com sucesso.")
+                onClose?.()
             }
-        } else {
-            notifySuccess("Produto desarquivado e reativado.")
-            onClose?.()
+        } catch (e: any) {
+            notifyError(e.message || "Erro ao arquivar produto")
+        } finally {
+            setIsArchivingProduct(false)
+            setShowArchiveModal(false)
         }
-    }, [productData.id, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose])
+    }, [productData.id, productData.status, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose])
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"
@@ -1363,9 +1364,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     />
                 )}
 
+                <AlertModal
+                    isOpen={showArchiveModal}
+                    onClose={() => setShowArchiveModal(false)}
+                    onConfirm={confirmArchiveProduct}
+                    title="Arquivar produto?"
+                    description={`Tem certeza que deseja arquivar ${productData.name}? O produto será movido para a lista de arquivados.`}
+                    confirmText={isArchivingProduct ? "Arquivando..." : "Arquivar"}
+                    variant="warning"
+                />
+
                 <SavingStatusModal
-                    isOpen={isSavingProduct}
-                    text={internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
+                    isOpen={isSavingProduct || isArchivingProduct}
+                    text={isArchivingProduct ? "Arquivando produto..." : internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
                 />
             </div>
         </FadeIn>

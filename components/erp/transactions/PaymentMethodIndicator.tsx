@@ -126,7 +126,7 @@ function resolveIcons(normalized: string, providerIsMP: boolean): { icons: React
     } else if (normalized.includes("multiplo") || normalized.includes("múltiplo")) {
         icons.push(<MultiplePaymentsIcon key="method" className="w-3.5 h-3.5 text-brand-dark dark:text-dark-heading" />)
         colorClass = "text-brand-dark dark:text-dark-heading"
-    } else if (normalized.includes("mercado") || normalized.includes("mp")) {
+    } else if (!providerIsMP && (normalized.includes("mercado") || normalized.includes("mp"))) {
         icons.push(<img key="method" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-brand-dark dark:text-dark-heading"
     } else if (!providerIsMP) {
@@ -139,8 +139,8 @@ function resolveIcons(normalized: string, providerIsMP: boolean): { icons: React
 function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = false, compact = false }: { part: string; provider?: string | null; simplify?: boolean; compact?: boolean }) {
     const displayPart = doSimplify ? simplifyLabel(part) : part
 
-    const providerIsMP = !!provider?.toLowerCase().includes("mercado pago")
     const normalized = displayPart.toLowerCase()
+    const providerIsMP = !!provider?.toLowerCase().includes("mercado pago") || normalized.includes("mercado pago") || normalized.includes("mercadopago")
     const isMultipleMethods = normalized.includes("multiplos") || normalized.includes("múltiplos")
     const { icons, colorClass } = resolveIcons(normalized, providerIsMP && !isMultipleMethods)
 

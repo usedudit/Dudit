@@ -189,10 +189,10 @@ BEGIN
         account_id,
         created_by_user_id
       ) VALUES (
-        v_request.partner_id,
-        'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-        'Refund',
-        ABS(p_refund_amount),
+      v_request.partner_id,
+      'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
+      'Reembolso',
+      ABS(p_refund_amount),
         CURRENT_DATE,
         NOW(),
         'paid',

@@ -103,8 +103,9 @@ export default function SaleReceiptThermalPreview({
                     </div>
 
                     {isDelivery && data.customerAddress ? (
-                        <div className="pt-1">
-                            <p className="text-[9.5px] leading-tight whitespace-pre-line font-medium">{data.customerAddress}</p>
+                        <div className="flex pt-0.5 text-[10.5px]">
+                            <span>Endereço:</span>
+                            <p className="leading-tight whitespace-pre-line">{data.customerAddress}</p>
                         </div>
                     ) : null}
                 </div>
@@ -147,7 +148,7 @@ export default function SaleReceiptThermalPreview({
                     <ReceiptRow left="Itens do pedido:" right={`R$ ${formatReceiptAmount(grossTotal)}`} />
 
                     {totalDiscounts > 0.009 && (
-                            <ReceiptRow left="Descontos:" right={`-R$ ${formatReceiptAmount(totalDiscounts)}`} />
+                        <ReceiptRow left="Descontos:" right={`-R$ ${formatReceiptAmount(totalDiscounts)}`} />
                     )}
 
                     {(data.shippingFee > 0.009 || data.deliveryPayer === "seller") && (
@@ -179,11 +180,11 @@ export default function SaleReceiptThermalPreview({
                             <ReceiptRow
                                 key={`pay-${i}`}
                                 left={line.label}
-                right={`R$ ${formatReceiptAmount(line.amount)}`}
-            />
-        ))
-    ) : (
-        <ReceiptRow left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
+                                right={`R$ ${formatReceiptAmount(line.amount)}`}
+                            />
+                        ))
+                    ) : (
+                        <ReceiptRow left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
                     )}
 
                     {data.isOnlinePayment && (

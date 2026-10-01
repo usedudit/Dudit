@@ -40,7 +40,7 @@ export function ExplorarHeaderSection({
                     </div>
                 )}
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-1">
+                    <h1 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1">
                         {title}
                     </h1>
                     {isLoading ? (

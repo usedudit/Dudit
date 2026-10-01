@@ -42,16 +42,6 @@ import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./context
 import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 import { trackEvent } from "@/lib/analytics"
 
-type CategoryGroup = "tudo" | "produtos" | "servicos" | "desapegos" | "lojas"
-
-const CATEGORY_GROUP_OPTIONS: { value: CategoryGroup; label: string }[] = [
-    { value: "tudo", label: "Tudo" },
-    { value: "produtos", label: "Produtos" },
-    { value: "servicos", label: "Serviços" },
-    { value: "desapegos", label: "Desapegos" },
-    { value: "lojas", label: "Lojas" },
-]
-
 interface ExplorarPageClientProps {
     initialResults?: any[]
     initialMoreDistantSellers?: any[]
@@ -778,13 +768,39 @@ export function ExplorarPageClient({
         return productCategories
     }, [currentType, dbServiceCategories, dbPartnerCategories, productCategories])
 
-    const activeCategoryGroup = useMemo<CategoryGroup | null>(() => {
-        if (currentType === "servicos") return "servicos"
-        if (currentType === "vitrines" || currentType === "negocios") return "lojas"
-        if (currentType === "produtos") return selectedCondition === "usado" ? "desapegos" : "produtos"
-        if (currentType === "tudo") return "tudo"
-        return null
-    }, [currentType, selectedCondition])
+    const categoryRows = useMemo(() => {
+        const rows: { key: string; label: string; groupType: string; categories: { name: string; icon_url: string | null }[] }[] = []
+
+        const isStandardIn = (itemName: string, list: { name: string; icon_url: string | null }[]) =>
+            list.some(cat => matchCategory(itemName, cat.name))
+
+        const buildRow = (
+            key: string,
+            label: string,
+            groupType: string,
+            baseCats: { name: string; icon_url: string | null }[],
+            itemTypes: string[]
+        ) => {
+            const categories = baseCats
+                .filter(cat => !(key === "produtos" && cat.name.toLowerCase() === "serviços"))
+                .map(cat => ({ name: cat.name, icon_url: cat.icon_url ?? null }))
+            const hasOutros = normalizedInitialResults.some(item =>
+                itemTypes.includes(item.itemType) &&
+                (!item.category || !isStandardIn(item.category, baseCats))
+            )
+            if (categories.length === 0 && !hasOutros) return
+            if (hasOutros && !categories.some(c => c.name === "Outros")) {
+                categories.push({ name: "Outros", icon_url: null })
+            }
+            rows.push({ key, label, groupType, categories })
+        }
+
+        buildRow("produtos", "Produtos", "produtos", productCategories, ["produto"])
+        buildRow("servicos", "Serviços", "servicos", dbServiceCategories, ["servico"])
+        buildRow("lojas", "Lojas", "vitrines", dbPartnerCategories, [])
+
+        return rows
+    }, [normalizedInitialResults, productCategories, dbServiceCategories, dbPartnerCategories])
 
     const isStandardCategory = useCallback((catName: string) => {
         return filterCategoriesList.some(cat => matchCategory(catName, cat.name))
@@ -811,9 +827,9 @@ export function ExplorarPageClient({
         }).slice(0, 20)
     }, [dataToFilter, isStandardCategory])
 
-    // In-memory filters for advanced filters
-    const filteredResults = useMemo(() => {
-        let filtered = [...dataToFilter]
+    // In-memory filters for advanced filters (aplicados às listas local e distante)
+    const applyBrowseFilters = useCallback((source: any[]) => {
+        let filtered = [...source]
         if (selectedCategories.length > 0) {
             const activeCat = selectedCategories[0]
             if (activeCat === "Outros") {
@@ -872,7 +888,25 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, selectedSection, isStandardCategory])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, selectedSection, isStandardCategory])
+
+    const filteredResults = useMemo(
+        () => applyBrowseFilters(dataToFilter),
+        [applyBrowseFilters, dataToFilter]
+    )
+
+    // Itens distantes: listados direto na página, respondendo aos mesmos filtros/ordenação
+    const filteredDistant = useMemo(() => {
+        if (!query || moreDistantItems.length === 0) return []
+        const typeFiltered = moreDistantItems.filter((item: any) => {
+            if (currentType === "produtos") return item.itemType === "produto"
+            if (currentType === "servicos") return item.itemType === "servico"
+            if (currentType === "vitrines" || currentType === "negocios") return item.itemType === "loja"
+            if (currentType === "planos") return item.itemType === "plano"
+            return true
+        })
+        return applyBrowseFilters(typeFiltered)
+    }, [query, moreDistantItems, currentType, applyBrowseFilters])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
@@ -1409,14 +1443,14 @@ export function ExplorarPageClient({
         return getProductUrl(item, item.partners)
     }
 
-    const renderListRow = (item: any) => {
+    const renderListRow = (item: any, locationOnly = false) => {
         const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const isStore = item.itemType === "loja"
         const showPrice = !isStore && item.show_price_in_store !== false
         const sellerName = partner?.store_name || item.name || ""
         const sellerLogoRaw = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
         const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw, "thumb") : null
-        const locationLabel = getLocationLabel(partner, locationContext)
+        const locationLabel = getLocationLabel(partner, locationContext, { full: locationOnly })
 
         // Resolve distance & delivery estimates
         const storeLat = partner?.latitude ?? item.latitude ?? (item as any).addresses?.[0]?.latitude ?? null
@@ -1570,7 +1604,13 @@ export function ExplorarPageClient({
                                             <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-semibold truncate leading-tight">
                                                 {sellerName}
                                             </p>
-                                            {item.itemType === "servico" ? (
+                                            {locationOnly ? (
+                                                locationLabel ? (
+                                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                                        <span className="shrink-0">{locationLabel}</span>
+                                                    </div>
+                                                ) : null
+                                            ) : item.itemType === "servico" ? (
                                                 serviceDuration ? (
                                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
                                                         <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
@@ -1635,6 +1675,15 @@ export function ExplorarPageClient({
         return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full" />
     }
 
+    const renderDistantItem = (item: any) => {
+        if (viewMode === "list") return renderListRow(item, true)
+
+        if (item.itemType === 'loja') {
+            return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full" />
+        }
+        return <ItemCard key={`dist-${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} preferCityLabel locationOnly className="w-full" />
+    }
+
     // Renders the category discovery sections
     const renderCategoryDiscoverSections = () => {
         if (!showCategoryDiscoverySections) return null
@@ -1643,7 +1692,7 @@ export function ExplorarPageClient({
                 {subcategoriesList.length > 0 && (
                     <div className="w-full">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading">Subcategorias</h2>
+                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Subcategorias</h2>
                         </div>
                         <div className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
                             {subcategoriesList.map((sub) => (
@@ -1746,32 +1795,14 @@ export function ExplorarPageClient({
 
     const showCommunityVideos = communityVideos.length > 0
 
-    const goToCategory = (catName: string) => {
+    const selectGroupCategory = (groupType: string, catName: string) => {
         triggerFilterLoading()
-        // "Serviços" usa o tipo de listagem de serviços em vez de uma categoria de produto
-        if (catName === "Serviços" || catName.toLowerCase() === "servicos") {
-            setCurrentType("servicos")
-            setSelectedCategories([])
-            updateUrl(selectedCitySlug, [], query, "servicos")
-            return
+        if (currentType !== groupType) {
+            setCurrentType(groupType)
+            setSelectedCondition("")
         }
-        const catSlug = categoryToSlug(catName)
         setSelectedCategories([catName])
-        updateUrl(selectedCitySlug, [catName], query, currentType)
-    }
-
-    const selectCategoryGroup = (group: CategoryGroup) => {
-        if (group === activeCategoryGroup) return
-        triggerFilterLoading()
-        const nextType = group === "servicos" ? "servicos"
-            : group === "lojas" ? "vitrines"
-                : group === "tudo" ? "tudo"
-                    : "produtos"
-        setSelectedCategories([])
-        setSelectedSection(null)
-        setCurrentType(nextType)
-        setSelectedCondition(group === "desapegos" ? "usado" : "")
-        updateUrl(selectedCitySlug, [], query, nextType, undefined, null)
+        updateUrl(selectedCitySlug, [catName], query, groupType)
     }
 
     return (
@@ -1799,48 +1830,35 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
-                    {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
-                    {!query && (productCategories.length > 0 || dbServiceCategories.length > 0 || dbPartnerCategories.length > 0) && !isLandingPage && !isCategoryMode && (
+                    {/* CATEGORIAS AGRUPADAS (Produtos / Serviços / Lojas) */}
+                    {!query && categoryRows.length > 0 && !isLandingPage && !isCategoryMode && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-3">Categorias</h2>
-                            {/* GRUPOS: cada grupo mostra as categorias do seu tipo */}
-                            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 mb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                {CATEGORY_GROUP_OPTIONS.map((group) => {
-                                    const isActive = activeCategoryGroup === group.value
-                                    return (
-                                        <button
-                                            key={group.value}
-                                            onClick={() => selectCategoryGroup(group.value)}
-                                            className={`shrink-0 px-4 py-1.5 rounded-full border text-xs sm:text-sm font-bold transition-colors ${isActive
-                                                ? "border-brand-green bg-[#ecfdf5] text-brand-green dark:bg-brand-dark/10"
-                                                : "border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-green hover:bg-green-50 dark:hover:bg-dark-border/30"
-                                                }`}
-                                        >
-                                            {group.label}
-                                        </button>
-                                    )
-                                })}
+                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
+                            <div className="space-y-5">
+                                {categoryRows.map((row) => (
+                                    <div key={row.key}>
+                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">{row.label}</h3>
+                                        <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            {row.categories.map((cat) => (
+                                                <button
+                                                    key={cat.name}
+                                                    onClick={() => selectGroupCategory(row.groupType, cat.name)}
+                                                    className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                                                >
+                                                    <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                                        {cat.icon_url ? (
+                                                            <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
+                                                        ) : (
+                                                            <span className="text-2xl">📦</span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            {activeCategoriesList.length > 0 && (
-                                <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                    {activeCategoriesList.map((cat) => (
-                                        <button
-                                            key={cat.name}
-                                            onClick={() => goToCategory(cat.name)}
-                                            className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
-                                        >
-                                            <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
-                                                {cat.icon_url ? (
-                                                    <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
-                                                ) : (
-                                                    <span className="text-2xl">📦</span>
-                                                )}
-                                            </div>
-                                            <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -2027,7 +2045,7 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* Carrossel de Lojas Distantes na Busca */}
-                                            {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
+                                    {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
                                         <div className="mb-6">
                                             <HorizontalCarousel
                                                 title="Lojas um pouco mais distantes do seu raio de busca"
@@ -2109,29 +2127,16 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : null}
 
-                                    {/* Carrossel de Itens Distantes na Busca */}
-                                    {!!query && moreDistantItems.length > 0 && (
+                                    {/* Itens Distantes na Busca — listados direto, respondendo aos filtros/ordenação da página */}
+                                    {!!query && filteredDistant.length > 0 && (
                                         <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
-                                            <HorizontalCarousel
-                                                title="Um pouco mais distantes do seu raio de busca"
-                                                items={moreDistantItems}
-                                                renderItem={(item) => (
-                                                    <ItemCard
-                                                        key={item.id}
-                                                        product={item}
-                                                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                                                        locationContext={locationContext}
-                                                        preferCityLabel
-                                                        className="w-full"
-                                                    />
-                                                )}
-                                                onSeeAll={() => {
-                                                    const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                    setSelectedCitySlug(stateSlug)
-                                                    updateUrl(stateSlug, selectedCategories, query, currentType)
-                                                }}
-                                                itemWidthClass="w-[190px] sm:w-[210px]"
-                                            />
+                                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distantes do seu raio de busca</h2>
+                                            <div className={viewMode === "grid"
+                                                ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6"
+                                                : ""
+                                            }>
+                                                {filteredDistant.map((item) => renderDistantItem(item))}
+                                            </div>
                                         </div>
                                     )}
 

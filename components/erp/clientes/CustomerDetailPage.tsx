@@ -77,7 +77,9 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [billingAddress, setBillingAddress] = useState<string | null>(null);
     const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showArchiveModal, setShowArchiveModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isArchiving, setIsArchiving] = useState(false);
     const [storeCredits, setStoreCredits] = useState<any[]>([]);
     const [isLoadingStoreCredits, setIsLoadingStoreCredits] = useState(false);
 
@@ -445,37 +447,33 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         }
     }
 
-    const handleArchive = async () => {
+    const handleArchive = () => setShowArchiveModal(true)
+
+    const handleUnarchive = () => setShowArchiveModal(true)
+
+    const handleArchiveConfirm = async () => {
+        if (!customer) return
+        const isCurrentlyArchived = customer.status === "arquivado" || customer.status === "archived"
+        setIsArchiving(true)
         try {
-            setIsDeleting(true)
-            const res = await archiveCustomerAction(realCustomerId)
+            const res = isCurrentlyArchived
+                ? await unarchiveCustomerAction(realCustomerId)
+                : await archiveCustomerAction(realCustomerId)
             if (res?.error) {
-                notifyError("Erro ao arquivar: " + res.error)
+                notifyError(isCurrentlyArchived ? "Erro ao desarquivar: " + res.error : "Erro ao arquivar: " + res.error)
             } else {
-                notifySuccess("Cliente arquivado com sucesso!")
+                notifySuccess(isCurrentlyArchived ? "Cliente reativado com sucesso!" : "Cliente arquivado com sucesso!")
                 onBack()
             }
         } catch (e: any) {
+            if (e?.digest?.includes?.('NEXT_REDIRECT')) {
+                notifySuccess(isCurrentlyArchived ? "Cliente reativado com sucesso!" : "Cliente arquivado com sucesso!")
+                return
+            }
             notifyError("Erro ao arquivar cliente.")
         } finally {
-            setIsDeleting(false)
-        }
-    }
-
-    const handleUnarchive = async () => {
-        try {
-            setIsDeleting(true)
-            const res = await unarchiveCustomerAction(realCustomerId)
-            if (res?.error) {
-                notifyError("Erro ao desarquivar: " + res.error)
-            } else {
-                notifySuccess("Cliente reativado com sucesso!")
-                onBack()
-            }
-        } catch (e: any) {
-            notifyError("Erro ao desarquivar cliente.")
-        } finally {
-            setIsDeleting(false)
+            setIsArchiving(false)
+            setShowArchiveModal(false)
         }
     }
 
@@ -936,6 +934,16 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                 </Tabs>
 
                 <AlertModal
+                    isOpen={showArchiveModal}
+                    onClose={() => setShowArchiveModal(false)}
+                    onConfirm={handleArchiveConfirm}
+                    title="Arquivar cliente?"
+                    description={`Tem certeza que deseja arquivar ${customer.name}? O cliente será movido para a lista de arquivados.`}
+                    confirmText={isArchiving ? "Arquivando..." : "Arquivar"}
+                    variant="warning"
+                />
+
+                <AlertModal
                     isOpen={showDeleteModal}
                     onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleDelete}
@@ -945,7 +953,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     variant="danger"
                 />
 
-                <SavingStatusModal isOpen={isDeleting} text="Excluindo cliente..." />
+                <SavingStatusModal isOpen={isDeleting || isArchiving} text={isArchiving ? "Arquivando cliente..." : "Excluindo cliente..."} />
             </div >
         </FadeIn>
     );
