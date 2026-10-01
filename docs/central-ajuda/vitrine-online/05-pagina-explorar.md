@@ -43,6 +43,7 @@ Quando você acessa `/explorar` sem nenhum parâmetro de busca, o sistema mostra
 
 | Seção | O que mostra |
 | :--- | :--- |
+| **Grupos de categorias** | Abas **Tudo, Produtos, Serviços, Desapegos e Lojas** acima dos círculos. Cada grupo mostra as categorias dele e ajusta os resultados para aquele tipo (Desapegos = produtos usados). |
 | **Categorias de Produtos** | Cards de todas as categorias principais (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, Outros). |
 | **Categorias de Serviços** | Card único para navegar a todos os serviços cadastrados. |
 

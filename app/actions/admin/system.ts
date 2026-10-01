@@ -82,6 +82,7 @@ export async function updateGlobalAnnouncementAdminAction(
     if (result.success) {
       revalidatePath("/", "layout")
       revalidatePath("/ddt-admin/system")
+      revalidatePath("/api/system/announcement")
     }
 
     return result

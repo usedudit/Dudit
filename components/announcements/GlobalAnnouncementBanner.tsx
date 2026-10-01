@@ -20,7 +20,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
   const [announcement, setAnnouncement] = useState<GlobalAnnouncementConfig | null>(
     initialAnnouncement || null
   )
-  const [isDismissed, setIsDismissed] = useState(true)
+  const [isDismissed, setIsDismissed] = useState(false)
 
   useEffect(() => {
     setMounted(true)

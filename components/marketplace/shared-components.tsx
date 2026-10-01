@@ -70,9 +70,10 @@ interface VitrineCardProps {
     className?: string
     locationContext?: LocationContext | null
     userCoords?: { lat: number; lng: number } | null
+    preferCityLabel?: boolean
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null, preferCityLabel = false }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -96,7 +97,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
     const reviewsCount = partner.reviewsCount ?? vitrine.reviewsCount ?? 0
     const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0
-    const locationLabel = getLocationLabel(partner, locationContext)
+    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel })
 
     // Resolve distance (O(1) in-memory calculation)
     const storeLat = partner.latitude ?? vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
@@ -111,7 +112,9 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
     }
 
-    const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null)
+    const distanceLabel = preferCityLabel && locationLabel
+        ? null
+        : (distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null))
 
     const deliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
@@ -328,6 +331,7 @@ interface ItemCardProps {
     hideSalesCount?: boolean
     className?: string
     locationContext?: LocationContext | null
+    preferCityLabel?: boolean
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
@@ -350,7 +354,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null, preferCityLabel = false }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -378,7 +382,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const sellerCategory = (product as any).category as string | null | undefined
     const sellerSubcategory = (product as any).subcategoryName as string | null | undefined
     const sellerLabel = sellerSubcategory || sellerCategory || null
-    const locationLabel = getLocationLabel(partner, locationContext)
+    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel })
 
     // Resolve distance & delivery estimates
     const storeLat = partner?.latitude ?? (product as any).latitude ?? (product as any).partners?.latitude ?? null
@@ -394,6 +398,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     }
 
     const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null)
+    const metaDistanceLabel = preferCityLabel ? (locationLabel || distanceLabel) : distanceLabel
 
     const deliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
@@ -644,17 +649,17 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                 </p>
                                 {locationContext?.scope === "country" && locationLabel ? (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {distanceLabel ? (
-                                            <span className="shrink-0">{distanceLabel}</span>
+                                        {metaDistanceLabel ? (
+                                            <span className="shrink-0">{metaDistanceLabel}</span>
                                         ) : (
                                             <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{locationLabel}</span>
                                         )}
                                     </div>
                                 ) : itemType === "servico" ? (
-                                    (serviceDuration || distanceLabel) ? (
+                                    (serviceDuration || metaDistanceLabel) ? (
                                         <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                            {distanceLabel && <span className="shrink-0">{distanceLabel}</span>}
-                                            {distanceLabel && serviceDuration && (
+                                            {metaDistanceLabel && <span className="shrink-0">{metaDistanceLabel}</span>}
+                                            {metaDistanceLabel && serviceDuration && (
                                                 <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
                                             )}
                                             {serviceDuration && <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>}
@@ -662,9 +667,9 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                     ) : null
                                 ) : (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {distanceLabel && (
+                                        {metaDistanceLabel && (
                                             <>
-                                                <span className="shrink-0">{distanceLabel}</span>
+                                                <span className="shrink-0">{metaDistanceLabel}</span>
                                                 <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
                                             </>
                                         )}
@@ -678,7 +683,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                             <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
                                                 {deliveryFeeLabel}
                                             </span>
-                                        ) : !deliveryTime && !distanceLabel ? (
+                                        ) : !deliveryTime && !metaDistanceLabel ? (
                                             <span>{sellerLabel || "Pronta entrega"}</span>
                                         ) : null}
                                     </div>

@@ -16,6 +16,7 @@ import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
 import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-features"
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner"
+import { getGlobalAnnouncementConfig } from "@/lib/services/system-settings.service"
 import { PostHogProvider } from "@/providers/posthog-provider"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -227,6 +228,8 @@ export default async function RootLayout({
     // lazily if needed, saving ~50-150ms on these routes.
     const user = isPublicPage ? null : await getCurrentUser()
 
+    const initialAnnouncement = await getGlobalAnnouncementConfig()
+
     return (
         <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
             <head>
@@ -243,7 +246,7 @@ export default async function RootLayout({
                     <PostHogProvider>
                         <SupabaseProvider initialUser={user} initialSessionData={null}>
                             <QueryProvider>
-                                <GlobalAnnouncementBanner />
+                                <GlobalAnnouncementBanner initialAnnouncement={initialAnnouncement} />
                                 <PreventSamePageNavigation />
                                 <NotificationProvider>
                                     <RouteAwareGlobalFeatures>

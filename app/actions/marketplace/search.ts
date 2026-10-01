@@ -111,6 +111,39 @@ const cityCoordsCache = new Map<string, { lat: number; lng: number } | null>()
 const normalizePlaceValue = (value: string | null | undefined) =>
     (value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
 
+function itemDistanceKm(item: any): number {
+    const distance = item?.partners?.distance_km ?? item?.distance_km
+    return typeof distance === "number" && Number.isFinite(distance) ? distance : Infinity
+}
+
+/**
+ * Ordena os resultados distantes pelo ranqueamento do marketplace (_searchRank da FTS,
+ * ou marketplace_score como fallback) com um leve empate por proximidade.
+ * A distancia pode reordenar itens cujo rank difere em no maximo 10% da faixa da lista;
+ * nunca sobrepoe a relevancia do ranqueamento.
+ */
+function sortDistantByRankAndDistance<T>(items: T[]): T[] {
+    const list = items as any[]
+    const bases = list.map((item) => {
+        if (typeof item?._searchRank === "number" && Number.isFinite(item._searchRank)) return item._searchRank
+        if (typeof item?.marketplace_score === "number" && Number.isFinite(item.marketplace_score)) return item.marketplace_score
+        return null
+    })
+    const finite = bases.filter((value): value is number => value !== null)
+    const min = finite.length > 0 ? Math.min(...finite) : 0
+    const span = finite.length > 0 ? Math.max(...finite) - min : 0
+
+    const scored = list.map((item, index) => {
+        const base = bases[index]
+        const baseNorm = base === null ? 0 : (span > 0 ? (base - min) / span : 1)
+        const distance = itemDistanceKm(item)
+        const distanceNorm = Number.isFinite(distance) ? Math.min(distance / 1000, 1) : 1
+        return { item, score: baseNorm - 0.1 * distanceNorm }
+    })
+    scored.sort((a, b) => b.score - a.score)
+    return scored.map((entry) => entry.item)
+}
+
 /**
  * A busca por cidade filtra por partner_id (RPC FTS), mas um parceiro pode ter lojas em
  * varios municipios. Itens publicados na loja de outra cidade voltariam como "locais".
@@ -281,14 +314,12 @@ export const searchMarketplaceDirectFull = cache(async (
 
         const enrichedDistant = enrichMarketplaceDistance(distantFiltered, finalCoords)
 
-        moreDistantSellers = enrichedDistant
-            .filter(r => r.itemType === 'loja')
-            .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
-            .slice(0, 20)
-        moreDistantItems = enrichedDistant
-            .filter(r => r.itemType !== 'loja')
-            .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
-            .slice(0, 20)
+        moreDistantSellers = sortDistantByRankAndDistance(
+            enrichedDistant.filter(r => r.itemType === 'loja')
+        ).slice(0, 20)
+        moreDistantItems = sortDistantByRankAndDistance(
+            enrichedDistant.filter(r => r.itemType !== 'loja')
+        ).slice(0, 20)
     }
 
     let finalResults = resultsWithDistance

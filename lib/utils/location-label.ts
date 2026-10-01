@@ -34,9 +34,25 @@ export function normalizeStateUf(value: string | null | undefined): string {
  *   - Outro estado: exibe "Cidade, UF" (ex: "São Paulo, SP").
  * - Se estiver no escopo nacional (scope === "country"):
  *   - Exibe "Cidade, UF" (ex: "Londrina, PR").
+ * - Com options.full: sempre exibe "Cidade, UF" (ex: "Maringá, PR"), ignorando o escopo.
  */
-export function getLocationLabel(partner: LocationPartner | null | undefined, context: LocationContext | null | undefined): string | null {
-    if (!partner || !context) return null
+export function getLocationLabel(
+    partner: LocationPartner | null | undefined,
+    context: LocationContext | null | undefined,
+    options?: { full?: boolean }
+): string | null {
+    if (!partner) return null
+
+    if (options?.full) {
+        const city = String(partner.city || "").trim()
+        const state = normalizeStateUf(partner.state)
+        if (city && state) return `${city}, ${state}`
+        if (city) return city
+        if (state) return state
+        return null
+    }
+
+    if (!context) return null
 
     const sellerCity = normalizeCityName(partner.city)
     const sellerState = normalizeStateUf(partner.state)

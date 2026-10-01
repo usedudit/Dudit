@@ -32,7 +32,7 @@ import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/ut
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
 import { getShippingPayerLabel, type ReturnShippingPayer } from "@/lib/returns/policy"
-import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction, getReturnShippingQuotesAction } from "@/app/actions/shipping/superfrete"
+import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction, getReturnShippingQuotesAction, printSuperFreteLabelAction } from "@/app/actions/shipping/superfrete"
 import { SUPERFRETE_LABEL_STATUS, type SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
@@ -219,6 +219,7 @@ export default function CreateReturnPage({
     const [returnShippingGate, setReturnShippingGate] = useState<{ canGenerate: boolean; reason: string | null }>({ canGenerate: false, reason: null })
     const [isReturnShippingOpen, setIsReturnShippingOpen] = useState(false)
     const [isPayingReturnLabel, setIsPayingReturnLabel] = useState(false)
+    const [isPrintingReturnLabel, setIsPrintingReturnLabel] = useState(false)
     const [returnQuotes, setReturnQuotes] = useState<{ id: number; label: string; price: number; deliveryDays: number | null }[]>([])
     const [selectedReturnService, setSelectedReturnService] = useState<number | null>(null)
     const [isLoadingQuotes, setIsLoadingQuotes] = useState(false)
@@ -616,6 +617,25 @@ export default function CreateReturnPage({
             notifyError(err?.message || "Erro ao pagar a etiqueta de devolução.")
         } finally {
             setIsPayingReturnLabel(false)
+        }
+    }
+
+    const handlePrintReturnLabel = async () => {
+        if (!returnShipping?.external_label_id || isPrintingReturnLabel) return
+        setIsPrintingReturnLabel(true)
+        try {
+            const res = await printSuperFreteLabelAction({ partnerId, labelId: returnShipping.external_label_id })
+            if (res.success) {
+                window.open(res.url, "_blank")
+            } else if (returnShipping.label_url) {
+                window.open(returnShipping.label_url, "_blank")
+            } else {
+                notifyError(res.error || "Erro ao gerar a impressão da etiqueta.")
+            }
+        } catch (err: any) {
+            notifyError(err?.message || "Erro ao gerar a impressão da etiqueta.")
+        } finally {
+            setIsPrintingReturnLabel(false)
         }
     }
 
@@ -2413,11 +2433,12 @@ export default function CreateReturnPage({
                                 </Button>
                             )}
                             <Button
-                                onClick={() => returnShipping.label_url && window.open(returnShipping.label_url, "_blank")}
-                                disabled={!returnShipping.label_url}
+                                onClick={handlePrintReturnLabel}
+                                isLoading={isPrintingReturnLabel}
+                                disabled={!returnShipping.external_label_id && !returnShipping.label_url}
                                 leftIcon={<PrinterIcon size={18} />}
                             >
-                                Abrir etiqueta
+                                {isPrintingReturnLabel ? "Abrindo..." : "Imprimir etiqueta"}
                             </Button>
                         </>
                     ) : (

@@ -235,14 +235,14 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                     }}
                                 >
                                     <div className="flex items-start gap-3">
-                                        <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
                                             <img src={getPrimaryProductDisplayImage(s)} alt={s.name} className="w-full h-full object-cover" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                                 {s.name}
                                             </p>
-                                            <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
+                                            <p className="text-xs text-brand-inactive-text mt-0.5">
                                                 {s.sku || s.gtin || "Sem SKU"}
                                             </p>
                                         </div>
@@ -275,7 +275,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 ) : (
                     loadingStagnant ? (
                         <div className="flex items-center justify-center py-16">
-                            <Spinner size={28} />
+                            <ThreeDotsLoader />
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -329,7 +329,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                                 onClick={() => openDiscountSheet(p)}
                                             >
                                                 <div className="flex items-start gap-3">
-                                                    <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
                                                         <img src={getPrimaryProductDisplayImage(p)} alt={p.name} className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
@@ -338,7 +338,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                                                 {p.name}
                                                             </p>
                                                         </div>
-                                                        <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
+                                                        <p className="text-xs text-brand-inactive-text mt-0.5">
                                                             {p.sku || p.gtin || "Sem SKU"} • {p.stock_quantity} em estoque
                                                         </p>
                                                     </div>
@@ -417,12 +417,6 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 {/* Header */}
                 <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setIsDiscountSheetOpen(false)}
-                            className="p-1.5 hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
-                        >
-                            <ArrowLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
                         <div>
                             <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                                 Preço Promocional
@@ -439,7 +433,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-6">
                     {/* Resumo do Produto */}
                     <div className="bg-brand-gray/40 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-white dark:bg-dark-surface shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                        <div className="w-14 h-14 rounded-full bg-white dark:bg-dark-surface shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
                             <img src={getPrimaryProductDisplayImage(selectedStagnant)} alt={selectedStagnant.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -475,7 +469,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
 
                     {/* Atalhos Rápidos de Desconto */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-brand-inactive-text mb-2.5">
+                        <label className="block text-sm font-medium text-brand-inactive-text mb-2.5">
                             Sugestões de Desconto Rápido
                         </label>
                         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -487,7 +481,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                         key={pct}
                                         type="button"
                                         onClick={() => setPromoPriceInput(calculatedPrice)}
-                                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${isSelected
+                                        className={`py-2 px-2 rounded-full text-xs font-bold border transition-all ${isSelected
                                             ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
                                             : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-primary/50"
                                             }`}

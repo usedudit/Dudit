@@ -9,6 +9,7 @@ import {
     createOrderShippingLabelAction,
     checkoutSuperFreteLabelAction,
     getOrderShipmentAction,
+    printSuperFreteLabelAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
 import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
@@ -26,6 +27,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     const [shipmentLoaded, setShipmentLoaded] = useState(false)
     const [creating, setCreating] = useState(false)
     const [paying, setPaying] = useState(false)
+    const [printing, setPrinting] = useState(false)
     const [docModalOpen, setDocModalOpen] = useState(false)
 
     const loadGate = useCallback(async () => {
@@ -108,6 +110,23 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
         }
     }
 
+    const handlePrint = async () => {
+        if (!shipment?.external_label_id) return
+        setPrinting(true)
+        try {
+            const res = await printSuperFreteLabelAction({ partnerId, labelId: shipment.external_label_id })
+            if (res.success) {
+                window.open(res.url, "_blank")
+            } else {
+                toast.error(res.error || "Erro ao gerar impressão.")
+            }
+        } catch {
+            toast.error("Erro ao gerar impressão.")
+        } finally {
+            setPrinting(false)
+        }
+    }
+
     if (!gateLoaded || !shipmentLoaded) return null
 
     let content: ReactNode = null
@@ -134,16 +153,25 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                 </Button>
             )
         }
-    } else if (shipment.tracking_url) {
+    } else {
         content = (
-            <Button
-                variant="link"
-                type="button"
-                className="shrink-0"
-                onClick={() => window.open(shipment.tracking_url || undefined, "_blank")}
-            >
-                Rastrear
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+                {shipment.external_label_id && (
+                    <Button variant="link" type="button" className="shrink-0" onClick={handlePrint} isLoading={printing}>
+                        Imprimir
+                    </Button>
+                )}
+                {shipment.tracking_url && (
+                    <Button
+                        variant="link"
+                        type="button"
+                        className="shrink-0"
+                        onClick={() => window.open(shipment.tracking_url || undefined, "_blank")}
+                    >
+                        Rastrear
+                    </Button>
+                )}
+            </div>
         )
     }
 

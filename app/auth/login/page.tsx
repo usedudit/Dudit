@@ -40,16 +40,7 @@ function RedirectToHome({ next }: { next: string }) {
   }, [next])
   return (
     <div className="min-h-screen flex items-center justify-center bg-brand-gray dark:bg-dark-background">
-      <div className="flex flex-col items-center gap-3 animate-pulse">
-        <img
-          src="https://img.dudit.com.br/static/Logo.png"
-          alt="Dudit"
-          width={110}
-          height={32}
-          className="h-8 w-auto"
-        />
-        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Redirecionando...</p>
-      </div>
+      <ThreeDotsLoader />
     </div>
   )
 }

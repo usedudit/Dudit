@@ -1476,7 +1476,7 @@ export async function getOrderShippingQuoteAction(payload: { orderId: string }):
 
     const origin = await resolveOriginAddress(supabase, order, partner, ctx.partnerId)
     const destination = await resolveDestinationAddress(supabase, order)
-    const originPostalCode = (config.originCep || origin?.postal_code || "").replace(/\D/g, "")
+    const originPostalCode = (origin?.postal_code || config.originCep || "").replace(/\D/g, "")
     const destinationPostalCode = destination?.postal_code || ""
 
     if (!originPostalCode) {
@@ -1918,7 +1918,7 @@ async function prepareReturnShipmentQuote(
   if (!client) return { error: "SuperFrete não conectado." }
 
   const fromPostalCode = buyerAddress.postal_code
-  const toPostalCode = (config.originCep || storeAddress.postal_code).replace(/\D/g, "")
+  const toPostalCode = (storeAddress.postal_code || config.originCep).replace(/\D/g, "")
 
   const services: SuperFreteServiceId[] =
     Array.isArray(config.services) && config.services.length > 0

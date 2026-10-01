@@ -42,6 +42,16 @@ import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./context
 import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 import { trackEvent } from "@/lib/analytics"
 
+type CategoryGroup = "tudo" | "produtos" | "servicos" | "desapegos" | "lojas"
+
+const CATEGORY_GROUP_OPTIONS: { value: CategoryGroup; label: string }[] = [
+    { value: "tudo", label: "Tudo" },
+    { value: "produtos", label: "Produtos" },
+    { value: "servicos", label: "Serviços" },
+    { value: "desapegos", label: "Desapegos" },
+    { value: "lojas", label: "Lojas" },
+]
+
 interface ExplorarPageClientProps {
     initialResults?: any[]
     initialMoreDistantSellers?: any[]
@@ -767,6 +777,14 @@ export function ExplorarPageClient({
         if (currentType === "vitrines" || currentType === "negocios") return dbPartnerCategories
         return productCategories
     }, [currentType, dbServiceCategories, dbPartnerCategories, productCategories])
+
+    const activeCategoryGroup = useMemo<CategoryGroup | null>(() => {
+        if (currentType === "servicos") return "servicos"
+        if (currentType === "vitrines" || currentType === "negocios") return "lojas"
+        if (currentType === "produtos") return selectedCondition === "usado" ? "desapegos" : "produtos"
+        if (currentType === "tudo") return "tudo"
+        return null
+    }, [currentType, selectedCondition])
 
     const isStandardCategory = useCallback((catName: string) => {
         return filterCategoriesList.some(cat => matchCategory(catName, cat.name))
@@ -1742,6 +1760,20 @@ export function ExplorarPageClient({
         updateUrl(selectedCitySlug, [catName], query, currentType)
     }
 
+    const selectCategoryGroup = (group: CategoryGroup) => {
+        if (group === activeCategoryGroup) return
+        triggerFilterLoading()
+        const nextType = group === "servicos" ? "servicos"
+            : group === "lojas" ? "vitrines"
+                : group === "tudo" ? "tudo"
+                    : "produtos"
+        setSelectedCategories([])
+        setSelectedSection(null)
+        setCurrentType(nextType)
+        setSelectedCondition(group === "desapegos" ? "usado" : "")
+        updateUrl(selectedCitySlug, [], query, nextType, undefined, null)
+    }
+
     return (
         <>
             {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
@@ -1768,27 +1800,47 @@ export function ExplorarPageClient({
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
-                    {!query && activeCategoriesList.length > 0 && !isLandingPage && !isCategoryMode && (
+                    {!query && (productCategories.length > 0 || dbServiceCategories.length > 0 || dbPartnerCategories.length > 0) && !isLandingPage && !isCategoryMode && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
-                            <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                {activeCategoriesList.map((cat) => (
-                                    <button
-                                        key={cat.name}
-                                        onClick={() => goToCategory(cat.name)}
-                                        className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
-                                    >
-                                        <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
-                                            {cat.icon_url ? (
-                                                <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
-                                            ) : (
-                                                <span className="text-2xl">📦</span>
-                                            )}
-                                        </div>
-                                        <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
-                                    </button>
-                                ))}
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-3">Categorias</h2>
+                            {/* GRUPOS: cada grupo mostra as categorias do seu tipo */}
+                            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 mb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                {CATEGORY_GROUP_OPTIONS.map((group) => {
+                                    const isActive = activeCategoryGroup === group.value
+                                    return (
+                                        <button
+                                            key={group.value}
+                                            onClick={() => selectCategoryGroup(group.value)}
+                                            className={`shrink-0 px-4 py-1.5 rounded-full border text-xs sm:text-sm font-bold transition-colors ${isActive
+                                                ? "border-brand-green bg-[#ecfdf5] text-brand-green dark:bg-brand-dark/10"
+                                                : "border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-green hover:bg-green-50 dark:hover:bg-dark-border/30"
+                                                }`}
+                                        >
+                                            {group.label}
+                                        </button>
+                                    )
+                                })}
                             </div>
+                            {activeCategoriesList.length > 0 && (
+                                <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                    {activeCategoriesList.map((cat) => (
+                                        <button
+                                            key={cat.name}
+                                            onClick={() => goToCategory(cat.name)}
+                                            className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                                        >
+                                            <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                                {cat.icon_url ? (
+                                                    <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
+                                                ) : (
+                                                    <span className="text-2xl">📦</span>
+                                                )}
+                                            </div>
+                                            <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1975,13 +2027,13 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* Carrossel de Lojas Distantes na Busca */}
-                                    {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
+                                            {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
                                         <div className="mb-6">
                                             <HorizontalCarousel
                                                 title="Lojas um pouco mais distantes do seu raio de busca"
                                                 items={moreDistantSellers}
                                                 renderItem={(vitrine) => (
-                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={false} locationContext={locationContext} className="w-full" />
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full" />
                                                 )}
                                                 onSeeAll={() => {
                                                     const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
@@ -2069,6 +2121,7 @@ export function ExplorarPageClient({
                                                         product={item}
                                                         userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
                                                         locationContext={locationContext}
+                                                        preferCityLabel
                                                         className="w-full"
                                                     />
                                                 )}

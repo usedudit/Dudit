@@ -4886,10 +4886,12 @@ export async function getERPOrdersPageAction(
                 }
             }
             const orderItems = Array.isArray(row?.order_items) ? row.order_items : []
-            const totalRemainingToRestore = orderItems.reduce((sum: number, item: any) => {
-                const returnedQty = returnedToInventoryQtyMap.get(item.id) || 0
-                return sum + Math.max(0, Number(item.quantity || 0) - returnedQty)
-            }, 0)
+            const totalRemainingToRestore = orderItems
+                .filter((item: any) => item.product_id)
+                .reduce((sum: number, item: any) => {
+                    const returnedQty = returnedToInventoryQtyMap.get(item.id) || 0
+                    return sum + Math.max(0, Number(item.quantity || 0) - returnedQty)
+                }, 0)
             const has_items_to_restore = totalRemainingToRestore > 0
 
             return {
