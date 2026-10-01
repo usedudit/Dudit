@@ -500,8 +500,10 @@ export const SUPERFRETE_LABEL_STATUS: Record<string, string> = {
   pending: "Aguardando pagamento",
   released: "Aguardando postagem",
   posted: "Postado",
+  in_transit: "Em trânsito",
   delivered: "Entregue",
   cancelled: "Cancelado",
+  failed: "Falhou",
 }
 
 export const SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS: Record<string, string> = {

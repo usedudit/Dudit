@@ -2031,37 +2031,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         </div>
                                     </FormSection>
 
-                                    {/* Rastreio do envio (transportadora) */}
-                                    {trackedShipment?.tracking_number && (
-                                        <FormSection title="Rastreio">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-3.5 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
-                                                        <TruckIcon size={20} />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                            {trackedShipment.tracking_number}
-                                                        </div>
-                                                        <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                            Código de rastreamento do envio
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {trackedShipment.tracking_url && (
-                                                    <a
-                                                        href={trackedShipment.tracking_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="shrink-0 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                                    >
-                                                        Rastrear
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </FormSection>
-                                    )}
-
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (
                                         <FormSection title="Entregador">
@@ -2381,54 +2350,74 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                     <div className="lg:col-span-8 space-y-6">
-                                    {/* Status da Entrega (Timeline) */}
-                                    <DeliveryStatusTimeline
-                                        deliveryStatus={order.delivery_status || ""}
-                                        isPickup={order.delivery_type === "pickup"}
-                                        isPaid={["paid", "partially_paid"].includes(order.situation)}
-                                        orderCreatedAt={order.created_at}
-                                        orderUpdatedAt={order.updated_at}
-                                        carrier={carrierInfo}
-                                    />
+                                        {/* Status da Entrega (Timeline) */}
+                                        <DeliveryStatusTimeline
+                                            deliveryStatus={order.delivery_status || ""}
+                                            isPickup={order.delivery_type === "pickup"}
+                                            isPaid={["paid", "partially_paid"].includes(order.situation)}
+                                            orderCreatedAt={order.created_at}
+                                            orderUpdatedAt={order.updated_at}
+                                            carrier={carrierInfo}
+                                        />
 
-                                    {/* Rastreio do envio (transportadora) */}
-                                    {trackedShipment?.tracking_number && (
-                                        <FormSection title="Rastreio">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-3.5 min-w-0">
-                                                    <div className="w-12 h-12 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
-                                                        <TruckIcon size={22} />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                            {trackedShipment.tracking_number}
-                                                        </div>
-                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                            Código de rastreamento do envio
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {trackedShipment.tracking_url && (
-                                                    <a
-                                                        href={trackedShipment.tracking_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="shrink-0 p-2.5 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                                    >
-                                                        Rastrear
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </FormSection>
-                                    )}
+                                        {/* Entregador */}
+                                        {order.delivery_type === "delivery" && (
+                                            (() => {
+                                                const marketplaceDriverInfo: DeliveryDriverInfo = order.delivery_driver
+                                                    ? order.delivery_driver.isPlatformDriver
+                                                        ? {
+                                                            type: "platform",
+                                                            name: order.delivery_driver.name,
+                                                            avatarUrl: order.delivery_driver.avatarUrl,
+                                                            isPlatformDriver: true,
+                                                            totalDeliveries: order.delivery_driver.totalDeliveries,
+                                                            vehicleType: order.delivery_driver.vehicleType,
+                                                            driverStatus: order.delivery_driver.status,
+                                                            phone: order.delivery_driver.phone,
+                                                            platformDriverData: {
+                                                                id: order.delivery_driver.id || order.delivery_driver.userId || order.delivery_driver.driverId,
+                                                                fullName: order.delivery_driver.name,
+                                                                phone: order.delivery_driver.phone,
+                                                                avatarUrl: order.delivery_driver.avatarUrl,
+                                                                vehicleType: order.delivery_driver.vehicleType,
+                                                                totalDeliveries: order.delivery_driver.totalDeliveries,
+                                                                status: order.delivery_driver.status,
+                                                                isPlatformDriver: true,
+                                                                isPendingAcceptance: order.delivery_driver.isPendingAcceptance,
+                                                                acceptedAt: order.delivery_driver.accepted_at,
+                                                                pickedUpAt: order.delivery_driver.picked_up_at,
+                                                            },
+                                                        }
+                                                        : {
+                                                            type: "store",
+                                                            name: order.delivery_driver.name,
+                                                            avatarUrl: null,
+                                                            isPlatformDriver: false,
+                                                        }
+                                                    : { type: "none", name: "Entrega própria", isPlatformDriver: false }
 
-                                    {/* Entregador */}
-                                    {order.delivery_type === "delivery" && (
-                                        (() => {
-                                            const marketplaceDriverInfo: DeliveryDriverInfo = order.delivery_driver
-                                                ? order.delivery_driver.isPlatformDriver
-                                                    ? {
-                                                        type: "platform",
+                                                return (
+                                                    <DeliveryDriverSection
+                                                        driverInfo={marketplaceDriverInfo}
+                                                        deliveryStatus={order.delivery_status || ""}
+                                                        formatCurrency={formatCurrency}
+                                                        carrier={carrierInfo}
+                                                    />
+                                                )
+                                            })()
+                                        )}
+                                    </div>
+                                    <div className="lg:col-span-4 pl-0 lg:pl-12 border-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
+
+                                        <DeliverySummarySection
+                                            order={order}
+                                            driverInfo={(() => {
+                                                if (!order.delivery_driver) {
+                                                    return { type: "none" as const, name: "Entrega própria", isPlatformDriver: false }
+                                                }
+                                                if (order.delivery_driver.isPlatformDriver) {
+                                                    return {
+                                                        type: "platform" as const,
                                                         name: order.delivery_driver.name,
                                                         avatarUrl: order.delivery_driver.avatarUrl,
                                                         isPlatformDriver: true,
@@ -2436,71 +2425,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         vehicleType: order.delivery_driver.vehicleType,
                                                         driverStatus: order.delivery_driver.status,
                                                         phone: order.delivery_driver.phone,
-                                                        platformDriverData: {
-                                                            id: order.delivery_driver.id || order.delivery_driver.userId || order.delivery_driver.driverId,
-                                                            fullName: order.delivery_driver.name,
-                                                            phone: order.delivery_driver.phone,
-                                                            avatarUrl: order.delivery_driver.avatarUrl,
-                                                            vehicleType: order.delivery_driver.vehicleType,
-                                                            totalDeliveries: order.delivery_driver.totalDeliveries,
-                                                            status: order.delivery_driver.status,
-                                                            isPlatformDriver: true,
-                                                            isPendingAcceptance: order.delivery_driver.isPendingAcceptance,
-                                                            acceptedAt: order.delivery_driver.accepted_at,
-                                                            pickedUpAt: order.delivery_driver.picked_up_at,
-                                                        },
                                                     }
-                                                    : {
-                                                        type: "store",
-                                                        name: order.delivery_driver.name,
-                                                        avatarUrl: null,
-                                                        isPlatformDriver: false,
-                                                    }
-                                                : { type: "none", name: "Entrega própria", isPlatformDriver: false }
-
-                                            return (
-                                                <DeliveryDriverSection
-                                                    driverInfo={marketplaceDriverInfo}
-                                                    deliveryStatus={order.delivery_status || ""}
-                                                    formatCurrency={formatCurrency}
-                                                    carrier={carrierInfo}
-                                                />
-                                            )
-                                        })()
-                                    )}
-                                    </div>
-                                    <div className="lg:col-span-4 pl-0 lg:pl-12 border-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
-
-                                    <DeliverySummarySection
-                                        order={order}
-                                        driverInfo={(() => {
-                                            if (!order.delivery_driver) {
-                                                return { type: "none" as const, name: "Entrega própria", isPlatformDriver: false }
-                                            }
-                                            if (order.delivery_driver.isPlatformDriver) {
-                                                return {
-                                                    type: "platform" as const,
-                                                    name: order.delivery_driver.name,
-                                                    avatarUrl: order.delivery_driver.avatarUrl,
-                                                    isPlatformDriver: true,
-                                                    totalDeliveries: order.delivery_driver.totalDeliveries,
-                                                    vehicleType: order.delivery_driver.vehicleType,
-                                                    driverStatus: order.delivery_driver.status,
-                                                    phone: order.delivery_driver.phone,
                                                 }
-                                            }
-                                            return {
-                                                type: "store" as const,
-                                                name: order.delivery_driver.name,
-                                                avatarUrl: null,
-                                                isPlatformDriver: false,
-                                            }
-                                        })()}
-                                        formatCurrency={formatCurrency}
-                                        formatPartnerAddress={formatPartnerAddress}
-                                        carrier={carrierInfo}
-                                        variant="card"
-                                    />
+                                                return {
+                                                    type: "store" as const,
+                                                    name: order.delivery_driver.name,
+                                                    avatarUrl: null,
+                                                    isPlatformDriver: false,
+                                                }
+                                            })()}
+                                            formatCurrency={formatCurrency}
+                                            formatPartnerAddress={formatPartnerAddress}
+                                            carrier={carrierInfo}
+                                            variant="card"
+                                        />
                                     </div>
                                 </div>
                             </TabsContent>

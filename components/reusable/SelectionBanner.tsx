@@ -73,7 +73,7 @@ export const SelectionBanner: React.FC<SelectionBannerProps> = ({
             <button
               type="button"
               onClick={onClearSelection}
-              className="px-3 py-1.5 rounded-full bg-white text-brand-dark dark:text-dark-heading text-xs font-bold hover:bg-gray-100 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-full bg-white text-brand-dark dark:bg-white/20 dark:text-white text-xs font-bold hover:bg-white/30 transition-colors cursor-pointer"
             >
               Limpar
             </button>

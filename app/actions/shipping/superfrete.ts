@@ -11,7 +11,9 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
-import { revalidateOrders, safeRevalidateTag } from "@/lib/utils/revalidation"
+import { revalidateOrders, revalidateTransactions, safeRevalidateTag } from "@/lib/utils/revalidation"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import type { ReturnShippingPayer } from "@/lib/returns/policy"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
   createSuperFreteClient,
@@ -636,7 +638,7 @@ export async function checkoutSuperFreteLabelAction(payload: {
       payload.labelId,
     )
     if (result.success) {
-      await maybeAdvanceReturnRequestAfterPayment(supabase, payload.partnerId, payload.labelId)
+      await syncReturnRequestAfterPayment(supabase, payload.partnerId, payload.labelId)
     }
     return result
   } catch (err: any) {
@@ -670,31 +672,40 @@ async function performLabelCheckout(
   client: SuperFreteClient,
   partnerId: string,
   labelId: string,
+  balancePromise?: Promise<{ userInfo?: any; error?: unknown }>,
 ): Promise<PerformCheckoutResult> {
   try {
     // Credit check: the seller pays from their own SuperFrete wallet.
-    // Preço vem do banco (order_shipments.price) — evita 1 roundtrip
-    // extra com getOrderInfo; saldo continua vindo da API em paralelo.
+    // Preço vem do banco (order_shipments.price); saldo pode ter sido
+    // buscado antes (em paralelo com a criação da etiqueta).
     let sandboxSkipReason: string | null = null
     try {
-      const [{ data: shipmentRow }, userInfo] = await Promise.all([
+      const [{ data: shipmentRow }, balanceRes] = await Promise.all([
         supabase
           .from("order_shipments")
           .select("price")
           .eq("partner_id", partnerId)
           .eq("external_label_id", labelId)
           .maybeSingle(),
-        client.getUserInfo(),
+        balancePromise ??
+          client.getUserInfo().then(
+            (userInfo: any) => ({ userInfo, error: null as unknown }),
+            (error: unknown) => ({ userInfo: undefined, error }),
+          ),
       ])
-      const price = Number(shipmentRow?.price ?? 0)
-      const balance = Number(userInfo?.balance ?? 0)
-      if (price > 0 && balance < price) {
-        if (isSuperFreteSandboxIntegration(integration)) {
-          sandboxSkipReason = `saldo insuficiente: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}`
-        } else {
-          return {
-            success: false,
-            error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+      if (balanceRes.error) {
+        console.warn("[SuperFrete] Balance pre-check failed (continuing):", balanceRes.error)
+      } else {
+        const price = Number(shipmentRow?.price ?? 0)
+        const balance = Number(balanceRes.userInfo?.balance ?? 0)
+        if (price > 0 && balance < price) {
+          if (isSuperFreteSandboxIntegration(integration)) {
+            sandboxSkipReason = `saldo insuficiente: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}`
+          } else {
+            return {
+              success: false,
+              error: `Saldo insuficiente na carteira SuperFrete: disponível R$ ${balance.toFixed(2)}, necessário R$ ${price.toFixed(2)}. Recarregue em https://sandbox.superfrete.com/#/account/credits`,
+            }
           }
         }
       }
@@ -792,9 +803,15 @@ async function performLabelCheckout(
   }
 }
 
-// Remessa reversa paga: APPROVED → WAITING_ITEM_RETURN (transição válida
-// no fluxo de devoluções; o webhook posteriormente leva a PROCESSING).
-async function maybeAdvanceReturnRequestAfterPayment(
+// Chamada após pagamento bem-sucedido de uma etiqueta (ida ou devolução).
+// Para remessa reversa (kind=return):
+//   1) APPROVED -> WAITING_ITEM_RETURN (transição válida; o webhook depois
+//      leva a PROCESSING quando o item chega);
+//   2) frete reverso: vendedor -> cria despesa com vencimento de 30 dias;
+//      cliente -> desconta o frete do reembolso (refund_amount);
+//      case_by_case/NULL -> nenhum lançamento.
+// Idempotente: despesa checada por reference_note, desconto por payload.
+async function syncReturnRequestAfterPayment(
   supabase: ReturnType<typeof getAdminClient>,
   partnerId: string,
   labelId: string,
@@ -802,7 +819,7 @@ async function maybeAdvanceReturnRequestAfterPayment(
   try {
     const { data: shipmentRow } = await supabase
       .from("order_shipments")
-      .select("kind, return_request_id")
+      .select("id, kind, return_request_id, price, order_id, external_label_id, payload")
       .eq("partner_id", partnerId)
       .eq("external_label_id", labelId)
       .maybeSingle()
@@ -810,18 +827,128 @@ async function maybeAdvanceReturnRequestAfterPayment(
 
     const { data: returnRequest } = await supabase
       .from("return_requests")
-      .select("id, status")
+      .select("id, status, refund_amount, return_freight_payer")
       .eq("id", shipmentRow.return_request_id)
       .is("deleted_at", null)
       .maybeSingle()
-    if (returnRequest?.status !== "APPROVED") return
+    if (!returnRequest) return
 
-    await supabase
-      .from("return_requests")
-      .update({ status: "WAITING_ITEM_RETURN", updated_at: new Date().toISOString() })
-      .eq("id", returnRequest.id)
+    if (returnRequest.status === "APPROVED") {
+      await supabase
+        .from("return_requests")
+        .update({ status: "WAITING_ITEM_RETURN", updated_at: new Date().toISOString() })
+        .eq("id", returnRequest.id)
+      await logAuditEvent({
+        partnerId,
+        actorUserId: null,
+        entityType: "return_request",
+        entityId: returnRequest.id,
+        actionType: "return_status_updated",
+        changeLines: ["Etiqueta de devolução paga — aguardando o envio do item pelo cliente."],
+        source: "system",
+        metadata: { from_status: "APPROVED", to_status: "WAITING_ITEM_RETURN", shipment_id: shipmentRow.id },
+      })
+    }
+
+    const payer = (returnRequest.return_freight_payer || "case_by_case") as ReturnShippingPayer
+    const price = Math.round(Number(shipmentRow.price || 0) * 100) / 100
+    if (price <= 0 || payer === "case_by_case") return
+
+    if (payer === "seller") {
+      const refNote = `return_freight:${shipmentRow.id}`
+      const { data: existingExpense } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .eq("reference_note", refNote)
+        .limit(1)
+        .maybeSingle()
+      if (existingExpense) return
+
+      const { data: orderRow } = await supabase
+        .from("orders")
+        .select("order_number, store_id")
+        .eq("id", shipmentRow.order_id)
+        .maybeSingle()
+      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const { error: insertErr } = await supabase.from("transactions").insert({
+        partner_id: partnerId,
+        store_id: orderRow?.store_id || null,
+        description: `Frete de devolução — Pedido ${orderRow?.order_number || shipmentRow.order_id}`.trim(),
+        category: "Trocas e Devoluções",
+        transaction_type: "expense",
+        amount: price,
+        original_amount: price,
+        due_date: dueDate,
+        status: "pending",
+        notes: `Etiqueta de devolução SuperFrete ${shipmentRow.external_label_id}. Vencimento: 30 dias após o pagamento do frete.`,
+        origin: "system",
+        reference_note: refNote,
+      })
+      if (insertErr) {
+        console.warn("[SuperFrete] Falha ao criar despesa do frete reverso:", insertErr)
+        return
+      }
+      await revalidateTransactions(partnerId)
+      await logAuditEvent({
+        partnerId,
+        actorUserId: null,
+        entityType: "return_request",
+        entityId: returnRequest.id,
+        actionType: "return_freight_expense_created",
+        changeLines: [
+          `Despesa de frete da devolução criada: R$ ${price.toFixed(2)} (vencimento ${dueDate.split("-").reverse().join("/")}).`,
+        ],
+        source: "system",
+        metadata: { shipment_id: shipmentRow.id, freight_price: price, due_date: dueDate, payer: "seller" },
+      })
+      return
+    }
+
+    if (payer === "customer") {
+      const shipmentPayload = (shipmentRow.payload as Record<string, unknown> | null) || {}
+      if (shipmentPayload.freight_discount_applied) return
+      const refundAmount = Math.round(Number(returnRequest.refund_amount || 0) * 100) / 100
+      const settledStatuses = ["RESOLVED", "REJECTED", "EXPIRED"]
+      if (refundAmount <= 0 || settledStatuses.includes(returnRequest.status)) return
+
+      const discount = Math.min(price, refundAmount)
+      const newRefund = Math.round((refundAmount - discount) * 100) / 100
+      const { error: updErr } = await supabase
+        .from("return_requests")
+        .update({ refund_amount: newRefund, updated_at: new Date().toISOString() })
+        .eq("id", returnRequest.id)
+      if (updErr) {
+        console.warn("[SuperFrete] Falha ao descontar frete do reembolso:", updErr)
+        return
+      }
+      await supabase
+        .from("order_shipments")
+        .update({
+          payload: { ...shipmentPayload, freight_discount_applied: true, freight_discount_amount: discount },
+        })
+        .eq("id", shipmentRow.id)
+      await logAuditEvent({
+        partnerId,
+        actorUserId: null,
+        entityType: "return_request",
+        entityId: returnRequest.id,
+        actionType: "return_freight_discounted",
+        changeLines: [
+          `Desconto do frete da devolução no reembolso: R$ ${discount.toFixed(2)} (comprador paga o frete). Novo valor de reembolso: R$ ${newRefund.toFixed(2)}.`,
+        ],
+        source: "system",
+        metadata: {
+          shipment_id: shipmentRow.id,
+          freight_price: discount,
+          refund_before: refundAmount,
+          refund_after: newRefund,
+          payer: "customer",
+        },
+      })
+    }
   } catch (err) {
-    console.warn("[SuperFrete] Falha ao avançar return_request:", err)
+    console.warn("[SuperFrete] Falha ao sincronizar return_request após pagamento:", err)
   }
 }
 
@@ -1676,25 +1803,29 @@ export async function getReturnShippingStateAction(payload: {
 
   try {
     const supabase = getAdminClient()
-    const { data: returnRequest } = await supabase
-      .from("return_requests")
-      .select("id, status")
-      .eq("id", payload.returnRequestId)
-      .eq("partner_id", ctx.partnerId)
-      .is("deleted_at", null)
-      .maybeSingle()
+    const [returnRes, shipmentRes] = await Promise.all([
+      supabase
+        .from("return_requests")
+        .select("id, status")
+        .eq("id", payload.returnRequestId)
+        .eq("partner_id", ctx.partnerId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabase
+        .from("order_shipments")
+        .select(
+          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+        )
+        .eq("return_request_id", payload.returnRequestId)
+        .eq("partner_id", ctx.partnerId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    const returnRequest = returnRes.data
     if (!returnRequest) return { success: false, error: "Solicitação de devolução não encontrada." }
 
-    const { data } = await supabase
-      .from("order_shipments")
-      .select(
-        "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
-      )
-      .eq("return_request_id", payload.returnRequestId)
-      .eq("partner_id", ctx.partnerId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const data = shipmentRes.data
 
     let canGenerate = true
     let reason: string | null = null
@@ -1703,16 +1834,16 @@ export async function getReturnShippingStateAction(payload: {
       canGenerate = false
       reason = "Solicitação de devolução encerrada: não é possível gerar etiqueta."
     } else {
-      const plan = await getPartnerPlan(ctx.partnerId)
+      const [plan, integration] = await Promise.all([
+        getPartnerPlan(ctx.partnerId),
+        getSuperFreteIntegration(supabase, ctx.partnerId),
+      ])
       if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
         canGenerate = false
         reason = "Entrega nacional exige o plano Escalar."
-      } else {
-        const integration = await getSuperFreteIntegration(supabase, ctx.partnerId)
-        if (!integration || integration.status !== "connected" || !integration.access_token_encrypted) {
-          canGenerate = false
-          reason = "SuperFrete não conectado."
-        }
+      } else if (!integration || integration.status !== "connected" || !integration.access_token_encrypted) {
+        canGenerate = false
+        reason = "SuperFrete não conectado."
       }
     }
 
@@ -1732,9 +1863,172 @@ export async function getReturnShippingStateAction(payload: {
   }
 }
 
+// Prepara a cotação de frete reverso (comprador -> loja): contexto do pedido,
+// endereços, cliente SuperFrete e cotações válidas. Usado pela geração da
+// etiqueta e pela action de cotação (seletor de transportadora na UI).
+type ReturnQuotePrepared =
+  | { error: string }
+  | {
+      data: {
+        context: {
+          integration: any
+          partner: any
+          order: any
+          config: any
+          supabase: ReturnType<typeof getAdminClient>
+        }
+        buyerAddress: ResolvedShippingAddress
+        storeAddress: ResolvedShippingAddress
+        client: SuperFreteClient
+        validQuotes: any[]
+        fromPostalCode: string
+        toPostalCode: string
+      }
+    }
+
+async function prepareReturnShipmentQuote(
+  partnerId: string,
+  returnRequest: { id: string; order_id: string },
+  opts?: { skipFreightQuote?: boolean },
+): Promise<ReturnQuotePrepared> {
+  const context = await loadShippingOrderContext(returnRequest.order_id, partnerId)
+  if ("error" in context && context.error) return { error: (context as any).error }
+  const { integration, partner, order, config, supabase } = context as any
+
+  // Reverse route: buyer (from) -> store (to) — resolvidos em paralelo.
+  const [buyerAddress, storeAddress] = await Promise.all([
+    resolveDestinationAddress(supabase, order),
+    resolveOriginAddress(supabase, order, partner, partnerId),
+  ])
+
+  if (!buyerAddress || !buyerAddress.postal_code) {
+    return { error: "O pedido não tem endereço do comprador com CEP. Não é possível gerar a etiqueta de devolução." }
+  }
+  if (!buyerAddress.district) {
+    return { error: "O endereço do comprador está incompleto (bairro, cidade, estado e CEP são obrigatórios)." }
+  }
+  if (!storeAddress || !storeAddress.postal_code || !storeAddress.district || !storeAddress.city || !storeAddress.state_abbr) {
+    return { error: "Cadastre o endereço completo da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
+  }
+  if (!storeAddress.document) {
+    return { error: "Cadastre o CNPJ ou CPF da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
+  }
+
+  const client = createClientFromIntegration(integration)
+  if (!client) return { error: "SuperFrete não conectado." }
+
+  const fromPostalCode = buyerAddress.postal_code
+  const toPostalCode = (config.originCep || storeAddress.postal_code).replace(/\D/g, "")
+
+  const services: SuperFreteServiceId[] =
+    Array.isArray(config.services) && config.services.length > 0
+      ? (config.services as SuperFreteServiceId[])
+      : ([1, 2] as SuperFreteServiceId[])
+
+  // Modal já cotou ao abrir (getReturnShippingQuotesAction): quando o serviço
+  // vem escolhido, pula a cotação — 1 chamada de API a menos no clique.
+  if (opts?.skipFreightQuote) {
+    return {
+      data: {
+        context: { integration, partner, order, config, supabase },
+        buyerAddress,
+        storeAddress,
+        client,
+        validQuotes: [],
+        fromPostalCode,
+        toPostalCode,
+      },
+    }
+  }
+
+  const quotes = await client.calculateFreight({
+    fromPostalCode,
+    toPostalCode,
+    services,
+    package: buildVolumes(config),
+    options: {
+      own_hand: Boolean(config.ownHand),
+      receipt: Boolean(config.receipt),
+      insurance_value: Number(config.insuranceValue || 0),
+      use_insurance_value: Number(config.insuranceValue || 0) > 0,
+    },
+  })
+
+  const validQuotes = (Array.isArray(quotes) ? quotes : []).filter(
+    (q: any) => q && !q.has_error && Number.isFinite(Number(q.price)),
+  )
+  if (validQuotes.length === 0) {
+    return { error: "Nenhuma transportadora disponível para a devolução neste endereço." }
+  }
+
+  return {
+    data: {
+      context: { integration, partner, order, config, supabase },
+      buyerAddress,
+      storeAddress,
+      client,
+      validQuotes,
+      fromPostalCode,
+      toPostalCode,
+    },
+  }
+}
+
+// Cotações do frete reverso para o seletor de transportadora no modal de
+// etiqueta de devolução (mesma lógica de preço/serviços da geração).
+export async function getReturnShippingQuotesAction(payload: {
+  returnRequestId: string
+}): Promise<
+  | {
+      success: true
+      quotes: { id: number; label: string; price: number; deliveryDays: number | null }[]
+    }
+  | { success: false; error: string }
+> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "view", user)
+
+  try {
+    const [plan, loaded] = await Promise.all([
+      getPartnerPlan(ctx.partnerId),
+      loadReturnShippingRequest(payload.returnRequestId, ctx.partnerId),
+    ])
+    if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
+      return { success: false, error: "Entrega nacional exige o plano Escalar." }
+    }
+    if ("error" in loaded && loaded.error) return { success: false, error: loaded.error }
+    const { returnRequest } = loaded as { returnRequest: { id: string; order_id: string } }
+
+    const prepared = await prepareReturnShipmentQuote(ctx.partnerId, returnRequest)
+    if ("error" in prepared) return { success: false, error: prepared.error }
+
+    const quotes = prepared.data.validQuotes
+      .map((q: any) => ({
+        id: Number(q.id),
+        label: String(q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`),
+        price: Number(q.price),
+        deliveryDays: q.delivery_range?.min ?? q.delivery_time ?? null,
+      }))
+      .sort((a, b) => a.price - b.price)
+
+    return { success: true, quotes }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "quote_return_shipping",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao cotar o frete de devolução." }
+  }
+}
+
 export async function createReturnShippingLabelAction(payload: {
   returnRequestId: string
   service?: SuperFreteServiceId
+  freightPayer?: ReturnShippingPayer
 }): Promise<
   | {
       success: true
@@ -1758,73 +2052,36 @@ export async function createReturnShippingLabelAction(payload: {
   if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
   await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "edit", user)
 
-  const plan = await getPartnerPlan(ctx.partnerId)
-  if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
-    return { success: false, error: "Entrega nacional exige o plano Escalar." }
-  }
-
   try {
-    const loaded = await loadReturnShippingRequest(payload.returnRequestId, ctx.partnerId)
+    const [plan, loaded] = await Promise.all([
+      getPartnerPlan(ctx.partnerId),
+      loadReturnShippingRequest(payload.returnRequestId, ctx.partnerId),
+    ])
+    if (!hasMinimumPlan(plan?.slug || "free", "escalar")) {
+      return { success: false, error: "Entrega nacional exige o plano Escalar." }
+    }
     if ("error" in loaded && loaded.error) return { success: false, error: loaded.error }
     const { returnRequest } = loaded as { returnRequest: { id: string; order_id: string } }
 
-    const context = await loadShippingOrderContext(returnRequest.order_id, ctx.partnerId)
-    if ("error" in context && context.error) return { success: false, error: context.error }
-    const { integration, partner, order, config, supabase } = context as any
-
-    // Reverse route: buyer (from) -> store (to)
-    const buyerAddress = await resolveDestinationAddress(supabase, order)
-    const storeAddress = await resolveOriginAddress(supabase, order, partner, ctx.partnerId)
-
-    if (!buyerAddress || !buyerAddress.postal_code) {
-      return { success: false, error: "O pedido não tem endereço do comprador com CEP. Não é possível gerar a etiqueta de devolução." }
-    }
-    if (!buyerAddress.district) {
-      return { success: false, error: "O endereço do comprador está incompleto (bairro, cidade, estado e CEP são obrigatórios)." }
-    }
-    if (!storeAddress || !storeAddress.postal_code || !storeAddress.district || !storeAddress.city || !storeAddress.state_abbr) {
-      return { success: false, error: "Cadastre o endereço completo da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
-    }
-    if (!storeAddress.document) {
-      return { success: false, error: "Cadastre o CNPJ ou CPF da loja (Ficha da Empresa) para gerar etiquetas de devolução." }
-    }
-
-    const client = createClientFromIntegration(integration)
-    if (!client) return { success: false, error: "SuperFrete não conectado." }
-
-    const fromPostalCode = buyerAddress.postal_code
-    const toPostalCode = (config.originCep || storeAddress.postal_code).replace(/\D/g, "")
-
-    const services: SuperFreteServiceId[] =
-      Array.isArray(config.services) && config.services.length > 0
-        ? (config.services as SuperFreteServiceId[])
-        : ([1, 2] as SuperFreteServiceId[])
-
-    const quotes = await client.calculateFreight({
-      fromPostalCode,
-      toPostalCode,
-      services,
-      package: buildVolumes(config),
-      options: {
-        own_hand: Boolean(config.ownHand),
-        receipt: Boolean(config.receipt),
-        insurance_value: Number(config.insuranceValue || 0),
-        use_insurance_value: Number(config.insuranceValue || 0) > 0,
-      },
+    const prepared = await prepareReturnShipmentQuote(ctx.partnerId, returnRequest, {
+      skipFreightQuote: Boolean(payload.service),
     })
-
-    const validQuotes = (Array.isArray(quotes) ? quotes : []).filter(
-      (q: any) => q && !q.has_error && Number.isFinite(Number(q.price)),
-    )
-    if (validQuotes.length === 0) {
-      return { success: false, error: "Nenhuma transportadora disponível para a devolução neste endereço." }
-    }
+    if ("error" in prepared) return { success: false, error: prepared.error }
+    const { context, buyerAddress, storeAddress, client, validQuotes, fromPostalCode, toPostalCode } = prepared.data
+    const { integration, config, order, supabase } = context
 
     const chosen = payload.service
       ? validQuotes.find((q: any) => Number(q.id) === Number(payload.service))
       : undefined
-    const quote = chosen || validQuotes.reduce((a: any, b: any) => (Number(a.price) <= Number(b.price) ? a : b))
+    const quote =
+      chosen ||
+      (validQuotes.length > 0
+        ? validQuotes.reduce((a: any, b: any) => (Number(a.price) <= Number(b.price) ? a : b))
+        : { id: Number(payload.service || 0), price: 0 })
     const serviceId = Number(quote.id) as SuperFreteServiceId
+    if (!SUPERFRETE_SERVICE_IDS.includes(serviceId)) {
+      return { success: false, error: "Serviço de transporte inválido." }
+    }
 
     const senderName = resolveCompleteName(buyerAddress.nameCandidates ?? [buyerAddress.name], {
       role: "remetente",
@@ -1835,6 +2092,13 @@ export async function createReturnShippingLabelAction(payload: {
       prefixIfSingle: "Loja",
     })
     if (!recipientName.ok) return { success: false, error: recipientName.error }
+
+    // Saldo buscado antes de criar a etiqueta: roda em paralelo com
+    // createOrder em vez de esperar depois (1 espera a menos).
+    const balancePromise = client.getUserInfo().then(
+      (userInfo: any) => ({ userInfo, error: null as unknown }),
+      (error: unknown) => ({ userInfo: undefined, error }),
+    )
 
     const label = await client.createOrder({
       service: serviceId,
@@ -1853,32 +2117,46 @@ export async function createReturnShippingLabelAction(payload: {
 
     const labelServiceId = label.service_id || serviceId
 
-    await supabase.from("order_shipments").insert({
-      order_id: returnRequest.order_id,
-      partner_id: ctx.partnerId,
-      integration_id: integration.id,
-      provider_slug: SUPERFRETE_PROVIDER,
-      kind: "return",
-      return_request_id: returnRequest.id,
-      status: label.status || "pending",
-      service_code: String(labelServiceId),
-      service_name: SERVICE_LABELS[labelServiceId] || SERVICE_LABELS[serviceId],
-      carrier: "SuperFrete",
-      external_label_id: label.id,
-      price: typeof label.price === "number" ? label.price : null,
-      tracking_number: label.tracking || null,
-      label_url: label.print?.url || null,
-      requested_at: new Date().toISOString(),
-      payload: {
+    // Registra quem paga o frete da remessa reversa (escolhido na UI;
+    // usado por syncReturnRequestAfterPayment após o pagamento).
+    const freightPayer: ReturnShippingPayer | null =
+      payload.freightPayer === "seller" ||
+      payload.freightPayer === "customer" ||
+      payload.freightPayer === "case_by_case"
+        ? payload.freightPayer
+        : null
+    await Promise.all([
+      supabase.from("order_shipments").insert({
+        order_id: returnRequest.order_id,
+        partner_id: ctx.partnerId,
+        integration_id: integration.id,
+        provider_slug: SUPERFRETE_PROVIDER,
         kind: "return",
         return_request_id: returnRequest.id,
-        service: serviceId,
-        service_id: labelServiceId,
-        response_status: label.status,
-        from_postal_code: fromPostalCode,
-        to_postal_code: toPostalCode,
-      },
-    })
+        status: label.status || "pending",
+        service_code: String(labelServiceId),
+        service_name: SERVICE_LABELS[labelServiceId] || SERVICE_LABELS[serviceId],
+        carrier: "SuperFrete",
+        external_label_id: label.id,
+        price: typeof label.price === "number" ? label.price : null,
+        tracking_number: label.tracking || null,
+        label_url: label.print?.url || null,
+        requested_at: new Date().toISOString(),
+        payload: {
+          kind: "return",
+          return_request_id: returnRequest.id,
+          service: serviceId,
+          service_id: labelServiceId,
+          response_status: label.status,
+          from_postal_code: fromPostalCode,
+          to_postal_code: toPostalCode,
+        },
+      }),
+      supabase
+        .from("return_requests")
+        .update({ return_freight_payer: freightPayer, updated_at: new Date().toISOString() })
+        .eq("id", returnRequest.id),
+    ])
 
     // One-click: paga a etiqueta logo em seguida (igual ao fluxo de ida).
     let paid = false
@@ -1886,12 +2164,12 @@ export async function createReturnShippingLabelAction(payload: {
     let simulated: boolean | undefined
     let paidTracking: string | null | undefined
     try {
-      const payRes = await performLabelCheckout(supabase, integration, client, ctx.partnerId, label.id)
+      const payRes = await performLabelCheckout(supabase, integration, client, ctx.partnerId, label.id, balancePromise)
       if (payRes.success) {
         paid = true
         simulated = Boolean(payRes.result.simulated)
         paidTracking = payRes.result.tracking || null
-        await maybeAdvanceReturnRequestAfterPayment(supabase, ctx.partnerId, label.id)
+        await syncReturnRequestAfterPayment(supabase, ctx.partnerId, label.id)
       } else {
         paymentError = payRes.error
       }

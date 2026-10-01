@@ -30,7 +30,10 @@ import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
-import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction } from "@/app/actions/shipping/superfrete"
+import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
+import { getShippingPayerLabel, type ReturnShippingPayer } from "@/lib/returns/policy"
+import { getReturnShippingStateAction, createReturnShippingLabelAction, checkoutSuperFreteLabelAction, getReturnShippingQuotesAction } from "@/app/actions/shipping/superfrete"
+import { SUPERFRETE_LABEL_STATUS, type SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
@@ -216,6 +219,11 @@ export default function CreateReturnPage({
     const [returnShippingGate, setReturnShippingGate] = useState<{ canGenerate: boolean; reason: string | null }>({ canGenerate: false, reason: null })
     const [isReturnShippingOpen, setIsReturnShippingOpen] = useState(false)
     const [isPayingReturnLabel, setIsPayingReturnLabel] = useState(false)
+    const [returnQuotes, setReturnQuotes] = useState<{ id: number; label: string; price: number; deliveryDays: number | null }[]>([])
+    const [selectedReturnService, setSelectedReturnService] = useState<number | null>(null)
+    const [isLoadingQuotes, setIsLoadingQuotes] = useState(false)
+    const [returnQuoteError, setReturnQuoteError] = useState<string | null>(null)
+    const [returnFreightPayer, setReturnFreightPayer] = useState<ReturnShippingPayer>("seller")
     const [isGeneratingReturnLabel, setIsGeneratingReturnLabel] = useState(false)
     const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
@@ -502,15 +510,61 @@ export default function CreateReturnPage({
         return () => { active = false }
     }, [mode, returnRequest?.id])
 
-    const handleOpenReturnShipping = () => {
+    const handleOpenReturnShipping = async () => {
         setIsReturnShippingOpen(true)
+        if (returnShipping || !returnRequest?.id || returnShippingGate.reason) return
+        setIsLoadingQuotes(true)
+        setReturnQuoteError(null)
+        try {
+            const [policyRes, quotesRes] = await Promise.allSettled([
+                getPartnerReturnPolicyAction(partnerId),
+                getReturnShippingQuotesAction({ returnRequestId: returnRequest.id }),
+            ])
+
+            // Padrão de quem paga o frete = configuração de Trocas e Devoluções
+            // ("A combinar" vira "Vendedor", o caso mais comum).
+            if (policyRes.status === "fulfilled" && policyRes.value.success) {
+                const cfg = policyRes.value.data.policy.shippingPayer as ReturnShippingPayer
+                setReturnFreightPayer(cfg === "case_by_case" ? "seller" : cfg)
+            }
+
+            if (quotesRes.status === "fulfilled") {
+                const qr = quotesRes.value
+                if (qr.success) {
+                    const quotes = qr.quotes
+                    setReturnQuotes(quotes)
+                    const cheapest = quotes.length > 0
+                        ? quotes.reduce((a, b) => (a.price <= b.price ? a : b))
+                        : null
+                    setSelectedReturnService(cheapest ? cheapest.id : null)
+                } else {
+                    setReturnQuotes([])
+                    setSelectedReturnService(null)
+                    setReturnQuoteError(qr.error)
+                }
+            } else {
+                setReturnQuotes([])
+                setSelectedReturnService(null)
+                setReturnQuoteError("Erro ao cotar o frete de devolução.")
+            }
+        } catch (err: any) {
+            setReturnQuotes([])
+            setSelectedReturnService(null)
+            setReturnQuoteError(err?.message || "Erro ao cotar o frete de devolução.")
+        } finally {
+            setIsLoadingQuotes(false)
+        }
     }
 
     const handleGenerateReturnLabel = async () => {
         if (!returnRequest?.id || isGeneratingReturnLabel) return
         setIsGeneratingReturnLabel(true)
         try {
-            const res = await createReturnShippingLabelAction({ returnRequestId: returnRequest.id })
+            const res = await createReturnShippingLabelAction({
+                returnRequestId: returnRequest.id,
+                service: selectedReturnService != null ? (selectedReturnService as SuperFreteServiceId) : undefined,
+                freightPayer: returnFreightPayer,
+            })
             if (!res.success) throw new Error(res.error)
             const state = await getReturnShippingStateAction({ returnRequestId: returnRequest.id })
             if (state.success) {
@@ -2342,6 +2396,12 @@ export default function CreateReturnPage({
                                         <span className="font-medium text-brand-dark dark:text-dark-heading">{returnShipping.tracking_number || "-"}</span>
                                     )}
                                 </div>
+                                <div className="flex justify-between px-4 py-3">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                    <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                        {SUPERFRETE_LABEL_STATUS[returnShipping.status] || returnShipping.status}
+                                    </span>
+                                </div>
                             </div>
                             {returnShipping.status === "pending" && returnShipping.external_label_id && (
                                 <Button
@@ -2370,9 +2430,43 @@ export default function CreateReturnPage({
                             {returnShippingGate.reason && (
                                 <p className="text-xs text-red-500">{returnShippingGate.reason}</p>
                             )}
+                            {isLoadingQuotes && (
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Cotando fretes...</p>
+                            )}
+                            {!isLoadingQuotes && returnQuoteError && (
+                                <p className="text-xs text-red-500">{returnQuoteError}</p>
+                            )}
+                            {!isLoadingQuotes && !returnQuoteError && returnQuotes.length > 0 && (
+                                <FormDropdown
+                                    label="Transportadora e serviço"
+                                    value={String(selectedReturnService ?? "")}
+                                    setValue={(v) => setSelectedReturnService(Number(v))}
+                                    options={returnQuotes.map((q) => ({
+                                        value: String(q.id),
+                                        label: `${q.label} — ${formatCurrency(q.price)}${q.deliveryDays != null ? ` • ${q.deliveryDays} dia(s)` : ""}`,
+                                    }))}
+                                />
+                            )}
+                            {!isLoadingQuotes && (
+                                <FormDropdown
+                                    label="Quem paga o frete da devolução"
+                                    value={returnFreightPayer}
+                                    setValue={(v) => setReturnFreightPayer(v as ReturnShippingPayer)}
+                                    options={[
+                                        { value: "seller", label: getShippingPayerLabel("seller") },
+                                        { value: "customer", label: getShippingPayerLabel("customer") },
+                                        { value: "case_by_case", label: getShippingPayerLabel("case_by_case") },
+                                    ]}
+                                />
+                            )}
                             <Button
                                 onClick={handleGenerateReturnLabel}
-                                disabled={isGeneratingReturnLabel || !returnShippingGate.canGenerate}
+                                disabled={
+                                    isGeneratingReturnLabel ||
+                                    !returnShippingGate.canGenerate ||
+                                    isLoadingQuotes ||
+                                    Boolean(returnQuoteError)
+                                }
                                 leftIcon={<TruckIcon size={18} />}
                             >
                                 {isGeneratingReturnLabel ? "Gerando..." : "Gerar etiqueta"}
@@ -2492,6 +2586,7 @@ export default function CreateReturnPage({
                 maxWidth="md"
             >
                 <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
                     <button
                         onClick={() => {
                             setIsMpWarningModalOpen(false)
@@ -2502,21 +2597,21 @@ export default function CreateReturnPage({
                     >
                         <XIcon size={18} />
                     </button>
-
-                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden bg-[#e6f4ea]">
+                    {/* Header with Dual Squares */}
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
                             src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
-                            alt="Reembolso Automático"
-                            className="w-64 h-auto object-contain transform translate-y-4"
+                            alt="Pagamento"
+                            className="w-64 h-auto object-contain transform translate-y-7"
                         />
                     </div>
 
-                    <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
+                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">
                         Confirmar Registro de Devolução
                     </h4>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-6 text-center leading-relaxed">
+                    <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
                         Você está registrando a devolução com método <strong>Mercado Pago</strong>. O Dudit atualizará o financeiro e o estoque no sistema.
-                    </p>
+                    </div>
 
                     <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4 mb-6 space-y-2.5">
                         <div className="flex justify-between text-sm">
@@ -2529,7 +2624,7 @@ export default function CreateReturnPage({
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-brand-inactive-text dark:text-dark-body">Valor do Reembolso</span>
-                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                            <span className="font-extrabold text-brand-green">
                                 {formatCurrency(refundValue)}
                             </span>
                         </div>
@@ -2540,12 +2635,10 @@ export default function CreateReturnPage({
                             checked={mpWarningChecked}
                             onChange={(checked: boolean) => setMpWarningChecked(!!checked)}
                         />
-                        <div
-                            className="text-xs font-medium text-amber-900 dark:text-amber-200 leading-normal select-none cursor-pointer"
-                            onClick={() => setMpWarningChecked(!mpWarningChecked)}
-                        >
-                            Por segurança da sua loja, o estorno de dinheiro não é disparado automaticamente pela plataforma. Estou ciente de que devo realizar o estorno de <strong className="font-bold">{formatCurrency(refundValue)}</strong> diretamente no aplicativo ou painel do Mercado Pago / banco.
-                        </div>
+                        <InfoCard
+                            message={`Por segurança da sua loja, o estorno de dinheiro não é disparado automaticamente pela plataforma. Estou ciente de que devo realizar o estorno de ${formatCurrency(refundValue)} diretamente no aplicativo ou painel do Mercado Pago / banco.`}
+                            color="orange"
+                        />
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
