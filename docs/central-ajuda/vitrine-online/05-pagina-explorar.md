@@ -43,9 +43,10 @@ Quando você acessa `/explorar` sem nenhum parâmetro de busca, o sistema mostra
 
 | Seção | O que mostra |
 | :--- | :--- |
+| **Produtos, Serviços e Lojas** | Na navegação inicial (modo Tudo), aparecem 3 círculos: Produtos, Serviços e Lojas. Clicando em cada um, os círculos trocam e mostram as categorias daquele grupo (no mesmo lugar). |
 | **Categorias de Produtos** | Círculos das categorias principais de produtos (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, Outros). |
-| **Categorias de Serviços** | Círculos das categorias de serviços, em sua própria seção. |
-| **Lojas** | Círculos das categorias de lojas/vitrines, em sua própria seção. |
+| **Categorias de Serviços** | Círculos das categorias de serviços. |
+| **Categorias de Lojas** | Círculos das categorias de lojas/vitrines. |
 
 Clique em qualquer categoria para ver os produtos/serviços relacionados à sua cidade.
 

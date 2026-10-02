@@ -1000,7 +1000,10 @@ export async function checkoutCartAction(
     }
   }
 
-  const shouldQuoteDelivery = (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
+  // Carrinho só com serviços não cota frete (nem próprio nem transportadora):
+  // serviços não têm envio físico e a cotação gerava "raio" indevido.
+  const hasOnlyServiceLines = resolvedLines.every((l) => l.itemType === "service_booking")
+  const shouldQuoteDelivery = !hasOnlyServiceLines && (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
 
   // 1. Parallel independent reads block
   const [

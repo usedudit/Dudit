@@ -117,10 +117,10 @@ export function PixQrDisplayModal({
 
                 {onVerifyPayment && (
                     <Button
-                        variant="filled"
+                        variant="link"
                         onClick={onVerifyPayment}
                         isLoading={isVerifying}
-                        className="w-full h-12 flex"
+                        className="w-full h-12 flex mb-6"
                     >
                         Verificar pagamento
                     </Button>

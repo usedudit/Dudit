@@ -68,6 +68,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
     // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
     const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
+    const deliveryQuoteSeqRef = useRef<Record<string, number>>({})
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [showNewAddressForm, setShowNewAddressForm] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
@@ -673,10 +674,31 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
             const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
             const isServicesOnly = hasOnlyServices(data.items || [])
-            if (isServicesOnly || partnerItemsTotal <= 0) return
+            if (isServicesOnly || partnerItemsTotal <= 0) {
+                // Só serviços (ou nada selecionado): não cota frete próprio nem transportadora.
+                // Limpa estado antigo — senão um erro "raio" de quando havia produtos
+                // selecionados permaneceria e dispararia a cotação de transportadora.
+                deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
+                setDeliveryQuotes(prev => {
+                    if (!(storeKey in prev)) return prev
+                    const next = { ...prev }
+                    delete next[storeKey]
+                    return next
+                })
+                setCarrierQuotes(prev => {
+                    if (!(storeKey in prev)) return prev
+                    const next = { ...prev }
+                    delete next[storeKey]
+                    return next
+                })
+                return
+            }
 
             const targetPartnerId = data.partnerId || data.partner?.id || storeKey
             const targetStoreId = data.storeId || data.store?.id || null
+
+            deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
+            const quoteSeq = deliveryQuoteSeqRef.current[storeKey]
 
             setDeliveryQuotes(prev => ({
                 ...prev,
@@ -694,6 +716,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 destinationCoords,
                 orderSubtotal: partnerItemsTotal,
             }).then(quote => {
+                if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                 if (quote.success) {
                     setDeliveryQuotes(prev => ({
                         ...prev,
@@ -718,6 +741,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                     }))
                 }
             }).catch(() => {
+                if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                 setDeliveryQuotes(prev => ({
                     ...prev,
                     [storeKey]: {
@@ -739,6 +763,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (destinationCep.length !== 8) return
 
         Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
+            if (hasOnlyServices(data.items || [])) return
             const quote = deliveryQuotes[storeKey]
             if (!quote || quote.loading || !quote.error || !quote.error.toLowerCase().includes("raio")) return
             // Frete nacional só é liberado com Mercado Pago conectado (igual ao sinal)
@@ -793,6 +818,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     }
 
     const renderCarrierQuote = (storeKey: string) => {
+        if (hasOnlyServices(itemsByPartner[storeKey]?.items || [])) return null
         const cq = carrierQuotes[storeKey]
         if (!cq || (!cq.loading && cq.options.length === 0 && !cq.error)) return null
         return (

@@ -1425,50 +1425,50 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                     <div className="space-y-3 text-sm">
                                                         {/* Itens */}
                                                         <div className="flex items-center justify-between gap-3">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Total de Itens</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.total}</span>
                                                         </div>
                                                         {isPreview && (
                                                             <>
                                                                 <div className="flex items-center justify-between gap-3">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Novos</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Novos</span>
                                                                     <span className="font-bold text-blue-600">{summaryCounts.novos}</span>
                                                                 </div>
                                                                 <div className="flex items-center justify-between gap-3">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Existentes</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Existentes</span>
                                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.existentes}</span>
                                                                 </div>
                                                                 {summaryCounts.conflitos > 0 && (
                                                                     <div className="flex items-center justify-between gap-3">
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Conflitos</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Conflitos</span>
                                                                         <span className="font-bold text-orange-500">{summaryCounts.conflitos}</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="flex items-center justify-between gap-3">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Movimentações</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Movimentações</span>
                                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{preview.items.filter((i: any) => i.match_status !== "skipped").length}</span>
                                                                 </div>
                                                                 <div className="flex items-center justify-between gap-3">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Parcelas</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Parcelas</span>
                                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{summaryCounts.duplicatas || "1"}</span>
                                                                 </div>
                                                             </>
                                                         )}
                                                         {preview.invoice.valor_total > 0 && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Valor Total</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {preview.invoice.valor_total.toFixed(2)}</span>
                                                             </div>
                                                         )}
                                                         {preview.invoice.data_emissao && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de Emissão</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
                                                             </div>
                                                         )}
                                                         {preview.created_at && (
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Importado em</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
                                                             </div>
                                                         )}
@@ -1507,7 +1507,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
                                                                 {isReversed ? (
                                                                     <>
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body mb-2">Resumo Financeiro</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold mb-2">Resumo Financeiro</span>
                                                                         <div className="space-y-1">
                                                                             {(() => {
                                                                                 const originals = financeData.filter((t: any) => t.transaction_type !== 'refund')
@@ -1518,25 +1518,25 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                                 return (
                                                                                     <>
                                                                                         <div className="flex items-center justify-between text-sm">
-                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor original</span>
+                                                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Valor original</span>
                                                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {totalOriginal.toFixed(2)}</span>
                                                                                         </div>
                                                                                         {totalPaid > 0 && (
                                                                                             <div className="flex items-center justify-between text-sm">
-                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">Pago</span>
+                                                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Pago</span>
                                                                                                 <span className="font-bold text-brand-green">R$ {totalPaid.toFixed(2)}</span>
                                                                                             </div>
                                                                                         )}
                                                                                         {totalRefunded > 0 && (
                                                                                             <div className="flex items-center justify-between text-sm">
-                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">Reembolsado</span>
+                                                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Reembolsado</span>
                                                                                                 <span className="font-bold text-brand-blue">R$ {totalRefunded.toFixed(2)}</span>
                                                                                             </div>
                                                                                         )}
                                                                                         {refunds.filter((t: any) => t.status === 'pending').map((t: any, i: number) => (
                                                                                             <div key={i} className="flex items-center justify-between text-sm">
                                                                                                 <div className="flex items-center gap-1">
-                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Estorno aguardando</span>
+                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Estorno aguardando</span>
                                                                                                 </div>
                                                                                                 <span className="font-bold text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
                                                                                             </div>
@@ -1548,7 +1548,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body my-2">Contas a Pagar</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold my-2">Contas a Pagar</span>
                                                                         <div className="space-y-1">
                                                                             {financeData.map((t: any, i: number) => (
                                                                                 <div key={i} className="flex items-center justify-between text-sm">
@@ -1564,7 +1564,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                         {/* Stock movements for completed/reversed imports */}
                                                         {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body mb-2">Movimentações de Estoque</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold mb-2">Movimentações de Estoque</span>
                                                                 <div className="space-y-1">
                                                                     {stockData.map((m: any, i: number) => (
                                                                         <div key={i} className="text-brand-dark dark:text-dark-heading">

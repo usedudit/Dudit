@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useEffect, useMemo, useState, useCallback } from "react"
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { AlertModal, IconPlaceholder, Pagination, Button, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -22,6 +23,13 @@ import {
     getSalesGoalByIdAction,
 } from "@/app/actions/erp/goals"
 import { formatCurrency } from "@/lib/utils"
+import {
+    EMPTY_DATE_PERIOD,
+    getBrazilTodayYmd,
+    isDatePeriodFilterActive,
+    resolveDatePeriodBounds,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 import { useToast } from "@/hooks/use-toast"
 import { PlusIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, Cell, PieChart, Pie, CartesianGrid } from "recharts"
@@ -117,6 +125,7 @@ export default function GoalsPage(props: {
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
     const { toast } = useToast()
+    const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
     const planGate = props.planGate
 
@@ -144,9 +153,6 @@ export default function GoalsPage(props: {
     const [ranking, setRanking] = useState<RankingRow[]>(props.initialRanking || [])
     const [summary, setSummary] = useState<Summary>(props.initialSummary)
     const [rankingLoading, setRankingLoading] = useState(false)
-    const [rankingPeriodMode, setRankingPeriodMode] = useState<"monthly" | "weekly" | "custom">("monthly")
-    const [rankingStartDate, setRankingStartDate] = useState("")
-    const [rankingEndDate, setRankingEndDate] = useState("")
     const [goalsPage, setGoalsPage] = useState(1)
     const [rankingPage, setRankingPage] = useState(1)
     const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
@@ -163,9 +169,11 @@ export default function GoalsPage(props: {
     const [filters, setFilters] = useState<{
         status: string[]
         periodType: string[]
+        period: DatePeriodFilterValue
     }>({
         status: [],
         periodType: [],
+        period: { ...EMPTY_DATE_PERIOD },
     })
 
     // Synchronize state when props change
@@ -220,40 +228,85 @@ export default function GoalsPage(props: {
         loadFormRequirements()
     }, [formMode, editId, duplicateId, props.partnerId, toast, close])
 
+    // Período do ranking (abas de filtro) - null = mês atual (padrão)
+    const rankingBounds = useMemo(() => {
+        if (!isDatePeriodFilterActive(filters.period)) return null
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.period)
+        return {
+            startDate: startYmd || "1970-01-01",
+            endDate: endYmd || getBrazilTodayYmd(),
+        }
+    }, [filters.period])
+
+    const rankingFilterArg = useMemo(
+        () =>
+            rankingBounds
+                ? ({ mode: "custom", startDate: rankingBounds.startDate, endDate: rankingBounds.endDate } as const)
+                : ({ mode: "monthly" } as const),
+        [rankingBounds],
+    )
+
+    const fetchRanking = useCallback(
+        async (showLoader = true) => {
+            if (showLoader) setRankingLoading(true)
+            try {
+                const rankingRes = await getSalesGoalsRankingAction(props.partnerId, rankingFilterArg)
+                if (rankingRes.success) {
+                    setRanking(rankingRes.ranking)
+                    return
+                }
+                toast({ title: "Erro", description: "Não foi possível carregar o ranking.", variant: "destructive" })
+            } catch {
+                toast({ title: "Erro", description: "Não foi possível carregar o ranking.", variant: "destructive" })
+            } finally {
+                if (showLoader) setRankingLoading(false)
+            }
+        },
+        [props.partnerId, rankingFilterArg, toast],
+    )
+
     async function refreshData() {
-        const [goalsRes, rankingRes, summaryRes] = await Promise.all([
+        const [goalsRes, rankingRes, summaryRes] = await Promise.allSettled([
             getSalesGoalsModuleAction(props.partnerId),
-            getSalesGoalsRankingAction(props.partnerId, {
-                mode: rankingPeriodMode,
-                startDate: rankingPeriodMode === "custom" ? rankingStartDate || null : null,
-                endDate: rankingPeriodMode === "custom" ? rankingEndDate || null : null,
-            }),
+            getSalesGoalsRankingAction(props.partnerId, rankingFilterArg),
             getSalesGoalsSummaryAction(props.partnerId),
         ])
 
-        if (goalsRes.success) setGoals(goalsRes.goals as GoalRow[])
-        if (rankingRes.success) setRanking(rankingRes.ranking)
-        if (summaryRes.success) setSummary(summaryRes.summary as Summary)
+        if (goalsRes.status === "fulfilled" && goalsRes.value.success) {
+            setGoals(goalsRes.value.goals as GoalRow[])
+        }
+        if (rankingRes.status === "fulfilled" && rankingRes.value.success) {
+            setRanking(rankingRes.value.ranking)
+        }
+        if (summaryRes.status === "fulfilled" && summaryRes.value.success) {
+            setSummary(summaryRes.value.summary as Summary)
+        }
     }
 
-    const refreshRanking = async () => {
-        setRankingLoading(true)
-        const rankingRes = await getSalesGoalsRankingAction(props.partnerId, {
-            mode: rankingPeriodMode,
-            startDate: rankingPeriodMode === "custom" ? rankingStartDate || null : null,
-            endDate: rankingPeriodMode === "custom" ? rankingEndDate || null : null,
-        })
-        setRankingLoading(false)
+    // Mantém o servidor em sincronia com o estado do cliente após mutações
+    async function refreshAll() {
+        await refreshData()
+        router.refresh()
+    }
 
-        if (rankingRes.success) {
-            setRanking(rankingRes.ranking)
+    // Recarrega o ranking quando o período do filtro muda
+    const rankingKeyRef = useRef<string | null>(null)
+    const rankingKey = rankingBounds ? `${rankingBounds.startDate}:${rankingBounds.endDate}` : "default"
+    useEffect(() => {
+        if (rankingKeyRef.current === null) {
+            rankingKeyRef.current = rankingKey
             return
         }
-
-        toast({ title: "Erro", description: "Não foi possível carregar o ranking.", variant: "destructive" })
-    }
+        if (rankingKeyRef.current === rankingKey) return
+        rankingKeyRef.current = rankingKey
+        void fetchRanking(true)
+    }, [rankingKey, fetchRanking])
 
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        if (activeTab === "Ranking") {
+            return [{ id: "period", title: "Período", type: "date-period" }]
+        }
+
         return [
             {
                 id: "status",
@@ -268,15 +321,14 @@ export default function GoalsPage(props: {
                 options: ["Mensal", "Semanal"],
             },
         ]
-    }, [])
+    }, [activeTab])
 
     const hasActiveFilters = useMemo(() => {
-        return (
-            filters.status.length > 0 ||
-            filters.periodType.length > 0 ||
-            search.trim().length > 0
-        )
-    }, [filters, search])
+        if (activeTab === "Ranking") {
+            return isDatePeriodFilterActive(filters.period) || search.trim().length > 0
+        }
+        return filters.status.length > 0 || filters.periodType.length > 0 || search.trim().length > 0
+    }, [activeTab, filters, search])
 
     const filteredGoals = useMemo(() => {
         let result = goals
@@ -336,7 +388,7 @@ export default function GoalsPage(props: {
 
     useEffect(() => {
         setRankingPage(1)
-    }, [ranking, rankingPeriodMode, rankingStartDate, rankingEndDate, search, rankingSort])
+    }, [ranking, rankingKey, search, rankingSort])
 
     useEffect(() => {
         if (goalsPage > totalGoalPages) setGoalsPage(totalGoalPages)
@@ -375,7 +427,7 @@ export default function GoalsPage(props: {
             return
         }
 
-        await refreshData()
+        await refreshAll()
         setGoalToDelete(null)
         toast({ title: "Sucesso", description: "Meta excluída." })
     }
@@ -448,7 +500,7 @@ export default function GoalsPage(props: {
                     onBack={() => close()}
                     onEdit={(id) => open("edit", id)}
                     onDuplicate={(id) => open("duplicate", id)}
-                    onSuccessMutation={() => refreshData()}
+                    onSuccessMutation={() => refreshAll()}
                 />
             </FadeIn>
         )
@@ -466,7 +518,7 @@ export default function GoalsPage(props: {
                     initialGoal={editingGoal}
                     onBack={() => {
                         close()
-                        refreshData()
+                        void refreshAll()
                     }}
                 />
             </FadeIn>
@@ -525,14 +577,6 @@ export default function GoalsPage(props: {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     hasActiveFilters={hasActiveFilters}
-                    rankingPeriodMode={rankingPeriodMode}
-                    onRankingPeriodModeChange={setRankingPeriodMode}
-                    rankingStartDate={rankingStartDate}
-                    onRankingStartDateChange={setRankingStartDate}
-                    rankingEndDate={rankingEndDate}
-                    onRankingEndDateChange={setRankingEndDate}
-                    onApplyRankingFilter={refreshRanking}
-                    rankingLoading={rankingLoading}
                 />
 
                 <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-10">
@@ -606,7 +650,11 @@ export default function GoalsPage(props: {
                                         imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                         imageAlt="Sem ranking"
                                         title="Sem dados para o período"
-                                        subtitle="Ajuste o período para visualizar o ranking de vendedores."
+                                        subtitle={
+                                            hasActiveFilters
+                                                ? "Ajuste o período ou a busca para visualizar o ranking de vendedores."
+                                                : "Ainda não há vendas registradas neste período. Assim que houver vendas, o ranking aparece aqui."
+                                        }
                                     />
                                 </div>
                             ) : (
@@ -654,7 +702,13 @@ export default function GoalsPage(props: {
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters}
-                onClear={() => setFilters({ status: [], periodType: [] })}
+                onClear={() =>
+                    setFilters({
+                        status: [],
+                        periodType: [],
+                        period: { ...EMPTY_DATE_PERIOD },
+                    })
+                }
             />
 
             <AlertModal

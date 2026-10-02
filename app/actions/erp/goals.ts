@@ -221,17 +221,39 @@ function resolveRankingRange(filter?: RankingPeriodFilter) {
   }
 }
 
+// Situações de pedido que representam faturamento já reconhecido.
+const RANKING_ORDER_SITUATIONS = ["paid", "partially_paid", "preparing", "shipped", "delivered", "completed"]
+
+// Pedidos vinculados a ordens de serviço já possuem contrapartida na tabela
+// `sales` (origin_type = 'service_order'), então são ignorados para não
+// contabilizar o mesmo faturamento duas vezes.
+const SERVICE_ORDER_SOURCES = new Set(["Ordem de Serviço", "admin_service_order"])
+
 async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
   const admin = getAdminClient()
   const { startDate, endDate, periodType } = resolveRankingRange(filter)
+
+  const startIso = `${startDate}T00:00:00.000Z`
+  const endIso = `${endDate}T23:59:59.999Z`
 
   const salesQuery = admin
     .from("sales")
     .select("finalized_by_user_id, final_amount, created_at")
     .eq("partner_id", partnerId)
     .in("payment_status", ["paid", "partially_paid"])
-    .gte("created_at", `${startDate}T00:00:00.000Z`)
-    .lte("created_at", `${endDate}T23:59:59.999Z`)
+    .gte("created_at", startIso)
+    .lte("created_at", endIso)
+
+  // O fluxo de pedidos/PDV não grava na tabela `sales`; sem estes registros o
+  // ranking ficava vazio para a maioria dos parceiros.
+  const ordersQuery = admin
+    .from("orders")
+    .select("created_by, total_amount, order_source, created_at")
+    .eq("partner_id", partnerId)
+    .in("situation", RANKING_ORDER_SITUATIONS)
+    .not("created_by", "is", null)
+    .gte("created_at", startIso)
+    .lte("created_at", endIso)
 
   let goalsQuery = admin
     .from("sales_goals")
@@ -241,8 +263,9 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
     .gte("end_date", startDate)
   if (periodType) goalsQuery = goalsQuery.eq("period_type", periodType)
 
-  const [{ data: sales }, sellerNameMap, { data: activeGoals }] = await Promise.all([
+  const [{ data: sales }, { data: orders }, sellerNameMap, { data: activeGoals }] = await Promise.all([
     salesQuery,
+    ordersQuery,
     resolveSellerNameMap(partnerId),
     goalsQuery,
   ])
@@ -258,10 +281,18 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
     : []
 
   const totalByUser = new Map<string, number>()
+  const addAmount = (userId: string, amount: number) => {
+    if (!userId) return
+    totalByUser.set(userId, money((totalByUser.get(userId) || 0) + Number(amount || 0)))
+  }
+
   for (const sale of sales || []) {
-    const userId = String((sale as any).finalized_by_user_id || "")
-    if (!userId) continue
-    totalByUser.set(userId, money((totalByUser.get(userId) || 0) + Number((sale as any).final_amount || 0)))
+    addAmount(String((sale as any).finalized_by_user_id || ""), Number((sale as any).final_amount || 0))
+  }
+
+  for (const order of orders || []) {
+    if (SERVICE_ORDER_SOURCES.has(String((order as any).order_source || ""))) continue
+    addAmount(String((order as any).created_by || ""), Number((order as any).total_amount || 0))
   }
 
   const progressMap = new Map<string, { current: number; target: number }>()
@@ -279,8 +310,13 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
     }
   }
 
-  const ranking = Array.from(totalByUser.entries())
-    .map(([userId, totalAmount]) => {
+  // Vendedores com meta ativa no período entram mesmo sem vendas no intervalo,
+  // para que o ranking mostre o progresso (0%) em vez de ficar vazio.
+  const userIds = new Set<string>([...totalByUser.keys(), ...progressMap.keys()])
+
+  const ranking = Array.from(userIds)
+    .map((userId) => {
+      const totalAmount = totalByUser.get(userId) || 0
       const progress = progressMap.get(userId)
       const progressPercent = progress && progress.target > 0 ? Math.min(100, Math.round((progress.current / progress.target) * 100)) : 0
       return {

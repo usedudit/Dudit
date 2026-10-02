@@ -42,6 +42,14 @@ import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./context
 import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 import { trackEvent } from "@/lib/analytics"
 
+// Navegação por grupo na página inicial de Explorar (modo "Tudo").
+// Clica num grupo -> mostra as categorias daquele tipo no mesmo lugar.
+const CATEGORY_GROUPS = [
+    { name: "Produtos", groupType: "produtos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
+    { name: "Serviços", groupType: "servicos", icon_url: null },
+    { name: "Lojas", groupType: "vitrines", icon_url: null },
+]
+
 interface ExplorarPageClientProps {
     initialResults?: any[]
     initialMoreDistantSellers?: any[]
@@ -768,40 +776,6 @@ export function ExplorarPageClient({
         return productCategories
     }, [currentType, dbServiceCategories, dbPartnerCategories, productCategories])
 
-    const categoryRows = useMemo(() => {
-        const rows: { key: string; label: string; groupType: string; categories: { name: string; icon_url: string | null }[] }[] = []
-
-        const isStandardIn = (itemName: string, list: { name: string; icon_url: string | null }[]) =>
-            list.some(cat => matchCategory(itemName, cat.name))
-
-        const buildRow = (
-            key: string,
-            label: string,
-            groupType: string,
-            baseCats: { name: string; icon_url: string | null }[],
-            itemTypes: string[]
-        ) => {
-            const categories = baseCats
-                .filter(cat => !(key === "produtos" && cat.name.toLowerCase() === "serviços"))
-                .map(cat => ({ name: cat.name, icon_url: cat.icon_url ?? null }))
-            const hasOutros = normalizedInitialResults.some(item =>
-                itemTypes.includes(item.itemType) &&
-                (!item.category || !isStandardIn(item.category, baseCats))
-            )
-            if (categories.length === 0 && !hasOutros) return
-            if (hasOutros && !categories.some(c => c.name === "Outros")) {
-                categories.push({ name: "Outros", icon_url: null })
-            }
-            rows.push({ key, label, groupType, categories })
-        }
-
-        buildRow("produtos", "Produtos", "produtos", productCategories, ["produto"])
-        buildRow("servicos", "Serviços", "servicos", dbServiceCategories, ["servico"])
-        buildRow("lojas", "Lojas", "vitrines", dbPartnerCategories, [])
-
-        return rows
-    }, [normalizedInitialResults, productCategories, dbServiceCategories, dbPartnerCategories])
-
     const isStandardCategory = useCallback((catName: string) => {
         return filterCategoriesList.some(cat => matchCategory(catName, cat.name))
     }, [filterCategoriesList])
@@ -818,6 +792,11 @@ export function ExplorarPageClient({
         }
         return all
     }, [filterCategoriesList, dataToFilter, isStandardCategory])
+
+    const categoryCircles = useMemo(
+        () => (currentType === "tudo" ? CATEGORY_GROUPS : activeCategoriesList),
+        [currentType, activeCategoriesList]
+    )
 
     const outrosItems = useMemo(() => {
         return dataToFilter.filter(p => {
@@ -1795,6 +1774,15 @@ export function ExplorarPageClient({
 
     const showCommunityVideos = communityVideos.length > 0
 
+    const selectGroupNav = (groupType: string) => {
+        triggerFilterLoading()
+        setSelectedCategories([])
+        setSelectedSection(null)
+        setCurrentType(groupType)
+        setSelectedCondition("")
+        updateUrl(selectedCitySlug, [], query, groupType, undefined, null)
+    }
+
     const selectGroupCategory = (groupType: string, catName: string) => {
         triggerFilterLoading()
         if (currentType !== groupType) {
@@ -1803,6 +1791,11 @@ export function ExplorarPageClient({
         }
         setSelectedCategories([catName])
         updateUrl(selectedCitySlug, [catName], query, groupType)
+    }
+
+    const handleCategoryCircleClick = (cat: { name: string; icon_url: string | null; groupType?: string }) => {
+        if (cat.groupType) selectGroupNav(cat.groupType)
+        else selectGroupCategory(currentType, cat.name)
     }
 
     return (
@@ -1830,33 +1823,26 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
-                    {/* CATEGORIAS AGRUPADAS (Produtos / Serviços / Lojas) */}
-                    {!query && categoryRows.length > 0 && !isLandingPage && !isCategoryMode && (
+                    {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
+                    {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
-                            <div className="space-y-5">
-                                {categoryRows.map((row) => (
-                                    <div key={row.key}>
-                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">{row.label}</h3>
-                                        <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                            {row.categories.map((cat) => (
-                                                <button
-                                                    key={cat.name}
-                                                    onClick={() => selectGroupCategory(row.groupType, cat.name)}
-                                                    className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
-                                                >
-                                                    <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
-                                                        {cat.icon_url ? (
-                                                            <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
-                                                        ) : (
-                                                            <span className="text-2xl">📦</span>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
-                                                </button>
-                                            ))}
+                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
+                            <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                {categoryCircles.map((cat) => (
+                                    <button
+                                        key={cat.name}
+                                        onClick={() => handleCategoryCircleClick(cat)}
+                                        className="snap-start shrink-0 flex flex-col items-center gap-2 group w-[85px]"
+                                    >
+                                        <div className="w-[68px] h-[68px] rounded-full bg-brand-gray dark:bg-dark-border/30 border border-gray-100 dark:border-dark-border flex items-center justify-center overflow-hidden group-hover:border-brand-green group-hover:shadow-md transition-all duration-200">
+                                            {cat.icon_url ? (
+                                                <img src={cat.icon_url} alt={cat.name} className="w-9 h-9 object-contain" />
+                                            ) : (
+                                                <span className="text-2xl">📦</span>
+                                            )}
                                         </div>
-                                    </div>
+                                        <span className="text-[11px] font-bold text-center leading-tight text-brand-dark dark:text-dark-heading line-clamp-2">{cat.name}</span>
+                                    </button>
                                 ))}
                             </div>
                         </div>

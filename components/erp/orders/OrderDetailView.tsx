@@ -1157,8 +1157,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     value={
                                                                         <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
                                                                             {formatCurrency(depositSummary.depositAmount)}
-                                                                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.depositStatus === "partially_paid" ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}>
-                                                                                {depositSummary.depositStatus === "partially_paid" ? "pago" : "pendente"}
+                                                                            <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                            <span className={`inline-flex items-center gap-1 font-bold ${depositSummary.depositStatus === "partially_paid" ? "text-brand-green" : "text-brand-orange"}`}>
+                                                                                {depositSummary.depositStatus === "partially_paid" ? <ClockIcon size={14} className="shrink-0 text-brand-inactive-text dark:text-dark-body" /> : <CheckCircleIcon size={14} className="shrink-0 text-brand-green" />}
                                                                             </span>
                                                                         </span>
                                                                     }

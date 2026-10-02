@@ -682,7 +682,7 @@ export function ERPSidebar() {
                                                                         <div
                                                                             className={cn(
                                                                                 "absolute left-0 top-0 w-[12px] h-[calc(50%)]",
-                                                                                "border-l border-b border-dark-border",
+                                                                                "border-l border-b border-white/10 border-dark-border",
                                                                                 "rounded-bl-[8px]",
                                                                             )}
                                                                         />

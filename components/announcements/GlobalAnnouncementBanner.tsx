@@ -98,7 +98,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -56, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md ${bgClasses}`}
+           className={`fixed top-0 left-0 right-0 z-[110] border-b backdrop-blur-md ${bgClasses}`}
         >
           <div className="w-full max-w-7xl mx-auto px-4 py-2.5 sm:py-3">
             <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">

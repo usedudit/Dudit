@@ -187,6 +187,7 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
             exit={{ x: "120%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+            style={{ zIndex: zIndex ? zIndex + 1 : undefined }}
             onClick={(e) => e.stopPropagation()}
           >
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">

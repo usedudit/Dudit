@@ -499,7 +499,6 @@ const PaymentModal = ({
     const [mpBoletoData, setMpBoletoData] = useState<{ barcode: string; ticketUrl: string } | null>(null);
     const [mpPaymentId, setMpPaymentId] = useState<string | null>(null);
     const [preCreatedOrderId, setPreCreatedOrderId] = useState<string | null>(null);
-    const [mpCopied, setMpCopied] = useState(false);
     const [mpIsCheckingStatus, setMpIsCheckingStatus] = useState(false);
     const mpInstanceRef = useRef<any>(null);
     const mpBricksBuilderRef = useRef<any>(null);
@@ -515,6 +514,8 @@ const PaymentModal = ({
     const [generatingDepositPix, setGeneratingDepositPix] = useState(false);
     const [showDepositPixModal, setShowDepositPixModal] = useState(false);
     const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+    const [showMpPixModal, setShowMpPixModal] = useState(false);
+    const [isCheckingMpPixStatus, setIsCheckingMpPixStatus] = useState(false);
     const [existingSinalLoaded, setExistingSinalLoaded] = useState(false);
 
     // Load existing sinal QR code data from MP when order already has a deposit
@@ -896,12 +897,13 @@ const PaymentModal = ({
             setMpBrickError(null);
             setMpIsProcessing(false);
             setMpPixData(null);
+            setShowMpPixModal(false);
             setMpBoletoData(null);
             setMpPaymentId(null);
             setPreCreatedOrderId(null);
             mpPaymentQuoteRef.current = null;
-            setMpCopied(false);
             setMpIsCheckingStatus(false);
+            setIsCheckingMpPixStatus(false);
             mpBrickInitializedRef.current = false;
             if (mpBrickIdRef.current) {
                 try { mpBrickIdRef.current.unmount(); } catch { }
@@ -1262,6 +1264,7 @@ const PaymentModal = ({
                 if (pix?.qrCode && pix?.qrCodeBase64) {
                     setMpPixData({ qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64 });
                     setMpStep("pix");
+                    setShowMpPixModal(true);
                 } else {
                     setMpBrickError("Dados do Pix não retornados pelo provedor.");
                 }
@@ -1328,13 +1331,49 @@ const PaymentModal = ({
         });
     };
 
-    const handleMpCopyPixCode = () => {
-        if (mpPixData?.qrCode) {
-            navigator.clipboard.writeText(mpPixData.qrCode);
-            setMpCopied(true);
-            toast({ title: "Código Pix copiado!", description: "Use a opção 'Pix Copia e Cola' no banco." });
-            setTimeout(() => setMpCopied(false), 2000);
+    const handleVerifyMpPixPayment = async () => {
+        if (!mpPaymentId) return;
+        setIsCheckingMpPixStatus(true);
+        try {
+            const res = await checkMercadoPagoPaymentStatusAction(mpPaymentId);
+            if (res && 'success' in res && res.success) {
+                if (res.status === "approved") {
+                    toast({ title: "Pix Pago!", description: "O pagamento foi confirmado." });
+                    setShowMpPixModal(false);
+                    setMpPixData(null);
+                    setMpStep("brick");
+                    setMpPaymentId(null);
+                    invalidate();
+                    handleMpConfirmPix();
+                } else {
+                    toast({ title: "Aguardando pagamento", description: "O Pix ainda não consta como pago." });
+                }
+            } else {
+                toast({
+                    title: "Erro ao verificar",
+                    description: (res && 'error' in res ? res.error : null) || "Não foi possível consultar o status do pagamento.",
+                    variant: "destructive"
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Ocorreu um erro ao verificar o pagamento.", variant: "destructive" });
+        } finally {
+            setIsCheckingMpPixStatus(false);
         }
+    };
+
+    const handleSendMpPixWhatsApp = () => {
+        if (!mpPixData || !customer?.phone) return;
+        const formattedAmount = formatCurrency(chargeTarget);
+        const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+        const messageText = `Olá, *${customerName || "Cliente"}*! 🌟\n\n` +
+            `Aqui está o código Pix Copia e Cola para o pagamento do seu pedido no valor de *${formattedAmount}*:\n\n` +
+            `\`${mpPixData.qrCode}\`\n\n` +
+            `Assim que realizar o pagamento, nosso sistema irá confirmar de forma automática! 😉`;
+        const encodedMsg = encodeURIComponent(messageText);
+        const phone = String(customer.phone).replace(/\D/g, "");
+        window.open(`https://wa.me/55${phone}?text=${encodedMsg}`, "_blank");
     };
 
     const activeSplitLegs = useMemo(
@@ -1933,6 +1972,8 @@ const PaymentModal = ({
             setMpBrickError(null);
             setMpStep('brick');
             setMpPixData(null);
+            setShowMpPixModal(false);
+            setIsCheckingMpPixStatus(false);
             setMpBoletoData(null);
             setMpPaymentId(null);
             setView('methods');
@@ -2215,11 +2256,11 @@ const PaymentModal = ({
         let finalPaymentProvider: string | undefined = undefined;
         let finalCheckoutFulfillment: Record<string, unknown> | null = null;
 
-        if (depositPaid && depositMpPaymentId && depositMeta) {
+        if (depositMpPaymentId && depositMeta) {
             const depositLeg = {
                 method: "Pix (Mercado Pago)",
                 amount: depositChargeAmount,
-                amountReceived: depositChargeAmount,
+                amountReceived: depositPaid ? depositChargeAmount : 0,
                 adjustmentType: 'none',
                 adjustmentPercent: 0,
                 adjustmentAmount: 0,
@@ -2233,7 +2274,7 @@ const PaymentModal = ({
                 paymentMethodId: null,
                 installmentNumber: 1,
                 provider: "Mercado Pago",
-                paymentStatus: "approved",
+                paymentStatus: depositPaid ? "approved" : "pending",
                 mpPaymentMethodId: "pix",
             };
 
@@ -2242,15 +2283,17 @@ const PaymentModal = ({
                 (e: any) => !(e?.provider && String(e.provider).toLowerCase().includes("mercado pago"))
             )];
 
-            finalPaidAmount = existingPaidAmount + depositChargeAmount + singleRegisterAmount;
+            if (depositPaid) {
+                finalPaidAmount = existingPaidAmount + depositChargeAmount + singleRegisterAmount;
 
-            const remainingAfterAll = finalPaidAmount - fullOrderTotal;
-            if (remainingAfterAll >= -0.005) {
-                finalPaymentStatus = 'paid';
-            } else if (finalPaidAmount > 0.005) {
-                finalPaymentStatus = 'partially_paid';
-            } else {
-                finalPaymentStatus = 'unpaid';
+                const remainingAfterAll = finalPaidAmount - fullOrderTotal;
+                if (remainingAfterAll >= -0.005) {
+                    finalPaymentStatus = 'paid';
+                } else if (finalPaidAmount > 0.005) {
+                    finalPaymentStatus = 'partially_paid';
+                } else {
+                    finalPaymentStatus = 'unpaid';
+                }
             }
 
             finalMpPaymentId = depositMpPaymentId;
@@ -2259,13 +2302,16 @@ const PaymentModal = ({
                 ...(depositMeta as Record<string, unknown>),
                 depositCheckout: {
                     ...depositMeta,
-                    depositStatus: "paid",
+                    depositStatus: depositPaid ? "paid" : "pending",
                 },
             } as Record<string, unknown>;
         }
 
+        // Recompute paymentMethod from final breakdown (includes deposit leg if generated)
+        const finalPaymentMethod = Array.from(new Set(finalPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || paymentMethod || 'Método não definido';
+
         return {
-            paymentMethod: paymentMethod || 'Método não definido',
+            paymentMethod: finalPaymentMethod,
             paymentBreakdown: finalPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
             paymentStatus: finalPaymentStatus,
@@ -2354,11 +2400,11 @@ const PaymentModal = ({
         // metadata into the payload so the order is created with the deposit
         // already recorded. The forcedPayload path (MP Pix/Boleto approval) bypasses
         // buildConfirmPayload, so we must inject deposit info here.
-        if (depositPaid && depositMpPaymentId && depositMeta && !payload.checkoutFulfillment) {
+        if (depositMpPaymentId && depositMeta && !payload.checkoutFulfillment) {
             const depositLeg = {
                 method: "Pix (Mercado Pago)",
                 amount: depositChargeAmount,
-                amountReceived: depositChargeAmount,
+                amountReceived: depositPaid ? depositChargeAmount : 0,
                 adjustmentType: 'none',
                 adjustmentPercent: 0,
                 adjustmentAmount: 0,
@@ -2372,7 +2418,7 @@ const PaymentModal = ({
                 paymentMethodId: null,
                 installmentNumber: 1,
                 provider: "Mercado Pago",
-                paymentStatus: "approved",
+                paymentStatus: depositPaid ? "approved" : "pending",
                 mpPaymentMethodId: "pix",
             };
 
@@ -2386,22 +2432,34 @@ const PaymentModal = ({
             payload = {
                 ...payload,
                 paymentBreakdown: [depositLeg, ...filteredBreakdown],
-                paidAmount: (Number(payload.paidAmount || 0) + depositChargeAmount),
-                mpPaymentId: payload.mpPaymentId || depositMpPaymentId,
-                paymentProvider: payload.paymentProvider || "Mercado Pago",
-                checkoutFulfillment: {
-                    ...(depositMeta as Record<string, unknown>),
-                    depositCheckout: {
-                        ...depositMeta,
-                        depositStatus: "paid",
-                    },
-                } as Record<string, unknown>,
-                paymentStatus: (() => {
-                    const totalPaid = Number(payload.paidAmount || 0) + depositChargeAmount;
-                    if (totalPaid >= fullOrderTotal - 0.005) return 'paid';
-                    if (totalPaid > 0.005) return 'partially_paid';
-                    return 'unpaid';
-                })(),
+                ...(depositPaid ? {
+                    paidAmount: (Number(payload.paidAmount || 0) + depositChargeAmount),
+                    mpPaymentId: payload.mpPaymentId || depositMpPaymentId,
+                    paymentProvider: payload.paymentProvider || "Mercado Pago",
+                    checkoutFulfillment: {
+                        ...(depositMeta as Record<string, unknown>),
+                        depositCheckout: {
+                            ...depositMeta,
+                            depositStatus: "paid",
+                        },
+                    } as Record<string, unknown>,
+                    paymentStatus: (() => {
+                        const totalPaid = Number(payload.paidAmount || 0) + depositChargeAmount;
+                        if (totalPaid >= fullOrderTotal - 0.005) return 'paid';
+                        if (totalPaid > 0.005) return 'partially_paid';
+                        return 'unpaid';
+                    })(),
+                } : {
+                    mpPaymentId: payload.mpPaymentId || depositMpPaymentId,
+                    paymentProvider: payload.paymentProvider || "Mercado Pago",
+                    checkoutFulfillment: {
+                        ...(depositMeta as Record<string, unknown>),
+                        depositCheckout: {
+                            ...depositMeta,
+                            depositStatus: "pending",
+                        },
+                    } as Record<string, unknown>,
+                }),
             };
         }
 
@@ -2724,6 +2782,7 @@ const PaymentModal = ({
                                                                     handleGenerateDepositCharge();
                                                                 }
                                                             }}
+                                                            className="px-4 py-3"
                                                             right={
                                                                 <Button
                                                                     variant="link"
@@ -3495,48 +3554,7 @@ const PaymentModal = ({
                                                 </div>
                                             )}
 
-                                            {mpStep === 'pix' && mpPixData && (
-                                                <div className="flex flex-col items-center px-2 pt-4">
-                                                    <div className="text-center mb-6">
-                                                        <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
-                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-8 h-8 object-contain" />
-                                                        </div>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Pix gerado via Mercado Pago</h3>
-                                                        <p className="text-sm text-brand-inactive-text">Escaneie o QR Code ou copie o código</p>
-                                                    </div>
-
-                                                    <div className="bg-white p-5 rounded-2xl border border-brand-border dark:border-dark-border mb-6 shadow-sm">
-                                                        <img src={`data:image/png;base64,${mpPixData.qrCodeBase64}`} alt="QR Code Pix" className="w-48 h-48 mx-auto" />
-                                                    </div>
-
-                                                    <div className="text-center mb-4">
-                                                        <span className="text-3xl font-black text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
-                                                    </div>
-
-                                                    <div className="w-full max-w-sm relative mb-6">
-                                                        <input
-                                                            type="text" readOnly
-                                                            value={mpPixData.qrCode}
-                                                            className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent focus:border-brand-green outline-none font-medium truncate"
-                                                        />
-                                                        <button
-                                                            onClick={handleMpCopyPixCode}
-                                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-lg transition-colors text-brand-dark dark:text-dark-heading"
-                                                        >
-                                                            {mpCopied ? <CheckCircleIcon size={18} className="text-brand-green" /> : <CopyIcon size={18} />}
-                                                        </button>
-                                                    </div>
-
-                                                    <Button variant="filled" className="w-full max-w-sm h-12" onClick={handleMpConfirmPix}>
-                                                        Confirmar pagamento recebido
-                                                    </Button>
-                                                    <p className="text-xs text-brand-inactive-text mt-3 text-center max-w-sm">
-                                                        Confirme após o cliente realizar o Pix. O status será atualizado automaticamente pelo webhook.
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {mpStep === 'boleto' && mpBoletoData && (
+                                             {mpStep === 'boleto' && mpBoletoData && (
                                                 <div className="flex flex-col items-center px-2 pt-4">
                                                     <div className="text-center mb-6">
                                                         <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
@@ -3979,6 +3997,27 @@ const PaymentModal = ({
                     onVerifyPayment={handleVerifyDepositPayment}
                     isVerifying={isCheckingDepositStatus}
                     onSendWhatsApp={customer?.phone ? handleSendDepositWhatsApp : undefined}
+                />
+            )}
+
+            {mpPixData && (
+                <PixQrDisplayModal
+                    isOpen={showMpPixModal}
+                    onClose={() => {
+                        setShowMpPixModal(false);
+                        setMpPixData(null);
+                        setMpStep("brick");
+                    }}
+                    qrCode={`data:image/png;base64,${mpPixData.qrCodeBase64}`}
+                    payload={mpPixData.qrCode}
+                    amount={chargeTarget}
+                    onConfirmPayment={() => {
+                        setShowMpPixModal(false);
+                        handleMpConfirmPix();
+                    }}
+                    onVerifyPayment={handleVerifyMpPixPayment}
+                    isVerifying={isCheckingMpPixStatus}
+                    onSendWhatsApp={customer?.phone ? handleSendMpPixWhatsApp : undefined}
                 />
             )}
 

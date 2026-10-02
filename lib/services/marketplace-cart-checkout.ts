@@ -96,7 +96,11 @@ export async function priceMarketplaceCartCheckout(
 
   const targetStoreId = resolvedLines.find((l) => l.storeId)?.storeId || null
 
-  const shouldQuoteDelivery = (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) && Boolean(params.deliveryAddress) && params.deliveryType === "delivery"
+  // Carrinho só com serviços não cota frete (nem próprio nem transportadora):
+  // serviços não têm envio físico e a cotação gerava "raio" indevido.
+  const hasOnlyServiceLines = resolvedLines.every((l) => l.itemType === "service_booking")
+
+  const shouldQuoteDelivery = !hasOnlyServiceLines && (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) && Boolean(params.deliveryAddress) && params.deliveryType === "delivery"
 
   if (shouldQuoteDelivery) {
     // Transportadora selecionada (SuperFrete) é a fonte autoritativa do frete —
@@ -198,7 +202,7 @@ export async function priceMarketplaceCartCheckout(
   const isFreeShippingCoupon = Boolean(
     couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping",
   )
-  if ((hasDeliveryLines || carrierApplied) && isFreeShippingCoupon) {
+  if (((!hasOnlyServiceLines && hasDeliveryLines) || carrierApplied) && isFreeShippingCoupon) {
     if (carrierApplied) {
       // Frete do carrier já resolvido — não re-cotar o frete próprio só pra zerar.
       deliveryFee = 0
