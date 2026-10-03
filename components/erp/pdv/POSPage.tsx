@@ -2006,19 +2006,39 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         </div>
                     </BottomSheet>
 
-                    <BottomSheet isOpen={isTypeFilterModalOpen} onClose={() => setIsTypeFilterModalOpen(false)} title="Selecione">
-                        <div className="px-5 pb-8">
-                            {[
-                                ...(hasProductsInCatalog ? [{ value: "product" as const, label: "Produtos" }] : []),
-                                ...(hasServicesInCatalog ? [{ value: "service" as const, label: "Serviços" }] : [])
-                            ].map((opt, i, arr) => (
-                                <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
-                                    <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
-                                    <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
-                                </div>
-                            ))}
-                        </div>
-                    </BottomSheet>
+                    {isMobile ? (
+                        <BottomSheet isOpen={isTypeFilterModalOpen} onClose={() => setIsTypeFilterModalOpen(false)} title="Selecione">
+                            <div className="px-5 pb-8">
+                                {[
+                                    ...(hasProductsInCatalog ? [{ value: "product" as const, label: "Produtos" }] : []),
+                                    ...(hasServicesInCatalog ? [{ value: "service" as const, label: "Serviços" }] : [])
+                                ].map((opt, i, arr) => (
+                                    <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
+                                        <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
+                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
+                                    </div>
+                                ))}
+                            </div>
+                        </BottomSheet>
+                    ) : (
+                        <DesktopPOSSheet
+                            isOpen={isTypeFilterModalOpen}
+                            onClose={() => setIsTypeFilterModalOpen(false)}
+                            title="Selecione"
+                        >
+                            <div className="px-5 pb-8">
+                                {[
+                                    ...(hasProductsInCatalog ? [{ value: "product" as const, label: "Produtos" }] : []),
+                                    ...(hasServicesInCatalog ? [{ value: "service" as const, label: "Serviços" }] : [])
+                                ].map((opt, i, arr) => (
+                                    <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
+                                        <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
+                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
+                                    </div>
+                                ))}
+                            </div>
+                        </DesktopPOSSheet>
+                    )}
 
                     <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
                         <div className="space-y-5 px-1 pb-2">

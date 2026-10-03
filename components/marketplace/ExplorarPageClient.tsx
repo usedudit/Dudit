@@ -1453,11 +1453,22 @@ export function ExplorarPageClient({
             : (item.itemType === "produto")
 
         const showDeliveryTime = isDeliveryEnabled && hasProducts
-        const deliveryTime = showDeliveryTime
+
+        // Check if seller is outside the delivery radius
+        const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
+        const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+        const outOfRadius = isDeliveryEnabled
+            && hasProducts
+            && distanceKm != null
+            && maxDeliveryKm != null
+            && maxDeliveryKm > 0
+            && distanceKm > maxDeliveryKm
+
+        const deliveryTime = (showDeliveryTime && !outOfRadius)
             ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : ((item.delivery_time_formatted || partner?.delivery_time_formatted) ? formatAverageDeliveryTimeFromRange(item.delivery_time_formatted || partner?.delivery_time_formatted) : null))
             : null
 
-        const rawFee = estimateDeliveryFeeLabel({
+        const rawFee = outOfRadius ? null : (estimateDeliveryFeeLabel({
             distanceKm,
             baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
             includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
@@ -1465,12 +1476,14 @@ export function ExplorarPageClient({
             maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
             isDeliveryEnabled,
             deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-        }) || partner?.delivery_fee_formatted || item.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null)
+        }) || partner?.delivery_fee_formatted || item.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
 
         const isFreeDelivery = rawFee ? (rawFee.toLowerCase().includes("grátis") || rawFee.toLowerCase().includes("gratis")) : false
-        const deliveryFeeLabel = isStore
-            ? rawFee
-            : (isFreeDelivery ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis") : rawFee)
+        const deliveryFeeLabel = outOfRadius
+            ? null
+            : (isStore
+                ? rawFee
+                : (isFreeDelivery ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis") : rawFee))
 
         const serviceDuration = item.itemType === "servico"
             ? formatServiceDuration(item.duration_minutes ?? item.durationMinutes ?? item.duration)

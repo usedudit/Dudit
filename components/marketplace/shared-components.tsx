@@ -122,11 +122,22 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
 
     // Only show delivery time if the store has products and delivery is enabled (not pickup only, not services only)
     const showDeliveryTime = isDeliveryEnabled && hasProducts
-    const deliveryTime = showDeliveryTime
+
+    // Check if seller is outside the delivery radius
+    const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
+    const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+    const outOfRadius = isDeliveryEnabled
+        && hasProducts
+        && distanceKm != null
+        && maxDeliveryKm != null
+        && maxDeliveryKm > 0
+        && distanceKm > maxDeliveryKm
+
+    const deliveryTime = (showDeliveryTime && !outOfRadius)
         ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted || vitrine.delivery_time_formatted) : null))
         : null
 
-    const deliveryFeeLabel = estimateDeliveryFeeLabel({
+    const deliveryFeeLabel = outOfRadius ? null : (estimateDeliveryFeeLabel({
         distanceKm,
         baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
         includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
@@ -134,7 +145,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
         isDeliveryEnabled,
         deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null)
+    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
 
     const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
 
@@ -404,11 +415,22 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const deliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
     const showDeliveryTime = itemType === "produto" && isDeliveryEnabled
-    const deliveryTime = showDeliveryTime
+
+    // Check if seller is outside the delivery radius
+    const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
+    const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+    const outOfRadius = isDeliveryEnabled
+        && itemType === "produto"
+        && distanceKm != null
+        && maxDeliveryKm != null
+        && maxDeliveryKm > 0
+        && distanceKm > maxDeliveryKm
+
+    const deliveryTime = (showDeliveryTime && !outOfRadius)
         ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : ((product as any).delivery_time_formatted || partner?.delivery_time_formatted ? formatAverageDeliveryTimeFromRange((product as any).delivery_time_formatted || partner?.delivery_time_formatted) : null))
         : null
 
-    const rawFee = estimateDeliveryFeeLabel({
+    const rawFee = outOfRadius ? null : (estimateDeliveryFeeLabel({
         distanceKm,
         baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
         includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
@@ -416,12 +438,14 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
         maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
         isDeliveryEnabled,
         deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-    }) || partner?.delivery_fee_formatted || (product as any).delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null)
+    }) || partner?.delivery_fee_formatted || (product as any).delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
 
     const isFreeDelivery = rawFee ? (rawFee.toLowerCase().includes("grátis") || rawFee.toLowerCase().includes("gratis")) : false
-    const deliveryFeeLabel = isFreeDelivery
-        ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis")
-        : rawFee
+    const deliveryFeeLabel = outOfRadius
+        ? null
+        : (isFreeDelivery
+            ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis")
+            : rawFee)
 
     const serviceDuration = itemType === "servico"
         ? formatServiceDuration((product as any).duration_minutes ?? (product as any).durationMinutes ?? (product as any).duration)

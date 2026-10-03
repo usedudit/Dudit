@@ -516,6 +516,13 @@ const PaymentModal = ({
     const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
     const [showMpPixModal, setShowMpPixModal] = useState(false);
     const [isCheckingMpPixStatus, setIsCheckingMpPixStatus] = useState(false);
+    const [isRegeneratingDepositPix, setIsRegeneratingDepositPix] = useState(false);
+    const [isRegeneratingMpPix, setIsRegeneratingMpPix] = useState(false);
+    const [mpPixGeneratedAt, setMpPixGeneratedAt] = useState<number | null>(null);
+    const [depositPixGeneratedAt, setDepositPixGeneratedAt] = useState<number | null>(null);
+    const [boletoGeneratedAt, setBoletoGeneratedAt] = useState<number | null>(null);
+    const [isRegeneratingBoleto, setIsRegeneratingBoleto] = useState(false);
+    const mpBrickFormDataRef = useRef<any>(null);
     const [existingSinalLoaded, setExistingSinalLoaded] = useState(false);
 
     // Load existing sinal QR code data from MP when order already has a deposit
@@ -532,6 +539,7 @@ const PaymentModal = ({
             .then((data) => {
                 if (data && data.pixData && depositChargeAmount > 0.009) {
                     setDepositMpPixData({ qrCode: data.pixData.qrCode, qrCodeBase64: data.pixData.qrCodeBase64 });
+                setDepositPixGeneratedAt(Date.now());
                     setDepositMpPaymentId(data.paymentId || data.mpPaymentId || null);
                     setExistingSinalLoaded(true);
                 }
@@ -566,7 +574,14 @@ const PaymentModal = ({
                     }
                     invalidate();
                 } else {
-                    toast({ title: "Aguardando pagamento", description: "O Pix do sinal ainda não consta como pago." });
+                    const isExpired = (res.status === "cancelled" || res.status === "expired" || res.status === "failed") ||
+                        (depositPixGeneratedAt !== null && (Date.now() - depositPixGeneratedAt > PIX_EXPIRATION_MS));
+                    if (isExpired) {
+                        toast({ title: "Pix expirado", description: "O QR Code do sinal expirou. Regenerando..." });
+                        await handleRegenerateDepositCharge();
+                    } else {
+                        toast({ title: "Aguardando pagamento", description: "O Pix do sinal ainda não consta como pago." });
+                    }
                 }
             } else {
                 toast({
@@ -671,6 +686,7 @@ const PaymentModal = ({
             });
             if (res?.pixData?.qrCode) {
                 setDepositMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
+                setDepositPixGeneratedAt(Date.now());
                 setDepositMpPaymentId(res.mpPaymentId);
                 setDepositMeta(buildDepositCheckoutMeta({
                     payDepositOnly: true,
@@ -690,6 +706,164 @@ const PaymentModal = ({
             toast({ title: "Erro", description: "Não foi possível gerar a cobrança de sinal.", variant: "destructive" });
         } finally {
             setGeneratingDepositPix(false);
+        }
+    };
+
+    const PIX_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutos
+
+    const handleRegenerateDepositCharge = async () => {
+        if (isAlreadyFullyPaid) return;
+        if (depositChargeAmount <= 0.009) return;
+        setIsRegeneratingDepositPix(true);
+        try {
+            if (!mpPaymentQuoteRef.current) {
+                const quoteData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+                    method: "POST",
+                    body: {
+                        products: cart.map((item: any) => ({
+                            id: item.productId || item.id,
+                            variant_id: item.variantId || item.variant_id || undefined,
+                            service_id: item.serviceId || item.service_id || undefined,
+                            name: item.name,
+                            quantity: item.quantity,
+                        })),
+                        partnerId,
+                        quoteOnly: true,
+                    },
+                });
+                mpPaymentQuoteRef.current = quoteData.payment_quote || null;
+            }
+            if (!mpPaymentQuoteRef.current) throw new Error("Não foi possível validar a cotação do pagamento.");
+            const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+            const nameParts = customerName ? customerName.split(/\s+/) : [];
+            const firstName = nameParts[0] || undefined;
+            const lastName = nameParts.slice(1).join(" ") || undefined;
+            const customerEmail = (customer?.email || customer?.customer_email || customer?.user?.email || "").trim();
+            const customerCpfCnpj = String(customer?.cpf_cnpj || customer?.cpf || customer?.cnpj || customer?.doc || "").replace(/\D/g, "");
+
+            const res = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
+                method: "POST",
+                body: {
+                    paymentFormData: {
+                        payment_method_id: "pix",
+                        payer: {
+                            email: customerEmail || undefined,
+                            first_name: firstName,
+                            last_name: lastName,
+                            ...(customerCpfCnpj ? {
+                                identification: {
+                                    type: customerCpfCnpj.length > 11 ? "CNPJ" : "CPF",
+                                    number: customerCpfCnpj,
+                                }
+                            } : {}),
+                        }
+                    },
+                    partnerId,
+                    orderId,
+                    amount: depositChargeAmount,
+                    paymentQuote: mpPaymentQuoteRef.current,
+                    description: `Sinal - ${customerName || "Cliente"}`,
+                    isDepositCharge: true,
+                    depositMeta: buildDepositCheckoutMeta({
+                        payDepositOnly: true,
+                        depositPercent: Number(effectiveDepositPercent || propsDepositPercentage || 0),
+                        serviceDepositAmount: depositChargeAmount,
+                        fullOrderTotal: total,
+                        initialChargeAmount: depositChargeAmount,
+                        paymentProvider: "Mercado Pago",
+                    }),
+                },
+            });
+            if (res?.pixData?.qrCode) {
+                setDepositMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
+                setDepositPixGeneratedAt(Date.now());
+                setDepositMpPaymentId(res.mpPaymentId);
+                setDepositMeta(buildDepositCheckoutMeta({
+                    payDepositOnly: true,
+                    depositPercent: Number(effectiveDepositPercent || propsDepositPercentage || 0),
+                    serviceDepositAmount: depositChargeAmount,
+                    fullOrderTotal: total,
+                    initialChargeAmount: depositChargeAmount,
+                    paymentProvider: "Mercado Pago",
+                }));
+                toast({ title: "Pix regenerado", description: "Novo QR Code do sinal gerado." });
+            } else {
+                toast({ title: "Erro", description: res?.error || "Falha ao regenerar Pix.", variant: "destructive" });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Não foi possível regenerar a cobrança de sinal.", variant: "destructive" });
+        } finally {
+            setIsRegeneratingDepositPix(false);
+        }
+    };
+
+    const handleRegenerateMpPix = async () => {
+        if (isAlreadyFullyPaid) return;
+        setIsRegeneratingMpPix(true);
+        try {
+            if (!mpPaymentQuoteRef.current) {
+                const quoteData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+                    method: "POST",
+                    body: {
+                        products: cart.map((item: any) => ({
+                            id: item.productId || item.id,
+                            variant_id: item.variantId || item.variant_id || undefined,
+                            service_id: item.serviceId || item.service_id || undefined,
+                            name: item.name,
+                            quantity: item.quantity,
+                        })),
+                        partnerId,
+                        quoteOnly: true,
+                    },
+                });
+                mpPaymentQuoteRef.current = quoteData.payment_quote || null;
+            }
+            if (!mpPaymentQuoteRef.current) throw new Error("Não foi possível validar a cotação do pagamento.");
+            const customerName = (customer?.name || customer?.full_name || customer?.fullName || customer?.customer_name || "").trim();
+            const nameParts = customerName ? customerName.split(/\s+/) : [];
+            const firstName = nameParts[0] || undefined;
+            const lastName = nameParts.slice(1).join(" ") || undefined;
+            const customerEmail = (customer?.email || customer?.customer_email || customer?.user?.email || "").trim();
+            const customerCpfCnpj = String(customer?.cpf_cnpj || customer?.cpf || customer?.cnpj || customer?.doc || "").replace(/\D/g, "");
+
+            const res = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
+                method: "POST",
+                body: {
+                    paymentFormData: {
+                        payment_method_id: "pix",
+                        payer: {
+                            email: customerEmail || undefined,
+                            first_name: firstName,
+                            last_name: lastName,
+                            ...(customerCpfCnpj ? {
+                                identification: {
+                                    type: customerCpfCnpj.length > 11 ? "CNPJ" : "CPF",
+                                    number: customerCpfCnpj,
+                                }
+                            } : {}),
+                        }
+                    },
+                    partnerId,
+                    orderId,
+                    amount: chargeTarget,
+                    paymentQuote: mpPaymentQuoteRef.current,
+                    description: `Venda ERP - ${customerName || "Cliente"}`,
+                },
+            });
+            if (res?.pixData?.qrCode) {
+                setMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
+                setMpPixGeneratedAt(Date.now());
+                if (res.mpPaymentId) setMpPaymentId(res.mpPaymentId);
+                toast({ title: "Pix regenerado", description: "Novo QR Code gerado." });
+            } else {
+                toast({ title: "Erro", description: res?.error || "Falha ao regenerar Pix.", variant: "destructive" });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Não foi possível regenerar o Pix.", variant: "destructive" });
+        } finally {
+            setIsRegeneratingMpPix(false);
         }
     };
 
@@ -898,10 +1072,13 @@ const PaymentModal = ({
             setMpIsProcessing(false);
             setMpPixData(null);
             setShowMpPixModal(false);
+            setMpPixGeneratedAt(null);
             setMpBoletoData(null);
+            setBoletoGeneratedAt(null);
             setMpPaymentId(null);
             setPreCreatedOrderId(null);
             mpPaymentQuoteRef.current = null;
+            mpBrickFormDataRef.current = null;
             setMpIsCheckingStatus(false);
             setIsCheckingMpPixStatus(false);
             mpBrickInitializedRef.current = false;
@@ -1212,6 +1389,7 @@ const PaymentModal = ({
         setMpBrickError(null);
         try {
             const resolvedFormData = formData.formData || formData;
+            mpBrickFormDataRef.current = resolvedFormData;
             const deviceId = (window as any).MP_DEVICE_SESSION_ID || null;
 
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
@@ -1263,6 +1441,7 @@ const PaymentModal = ({
                 const pix = responseData.pixData;
                 if (pix?.qrCode && pix?.qrCodeBase64) {
                     setMpPixData({ qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64 });
+                    setMpPixGeneratedAt(Date.now());
                     setMpStep("pix");
                     setShowMpPixModal(true);
                 } else {
@@ -1272,6 +1451,7 @@ const PaymentModal = ({
                 const boleto = responseData.boletoData;
                 if (boleto?.barcode || boleto?.ticketUrl) {
                     setMpBoletoData(boleto);
+                    setBoletoGeneratedAt(Date.now());
                     setMpStep("boleto");
                 } else {
                     setMpBrickError("Dados do Boleto não retornados pelo provedor.");
@@ -1346,7 +1526,14 @@ const PaymentModal = ({
                     invalidate();
                     handleMpConfirmPix();
                 } else {
-                    toast({ title: "Aguardando pagamento", description: "O Pix ainda não consta como pago." });
+                    const isExpired = (res.status === "cancelled" || res.status === "expired" || res.status === "failed") ||
+                        (mpPixGeneratedAt !== null && (Date.now() - mpPixGeneratedAt > PIX_EXPIRATION_MS));
+                    if (isExpired) {
+                        toast({ title: "Pix expirado", description: "O QR Code expirou. Regenerando..." });
+                        await handleRegenerateMpPix();
+                    } else {
+                        toast({ title: "Aguardando pagamento", description: "O Pix ainda não consta como pago." });
+                    }
                 }
             } else {
                 toast({
@@ -1374,6 +1561,131 @@ const PaymentModal = ({
         const encodedMsg = encodeURIComponent(messageText);
         const phone = String(customer.phone).replace(/\D/g, "");
         window.open(`https://wa.me/55${phone}?text=${encodedMsg}`, "_blank");
+    };
+
+    const BOLETO_EXPIRATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 dias
+
+    const handleVerifyBoletoPayment = async () => {
+        if (!mpPaymentId) return;
+        setIsCheckingMpPixStatus(true);
+        try {
+            const res = await checkMercadoPagoPaymentStatusAction(mpPaymentId);
+            if (res && 'success' in res && res.success) {
+                if (res.status === "approved") {
+                    const mpLabel = "Boleto (Mercado Pago)";
+                    const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
+                    const mpLeg = {
+                        method: mpLabel,
+                        amount: chargeTarget,
+                        amountReceived: chargeTarget,
+                        paymentMethodId: null,
+                        installmentNumber: 1,
+                        provider: "Mercado Pago",
+                        interestAmount: 0,
+                        feeAmount: 0,
+                        fixedFeeAmount: 0,
+                        feeBearer: "merchant",
+                    };
+                    handleStartProcessing({
+                        paymentMethod: mpLabel,
+                        paymentProvider: "Mercado Pago",
+                        mpPaymentId: mpPaymentId,
+                        paymentStatus: "paid",
+                        paidAmount: existingPaidAmount + chargeTarget,
+                        paymentBreakdown: [...existingLegs, mpLeg],
+                        splitPayments: [],
+                        isPendingDelivery,
+                    });
+                } else {
+                    const isExpired = res.status === "cancelled" || res.status === "expired" || res.status === "failed" ||
+                        (boletoGeneratedAt !== null && (Date.now() - boletoGeneratedAt > BOLETO_EXPIRATION_MS));
+                    if (isExpired) {
+                        toast({ title: "Boleto expirado", description: "O boleto expirou. Regenerando..." });
+                        await handleRegenerateBoleto();
+                    } else {
+                        toast({ title: "Aguardando pagamento", description: "O boleto ainda não consta como pago." });
+                    }
+                }
+            } else {
+                toast({
+                    title: "Erro ao verificar",
+                    description: (res && 'error' in res ? res.error : null) || "Não foi possível consultar o status do pagamento.",
+                    variant: "destructive"
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Ocorreu um erro ao verificar o pagamento.", variant: "destructive" });
+        } finally {
+            setIsCheckingMpPixStatus(false);
+        }
+    };
+
+    const handleRegenerateBoleto = async () => {
+        if (!mpBrickFormDataRef.current || isAlreadyFullyPaid) return;
+        setIsRegeneratingBoleto(true);
+        try {
+            const deviceId = (window as any).MP_DEVICE_SESSION_ID || null;
+            const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
+                method: "POST",
+                body: {
+                    orderId,
+                    paymentFormData: mpBrickFormDataRef.current,
+                    deviceId,
+                    partnerId,
+                    amount: chargeTarget,
+                    paymentQuote: mpPaymentQuoteRef.current,
+                    description: `Venda ERP - ${customer?.name || "Cliente"}`,
+                },
+            });
+            if (responseData.mpPaymentId) setMpPaymentId(responseData.mpPaymentId);
+
+            const status = responseData.paymentStatus;
+            const paymentMethod = responseData.paymentMethod;
+            if (status === "approved") {
+                const mpLabel = responseData.paymentMethodDisplayName || "Boleto (Mercado Pago)";
+                const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
+                const mpLeg = {
+                    method: mpLabel,
+                    amount: chargeTarget,
+                    amountReceived: chargeTarget,
+                    paymentMethodId: null,
+                    installmentNumber: 1,
+                    provider: "Mercado Pago",
+                    interestAmount: 0,
+                    feeAmount: 0,
+                    fixedFeeAmount: 0,
+                    feeBearer: "merchant",
+                };
+                handleStartProcessing({
+                    paymentMethod: mpLabel,
+                    paymentProvider: "Mercado Pago",
+                    mpPaymentId: responseData.mpPaymentId,
+                    paymentStatus: "paid",
+                    paidAmount: existingPaidAmount + chargeTarget,
+                    paymentBreakdown: [...existingLegs, mpLeg],
+                    splitPayments: [],
+                    isPendingDelivery,
+                });
+            } else if (status === "pending" && (paymentMethod === "bolbradesco" || paymentMethod === "boleto" || paymentMethod === "ticket")) {
+                const boleto = responseData.boletoData;
+                if (boleto?.barcode || boleto?.ticketUrl) {
+                    setMpBoletoData(boleto);
+                    setBoletoGeneratedAt(Date.now());
+                    setMpStep("boleto");
+                    toast({ title: "Boleto regenerado", description: "Novo boleto gerado via Mercado Pago." });
+                } else {
+                    setMpBrickError("Dados do Boleto não retornados pelo provedor.");
+                }
+            } else {
+                setMpBrickError(`Status inesperado do pagamento: ${status}`);
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Não foi possível regenerar o boleto.", variant: "destructive" });
+        } finally {
+            setIsRegeneratingBoleto(false);
+        }
     };
 
     const activeSplitLegs = useMemo(
@@ -1973,8 +2285,10 @@ const PaymentModal = ({
             setMpStep('brick');
             setMpPixData(null);
             setShowMpPixModal(false);
+            setMpPixGeneratedAt(null);
             setIsCheckingMpPixStatus(false);
             setMpBoletoData(null);
+            setBoletoGeneratedAt(null);
             setMpPaymentId(null);
             setView('methods');
         } else if (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit') {
@@ -3584,13 +3898,17 @@ const PaymentModal = ({
                                                     )}
 
                                                     {mpBoletoData.ticketUrl && (
-                                                        <a href={mpBoletoData.ticketUrl} target="_blank" rel="noopener noreferrer" className="w-full max-w-sm mb-4">
+                                                        <a href={mpBoletoData.ticketUrl} target="_blank" rel="noopener noreferrer" className="w-full max-w-sm mb-2">
                                                             <Button variant="outline" className="w-full h-12">
                                                                 <PrinterIcon size={18} className="mr-2" />
                                                                 Abrir Boleto
                                                             </Button>
                                                         </a>
                                                     )}
+
+                                                    <Button variant="link" className="w-full max-w-sm h-12 mb-2" onClick={handleVerifyBoletoPayment} isLoading={isCheckingMpPixStatus}>
+                                                        Verificar pagamento
+                                                    </Button>
 
                                                     <Button variant="filled" className="w-full max-w-sm h-12 mt-2" onClick={() => {
                                                         handleStartProcessing({
@@ -3989,6 +4307,7 @@ const PaymentModal = ({
                     isOpen={showDepositPixModal}
                     onClose={() => {
                         setShowDepositPixModal(false);
+                        setDepositPixGeneratedAt(null);
                     }}
                     qrCode={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
                     payload={depositMpPixData.qrCode}
@@ -4007,6 +4326,7 @@ const PaymentModal = ({
                         setShowMpPixModal(false);
                         setMpPixData(null);
                         setMpStep("brick");
+                        setMpPixGeneratedAt(null);
                     }}
                     qrCode={`data:image/png;base64,${mpPixData.qrCodeBase64}`}
                     payload={mpPixData.qrCode}

@@ -160,6 +160,7 @@ function ErpPlanGatedNavItem({
     icon: Icon,
     iconClassName,
     isActiveGroup,
+    children,
 }: {
     href: string
     label: string
@@ -170,6 +171,7 @@ function ErpPlanGatedNavItem({
     icon?: React.ComponentType<{ className?: string }>
     iconClassName?: string
     isActiveGroup?: boolean
+    children?: React.ReactNode
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const minimumPlan = PLAN_GATED_MINIMUM[href]
@@ -187,6 +189,7 @@ function ErpPlanGatedNavItem({
                 <span className={cn("truncate", labelClass)}>{label}</span>
                 {star ? <img src={star} alt="" className="w-4 h-4 shrink-0 object-contain" /> : null}
             </span>
+            {children}
         </>
     )
 
@@ -575,7 +578,16 @@ export function ERPSidebar() {
                                                                     toggleSubmenu(item.label)
                                                                 }
                                                             }}
-                                                        />
+                                                        >
+                                                            {hasSubmenu && !isCollapsed && (
+                                                                <ChevronDownIcon
+                                                                    className={cn(
+                                                                        "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
+                                                                        isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                                    )}
+                                                                />
+                                                            )}
+                                                        </ErpPlanGatedNavItem>
                                                     )
                                                 }
 
@@ -613,6 +625,15 @@ export function ERPSidebar() {
                                                         >
                                                             {item.label}
                                                         </span>
+
+                                                        {hasSubmenu && !isCollapsed && (
+                                                            <ChevronDownIcon
+                                                                className={cn(
+                                                                    "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
+                                                                    isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                                )}
+                                                            />
+                                                        )}
                                                     </IntentPrefetchLink>
                                                 )
                                             })()

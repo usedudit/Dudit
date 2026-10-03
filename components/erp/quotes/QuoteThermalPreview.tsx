@@ -149,8 +149,16 @@ export default function QuoteThermalPreview({
                         </p>
                     ) : null}
                     <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
+                        <span>Cliente:</span>
+                        {selectedCustomer ? (
+                            <span> {selectedCustomer.name}</span>
+                        ) : (
+                            <span>{QUOTE_DEFAULT_CUSTOMER_LABEL}</span>
+                        )}
+                    </div>
+                    <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
                         <span>Nº Orçamento:</span>
-                        <span className="font-bold">{invoiceNumber}</span>
+                        <span>{invoiceNumber}</span>
                     </div>
                     <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
                         <span>Emissão:</span>
@@ -166,46 +174,6 @@ export default function QuoteThermalPreview({
                             <span>{salespersonName}</span>
                         </div>
                     ) : null}
-                </div>
-
-                <DashedLine className="my-1.5" />
-
-                {/* Dados do cliente */}
-                <div className="space-y-0.5 text-[10.5px]" style={{ color: "#000000" }}>
-                    <p className="font-bold text-[9.5px] uppercase" style={{ color: "#000000" }}>Cliente:</p>
-                    {selectedCustomer ? (
-                        <>
-                            <p className="font-bold text-[10.5px]" style={{ color: "#000000" }}>
-                                {selectedCustomer.name}
-                            </p>
-                            {selectedCustomer.phone ? (
-                                <p className="leading-tight" style={{ color: "#000000" }}>
-                                    {formatBrazilPhone(selectedCustomer.phone)}
-                                </p>
-                            ) : null}
-                            {selectedCustomer.addresses && selectedCustomer.addresses.length > 0 ? (
-                                (() => {
-                                    const addr = selectedCustomer.addresses.find(
-                                        (a: any) => a.address_type === "primary" || a.is_default
-                                    ) || selectedCustomer.addresses[0]
-                                    const addrText = addr
-                                        ? [addr.street, addr.number, addr.complement, addr.neighborhood, addr.city]
-                                              .filter(Boolean)
-                                              .join(" - ")
-                                        : null
-                                    return addrText ? (
-                                        <p className="leading-tight whitespace-pre-line" style={{ color: "#000000" }}>
-                                            {addrText}
-                                        </p>
-                                    ) : null
-                                })()
-                            ) : null}
-                        </>
-                    ) : (
-                        <p className="leading-tight" style={{ color: "#000000" }}>
-                            {QUOTE_DEFAULT_CUSTOMER_LABEL}
-                        </p>
-                    )}
                 </div>
 
                 <DashedLine className="my-1.5" />

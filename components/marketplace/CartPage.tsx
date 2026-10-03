@@ -69,6 +69,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
     const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
     const deliveryQuoteSeqRef = useRef<Record<string, number>>({})
+    const carrierFetchedKeysRef = useRef<Record<string, string>>({})
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [showNewAddressForm, setShowNewAddressForm] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
@@ -679,6 +680,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 // Limpa estado antigo — senão um erro "raio" de quando havia produtos
                 // selecionados permaneceria e dispararia a cotação de transportadora.
                 deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
+                delete carrierFetchedKeysRef.current[storeKey]
                 setDeliveryQuotes(prev => {
                     if (!(storeKey in prev)) return prev
                     const next = { ...prev }
@@ -708,6 +710,45 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
                 ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
                 : null
+
+            // Transportadora em PARALELO com o frete próprio: o SuperFrete já
+            // responde enquanto o geocoding/radi check roda; se o frete próprio
+            // cobrir, as opções simplesmente ficam escondidas (gate por "raio").
+            const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
+            if (destinationCep.length === 8 && data.partner?.mp_user_id) {
+                const carrierKey = `${targetPartnerId}:${destinationCep}`
+                if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
+                    carrierFetchedKeysRef.current[storeKey] = carrierKey
+                    setCarrierQuotes(prev => ({
+                        ...prev,
+                        [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: carrierKey },
+                    }))
+                    quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: destinationCep }).then(res => {
+                        if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
+                        setCarrierQuotes(prev => {
+                            const cur = prev[storeKey]
+                            if (!cur || cur.key !== carrierKey) return prev
+                            if (res.success && res.options.length > 0) {
+                                return {
+                                    ...prev,
+                                    [storeKey]: { options: res.options, loading: false, error: null, selectedServiceId: res.options[0].serviceId, key: carrierKey },
+                                }
+                            }
+                            return {
+                                ...prev,
+                                [storeKey]: { options: [], loading: false, error: !res.success ? res.error : "Nenhuma transportadora disponível para este endereço.", selectedServiceId: null, key: carrierKey },
+                            }
+                        })
+                    }).catch(() => {
+                        if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
+                        setCarrierQuotes(prev => {
+                            const cur = prev[storeKey]
+                            if (!cur || cur.key !== carrierKey) return prev
+                            return { ...prev, [storeKey]: { ...cur, loading: false, options: [], selectedServiceId: null, error: "Não foi possível calcular o frete agora." } }
+                        })
+                    })
+                }
+            }
 
             quoteDeliveryFeeAction({
                 partnerId: targetPartnerId,
@@ -756,53 +797,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         })
     }, [selectedAddress, optimisticItems, itemsByPartner])
 
-    // Quote carrier options per partner once own delivery reports no coverage ("raio")
-    useEffect(() => {
-        if (!selectedAddress) return
-        const destinationCep = String(selectedAddress.zip_code || "").replace(/\D/g, "")
-        if (destinationCep.length !== 8) return
-
-        Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
-            if (hasOnlyServices(data.items || [])) return
-            const quote = deliveryQuotes[storeKey]
-            if (!quote || quote.loading || !quote.error || !quote.error.toLowerCase().includes("raio")) return
-            // Frete nacional só é liberado com Mercado Pago conectado (igual ao sinal)
-            if (!data.partner?.mp_user_id) return
-
-            const partnerId = data.partnerId || data.partner?.id || storeKey
-            const dedupeKey = `${partnerId}:${destinationCep}`
-            if (carrierQuotes[storeKey]?.key === dedupeKey) return
-
-            setCarrierQuotes(prev => ({
-                ...prev,
-                [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: dedupeKey },
-            }))
-
-            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep }).then(res => {
-                setCarrierQuotes(prev => {
-                    const cur = prev[storeKey]
-                    if (!cur || cur.key !== dedupeKey) return prev
-                    if (res.success && res.options.length > 0) {
-                        return {
-                            ...prev,
-                            [storeKey]: { options: res.options, loading: false, error: null, selectedServiceId: res.options[0].serviceId, key: dedupeKey },
-                        }
-                    }
-                    return {
-                        ...prev,
-                        [storeKey]: { options: [], loading: false, error: !res.success ? res.error : "Nenhuma transportadora disponível para este endereço.", selectedServiceId: null, key: dedupeKey },
-                    }
-                })
-            }).catch(() => {
-                setCarrierQuotes(prev => {
-                    const cur = prev[storeKey]
-                    if (!cur || cur.key !== dedupeKey) return prev
-                    return { ...prev, [storeKey]: { ...cur, loading: false, options: [], selectedServiceId: null, error: "Não foi possível calcular o frete agora." } }
-                })
-            })
-        })
-    }, [selectedAddress, deliveryQuotes, itemsByPartner, carrierQuotes])
-
     const handleCarrierQuoteSelect = (storeKey: string, opt: CarrierFreightOption) => {
         setCarrierQuotes(prev => ({
             ...prev,
@@ -810,8 +804,17 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         }))
     }
 
+    // A transportadora só é válida/exibida quando o frete próprio falhou por
+    // raio — a cotação SuperFrete é pré-buscada em paralelo e fica oculta
+    // enquanto o frete próprio cobre normalmente.
+    const isOwnQuoteRaio = (storeKey?: string) => {
+        if (!storeKey) return false
+        const q = deliveryQuotes[storeKey]
+        return Boolean(q && !q.loading && q.error && q.error.toLowerCase().includes("raio"))
+    }
+
     const getCarrierSelectedOption = (storeKey?: string) => {
-        if (!storeKey) return null
+        if (!storeKey || !isOwnQuoteRaio(storeKey)) return null
         const cq = carrierQuotes[storeKey]
         if (!cq || cq.selectedServiceId == null || cq.options.length === 0) return null
         return cq.options.find(o => o.serviceId === cq.selectedServiceId) || null
@@ -819,6 +822,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const renderCarrierQuote = (storeKey: string) => {
         if (hasOnlyServices(itemsByPartner[storeKey]?.items || [])) return null
+        if (!isOwnQuoteRaio(storeKey)) return null
         const cq = carrierQuotes[storeKey]
         if (!cq || (!cq.loading && cq.options.length === 0 && !cq.error)) return null
         return (
@@ -917,7 +921,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (carrierOption) {
             return formatCurrency(Number(carrierOption.price))
         }
-        const carrierQuoteState = storeKey ? carrierQuotes[storeKey] : null
+        const carrierQuoteState = storeKey && isOwnQuoteRaio(storeKey) ? carrierQuotes[storeKey] : null
         if (carrierQuoteState?.loading) {
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando frete nacional...</span>
         }

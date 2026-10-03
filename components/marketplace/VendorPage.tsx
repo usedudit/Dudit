@@ -834,7 +834,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const deliveryNode = useMemo<ReactNode | null>(() => {
         if (deliveryInfo.outOfRadius) {
-            return <span className="font-medium text-brand-red">Fora da área de entrega - Verifique sua localização</span>
+            return null
         }
         if (!deliveryInfo.isDeliveryEnabled || !deliveryInfo.sellsProducts) {
             return <span className="font-medium text-brand-dark dark:text-dark-heading">Retirada no local</span>

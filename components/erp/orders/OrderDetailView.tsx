@@ -211,8 +211,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isFullOrder = Boolean(initialOrder && (initialOrder.order_items || initialOrder.items) && !initialOrder.__partial)
-    const [order, setOrder] = useState<any>(isFullOrder ? initialOrder : null)
-    const [loading, setLoading] = useState(!isFullOrder)
+    const [order, setOrder] = useState<any>(initialOrder || null)
+    const [loading, setLoading] = useState(!initialOrder)
     const [activeTab, setActiveTab] = useState("summary")
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -282,6 +282,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         }
     }, [])
 
+    useEffect(() => {
+        if (initialOrder && (initialOrder.order_items || initialOrder.items) && !initialOrder.__partial) {
+            setOrder(initialOrder)
+            setLoading(false)
+        }
+    }, [initialOrder])
+
     // Always fetch full data in background, even if we have initialOrder
     useEffect(() => {
         let mounted = true
@@ -289,7 +296,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         async function load() {
             try {
                 // Only show loading spinner if we have NO data at all
-                if (!initialOrder) setLoading(true)
+                if (!initialOrder && !order) setLoading(true)
 
                 const res = await getOrderDetailsAction(orderId, partnerId)
                 if (!mounted) return
@@ -299,14 +306,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 } else {
                     const errorMsg = res && 'error' in res && typeof res.error === 'string' ? res.error : "Erro ao carregar detalhes do pedido"
                     console.error("[OrderDetailView] error loading order details:", errorMsg)
-                    if (!initialOrder) {
+                    if (!initialOrder && !order) {
                         notifyError("Erro", errorMsg)
                         onBack()
                     }
                 }
             } catch (err: any) {
                 console.error("[OrderDetailView] failed to fetch order details:", err)
-                if (!initialOrder) {
+                if (!initialOrder && !order) {
                     notifyError("Erro", err?.message || "Erro desconhecido")
                     onBack()
                 }
@@ -317,9 +324,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
         load()
         return () => { mounted = false }
-    }, [orderId, partnerId, initialOrder, notifyError, onBack])
+    }, [orderId, partnerId, notifyError, onBack])
 
+    // Lazy load delivery summary only when delivery tab is active
     useEffect(() => {
+        if (activeTab !== "delivery") return
         let mounted = true
         async function loadDelivery() {
             if (!orderId || !partnerId) return
@@ -333,7 +342,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         }
         loadDelivery()
         return () => { mounted = false }
-    }, [orderId, partnerId])
+    }, [activeTab, orderId, partnerId])
 
     const loadFinancialBreakdown = useCallback(async () => {
         if (financialData) {

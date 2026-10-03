@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { DefaultModal, Button, Input, FormTextarea, PhoneInput, Spinner, ListItem } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
-import { CheckCircleIcon, MapPinIcon, ClockIcon, ArrowRightIcon, FileIcon } from "@/lib/icons"
+import { CheckCircleIcon, MapPinIcon, ClockIcon, FileIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { requestMarketplaceQuoteAction } from "@/app/actions/marketplace/quotes"
 
@@ -52,6 +52,11 @@ export function RequestQuoteModal({
     const [additionalNotes, setAdditionalNotes] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
+
+    const MAX_DESCRIPTION = 500
+    const MAX_PREFERRED_DATE = 100
+    const MAX_SERVICE_LOCATION = 200
+    const MAX_ADDITIONAL_NOTES = 200
 
     // Reset state when modal opens
     useEffect(() => {
@@ -161,34 +166,6 @@ export function RequestQuoteModal({
             onClose={handleClose}
             title={isSuccess ? "Solicitação Enviada!" : "Solicitar Orçamento"}
             maxWidth="lg"
-            footer={
-                <div className="flex items-center justify-end gap-2.5">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSubmitting || !description.trim() || !phone.trim()}
-                        className="min-w-[170px]"
-                    >
-                        {isSubmitting ? (
-                            <span className="flex items-center gap-2">
-                                <Spinner />
-                                Enviando...
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-2">
-                                Enviar Solicitação
-                            </span>
-                        )}
-                    </Button>
-                </div>
-            }
         >
             {isSuccess ? (
                 <div className="flex flex-col items-center justify-center text-center py-6 px-2 space-y-4">
@@ -220,6 +197,7 @@ export function RequestQuoteModal({
                         icon={FileIcon}
                         title={`${service.name} - A partir de ${formatCurrency(startingPrice)}`}
                         description={partner.store_name || "Prestador Dudit"}
+                        className="px-4 py-3"
                     />
 
                     {/* Description field */}
@@ -228,10 +206,12 @@ export function RequestQuoteModal({
                             label="O que você precisa?"
                             name="description"
                             value={description}
-                            onChange={(e: any) => setDescription(e.target.value)}
+                            onChange={(e: any) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION))}
                             placeholder="Descreva os detalhes do serviço que você precisa, medidas, ambiente, modelo ou necessidades específicas..."
                             rows={4}
                             required
+                            maxLength={MAX_DESCRIPTION}
+                            showCharacterCount
                         />
                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1 block">
                             Quanto mais detalhes você fornecer, mais precisa será a proposta do prestador.
@@ -256,8 +236,10 @@ export function RequestQuoteModal({
                                 label="Prazo / Data desejada"
                                 name="preferredDate"
                                 value={preferredDate}
-                                onChange={(e: any) => setPreferredDate(e.target.value)}
+                                onChange={(e: any) => setPreferredDate(e.target.value.slice(0, MAX_PREFERRED_DATE))}
                                 placeholder="Ex: Próxima semana, até 25/10..."
+                                maxLength={MAX_PREFERRED_DATE}
+                                showCharacterCount
                             />
                         </div>
                     </div>
@@ -306,8 +288,10 @@ export function RequestQuoteModal({
                                 label="Endereço do local do serviço"
                                 name="serviceLocation"
                                 value={serviceLocation}
-                                onChange={(e: any) => setServiceLocation(e.target.value)}
+                                onChange={(e: any) => setServiceLocation(e.target.value.slice(0, MAX_SERVICE_LOCATION))}
                                 placeholder="Bairro, Rua, Número, Cidade..."
+                                maxLength={MAX_SERVICE_LOCATION}
+                                showCharacterCount
                             />
                         </div>
                     )}
@@ -318,10 +302,38 @@ export function RequestQuoteModal({
                             label="Observações adicionais"
                             name="additionalNotes"
                             value={additionalNotes}
-                            maxLength={200}
-                            onChange={(e: any) => setAdditionalNotes(e.target.value)}
+                            onChange={(e: any) => setAdditionalNotes(e.target.value.slice(0, MAX_ADDITIONAL_NOTES))}
+                            maxLength={MAX_ADDITIONAL_NOTES}
+                            showCharacterCount
                             placeholder="Horário preferido para contato, restrições, etc."
                         />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2.5 pt-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleClose}
+                            disabled={isSubmitting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting || !description.trim() || !phone.trim()}
+                            className="min-w-[170px]"
+                        >
+                            {isSubmitting ? (
+                                <span className="flex items-center gap-2">
+                                    <Spinner />
+                                    Enviando...
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                    Enviar Solicitação
+                                </span>
+                            )}
+                        </Button>
                     </div>
                 </form>
             )}

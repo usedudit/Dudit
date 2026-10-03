@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     ChevronLeftIcon,
     CancelCircleIcon,
@@ -98,9 +98,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isFullQuote = Boolean(initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial);
-    const [quote, setQuote] = useState<any>(isFullQuote ? initialQuote : null);
-    const [loading, setLoading] = useState(!isFullQuote);
-    const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(Boolean(initialQuote));
+    const [quote, setQuote] = useState<any>(initialQuote || null);
+    const [loading, setLoading] = useState(!initialQuote);
+    const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(!isFullQuote);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
@@ -206,8 +206,17 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     }, []);
 
     useEffect(() => {
+        if (initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial) {
+            setQuote(initialQuote);
+            setLoading(false);
+            setIsLoadingQuoteItems(false);
+            lastLoadedQuoteId.current = quoteId;
+        }
+    }, [initialQuote, quoteId]);
+
+    useEffect(() => {
         if (lastLoadedQuoteId.current === quoteId) return;
-        if (initialQuote && initialQuote.items) {
+        if (initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial) {
             setQuote(initialQuote);
             setPendingStatus(initialQuote.status || 'draft');
             setLoading(false);
@@ -215,17 +224,19 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             lastLoadedQuoteId.current = quoteId;
             return;
         }
+        let mounted = true;
         async function load() {
+            if (!quote && !initialQuote) setLoading(true);
             setIsLoadingQuoteItems(true);
-            if (!quote) setLoading(true);
 
             const detailsRes = await getQuoteDetailsAction(quoteId, partnerId);
+            if (!mounted) return;
 
             if (detailsRes.success) {
                 setQuote(detailsRes.data);
                 setPendingStatus(detailsRes.data.status || 'draft');
                 lastLoadedQuoteId.current = quoteId;
-            } else if (!initialQuote) {
+            } else if (!initialQuote && !quote) {
                 notifyError("Erro", detailsRes.error);
                 onBack();
             }
@@ -234,6 +245,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             setIsLoadingQuoteItems(false);
         }
         load();
+        return () => { mounted = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quoteId, partnerId]);
 
@@ -241,8 +253,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         setItemsPage(1);
     }, [quoteId]);
 
+    // Lazy load history only when Histórico tab is active
     useEffect(() => {
-        if (lastLoadedHistoryQuoteId.current === quoteId) return;
+        if (activeTab !== 'Histórico' || lastLoadedHistoryQuoteId.current === quoteId) return;
         let cancelled = false;
         async function loadHistory() {
             setHistoryLoading(true);
@@ -262,7 +275,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         }
         loadHistory();
         return () => { cancelled = true; };
-    }, [quoteId, partnerId]);
+    }, [activeTab, quoteId, partnerId]);
 
     const runConvert = async (acknowledgeUnapprovedConversion: boolean) => {
         setIsConverting(true);

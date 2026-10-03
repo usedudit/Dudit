@@ -515,7 +515,8 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                             </div>
                         </div>
 
-                        {/* Sidebar - Desktop only */}
+                        {/* Right Column / Sidebar */}
+                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                         <SidebarCard hasTopStrip hasSeparator title={
                             <span className="inline-flex items-center gap-2">
                                 Quem paga a entrega
@@ -548,6 +549,7 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                 </button>
                             </div>
                         </SidebarCard>
+                        </div>
                     </div>
                 </div>
             </div >

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal, Tabs, TabsList, TabsTrigger, FormTextarea } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, SavingStatusModal } from "@/components/reusable"
 import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -14,17 +14,16 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
 import { diffCalendarDaysInSaoPaulo, formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
-import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, CreditCardIcon, FileIcon, MoneyIcon, EditIcon, ClockIcon, InstallmentIcon, CheckCircleIcon, CashierIcon, SaveIcon, AlertTriangleIcon, ShoppingCartIcon, Users } from "@/lib/icons"
+import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, CreditCardIcon, FileIcon, MoneyIcon, EditIcon, ClockIcon, InstallmentIcon, CheckCircleIcon, CashierIcon, SaveIcon, ShoppingCartIcon, Users } from "@/lib/icons"
 import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListRow"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
-import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
-import { getInstallmentGroupDetailsAction, updateInstallmentGroupNotesAction } from "@/app/actions/erp/transactions"
+import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
@@ -34,7 +33,6 @@ import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { BulkEditActionsModal, type BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 import { UndoGracePeriodToast } from "@/components/reusable/UndoGracePeriodToast"
-import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -209,7 +207,6 @@ export default function TransactionsPage({
     const [bulkModalOpen, setBulkModalOpen] = useState(false)
     const undoManager = useUndoGracePeriod(10000)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
-    const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
     const [payingInstallment, setPayingInstallment] = useState(false)
     const [paymentModalOpen, setPaymentModalOpen] = useState(false)
@@ -234,9 +231,6 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
-    const [installmentDetailTab, setInstallmentDetailTab] = useState<"general" | "attachments" | "notes">("general")
-    const [installmentNotesText, setInstallmentNotesText] = useState("")
-    const [savingInstallmentNotes, setSavingInstallmentNotes] = useState(false)
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -707,6 +701,7 @@ export default function TransactionsPage({
             collapsedGroups.push({
                 ...nextPending,
                 id: `group-${groupId}`,
+                groupRepresentativeTransactionId: nextPending.id,
                 description: `${nextPending.installmentGroupDescription || nextPending.description} - ${totalCount}x`,
                 installmentGroupId: groupId,
                 installmentTotalCount: totalCount,
@@ -1122,45 +1117,15 @@ export default function TransactionsPage({
         closeEntity()
     }, [closeEntity])
 
-    const handleCloseInstallmentDetail = useCallback(() => {
-        closeEntity()
-        setInstallmentDetail(null)
-    }, [closeEntity])
-
     const { setHeaderOverride } = useSidebar()
 
-    useEffect(() => {
-        if (!(isViewing && entityState.entityType === "installment" && entityState.entityId)) return
-        if (installmentDetail || installmentDetailLoading) return
-        setInstallmentDetailLoading(true)
-        void (async () => {
-            const res = await getInstallmentGroupDetailsAction({
-                partnerId,
-                installmentGroupId: entityState.entityId as string,
-            })
-            if (res.success) setInstallmentDetail(res.data)
-            else notifyError(res.error || "Erro ao carregar parcelado")
-            setInstallmentDetailLoading(false)
-        })()
-    }, [isViewing, entityState.entityType, entityState.entityId, installmentDetail, installmentDetailLoading, partnerId, notifyError])
-
     const refreshInstallmentDetail = useCallback(async (groupId?: string | null) => {
-        const gid = groupId || (entityState.entityType === "installment" ? entityState.entityId : null)
+        const gid = groupId
         if (!gid) return
         const res = await getInstallmentGroupDetailsAction({ partnerId, installmentGroupId: gid })
         if (res.success) setInstallmentDetail(res.data)
-        else notifyError(res.error || "Erro ao atualizar parcelado")
-    }, [partnerId, entityState.entityType, entityState.entityId, notifyError])
-
-    useEffect(() => {
-        if (!(isViewing && entityState.entityType === "installment")) return
-        setHeaderOverride({
-            title: "Detalhes do parcelamento",
-            onBack: handleCloseInstallmentDetail,
-            isSubPage: true
-        })
-        return () => setHeaderOverride(null)
-    }, [isViewing, entityState.entityType, handleCloseInstallmentDetail, setHeaderOverride])
+        else notifyError(res.error || "Erro ao atualizar parcelas")
+    }, [partnerId, notifyError])
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {
@@ -1318,24 +1283,10 @@ export default function TransactionsPage({
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
-            // Installment group with pending → open installment detail view
-            if (transaction.isInstallmentGroup && transaction.installmentGroupId && Number(transaction.installmentPendingCount || 0) > 0) {
-                openEntity("view", transaction.installmentGroupId, "installment")
-                setInstallmentDetail(null)
-                setInstallmentDetailLoading(true)
-                void (async () => {
-                    const res = await getInstallmentGroupDetailsAction({
-                        partnerId,
-                        installmentGroupId: transaction.installmentGroupId as string,
-                    })
-                    if (res.success) setInstallmentDetail(res.data)
-                    else notifyError(res.error || "Erro ao carregar parcelado")
-                    setInstallmentDetailLoading(false)
-                })()
-                return
-            }
-            // Fully paid installment group → view representative transaction
-            if (transaction.isInstallmentGroup && Number(transaction.installmentPendingCount || 0) === 0) {
+            // Installment group → open the representative transaction's normal detail
+            // view, which renders the timeline, transaction items, details, customer
+            // card AND the "Parcelas da transação" FormSection (installment breakdown).
+            if (transaction.isInstallmentGroup && transaction.installmentGroupId) {
                 const representativeId = transaction.groupRepresentativeTransactionId || transaction.id
                 openEntity("view", representativeId)
                 return
@@ -2147,187 +2098,6 @@ export default function TransactionsPage({
 
                 {renderSharedModals()}
             </FadeIn>
-        )
-    }
-
-    if (isViewing && entityState.entityType === "installment") {
-        if (installmentDetailLoading) {
-            return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
-                    <ThreeDotsLoader />
-                </div>
-            )
-        }
-        if (!installmentDetail) return null
-        const representativeTxId = installmentDetail?.installments?.[0]?.id || entityState.entityId
-        return (
-            <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
-
-                        {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                                {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={() => {
-                                        closeEntity()
-                                        setInstallmentDetail(null)
-                                        setInstallmentDetailTab("general")
-                                    }}
-                                        className="w-10 h-10 p-0 flex items-center justify-center">
-                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    </Button>
-                                </div>
-
-                                {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">Detalhes do parcelamento</span>
-                                        </h1>
-
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Resumo completo e gestão de parcelas
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Tabs */}
-                                <div className="w-full transition-all duration-500 md:mt-4">
-                                    <Tabs value={installmentDetailTab} onValueChange={(v) => setInstallmentDetailTab(v as any)}>
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="general">Dados Gerais</TabsTrigger>
-                                            <TabsTrigger value="attachments">Anexos</TabsTrigger>
-                                            <TabsTrigger value="notes">Observações</TabsTrigger>
-                                        </TabsList>
-                                    </Tabs>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Scrollable Content */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6">
-                                {installmentDetailLoading ? (
-                                    <ThreeDotsLoader />
-                                ) : installmentDetail ? (
-                                    <>
-                                        {installmentDetailTab === "general" && (
-                                            <div className="space-y-4">
-                                                {(() => {
-                                                    const total = Number(installmentDetail.group?.total_amount || 0)
-                                                    const rows = installmentDetail.installments || []
-                                                    const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                                    const overdue = rows
-                                                        .filter((row: any) => row.status === "overdue")
-                                                        .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                                    const pending = Math.max(0, total - paid)
-                                                    return (
-                                                        <HorizontalKPICard
-                                                            items={[
-                                                                { title: "Total", value: formatCurrency(total), icon: FileIcon, iconBg: "bg-indigo-50 dark:bg-indigo-950/20", iconColor: "text-indigo-600 dark:text-indigo-400" },
-                                                                { title: "Pago", value: formatCurrency(paid), icon: CheckCircleIcon, iconBg: "bg-emerald-50 dark:bg-emerald-950/20", iconColor: "text-emerald-600 dark:text-emerald-400" },
-                                                                { title: "Restante", value: formatCurrency(pending), icon: ClockIcon, iconBg: "bg-amber-50 dark:bg-amber-950/20", iconColor: "text-amber-600 dark:text-amber-400" },
-                                                                { title: "Vencido", value: formatCurrency(overdue), icon: AlertTriangleIcon, iconBg: "bg-rose-50 dark:bg-rose-950/20", iconColor: "text-rose-600 dark:text-rose-400" },
-                                                            ]}
-                                                        />
-                                                    )
-                                                })()}
-                                                {/* Table / List Container */}
-                                                <FormSection hasSeparator title="Parcelas">
-                                                    <InstallmentParcelsTable
-                                                        rows={
-                                                            (installmentDetail.installments || []).map(
-                                                                (row: any): InstallmentParcelRow => ({
-                                                                    id: row.id,
-                                                                    installmentNumber: row.installmentNumber,
-                                                                    totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                                                    status: row.status,
-                                                                    originalAmount: Number(row.originalAmount || 0),
-                                                                    paidAmount: Number(row.paidAmount || 0),
-                                                                    interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                                                    discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                                                    dueDate: row.dueDate ? String(row.dueDate) : null,
-                                                                    finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                                                    paymentType: row.paymentType ? String(row.paymentType) : null,
-                                                                    reason: String(installmentDetail.group?.description || "Parcela"),
-                                                                    reference: String(row.description || "-"),
-                                                                    remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
-                                                                }),
-                                                            )
-                                                        }
-                                                        getActionsSlot={(row) =>
-                                                            row.status === "paid" ? null : (
-                                                                <ActionsDropdown>
-                                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
-                                                                        <MoneyIcon className="w-4 h-4" /> Registrar pagamento
-                                                                    </DropdownItem>
-                                                                </ActionsDropdown>
-                                                            )
-                                                        }
-                                                    />
-                                                </FormSection>
-                                            </div>
-                                        )}
-                                        {installmentDetailTab === "attachments" && (
-                                            <div className="py-2">
-                                                <GenericAttachmentsTab
-                                                    entityId={representativeTxId}
-                                                    partnerId={partnerId}
-                                                    entityType="transaction"
-                                                    title="Anexos do Parcelamento"
-                                                    subtitle="Gerencie contratos, comprovantes ou documentos deste parcelamento."
-                                                    onMutation={() => void refreshTransactionsNow()}
-                                                />
-                                            </div>
-                                        )}
-                                        {installmentDetailTab === "notes" && (
-                                            <FormSection title="Observações do Parcelamento">
-                                                <FormTextarea
-                                                    name="observacoes"
-                                                    label="Observações"
-                                                    value={installmentNotesText}
-                                                    onChange={(e) => setInstallmentNotesText(e.target.value)}
-                                                    rows={5}
-                                                    placeholder="Ex: Contrato assinado presencialmente, renegociação..."
-                                                />
-                                                <div className="flex justify-end">
-                                                    <Button
-                                                        onClick={async () => {
-                                                            if (!installmentDetail?.group?.id) return
-                                                            setSavingInstallmentNotes(true)
-                                                            const res = await updateInstallmentGroupNotesAction({
-                                                                partnerId,
-                                                                installmentGroupId: installmentDetail.group.id,
-                                                                notes: installmentNotesText,
-                                                            })
-                                                            setSavingInstallmentNotes(false)
-                                                            if (res.success) {
-                                                                notifySuccess("Observações do parcelamento salvas com sucesso!")
-                                                                void refreshTransactionsNow()
-                                                            } else {
-                                                                notifyError(res.error || "Erro ao salvar observações.")
-                                                            }
-                                                        }}
-                                                        disabled={savingInstallmentNotes}
-                                                        leftIcon={<SaveIcon size={18} />}
-                                                    >
-                                                        {savingInstallmentNotes ? "Salvando..." : "Salvar observações"}
-                                                    </Button>
-                                                </div>
-                                            </FormSection>
-                                        )}
-                                    </>
-                                ) : (
-                                    <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {renderSharedModals()}
-            </FadeIn >
         )
     }
 

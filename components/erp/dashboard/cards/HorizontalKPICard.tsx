@@ -2,6 +2,7 @@
 
 import { MoneyIcon, ShoppingCartIcon, Users, CreditCardIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
+import { FitText } from "@/components/ui/fit-text"
 
 interface KPIItem {
     title: string
@@ -55,13 +56,18 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                 const iconColor = item.iconColor || "text-brand-dark dark:text-dark-heading"
 
                 return (
-                    <div key={item.title} className="p-4 sm:p-5 lg:p-6 flex flex-col justify-between min-w-0">
+                    <div key={item.title} className="p-4 sm:p-5 lg:p-6 flex flex-col justify-between min-w-0 overflow-hidden">
                         <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
-                            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+                            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                                 <div className={cn("w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0", iconBg)}>
                                     <CardIcon size={16} className={iconColor} />
                                 </div>
-                                <span className="text-[12px] sm:text-[13px] lg:text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.title}</span>
+                                <FitText
+                                    textClassName="text-[12px] sm:text-[13px] lg:text-[14px] font-bold text-brand-dark dark:text-dark-heading"
+                                    minSize={9}
+                                >
+                                    {item.title}
+                                </FitText>
                             </div>
                             {item.trend && (
                                 <span className={cn(
@@ -74,7 +80,9 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                         </div>
 
                         <div className="min-w-0">
-                            <h2 className="text-[22px] sm:text-[26px] lg:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{item.value}</h2>
+                            <h2 className="text-[22px] sm:text-[26px] lg:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                <FitText minSize={14}>{item.value}</FitText>
+                            </h2>
                         </div>
                     </div>
                 )

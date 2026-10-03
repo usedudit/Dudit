@@ -2441,53 +2441,22 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             if (customerData) return customerData
 
             try {
-                const { data: authUserRes } = await supabase.auth.admin.getUserById(data.buyer_id)
-                const authUser = authUserRes?.user
-                if (authUser) {
-                    const email = authUser.email
-                    const phone = authUser.phone
+                const { data: userProfile } = await supabase
+                    .from("user_profiles")
+                    .select("full_name, phone, avatar_url")
+                    .eq("user_id", data.buyer_id)
+                    .maybeSingle()
 
-                    if (email || phone) {
-                        let query = supabase
-                            .from("customers")
-                            .select("id, name, email, phone, image_url, addresses(*)")
-                            .eq("partner_id", partnerId)
-
-                        if (email && phone) {
-                            query = query.or(`email.eq.${email},phone.eq.${phone}`)
-                        } else if (email) {
-                            query = query.eq("email", email)
-                        } else if (phone) {
-                            query = query.eq("phone", phone)
-                        }
-
-                        const { data: matchedCustomers } = await query.limit(1)
-                        if (matchedCustomers && matchedCustomers.length > 0) {
-                            const matched = matchedCustomers[0]
-                            // Link customer to user_id for faster future queries
-                            await supabase
-                                .from("customers")
-                                .update({ user_id: data.buyer_id })
-                                .eq("id", matched.id)
-                                .eq("partner_id", partnerId)
-                            return {
-                                ...matched,
-                                user_id: data.buyer_id,
-                            }
-                        }
-                    }
-
-                    // Fallback to auth user info if no customer record exists under this partner yet
-                    return {
-                        id: data.buyer_id,
-                        name: data.customer_name || authUser.user_metadata?.full_name || "Cliente Marketplace",
-                        email: email || null,
-                        phone: phone || null,
-                        addresses: [],
-                    }
+                return {
+                    id: data.buyer_id,
+                    name: data.customer_name || userProfile?.full_name || "Cliente Marketplace",
+                    email: data.buyer_email || null,
+                    phone: userProfile?.phone || null,
+                    image_url: userProfile?.avatar_url || null,
+                    addresses: [],
                 }
             } catch (err) {
-                console.error("Error looking up customer for marketplace order:", err)
+                console.error("Error looking up customer profile for marketplace order:", err)
             }
             return null
         }

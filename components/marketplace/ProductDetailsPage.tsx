@@ -199,7 +199,6 @@ export function ProductDetailsPageClient({
     const [deliveryLoading, setDeliveryLoading] = useState(false)
     // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
-    const [carrierSelectedServiceId, setCarrierSelectedServiceId] = useState<number | null>(null)
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
     const carrierQuoteKeyRef = useRef<string | null>(null)
     const [carrierError, setCarrierError] = useState<string | null>(null)
@@ -802,20 +801,18 @@ export function ProductDetailsPageClient({
         return digits.length === 8 ? digits : ""
     }, [userId, selectedAddress?.zip_code, cep])
 
-    // Quote carrier options once own delivery reports no coverage ("raio").
-    // The dedupe key lives in a ref so this effect never re-runs on its own
-    // updates — otherwise the cleanup would cancel the in-flight request.
+    // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
+    // este efeito esperava o erro "raio" — serializando geocoding + SuperFrete.
+    // Agora dispara assim que há CEP de destino; as opções ficam ocultas até
+    // o frete próprio falhar (gate de render/apply por "raio"/superfrete).
+    // NOTE: the dedupe key lives in a ref so this effect never re-runs on its
+    // own updates — otherwise the cleanup would cancel the in-flight request.
     useEffect(() => {
         const targetPartnerId = partner.partner_id || partner.id
         if (!carrierDestinationCep || !targetPartnerId || !partner.mp_user_id) {
             setCarrierOptions([])
-            setCarrierSelectedServiceId(null)
             carrierQuoteKeyRef.current = null
             setCarrierError(null)
-            return
-        }
-        if (deliveryLoading || !deliveryError || !deliveryError.toLowerCase().includes("raio")) {
-            if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) carrierQuoteKeyRef.current = null
             return
         }
         const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}`
@@ -824,6 +821,8 @@ export function ProductDetailsPageClient({
         let completed = false
         carrierQuoteKeyRef.current = dedupeKey
         setCarrierQuoteLoading(true)
+        setCarrierOptions([])
+        setCarrierError(null)
         ;(async () => {
             try {
                 const res = await quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: carrierDestinationCep })
@@ -831,10 +830,8 @@ export function ProductDetailsPageClient({
                 if (res.success && res.options.length > 0) {
                     setCarrierOptions(res.options)
                     setCarrierError(null)
-                    setCarrierSelectedServiceId(res.options[0].serviceId)
                 } else {
                     setCarrierOptions([])
-                    setCarrierSelectedServiceId(null)
                     setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
                 }
             } catch {
@@ -849,13 +846,13 @@ export function ProductDetailsPageClient({
             active = false
             if (!completed) carrierQuoteKeyRef.current = null
         }
-    }, [carrierDestinationCep, deliveryError, deliveryLoading, partner.partner_id, partner.id, partner.mp_user_id])
+    }, [carrierDestinationCep, partner.partner_id, partner.id, partner.mp_user_id])
 
-    // Apply the selected carrier option as delivery fee whenever own quote failed
+    // Apply the first carrier option as delivery fee whenever own quote failed
     useEffect(() => {
         if (carrierOptions.length === 0) return
         if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
-        const opt = carrierOptions.find(o => o.serviceId === carrierSelectedServiceId) || carrierOptions[0]
+        const opt = carrierOptions[0]
         setDeliveryFee(Number(opt.price))
         setDeliveryBreakdown({
             source: "superfrete",
@@ -868,23 +865,7 @@ export function ProductDetailsPageClient({
             toPostalCode: carrierDestinationCep,
         })
         setDeliveryError(null)
-    }, [carrierOptions, carrierSelectedServiceId, deliveryError, carrierDestinationCep])
-
-    const handleCarrierSelect = (opt: CarrierFreightOption) => {
-        setCarrierSelectedServiceId(opt.serviceId)
-        setDeliveryFee(Number(opt.price))
-        setDeliveryBreakdown({
-            source: "superfrete",
-            carrier: "SuperFrete",
-            serviceId: opt.serviceId,
-            serviceName: opt.serviceName,
-            companyName: opt.companyName,
-            deliveryMinDays: opt.deliveryMinDays,
-            deliveryMaxDays: opt.deliveryMaxDays,
-            toPostalCode: carrierDestinationCep,
-        })
-        setDeliveryError(null)
-    }
+    }, [carrierOptions, deliveryError, carrierDestinationCep])
 
     const galleryContainerRef = useRef<HTMLDivElement>(null)
     const reviewsRef = useRef<HTMLDivElement>(null)
@@ -1922,21 +1903,21 @@ export function ProductDetailsPageClient({
                                         )
                                     })()}
 
-                                    {!deliveryLoading && (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
+                                    {/* Transportadora: só quando o frete próprio falhou por raio
+                                        (ou já foi aplicada como fonte do frete) */}
+                                    {!deliveryLoading &&
+                                        ((deliveryError && deliveryError.toLowerCase().includes("raio")) ||
+                                            deliveryBreakdown?.source === "superfrete") &&
+                                        (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
                                         <div className="pt-3 space-y-2">
                                             <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
                                                 <TruckIcon size={14} />
                                                 Entrega por transportadora (SuperFrete)
                                             </p>
                                             {carrierOptions.map((opt) => (
-                                                <button
+                                                <div
                                                     key={opt.serviceId}
-                                                    type="button"
-                                                    onClick={() => handleCarrierSelect(opt)}
-                                                    className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${carrierSelectedServiceId === opt.serviceId
-                                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                                        : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
-                                                    }`}
+                                                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3 text-left bg-transparent"
                                                 >
                                                     <span className="flex flex-col">
                                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -1949,7 +1930,7 @@ export function ProductDetailsPageClient({
                                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(Number(opt.price))}
                                                     </span>
-                                                </button>
+                                                </div>
                                             ))}
                                             {carrierQuoteLoading && (
                                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>

@@ -106,8 +106,8 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
 
                 if (!quote.public_token || isUuid(quote.public_token)) {
                     const newToken = generateShortId()
-                    await supabase.from("quotes").update({ public_token: newToken }).eq("id", quoteId)
                     quote.public_token = newToken
+                    supabase.from("quotes").update({ public_token: newToken }).eq("id", quoteId).then(() => {})
                 }
 
                 const { data: items, error: itemsError } = await supabase
@@ -170,11 +170,9 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                         .eq("user_id", quote.user_id)
                         .maybeSingle()
                     if (profile) {
-                        const { data: authData } = await supabase.auth.admin.getUserById(quote.user_id)
-                        const authUser = authData?.user ? { email: authData.user.email } : null
                         userProfile = {
                             full_name: profile.full_name,
-                            email: authUser?.email || null
+                            email: null
                         }
                     }
                 }
