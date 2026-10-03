@@ -852,13 +852,21 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             })
             if (!active) return
 
+            // Não sobrescrever uma seleção de transportadora: mantém enquanto
+            // o endereço seguir fora do frete próprio; volta pra entrega
+            // própria se o endereço entrar no raio.
+            const isCarrierSelected = (deliveryBreakdown as any)?.source === "superfrete"
+
             if (quote.success) {
+                const outsideRadius = Boolean(quote.isOutsideRadius || (quote.breakdown as any)?.isOutsideRadius)
+                if (isCarrierSelected && outsideRadius) return
                 const originalFee = Number(quote.breakdown?.originalFee ?? quote.fee ?? 0)
                 const payer = quote.breakdown?.deliveryPayer === "seller" ? "seller" : "customer"
                 const effectiveFee = payer === "seller" ? 0 : originalFee
                 setShippingFee(String(Math.max(0, effectiveFee)))
                 setDeliveryBreakdown(quote.breakdown ? { ...quote.breakdown, deliveryPayer: payer, originalFee, deliverySubsidy: payer === "seller" ? originalFee : 0 } : null)
             } else {
+                if (isCarrierSelected) return
                 setShippingFee("0")
                 setDeliveryBreakdown(null)
             }
@@ -1293,7 +1301,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (deliveryMethod === "delivery" && (!deliveryDate || !deliveryTime)) {
             setFieldErrors(new Set(["deliveryDate", "deliveryTime"]))
             setActiveTab("delivery")
-            setValidationMessage("Preencha a data e o horÃ¡rio de saÃ­da para criar a entrega automÃ¡tica.")
+            setValidationMessage("Preencha a data e o horário de saída para criar a entrega automática.")
             setShowValidationModal(true)
             return false
         }
@@ -1511,7 +1519,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     await attachmentPromise
 
                     if (!autoDeliveryResult.success) {
-                        notifyError("Pedido criado, mas a entrega automÃ¡tica falhou", autoDeliveryResult.error)
+                        notifyError("Pedido criado, mas a entrega automática falhou", autoDeliveryResult.error)
                     } else if (platformDriverId && autoDeliveryResult.deliveryId) {
                         const assignmentResult = await assignPlatformDriverToDeliveryAction({
                             partnerId,

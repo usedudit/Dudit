@@ -199,7 +199,7 @@ const OrderListItem = React.memo(
 
                 case "tracking":
                     if (!order.tracking_number) {
-                        if (onGenerateLabel && order.situation !== "cancelled") {
+                        if (onGenerateLabel && order.situation !== "cancelled" && order.isCarrierDelivery) {
                             return (
                                 <div
                                     className="flex items-center"

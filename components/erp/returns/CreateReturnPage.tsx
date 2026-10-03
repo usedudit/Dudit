@@ -282,11 +282,11 @@ export default function CreateReturnPage({
     const [promotions, setPromotions] = useState<any[]>([])
 
     useEffect(() => {
-        if (!partnerId) return
+        if (!partnerId || mode === "view") return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setPromotions(res)
         }).catch(() => { })
-    }, [partnerId])
+    }, [partnerId, mode])
 
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -299,7 +299,7 @@ export default function CreateReturnPage({
     const [financeAccounts, setFinanceAccounts] = useState<{ id: string; name: string; type: string }[]>([])
 
     useEffect(() => {
-        if (!partnerId) return
+        if (!partnerId || mode === "view") return
         import("@/app/actions/erp/finance-accounts").then(mod =>
             mod.getFinanceAccountsAction(partnerId).then(res => {
                 const accounts = (res as any)?.data?.accounts || (res as any)?.data || []
@@ -311,7 +311,7 @@ export default function CreateReturnPage({
                 }
             }).catch(() => { })
         ).catch(() => { })
-    }, [partnerId])
+    }, [partnerId, mode])
 
     const isConsumidorFinal = useMemo(() => {
         if (!selectedOrder) return false

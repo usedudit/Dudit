@@ -238,30 +238,37 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         }
     }, [checkScroll]);
 
+    const [hasLoadedStoreCredits, setHasLoadedStoreCredits] = useState(false);
+
     useEffect(() => {
-        const fetchOrders = async () => {
-            setIsLoadingOrders(true);
+        setHasLoadedStoreCredits(false);
+        setStoreCredits([]);
+    }, [realCustomerId]);
+
+    useEffect(() => {
+        let isCurrent = true;
+        setIsLoadingOrders(true);
+
+        const loadInitialData = async () => {
             try {
-                const res = await getCustomerOrdersAction(realCustomerId);
-                if (res && "orders" in res && Array.isArray((res as any).orders)) {
-                    setFetchedOrders((res as any).orders);
+                const [ordersRes, addressRes] = await Promise.all([
+                    getCustomerOrdersAction(realCustomerId),
+                    getAddressesAction(realCustomerId, "customer"),
+                ]);
+
+                if (!isCurrent) return;
+
+                if (ordersRes && "orders" in ordersRes && Array.isArray((ordersRes as any).orders)) {
+                    setFetchedOrders((ordersRes as any).orders);
                 }
-                if (res && "stats" in res && (res as any).stats) {
-                    setOrderStats((res as any).stats);
+                if (ordersRes && "stats" in ordersRes && (ordersRes as any).stats) {
+                    setOrderStats((ordersRes as any).stats);
                 }
-            } catch (e) {
-                console.error("[CustomerDetailPage DEBUG] fetchOrders error:", e);
-            } finally {
-                setIsLoadingOrders(false);
-            }
-        };
-        const fetchAddress = async () => {
-            try {
-                const res = await getAddressesAction(realCustomerId, "customer");
-                if (res.addresses && res.addresses.length > 0) {
-                    setCustomerAddresses(res.addresses);
-                    const primaryAddr = res.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || res.addresses[0];
-                    const billingAddr = res.addresses.find((a: any) => a.address_type === "billing");
+
+                if (addressRes.addresses && addressRes.addresses.length > 0) {
+                    setCustomerAddresses(addressRes.addresses);
+                    const primaryAddr = addressRes.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || addressRes.addresses[0];
+                    const billingAddr = addressRes.addresses.find((a: any) => a.address_type === "billing");
 
                     const format = (addr: any) => [
                         addr.street,
@@ -277,26 +284,44 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     if (billingAddr) setBillingAddress(format(billingAddr));
                 }
             } catch (e) {
-                console.error("Error fetching address:", e);
-            }
-        };
-        const fetchStoreCredits = async () => {
-            setIsLoadingStoreCredits(true);
-            try {
-                const res = await getCustomerStoreCreditsAction(realCustomerId);
-                if (res.success && res.storeCredits) {
-                    setStoreCredits(res.storeCredits);
-                }
-            } catch (e) {
-                console.error("Error fetching store credits:", e);
+                console.error("[CustomerDetailPage DEBUG] loadInitialData error:", e);
             } finally {
-                setIsLoadingStoreCredits(false);
+                if (isCurrent) setIsLoadingOrders(false);
             }
         };
-        fetchOrders();
-        fetchAddress();
-        fetchStoreCredits();
+
+        loadInitialData();
+
+        return () => {
+            isCurrent = false;
+        };
     }, [realCustomerId]);
+
+    // Lazy load store credits only when tab is accessed
+    useEffect(() => {
+        if (activeTab === "StoreCredits" && !hasLoadedStoreCredits && !isLoadingStoreCredits) {
+            let isCurrent = true;
+            setIsLoadingStoreCredits(true);
+            getCustomerStoreCreditsAction(realCustomerId)
+                .then((res) => {
+                    if (!isCurrent) return;
+                    if (res.success && res.storeCredits) {
+                        setStoreCredits(res.storeCredits);
+                    }
+                    setHasLoadedStoreCredits(true);
+                })
+                .catch((e) => {
+                    console.error("Error fetching store credits:", e);
+                })
+                .finally(() => {
+                    if (isCurrent) setIsLoadingStoreCredits(false);
+                });
+
+            return () => {
+                isCurrent = false;
+            };
+        }
+    }, [activeTab, hasLoadedStoreCredits, isLoadingStoreCredits, realCustomerId]);
 
     const [fetchedReviews, setFetchedReviews] = useState<any[] | null>(null);
     const [isLoadingReviews, setIsLoadingReviews] = useState(false);

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
-import { WrenchIcon, UserIcon } from "@/lib/icons"
+import { WrenchIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 
@@ -28,6 +28,10 @@ interface ServiceOrderListRowProps {
   statusColor: string
   statusLabel: string
   teamMembers?: any[]
+  /** Prefetch handlers for hover/touch-based entity preloading */
+  onPrefetchMouseEnter?: () => void
+  onPrefetchMouseLeave?: () => void
+  onPrefetchTouchStart?: () => void
 }
 
 const ServiceOrderListRow = React.memo(
@@ -44,6 +48,9 @@ const ServiceOrderListRow = React.memo(
     statusColor,
     statusLabel,
     teamMembers = [],
+    onPrefetchMouseEnter,
+    onPrefetchMouseLeave,
+    onPrefetchTouchStart,
   }: ServiceOrderListRowProps) => {
     const formatDate = (d: string) => {
       if (!d) return "-"
@@ -139,6 +146,9 @@ const ServiceOrderListRow = React.memo(
         animate={{ opacity: 1 }}
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={onDetails}
+        onMouseEnter={onPrefetchMouseEnter}
+        onMouseLeave={onPrefetchMouseLeave}
+        onTouchStart={onPrefetchTouchStart}
       >
         <td
           className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14"

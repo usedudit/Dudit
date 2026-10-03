@@ -113,20 +113,38 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
         }
     }, [checkScroll]);
 
+    const [hasLoadedImports, setHasLoadedImports] = useState(false);
+
     useEffect(() => {
+        setHasLoadedImports(false);
+        setFetchedImports([]);
+    }, [realSupplierId]);
+
+    useEffect(() => {
+        const shouldFetch = (!isTablet || activeTab === "Imports") && !hasLoadedImports;
+        if (!shouldFetch) return;
+
+        let isCurrent = true;
         const fetchImports = async () => {
             setIsLoadingImports(true);
             try {
                 const res = await getSupplierXmlImportsAction(realSupplierId);
-                if (res.xmlImports) setFetchedImports(res.xmlImports);
+                if (isCurrent && res.xmlImports) {
+                    setFetchedImports(res.xmlImports);
+                    setHasLoadedImports(true);
+                }
             } catch (e) {
                 console.error(e);
             } finally {
-                setIsLoadingImports(false);
+                if (isCurrent) setIsLoadingImports(false);
             }
         };
         fetchImports();
-    }, [realSupplierId]);
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [realSupplierId, isTablet, activeTab, hasLoadedImports]);
 
     const stats = useMemo(() => {
         const xml_count = fetchedImports.length;

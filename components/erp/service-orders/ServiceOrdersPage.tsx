@@ -163,6 +163,7 @@ export default function ServiceOrdersPage({
     currentEntity, isLoadingDetail,
     search: searchVal, setSearch: setSearchVal,
     afterMutation, queryClient,
+    getPrefetchProps,
   } = entityPage
 
   const activeOrder = useMemo(() => {
@@ -580,6 +581,7 @@ export default function ServiceOrdersPage({
                 onBack={() => closeEntity()}
                 onMutation={() => handleMutation()}
                 onEdit={(id) => openEntity("edit", id)}
+                teamMembers={teamMembers}
               />
             )}
           </FadeIn>
@@ -794,31 +796,37 @@ export default function ServiceOrdersPage({
                       <div className="flex-1">
                         {effectiveViewMode === "grid" ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                            {paginated.map((o: any) => (
-                              <ServiceOrderGridCard
-                                key={o.id}
-                                order={o}
-                                selected={selection.has(o.id)}
-                                onSelect={() => {
-                                  const next = new Set(selection)
-                                  if (next.has(o.id)) next.delete(o.id)
-                                  else next.add(o.id)
-                                  setSelection(next)
-                                }}
-                                onDetails={() => openEntity("view", o.id)}
-                                onEdit={() => openEntity("edit", o.id)}
-                                onStatus={() => handleOpenStatusModal(o.id)}
-                                onShare={async () => {
-                                  const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                  const token = await ensurePublicTokenAction(partnerId, o.id)
-                                  if (token) setShowShareModal({ id: o.id, token })
-                                }}
-                                onDelete={() => setConfirmDelete(o.id)}
-                                statusColor={statusColor(o.status)}
-                                statusLabel={statusLabel(o.status)}
-                                teamMembers={teamMembers}
-                              />
-                            ))}
+                            {paginated.map((o: any) => {
+                              const prefetch = getPrefetchProps(o.id)
+                              return (
+                                <ServiceOrderGridCard
+                                  key={o.id}
+                                  order={o}
+                                  selected={selection.has(o.id)}
+                                  onSelect={() => {
+                                    const next = new Set(selection)
+                                    if (next.has(o.id)) next.delete(o.id)
+                                    else next.add(o.id)
+                                    setSelection(next)
+                                  }}
+                                  onDetails={() => openEntity("view", o.id)}
+                                  onEdit={() => openEntity("edit", o.id)}
+                                  onStatus={() => handleOpenStatusModal(o.id)}
+                                  onShare={async () => {
+                                    const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                    const token = await ensurePublicTokenAction(partnerId, o.id)
+                                    if (token) setShowShareModal({ id: o.id, token })
+                                  }}
+                                  onDelete={() => setConfirmDelete(o.id)}
+                                  statusColor={statusColor(o.status)}
+                                  statusLabel={statusLabel(o.status)}
+                                  teamMembers={teamMembers}
+                                  onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                  onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                  onPrefetchTouchStart={prefetch.onTouchStart}
+                                />
+                              )
+                            })}
                           </div>
                         ) : (
                           <div className="w-full overflow-hidden rounded-xl relative">
@@ -872,32 +880,38 @@ export default function ServiceOrdersPage({
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {paginated.map((o: any) => (
-                                    <ServiceOrderListRow
-                                      key={o.id}
-                                      order={o}
-                                      columns={COLUMNS}
-                                      selected={selection.has(o.id)}
-                                      onSelect={(id) => {
-                                        const next = new Set(selection)
-                                        if (next.has(id)) next.delete(id)
-                                        else next.add(id)
-                                        setSelection(next)
-                                      }}
-                                      onDetails={() => openEntity("view", o.id)}
-                                      onEdit={() => openEntity("edit", o.id)}
-                                      onStatus={() => handleOpenStatusModal(o.id)}
-                                      onShare={async () => {
-                                        const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                        const token = await ensurePublicTokenAction(partnerId, o.id)
-                                        if (token) setShowShareModal({ id: o.id, token })
-                                      }}
-                                      onDelete={() => setConfirmDelete(o.id)}
-                                      statusColor={statusColor(o.status)}
-                                      statusLabel={statusLabel(o.status)}
-                                      teamMembers={teamMembers}
-                                    />
-                                  ))}
+                                  {paginated.map((o: any) => {
+                                    const prefetch = getPrefetchProps(o.id)
+                                    return (
+                                      <ServiceOrderListRow
+                                        key={o.id}
+                                        order={o}
+                                        columns={COLUMNS}
+                                        selected={selection.has(o.id)}
+                                        onSelect={(id) => {
+                                          const next = new Set(selection)
+                                          if (next.has(id)) next.delete(id)
+                                          else next.add(id)
+                                          setSelection(next)
+                                        }}
+                                        onDetails={() => openEntity("view", o.id)}
+                                        onEdit={() => openEntity("edit", o.id)}
+                                        onStatus={() => handleOpenStatusModal(o.id)}
+                                        onShare={async () => {
+                                          const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                          const token = await ensurePublicTokenAction(partnerId, o.id)
+                                          if (token) setShowShareModal({ id: o.id, token })
+                                        }}
+                                        onDelete={() => setConfirmDelete(o.id)}
+                                        statusColor={statusColor(o.status)}
+                                        statusLabel={statusLabel(o.status)}
+                                        teamMembers={teamMembers}
+                                        onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                        onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                        onPrefetchTouchStart={prefetch.onTouchStart}
+                                      />
+                                    )
+                                  })}
                                 </tbody>
                               </table>
                             </div>

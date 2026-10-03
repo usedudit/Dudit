@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { XIcon } from "@/lib/icons"
+import { XIcon, TruckIcon } from "@/lib/icons"
 import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { quoteCarrierFreightAction, type CarrierFreightOption } from "@/app/actions/marketplace/carrier-shipping"
+import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -106,6 +108,11 @@ export default function POSShippingSheet({
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [outsideRadiusWarning, setOutsideRadiusWarning] = useState<string | null>(null)
 
+    const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
+    const [carrierLoading, setCarrierLoading] = useState(false)
+    const [carrierError, setCarrierError] = useState<string | null>(null)
+    const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
+
     const [zipCode, setZipCode] = useState("")
     const [street, setStreet] = useState("")
     const [number, setNumber] = useState("")
@@ -135,6 +142,10 @@ export default function POSShippingSheet({
         setCalculatedFee(0)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
+        setCarrierOptions([])
+        setCarrierLoading(false)
+        setCarrierError(null)
+        setSelectedCarrierServiceId(null)
         if (hasOrderAddress) setUseOrderAddress(true)
     }, [isOpen, currentShippingFee, hasOrderAddress])
 
@@ -196,9 +207,20 @@ export default function POSShippingSheet({
     const isSubsidized = isCustomShipping ? shippingFree : isStoreSubsidizedBySettings
 
     const calculatedOriginalFee = Number((breakdown as any)?.originalFee || (breakdown as any)?.baseFee || 0)
+
+    // A seção de transportadora só vale quando o frete próprio não cobre
+    // (fora do raio ou erro de cotação).
+    const carrierSectionVisible = Boolean(outsideRadiusWarning || deliveryError)
+    const effectiveCarrierOption = carrierSectionVisible && carrierOptions.length > 0
+        ? (carrierOptions.find((o) => o.serviceId === selectedCarrierServiceId) || carrierOptions[0])
+        : null
+    const useCarrier = carrierSectionVisible && !isCustomShipping && Boolean(effectiveCarrierOption)
+
     const feeToDisplay = isCustomShipping
         ? Math.max(0, Number(shippingInput || calculatedFee || 0))
-        : (calculatedOriginalFee > 0 ? calculatedOriginalFee : calculatedFee)
+        : (useCarrier && effectiveCarrierOption
+            ? effectiveCarrierOption.price
+            : (calculatedOriginalFee > 0 ? calculatedOriginalFee : calculatedFee))
 
     useEffect(() => {
         let active = true
@@ -207,6 +229,37 @@ export default function POSShippingSheet({
         setIsQuoteLoading(true)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
+
+        // Transportadora em paralelo com o frete próprio; só aparece na UI
+        // quando o frete próprio não cobre o endereço.
+        const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
+        setCarrierOptions([])
+        setSelectedCarrierServiceId(null)
+        if (destinationCep.length === 8) {
+            setCarrierLoading(true)
+            setCarrierError(null)
+            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+                .then((res) => {
+                    if (!active) return
+                    if (res.success && res.options.length > 0) {
+                        setCarrierOptions(res.options)
+                        setCarrierError(null)
+                    } else {
+                        setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este CEP.")
+                    }
+                })
+                .catch(() => {
+                    if (!active) return
+                    setCarrierError("Não foi possível calcular o frete da transportadora.")
+                })
+                .finally(() => {
+                    if (active) setCarrierLoading(false)
+                })
+        } else {
+            setCarrierLoading(false)
+            setCarrierError("Informe o CEP para cotar a transportadora.")
+        }
+
             ; (async () => {
                 const quote = await quoteDeliveryFeeAction({
                     partnerId,
@@ -274,6 +327,52 @@ export default function POSShippingSheet({
                         message={outsideRadiusWarning}
                     />
                 )}
+
+                {carrierSectionVisible && (
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <TruckIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Entrega por transportadora (SuperFrete)
+                            </p>
+                        </div>
+                        {carrierLoading && (
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Calculando opções de transporte...
+                            </p>
+                        )}
+                        {!carrierLoading && carrierError && (
+                            <p className="text-xs text-red-500">{carrierError}</p>
+                        )}
+                        {!carrierLoading && !carrierError && carrierOptions.map((opt) => {
+                            const isSelected = !isCustomShipping && (effectiveCarrierOption?.serviceId === opt.serviceId)
+                            return (
+                                <button
+                                    key={opt.serviceId}
+                                    type="button"
+                                    onClick={() => setSelectedCarrierServiceId(opt.serviceId)}
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
+                                        ? "border-brand-green bg-green-50/40 dark:bg-green-900/10"
+                                        : "border-brand-border dark:border-dark-border hover:border-brand-green/60 dark:hover:border-brand-green/40"
+                                    }`}
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            {[opt.companyName, opt.serviceName].filter(Boolean).join(" - ")}
+                                        </span>
+                                        <span className="block text-xs text-brand-inactive-text dark:text-dark-body">
+                                            {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(opt.price)}
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="w-full">
                         <TabsTrigger value="cliente">Cliente</TabsTrigger>
@@ -390,19 +489,37 @@ export default function POSShippingSheet({
                         className="h-12 flex-1"
                         disabled={!hasSelectedCustomer || !activeHasStreet}
                         onClick={() => {
-                            const effectiveDeliveryPayer = isSubsidized ? "seller" : "customer"
+                            const carrier = useCarrier ? effectiveCarrierOption : null
+                            const effectiveDeliveryPayer = carrier
+                                ? "customer"
+                                : (isSubsidized ? "seller" : "customer")
                             const effectiveOriginalFee = feeToDisplay
                             const effectiveCustomerFee = effectiveDeliveryPayer === "seller" ? 0 : effectiveOriginalFee
 
                             onApply({
                                 shippingFee: effectiveCustomerFee,
                                 distanceKm,
-                                breakdown: {
-                                    ...breakdown,
-                                    deliveryPayer: effectiveDeliveryPayer,
-                                    originalFee: effectiveOriginalFee,
-                                    deliverySubsidy: effectiveDeliveryPayer === "seller" ? effectiveOriginalFee : 0,
-                                },
+                                breakdown: carrier
+                                    ? {
+                                        ...breakdown,
+                                        source: "superfrete",
+                                        carrier: "SuperFrete",
+                                        serviceId: carrier.serviceId,
+                                        serviceName: carrier.serviceName,
+                                        companyName: carrier.companyName,
+                                        deliveryMinDays: carrier.deliveryMinDays,
+                                        deliveryMaxDays: carrier.deliveryMaxDays,
+                                        toPostalCode: String(activeAddress?.zipCode || "").replace(/\D/g, ""),
+                                        originalFee: carrier.price,
+                                        deliveryPayer: "customer",
+                                        deliverySubsidy: 0,
+                                    }
+                                    : {
+                                        ...breakdown,
+                                        deliveryPayer: effectiveDeliveryPayer,
+                                        originalFee: effectiveOriginalFee,
+                                        deliverySubsidy: effectiveDeliveryPayer === "seller" ? effectiveOriginalFee : 0,
+                                    },
                                 deliveryAddress: activeAddress || null,
                             })
                         }}

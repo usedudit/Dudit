@@ -171,6 +171,13 @@ export default function DeliveryDetailPage({
     }, [loadDeliveryDetails])
 
     useEffect(() => {
+        setRoute(null)
+        setRouteError(null)
+    }, [deliveryId])
+
+    useEffect(() => {
+        if (activeTab !== "mapa_rota" || route !== null) return
+
         let alive = true
         const run = async () => {
             setRouteLoading(true)
@@ -187,7 +194,7 @@ export default function DeliveryDetailPage({
         }
         run()
         return () => { alive = false }
-    }, [deliveryId, partnerId])
+    }, [deliveryId, partnerId, activeTab, route])
 
     const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return

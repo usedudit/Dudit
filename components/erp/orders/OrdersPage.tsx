@@ -109,6 +109,9 @@ interface Order {
     checkout_fulfillment?: Record<string, unknown> | null;
     tracking_number?: string | null;
     tracking_url?: string | null;
+    delivery_breakdown?: any;
+    order_shipments?: any[];
+    isCarrierDelivery?: boolean;
 }
 
 interface FilterState {
@@ -487,6 +490,9 @@ export default function OrdersPage({
                     checkout_fulfillment: o.checkout_fulfillment || null,
                     tracking_number: trackedShipment?.tracking_number || null,
                     tracking_url: trackedShipment?.tracking_url || null,
+                    delivery_breakdown: (o.delivery_breakdown as any) || null,
+                    order_shipments: shipments,
+                    isCarrierDelivery,
                 }
             })
             .filter((o: Order) => {

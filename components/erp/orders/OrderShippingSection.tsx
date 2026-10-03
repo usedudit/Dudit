@@ -6,11 +6,15 @@ import {
     Badge,
     Button,
     FormSection,
+    InfoCard,
     ListItem,
 } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { TruckIcon } from "@/lib/icons"
+import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { isCarrierDeliveryOrder } from "@/components/erp/shared/DeliveryTabContent"
+import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
     getOrderShippingGateAction,
     createOrderShippingLabelAction,
@@ -18,6 +22,7 @@ import {
     printSuperFreteLabelAction,
     cancelSuperFreteLabelAction,
     getOrderShipmentAction,
+    getOrderShippingQuoteAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
 import { RecipientDocumentModal } from "@/components/erp/orders/RecipientDocumentModal"
@@ -50,6 +55,10 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelling, setCancelling] = useState(false)
     const [docModalOpen, setDocModalOpen] = useState(false)
+    const [quoteOptions, setQuoteOptions] = useState<any[]>([])
+    const [quotesLoading, setQuotesLoading] = useState(false)
+    const [quotesError, setQuotesError] = useState<string | null>(null)
+    const [selectedService, setSelectedService] = useState<number | null>(null)
 
     const loadGate = useCallback(async () => {
         try {
@@ -89,10 +98,64 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const statusMeta = SHIPPING_STATUS_META[shippingStatus || ""] || (shippingStatus ? { label: shippingStatus, variant: "gray" as const } : null)
     const canGenerate = Boolean(gate?.connected && gate?.planAllowed)
 
+    // Só pedido marcado como transportadora tem fluxo de etiqueta; se já
+    // existe etiqueta, mostra o histórico para qualquer pedido.
+    const isCarrierBound = isCarrierDeliveryOrder(order)
+    const serviceIdFromBreakdown = Number(order?.delivery_breakdown?.serviceId || 0)
+    const needsQuoteSelection = Boolean(isCarrierBound && !labelId && canGenerate && !serviceIdFromBreakdown)
+
+    const paidSituations = ["paid", "shipped", "delivered"]
+    const isPaid = paidSituations.includes(String(order?.situation || "").toLowerCase())
+    const paymentLabel = getPaymentStatusMeta(order?.situation).label
+
+    useEffect(() => {
+        if (!shipmentLoaded || !gateLoaded) return
+        if (!needsQuoteSelection) return
+        let active = true
+        setQuotesLoading(true)
+        setQuotesError(null)
+        getOrderShippingQuoteAction({ orderId })
+            .then((res) => {
+                if (!active) return
+                if (res.success) {
+                    setQuoteOptions(res.quotes)
+                    if (res.quotes.length === 0) {
+                        setQuotesError("Nenhuma opção de frete encontrada.")
+                        setSelectedService(null)
+                    } else {
+                        setSelectedService(Number(res.quotes[0]?.id) || null)
+                    }
+                } else {
+                    setQuoteOptions([])
+                    setSelectedService(null)
+                    setQuotesError(res.error)
+                }
+            })
+            .catch(() => {
+                if (!active) return
+                setQuoteOptions([])
+                setSelectedService(null)
+                setQuotesError("Erro ao cotar o frete.")
+            })
+            .finally(() => {
+                if (active) setQuotesLoading(false)
+            })
+        return () => {
+            active = false
+        }
+    }, [needsQuoteSelection, shipmentLoaded, gateLoaded, orderId])
+
     const handleCreate = async () => {
         setCreating(true)
         try {
-            const res = await createOrderShippingLabelAction({ orderId })
+            const service = !serviceIdFromBreakdown && selectedService
+                ? (selectedService as SuperFreteServiceId)
+                : undefined
+            if (needsQuoteSelection && !service) {
+                toast.error("Selecione um serviço de frete para gerar a etiqueta.")
+                return
+            }
+            const res = await createOrderShippingLabelAction({ orderId, ...(service ? { service } : {}) })
             if (res.success) {
                 const payRes = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: res.label.id })
                 if (payRes.success) {
@@ -178,12 +241,19 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     }
 
     if (!gateLoaded || !shipmentLoaded) return null
-    if (!labelId && !canGenerate) return null
+    if (!labelId && (!canGenerate || !isCarrierBound)) return null
 
     return (
         <FormSection title="Frete" className="mt-8">
             {!labelId ? (
                 <div className="space-y-4">
+                    {!isPaid && (
+                        <InfoCard
+                            color="orange"
+                            title="Pagamento pendente"
+                            message={`Este pedido ainda não está pago (${paymentLabel}). Recomendamos gerar a etiqueta somente após a confirmação do pagamento.`}
+                        />
+                    )}
                     <div className="flex items-start gap-3">
                         <div className="w-10 h-10 rounded-full bg-brand-blue/10 dark:bg-blue-900/30 text-brand-blue dark:text-blue-400 flex items-center justify-center shrink-0">
                             <TruckIcon className="w-5 h-5" />
@@ -200,7 +270,55 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                             )}
                         </div>
                     </div>
-                    <Button type="button" onClick={handleCreate} isLoading={creating} leftIcon={<TruckIcon className="w-4 h-4" />}>
+
+                    {needsQuoteSelection && (
+                        <div className="space-y-2">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Selecione o serviço de frete
+                            </p>
+                            {quotesLoading && (
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculando opções de frete...</p>
+                            )}
+                            {!quotesLoading && quotesError && (
+                                <p className="text-xs text-red-500">{quotesError}</p>
+                            )}
+                            {!quotesLoading && !quotesError && quoteOptions.map((q: any) => {
+                                const optionServiceId = Number(q?.id) || 0
+                                const isSelected = selectedService === optionServiceId
+                                return (
+                                    <button
+                                        key={q?.id}
+                                        type="button"
+                                        onClick={() => setSelectedService(optionServiceId)}
+                                        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
+                                            ? "border-brand-green bg-green-50/40 dark:bg-green-900/10"
+                                            : "border-brand-border dark:border-dark-border hover:border-brand-green/60 dark:hover:border-brand-green/40"
+                                        }`}
+                                    >
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {[q?.company?.name, q?.name].filter(Boolean).join(" - ") || `Serviço ${q?.id}`}
+                                            </span>
+                                            <span className="block text-xs text-brand-inactive-text dark:text-dark-body">
+                                                {formatDeliveryDaysRange(q?.delivery_range?.min ?? null, q?.delivery_range?.max ?? null)}
+                                            </span>
+                                        </span>
+                                        <span className="shrink-0 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(Number(q?.price || 0))}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    <Button
+                        type="button"
+                        onClick={handleCreate}
+                        isLoading={creating}
+                        disabled={needsQuoteSelection && (quotesLoading || !selectedService)}
+                        leftIcon={<TruckIcon className="w-4 h-4" />}
+                    >
                         Gerar etiqueta de frete
                     </Button>
                 </div>

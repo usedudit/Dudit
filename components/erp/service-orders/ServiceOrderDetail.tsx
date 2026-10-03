@@ -1,11 +1,11 @@
-﻿"use client"
+"use client"
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, SidebarCard, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, FormSection, SidebarCard, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
-import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, PackageIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 import SignatureDialog from "./SignatureDialog"
@@ -13,7 +13,6 @@ import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
 import {
     updateServiceOrderStatusAction,
-    assignServiceOrderAction,
     getServiceOrderDetailsAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
@@ -62,9 +61,10 @@ interface ServiceOrderDetailProps {
     onMutation?: () => void
     onEdit?: (id: string) => void
     onDelete?: (id: string) => void
+    teamMembers?: any[]
 }
 
-export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit, onDelete }: ServiceOrderDetailProps) {
+export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation, onEdit, onDelete, teamMembers: propTeamMembers = [] }: ServiceOrderDetailProps) {
     const { toast } = useToast()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -73,7 +73,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [order, setOrder] = useState(data)
     const [loading, setLoading] = useState(false)
     const [showSignature, setShowSignature] = useState(false)
-    const [teamMembers, setTeamMembers] = useState<any[]>([])
+    const [teamMembers, setTeamMembers] = useState<any[]>(propTeamMembers)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showShareModal, setShowShareModal] = useState(false)
@@ -140,8 +140,15 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
     const statusMeta = order?.status ? SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus] : null
 
-    // Load team members to resolve technician's name
     useEffect(() => {
+        if (propTeamMembers && propTeamMembers.length > 0) {
+            setTeamMembers(propTeamMembers)
+        }
+    }, [propTeamMembers])
+
+    // Load team members to resolve technician's name only if not provided by parent
+    useEffect(() => {
+        if (teamMembers.length > 0) return
         async function loadTeam() {
             try {
                 const { getTeamMembers } = await import("@/app/actions/erp/team")
@@ -154,7 +161,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             }
         }
         loadTeam()
-    }, [])
+    }, [teamMembers.length])
 
     const handleStatusChange = async (newStatus: string, reason?: string) => {
         setLoading(true)

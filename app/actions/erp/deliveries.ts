@@ -665,6 +665,14 @@ async function estimateOrderDistanceKm(params: {
   return Number(calculateDistance(params.originCoords, dest).toFixed(2))
 }
 
+// Pedidos vinculados a transportadora (SuperFrete) não entram no fluxo de
+// entregas próprias: já têm etiqueta/rotas pelo transportador.
+function isCarrierBoundOrder(order: any): boolean {
+  if (order?.delivery_breakdown?.source === "superfrete") return true
+  const shipments = Array.isArray(order?.order_shipments) ? order.order_shipments : []
+  return shipments.some((s: any) => s && s.kind !== "return")
+}
+
 export async function getSmartDeliverySuggestionsAction(input: {
   partnerId: string
   maxOrdersPerDelivery?: number
@@ -707,6 +715,8 @@ export async function getSmartDeliverySuggestionsAction(input: {
       created_at,
       distance_km,
       delivery_type,
+      delivery_breakdown,
+      order_shipments(id, kind),
       order_items(
         id,
         product_name,
@@ -774,6 +784,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
     .filter((o: any) => {
       if (!o?.id) return false
       if (activeOrderIds.has(String(o.id))) return false
+      if (isCarrierBoundOrder(o)) return false
       const situation = String(o.situation || "").toLowerCase()
       if (situation === "cancelled" || situation === "refunded") return false
       if (!formatAddress(o)) return false
@@ -982,6 +993,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       created_at,
       order_source,
       delivery_type,
+      order_shipments(id, kind),
       order_items(
         id,
         product_name,
@@ -1046,6 +1058,10 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
     .filter((order: any) => {
       const situation = String(order.situation || "").toLowerCase()
       if (situation === "cancelled" || situation === "refunded") return false
+
+      // Transportadora: já é tratado pelo fluxo do transportador, não gera
+      // entrega própria
+      if (isCarrierBoundOrder(order)) return false
 
       // Apenas pendente / nao enviado / em preparação
       const dStatus = String(order.delivery_status || "").toLowerCase()
