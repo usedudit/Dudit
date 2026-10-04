@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { cn } from "@/lib/utils"
-import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon } from "@/lib/icons"
+import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon, RepeatIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePermissions } from "@/lib/permission-context"
@@ -117,6 +117,15 @@ const navItems: NavItem[] = [
         ],
     },
     {
+        icon: RepeatIcon,
+        label: "Assinaturas",
+        href: "/erp/recorrentes/planos",
+        submenu: [
+            { label: "Planos Recorrentes", href: "/erp/recorrentes/planos" },
+            { label: "Assinaturas de Clientes", href: "/erp/recorrentes/assinaturas" },
+        ],
+    },
+    {
         icon: SettingsIcon,
         label: "Configurações",
         href: "/erp/configuracoes",
@@ -148,6 +157,8 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/importacao-xml": "crescer",
     "/erp/movimentacao-estoque": "crescer",
     "/erp/videos": "crescer",
+    "/erp/recorrentes/planos": "escalar",
+    "/erp/recorrentes/assinaturas": "escalar",
 }
 
 function ErpPlanGatedNavItem({

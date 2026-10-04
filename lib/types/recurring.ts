@@ -15,6 +15,15 @@ export type RecurringExecutionStatus =
   | "awaiting_payment"
   | "completed"
   | "failed"
+
+/**
+ * Status filter used by the ERP subscriptions panel.
+ * `delinquent` is a pseudo-status that groups `past_due` + `payment_failed`.
+ */
+export type RecurringSubscriptionStatusFilter =
+  | RecurringSubscriptionStatus
+  | "all"
+  | "delinquent"
 export type RecurringPlanItemType = "product" | "service"
 
 export type RecurringPlanItem = {

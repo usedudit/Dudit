@@ -10,10 +10,16 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateTag } from "next/cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { processDueRecurringExecutions } from "@/lib/services/recurring-execution.service"
-import type { RecurringListCursor, RecurringSubscriptionStatus } from "@/lib/types/recurring"
+import type {
+  RecurringListCursor,
+  RecurringSubscriptionStatus,
+  RecurringSubscriptionStatusFilter,
+} from "@/lib/types/recurring"
 import { mapSubscriptionRow } from "@/lib/types/recurring"
 
 const PAGE_SIZE = 20
+
+const DELINQUENT_STATUSES = ["past_due", "payment_failed"]
 
 function encodeCursor(cursor: RecurringListCursor | null): string | null {
   if (!cursor) return null
@@ -33,7 +39,7 @@ export async function listRecurringSubscriptionsAction(
   partnerId: string,
   options?: {
     cursor?: string | null
-    status?: RecurringSubscriptionStatus | "all"
+    status?: RecurringSubscriptionStatusFilter
     customerId?: string | null
     planId?: string | null
     search?: string
@@ -57,7 +63,13 @@ export async function listRecurringSubscriptionsAction(
       .order("id", { ascending: false })
       .limit(PAGE_SIZE + 1)
 
-    if (options?.status && options.status !== "all") query = query.eq("status", options.status)
+    if (options?.status && options.status !== "all") {
+      if (options.status === "delinquent") {
+        query = query.in("status", DELINQUENT_STATUSES)
+      } else {
+        query = query.eq("status", options.status)
+      }
+    }
     if (options?.customerId) query = query.eq("customer_id", options.customerId)
     if (options?.planId) query = query.eq("recurring_plan_id", options.planId)
     if (search) {
@@ -311,11 +323,23 @@ export async function getRecurringSubscriptionStatsAction(partnerId: string) {
       .select("status")
       .eq("partner_id", partnerId)
 
-    const stats = { active: 0, paused: 0, cancelled: 0, expired: 0, total: 0 }
+    const stats = {
+      active: 0,
+      paused: 0,
+      cancelled: 0,
+      expired: 0,
+      awaiting_restock: 0,
+      pending: 0,
+      past_due: 0,
+      payment_failed: 0,
+      delinquent: 0,
+      total: 0,
+    }
     for (const row of data || []) {
       stats.total++
       const key = row.status as keyof typeof stats
-      if (key in stats && key !== "total") stats[key]++
+      if (key in stats && key !== "total" && key !== "delinquent") stats[key]++
+      if (DELINQUENT_STATUSES.includes(row.status)) stats.delinquent++
     }
     return { success: true, data: stats }
   } catch (e: unknown) {

@@ -31,6 +31,9 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
   const statusVariant = (status: string) => {
     if (status === "active") return "green" as const
     if (status === "paused") return "orange" as const
+    if (status === "pending") return "blue" as const
+    if (status === "past_due") return "orange" as const
+    if (status === "payment_failed") return "red" as const
     if (status === "cancelled") return "red" as const
     if (status === "awaiting_restock") return "red" as const
     return "gray" as const

@@ -10,17 +10,28 @@ import {
   Users,
   CheckCircleIcon,
   CancelCircleIcon,
-  BlockedIcon
+  BlockedIcon,
+  ClockIcon,
+  AlertTriangleIcon
 } from "@/lib/icons"
+import type { RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
 
 interface SubscriptionPageControlsProps {
-  statusFilter: "all" | "active" | "paused" | "cancelled" | "expired" | "awaiting_restock"
-  setStatusFilter: (status: "all" | "active" | "paused" | "cancelled" | "expired" | "awaiting_restock") => void
+  statusFilter: RecurringSubscriptionStatusFilter
+  setStatusFilter: (status: RecurringSubscriptionStatusFilter) => void
   search: string
   onSearchChange: (value: string) => void
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
-  tabCounts?: { all: number; active: number; paused: number; awaiting_restock: number; cancelled: number }
+  tabCounts?: {
+    all: number
+    active: number
+    paused: number
+    pending: number
+    delinquent: number
+    awaiting_restock: number
+    cancelled: number
+  }
 }
 
 export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> = ({
@@ -46,6 +57,12 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
             </TabsTrigger>
             <TabsTrigger value="paused" icon={CancelCircleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.paused} variant="yellow" />}>
               Pausadas
+            </TabsTrigger>
+            <TabsTrigger value="pending" icon={ClockIcon} badge={tabCounts && <TabCountBadge count={tabCounts.pending} variant="blue" />}>
+              Aguardando Cobrança
+            </TabsTrigger>
+            <TabsTrigger value="delinquent" icon={AlertTriangleIcon} badge={tabCounts && <TabCountBadge count={tabCounts.delinquent} variant="red" />}>
+              Com Pendência
             </TabsTrigger>
             <TabsTrigger value="awaiting_restock" icon={BlockedIcon} badge={tabCounts && <TabCountBadge count={tabCounts.awaiting_restock} variant="orange" />}>
               Sem Estoque

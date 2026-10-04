@@ -32,8 +32,9 @@ import {
   getSubscriptionForecastAction,
   getSubscriptionCreditsAction,
   syncSubscriptionWithMpErpAction,
+  getRecurringSubscriptionStatsAction,
 } from "@/app/actions/erp/recurring-subscriptions"
-import type { RecurringSubscription } from "@/lib/types/recurring"
+import type { RecurringSubscription, RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
 import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate, formatCurrency } from "@/lib/utils"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -77,7 +78,7 @@ export default function RecurringSubscriptionsPage({
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "cancelled" | "expired" | "awaiting_restock">("all")
+  const [statusFilter, setStatusFilter] = useState<RecurringSubscriptionStatusFilter>("all")
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
 
@@ -103,6 +104,16 @@ export default function RecurringSubscriptionsPage({
   const [loadingCredits, setLoadingCredits] = useState(false)
   const [creditsSearch, setCreditsSearch] = useState("")
 
+  const [tabCounts, setTabCounts] = useState<{
+    all: number
+    active: number
+    paused: number
+    pending: number
+    delinquent: number
+    awaiting_restock: number
+    cancelled: number
+  } | null>(null)
+
   const observerTarget = useRef<HTMLDivElement>(null)
   const itemsPerPage = 8
 
@@ -114,21 +125,37 @@ export default function RecurringSubscriptionsPage({
     return () => clearTimeout(timer)
   }, [search])
 
+  const loadStats = useCallback(async () => {
+    const res = await getRecurringSubscriptionStatsAction(partnerId)
+    if (res.success && res.data) {
+      setTabCounts({
+        all: res.data.total,
+        active: res.data.active,
+        paused: res.data.paused,
+        pending: res.data.pending,
+        delinquent: res.data.delinquent,
+        awaiting_restock: res.data.awaiting_restock,
+        cancelled: res.data.cancelled,
+      })
+    }
+  }, [partnerId])
+
   // Fetch / reload subscriptions when filters change
   const reload = useCallback(async (statusVal: typeof statusFilter, searchVal: string) => {
     setLoading(true)
     const res = await listRecurringSubscriptionsAction(partnerId, {
-      status: statusVal as any,
+      status: statusVal,
       search: searchVal,
     })
     setLoading(false)
+    void loadStats()
     if (res.success && res.data) {
       setSubscriptions(res.data.items as RecurringSubscription[])
       setHasMore(res.data.hasMore)
       setNextCursor(res.data.nextCursor)
       setPage(1)
     }
-  }, [partnerId])
+  }, [partnerId, loadStats])
 
   useEffect(() => {
     if (currentTab === "list") {
@@ -172,7 +199,7 @@ export default function RecurringSubscriptionsPage({
     setLoadingMore(true)
     const res = await listRecurringSubscriptionsAction(partnerId, {
       cursor: nextCursor,
-      status: statusFilter as any,
+      status: statusFilter,
       search: debouncedSearch,
     })
     setLoadingMore(false)
@@ -363,12 +390,13 @@ export default function RecurringSubscriptionsPage({
         {currentTab === "list" && (
           <>
             <SubscriptionPageControls
-              statusFilter={statusFilter as any}
-              setStatusFilter={setStatusFilter as any}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
               search={search}
               onSearchChange={setSearch}
               viewMode={effectiveViewMode}
               onViewModeChange={setViewModeState}
+              tabCounts={tabCounts || undefined}
             />
 
             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
