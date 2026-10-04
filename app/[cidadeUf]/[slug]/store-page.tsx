@@ -3,11 +3,18 @@ import { getCachedStoreProducts, getCachedStoreServices, getCachedStoreReviews, 
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
+import { getCurrentUser } from "@/lib/auth/authorization"
+import { getUserSessionData } from "@/lib/data/user"
 
 export async function StorePage({ storeData }: { storeData: any }) {
     const partner = storeData.partners
     const storeId = storeData.id
     const partnerId = storeData.partner_id
+
+    const user = await getCurrentUser()
+    const sessionData = user ? await getUserSessionData(user.id) : null
+    const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null, avatar_url: sessionData.profile.avatar_url || null, latitude: sessionData.profile.latitude, longitude: sessionData.profile.longitude } : null
+    const cartCount = sessionData?.cartCount || 0
 
     const [products, services, reviews, stats] = await Promise.all([
         getCachedStoreProducts(storeId, partnerId),
@@ -90,6 +97,8 @@ export async function StorePage({ storeData }: { storeData: any }) {
                     productCategories={productCategories}
                     serviceCategories={serviceCategories}
                     isShowcaseActive={partnerData.isShowcaseActive}
+                    userProfile={userProfile}
+                    cartCount={cartCount}
                 />
             </main>
             <MarketplaceFooter />

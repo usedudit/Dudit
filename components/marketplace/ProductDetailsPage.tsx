@@ -683,7 +683,7 @@ export function ProductDetailsPageClient({
         if (!selectedAddress || !targetPartnerId) return
         let active = true
 
-        async function calculateForAddress() {
+        const timer = setTimeout(async () => {
             setDeliveryLoading(true)
             setDeliveryError(null)
             try {
@@ -721,10 +721,12 @@ export function ProductDetailsPageClient({
             } finally {
                 if (active) setDeliveryLoading(false)
             }
-        }
+        }, 300)
 
-        calculateForAddress()
-        return () => { active = false }
+        return () => {
+            active = false
+            clearTimeout(timer)
+        }
     }, [selectedAddress, partner.partner_id, partner.id, partner.store_id, product.store_id, pricing.total])
 
     // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
@@ -745,7 +747,7 @@ export function ProductDetailsPageClient({
         if (!targetPartnerId) return
 
         let active = true
-        async function calculateForCep() {
+        const timer = setTimeout(async () => {
             setDeliveryLoading(true)
             setDeliveryError(null)
             try {
@@ -788,10 +790,12 @@ export function ProductDetailsPageClient({
             } finally {
                 if (active) setDeliveryLoading(false)
             }
-        }
+        }, 300)
 
-        calculateForCep()
-        return () => { active = false }
+        return () => {
+            active = false
+            clearTimeout(timer)
+        }
     }, [cep, partner.partner_id, partner.id, partner.store_id, product.store_id, userId, pricing.total])
 
     // Destination CEP for carrier freight quotes (logged in: saved address, logged out: CEP input)

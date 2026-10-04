@@ -444,6 +444,11 @@ export function PlanDetailsPageClient({
                 <span className="text-xs text-brand-green font-semibold mt-2 block">
                     ✓ Cobrança recorrente {frequencyLabel}
                 </span>
+                {plan.billingMode === "auto_mercado_pago" && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 block">
+                        ✓ Faturamento automático no cartão (Mercado Pago)
+                    </span>
+                )}
             </div>
 
             {isPlanOwner && (

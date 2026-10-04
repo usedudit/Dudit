@@ -153,26 +153,70 @@ export default function CashRegisterPage({
     const [detailedSession, setDetailedSession] = useState<any | null>(null)
     const [isDetailLoading, setIsDetailLoading] = useState(false)
 
+    const sessionDetailCache = useRef<Map<string, { data: any; timestamp: number }>>(new Map())
+    const prefetchTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
+    const prefetchSessionDetails = useCallback((id: string) => {
+        if (!id || !partnerId) return
+        const cached = sessionDetailCache.current.get(id)
+        if (cached && Date.now() - cached.timestamp < 60000) return
+
+        const existing = prefetchTimeoutRef.current.get(id)
+        if (existing) clearTimeout(existing)
+
+        const timer = setTimeout(() => {
+            prefetchTimeoutRef.current.delete(id)
+            getCashSessionDetailsAction(partnerId, id).then((res) => {
+                if (res.success && res.data) {
+                    sessionDetailCache.current.set(id, { data: res.data, timestamp: Date.now() })
+                }
+            }).catch(() => {})
+        }, 200)
+
+        prefetchTimeoutRef.current.set(id, timer)
+    }, [partnerId])
+
+    const cancelPrefetchSessionDetails = useCallback((id: string) => {
+        const existing = prefetchTimeoutRef.current.get(id)
+        if (existing) {
+            clearTimeout(existing)
+            prefetchTimeoutRef.current.delete(id)
+        }
+    }, [])
+
+    const getPrefetchProps = useCallback((id: string) => ({
+        onMouseEnter: () => prefetchSessionDetails(id),
+        onMouseLeave: () => cancelPrefetchSessionDetails(id),
+        onTouchStart: () => prefetchSessionDetails(id),
+    }), [prefetchSessionDetails, cancelPrefetchSessionDetails])
+
     useEffect(() => {
         if (!activeViewId || !partnerId) {
             setDetailedSession(null)
             return
         }
         let mounted = true
-        setIsDetailLoading(true)
+        const cached = sessionDetailCache.current.get(activeViewId)
+        if (cached?.data) {
+            setDetailedSession(cached.data)
+        } else {
+            setIsDetailLoading(true)
+        }
+
         void (async () => {
             try {
                 const res = await getCashSessionDetailsAction(partnerId, activeViewId)
                 if (mounted) {
                     if (res.success && res.data) {
+                        sessionDetailCache.current.set(activeViewId, { data: res.data, timestamp: Date.now() })
                         setDetailedSession(res.data)
-                    } else {
+                    } else if (!cached) {
                         notifyError(res.error || "Erro ao carregar detalhes do caixa.")
                         close()
                     }
                 }
             } catch (err: any) {
-                if (mounted) {
+                if (mounted && !cached) {
                     notifyError(err?.message || "Erro ao carregar detalhes do caixa.")
                     close()
                 }
@@ -365,48 +409,32 @@ export default function CashRegisterPage({
     }
 
     const handleViewDetails = useCallback((id: string) => {
+        const cached = sessionDetailCache.current.get(id)
+        if (cached?.data) {
+            setDetailedSession(cached.data)
+        } else {
+            const item = history.find((s) => s.id === id)
+            if (item) {
+                const initAmt = Number(item.initial_amount || 0)
+                setDetailedSession({
+                    session: item,
+                    movements: [],
+                    operators: { open_name: item.user_name || item.opened_by_name || "", close_name: item.closed_by_name || null },
+                    drawer: { initial: initAmt, cashSales: 0, deposits: 0, withdrawals: 0, total: initAmt },
+                    summaryByPaymentMethod: [],
+                    totals: { initial: initAmt, totalCashSales: 0, totalWithdrawals: 0, totalDeposits: 0, calculatedDrawerTotal: initAmt, informedDrawerTotal: null, difference: null },
+                    adjustmentMovementCount: 0,
+                })
+            }
+        }
         open("view", id)
-    }, [open])
+    }, [history, open])
 
     useEffect(() => {
         if (initialViewId && !activeViewId) {
             open("view", initialViewId)
         }
     }, [initialViewId, activeViewId, open])
-
-    useEffect(() => {
-        if (!activeViewId) {
-            setDetailedSession(null)
-            return
-        }
-
-        let isMounted = true
-        setIsDetailLoading(true)
-        getCashSessionDetailsAction(partnerId, activeViewId)
-            .then((res) => {
-                if (isMounted) {
-                    if (res.success) {
-                        setDetailedSession(res.data)
-                    } else {
-                        notifyError(res.error || "Erro ao carregar detalhes")
-                        close()
-                    }
-                }
-            })
-            .catch(() => {
-                if (isMounted) {
-                    notifyError("Erro de conexão ao carregar detalhes")
-                    close()
-                }
-            })
-            .finally(() => {
-                if (isMounted) setIsDetailLoading(false)
-            })
-
-        return () => {
-            isMounted = false
-        }
-    }, [partnerId, activeViewId, close, notifyError])
 
     const resetOpenForm = () => {
         setOpeningBalance(0)
@@ -696,13 +724,19 @@ export default function CashRegisterPage({
                                         >
                                             {effectiveViewMode === "grid" ? (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {paginated.map((session) => (
-                                                        <CashSessionGridCard
-                                                            key={session.id}
-                                                            session={session}
-                                                            onDetails={handleViewDetails}
-                                                        />
-                                                    ))}
+                                                    {paginated.map((session) => {
+                                                        const prefetch = getPrefetchProps(session.id)
+                                                        return (
+                                                            <CashSessionGridCard
+                                                                key={session.id}
+                                                                session={session}
+                                                                onDetails={handleViewDetails}
+                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                            />
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="w-full overflow-hidden rounded-xl relative">
@@ -745,17 +779,23 @@ export default function CashRegisterPage({
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {paginated.map((session) => (
-                                                                    <CashSessionListItem
-                                                                        key={session.id}
-                                                                        session={session}
-                                                                        columns={columns}
-                                                                        selected={false}
-                                                                        onSelect={() => { }}
-                                                                        onDetails={handleViewDetails}
-                                                                        showCheckbox={false}
-                                                                    />
-                                                                ))}
+                                                                {paginated.map((session) => {
+                                                                    const prefetch = getPrefetchProps(session.id)
+                                                                    return (
+                                                                        <CashSessionListItem
+                                                                            key={session.id}
+                                                                            session={session}
+                                                                            columns={columns}
+                                                                            selected={false}
+                                                                            onSelect={() => { }}
+                                                                            onDetails={handleViewDetails}
+                                                                            showCheckbox={false}
+                                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                            onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                        />
+                                                                    )
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>

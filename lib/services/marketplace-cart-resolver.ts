@@ -101,7 +101,7 @@ export async function resolveCheckoutCartLines(
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
       services(id, name, price, promotional_price, is_active, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id, cost_price),
       recurring_plans(
-        id, name, status, show_in_marketplace,
+        id, name, status, show_in_marketplace, price,
         recurring_plan_items(
           unit_price, quantity, item_type, product_id, service_id,
           products(fulfillment_modes, product_type),
@@ -422,7 +422,7 @@ export async function resolveCheckoutCartLines(
         hasDeliveryLines = true
       }
 
-      const unitPrice = planTotalFromItems(planItems)
+      const unitPrice = planRow.price != null ? Number(planRow.price) : planTotalFromItems(planItems)
       const subtotal = unitPrice * qty
       const lineName = planRow.name || "Assinatura"
 

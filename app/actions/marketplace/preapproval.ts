@@ -12,6 +12,7 @@ import {
   getMpPreapprovalDetails,
 } from "@/lib/services/mercadopago/partner-preapproval"
 import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
+import { computeNextExecutionAt, toMpFrequency } from "@/lib/services/recurring/frequency"
 
 interface CreatePreapprovalInput {
   partnerId: string
@@ -86,7 +87,9 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     // 2. Fetch the plan details
     const { data: plan } = await admin
       .from("recurring_plans")
-      .select("id, name, status, price, frequency_type, frequency_interval, billing_mode")
+      .select(
+        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode",
+      )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
       .maybeSingle()
@@ -101,24 +104,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     }
 
     const now = new Date()
-    const freqType = plan.frequency_type
-    const freqInterval = Number(plan.frequency_interval || 1)
-    let nextExecutionAt: string
-    if (freqType === "day") {
-      nextExecutionAt = new Date(now.getTime() + freqInterval * 24 * 60 * 60 * 1000).toISOString()
-    } else if (freqType === "week") {
-      nextExecutionAt = new Date(now.getTime() + freqInterval * 7 * 24 * 60 * 60 * 1000).toISOString()
-    } else if (freqType === "month") {
-      const d = new Date(now)
-      d.setMonth(d.getMonth() + freqInterval)
-      nextExecutionAt = d.toISOString()
-    } else if (freqType === "year") {
-      const d = new Date(now)
-      d.setFullYear(d.getFullYear() + freqInterval)
-      nextExecutionAt = d.toISOString()
-    } else {
-      nextExecutionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    }
+    const nextExecutionAt = await computeNextExecutionAt(admin, plan, now)
 
     // 3. Insert local subscription record as 'pending' (Awaiting approval from webhook/server)
     const { data: sub, error: subErr } = await admin
@@ -150,22 +136,17 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     })
 
     // 4. Request preapproval from Mercado Pago
-    // Convert frequency_type: 'month'/'week'/'day' to days/months for MP
-    const frequencyType: "days" | "months" =
-      plan.frequency_type === "month" ? "months" : "days"
-    const frequency =
-      plan.frequency_type === "week"
-        ? plan.frequency_interval * 7
-        : plan.frequency_interval
+    const { frequency, frequency_type: frequencyType } = toMpFrequency(plan)
 
     const mpPreapproval = await createMpPreapproval({
       partnerId: input.partnerId,
       payerEmail: user.email || "cliente@dudit.com.br",
       planName: plan.name,
-      amount: plan.price,
+      amount: Number(plan.price || 0),
       frequency,
       frequencyType,
       externalReference: sub.id,
+      startDate: nextExecutionAt,
     })
 
     // Update the pending subscription record with the MP Preapproval ID

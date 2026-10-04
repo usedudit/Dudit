@@ -209,6 +209,81 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ──── Marketplace recurring subscriptions ────────────────────────────────────
+
+type SupabaseAdmin = ReturnType<typeof createAdminClient>
+
+function mapMpStatusToRecurringStatus(
+  mpStatus?: string | null,
+): "active" | "paused" | "cancelled" | "past_due" | null {
+  switch (mpStatus) {
+    case "authorized":
+    case "approved":
+      return "active"
+    case "paused":
+      return "paused"
+    case "cancelled":
+    case "deactivated":
+      return "cancelled"
+    case "rejected":
+      return "past_due"
+    default:
+      return null
+  }
+}
+
+/**
+ * Sincroniza a assinatura de marketplace (recurring_subscriptions) com o estado
+ * do preapproval no Mercado Pago. Antes deste ponto o webhook so mexia na
+ * tabela `subscriptions` (billing do ERP), deixando o marketplace sem evoluir.
+ */
+async function syncRecurringSubscriptionWithMp(
+  supabase: SupabaseAdmin,
+  ids: { mpPreapprovalId?: string | null; externalReference?: string | null },
+  mpStatus: string | null | undefined,
+) {
+  try {
+    const targetStatus = mapMpStatusToRecurringStatus(mpStatus)
+    if (!targetStatus) return
+
+    if (!ids.mpPreapprovalId && !(ids.externalReference && isUuid(ids.externalReference))) {
+      return
+    }
+
+    let query = supabase.from("recurring_subscriptions").select("id, status")
+
+    if (ids.mpPreapprovalId) {
+      query = query.eq("mp_preapproval_id", ids.mpPreapprovalId)
+    } else {
+      query = query.eq("id", ids.externalReference as string)
+    }
+
+    const { data: sub, error } = await query.maybeSingle()
+
+    if (error || !sub?.id) return
+    if (sub.status === targetStatus) return
+    // Cancelamento local e definitivo: um webhook atrasado nao pode reativar.
+    if (sub.status === "cancelled" && targetStatus !== "cancelled") return
+
+    const { error: updateError } = await supabase
+      .from("recurring_subscriptions")
+      .update({ status: targetStatus, updated_at: new Date().toISOString() })
+      .eq("id", sub.id)
+
+    if (updateError) {
+      console.error("[WEBHOOK] Falha ao sincronizar recurring_subscriptions:", updateError.message)
+      return
+    }
+
+    console.log(
+      `[WEBHOOK] recurring_subscriptions ${sub.id}: ${sub.status} -> ${targetStatus} (MP: ${mpStatus})`,
+    )
+  } catch (e) {
+    // Nunca pode impedir a sincronizacao do billing do ERP no mesmo evento.
+    console.error("[WEBHOOK] Erro ao sincronizar recurring_subscriptions:", e)
+  }
+}
+
 // ─── Async Processing with Retry ────────────────────────────────────────────
 
 async function processWebhookWithRetry(
@@ -237,6 +312,16 @@ async function processWebhookWithRetry(
         })
         if (mpRes.ok) {
           const preapprovalData = await mpRes.json()
+
+          await syncRecurringSubscriptionWithMp(
+            supabase,
+            {
+              mpPreapprovalId: paymentId?.toString(),
+              externalReference: preapprovalData?.external_reference,
+            },
+            preapprovalData?.status,
+          )
+
           const { data: sub } = await supabase
             .from("subscriptions")
             .select("id, status")
@@ -262,6 +347,12 @@ async function processWebhookWithRetry(
           const authPayData = await mpRes.json()
           const preapprovalId = authPayData.preapproval_id
           if (preapprovalId) {
+            await syncRecurringSubscriptionWithMp(
+              supabase,
+              { mpPreapprovalId: preapprovalId.toString() },
+              authPayData?.status,
+            )
+
             const { data: sub } = await supabase
               .from("subscriptions")
               .select("id, status, partner_id, plan_id")

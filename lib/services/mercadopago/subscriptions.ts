@@ -246,7 +246,7 @@ export async function createMpSubscription(
   try {
     const accessToken = await getMpPlatformAccessToken()
 
-    const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"}/erp/configuracoes/assinatura`
+    const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"}/erp/configuracoes?tab=assinatura`
 
     const mpPayload = {
       reason: `Dudit ${plan.name} - Assinatura mensal`,

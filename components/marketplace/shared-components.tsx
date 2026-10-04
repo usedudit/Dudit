@@ -116,7 +116,8 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         ? null
         : (distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null))
 
-    const deliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
+    const rawDeliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
+    const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
     const hasProducts = vitrine.has_products !== false && partner.has_products !== false && vitrine.type !== "services_only" && partner.business_type !== "services"
 
@@ -412,7 +413,8 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null)
     const metaDistanceLabel = preferCityLabel ? (locationLabel || distanceLabel) : distanceLabel
 
-    const deliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
+    const rawDeliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
+    const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
     const showDeliveryTime = itemType === "produto" && isDeliveryEnabled
 

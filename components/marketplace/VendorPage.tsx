@@ -796,7 +796,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [userProfile?.latitude, userProfile?.longitude])
 
     const deliveryInfo = useMemo(() => {
-        const settings = partner?.delivery_settings || null
+        const rawSettings = partner?.delivery_settings || null
+        const settings = Array.isArray(rawSettings) ? rawSettings[0] : rawSettings
         const isDeliveryEnabled = settings?.is_delivery_enabled !== false && settings?.isDeliveryEnabled !== false
         const sellsProducts = partner?.offeringType ? partner.offeringType !== "services" : (products?.length > 0)
 
@@ -815,9 +816,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             && maxDeliveryKm > 0
             && distanceKm > maxDeliveryKm
 
-        const deliveryTime = distanceKm != null
-            ? estimateAverageDeliveryTime(distanceKm)
-            : formatAverageDeliveryTimeFromRange(partner?.delivery_time_formatted)
+        const deliveryTime = outOfRadius ? null
+            : (distanceKm != null
+                ? estimateAverageDeliveryTime(distanceKm)
+                : formatAverageDeliveryTimeFromRange(partner?.delivery_time_formatted))
 
         const feeLabel = outOfRadius ? null : estimateDeliveryFeeLabel({
             distanceKm,

@@ -1446,7 +1446,8 @@ export function ExplorarPageClient({
 
         const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || item.distance_km_formatted || null)
 
-        const deliverySettings = partner?.delivery_settings || item.delivery_settings || null
+        const rawDeliverySettings = partner?.delivery_settings || item.delivery_settings || null
+        const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
         const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
         const hasProducts = isStore
             ? (item.has_products !== false && partner?.has_products !== false && item.type !== "services_only" && partner?.business_type !== "services")

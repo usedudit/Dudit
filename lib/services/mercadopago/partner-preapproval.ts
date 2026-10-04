@@ -6,8 +6,10 @@ interface PreapprovalConfig {
   planName: string
   amount: number
   frequency: number
-  frequencyType: "days" | "months"
+  frequencyType: "days" | "weeks" | "months" | "years"
   externalReference: string
+  /** Data da primeira cobranca recorrente (auto_recurring.start_date). */
+  startDate?: string | null
 }
 
 /**
@@ -21,12 +23,13 @@ export async function createMpPreapproval({
   frequency,
   frequencyType,
   externalReference,
+  startDate,
 }: PreapprovalConfig) {
   const token = await getValidMercadoPagoAccessToken(partnerId)
-  
+
   const payload = {
     payer_email: payerEmail,
-    back_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://dudit.com.br"}/marketplace/checkout/fulfillment?subscription_id=${externalReference}`,
+    back_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://dudit.com.br"}/checkout/fulfillment?subscription_id=${externalReference}`,
     reason: `Assinatura: ${planName}`,
     external_reference: externalReference,
     auto_recurring: {
@@ -34,6 +37,7 @@ export async function createMpPreapproval({
       frequency_type: frequencyType,
       transaction_amount: Number(amount.toFixed(2)),
       currency_id: "BRL",
+      ...(startDate ? { start_date: startDate } : {}),
     },
     status: "authorized",
   }

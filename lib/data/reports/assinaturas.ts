@@ -63,6 +63,8 @@ export async function getSubscriptionReportData(
       }
     } else if (status === "awaiting_restock") {
       delinquentCount++ // awaiting restock counts as stock-delinquent
+    } else if (status === "past_due" || status === "payment_failed") {
+      delinquentCount++ // payment delinquent (dunning em andamento ou esgotada)
     }
 
     // Calculate MRR contribution of this subscription if active or paused

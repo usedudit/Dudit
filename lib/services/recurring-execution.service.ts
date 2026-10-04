@@ -10,6 +10,9 @@ import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getDateComponents, getDefaultTimezone } from "@/lib/date"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 
+/** Tentativas de cobranca do MP antes de considerar a assinatura inadimplente. */
+const MAX_PAYMENT_ATTEMPTS = 3
+
 export type ClaimedRecurringExecution = {
   executionId: string
   subscriptionId: string
@@ -361,6 +364,7 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
       .from("recurring_executions")
       .update({ status: "awaiting_payment" })
       .eq("id", claim.executionId)
+      .in("status", ["pending", "failed"])
     return
   }
 
@@ -788,30 +792,44 @@ export async function processPreapprovalPaymentFailed(params: {
 
   if (!sub) return { success: false, message: "Subscription not found" }
 
-  await supabase
-    .from("recurring_subscriptions")
-    .update({ status: "payment_failed", updated_at: new Date().toISOString() })
-    .eq("id", sub.id)
-
   const { data: exec } = await supabase
     .from("recurring_executions")
-    .select("id")
+    .select("id, payment_attempts")
     .eq("subscription_id", sub.id)
     .in("status", ["pending", "awaiting_payment", "processing"])
     .order("scheduled_for", { ascending: false })
     .limit(1)
     .maybeSingle()
 
+  const attempts = Number(exec?.payment_attempts || 0) + 1
+  const exhausted = attempts >= MAX_PAYMENT_ATTEMPTS
+  const statusDetail = `Status: ${params.paymentInfo?.status}, Detalhe: ${params.paymentInfo?.status_detail}`
+
   if (exec) {
     await supabase
       .from("recurring_executions")
       .update({
-        status: "failed",
-        error_message: `Pagamento recusado no Mercado Pago (Status: ${params.paymentInfo.status}, Detalhe: ${params.paymentInfo.status_detail})`,
-        completed_at: new Date().toISOString()
+        // Dunning: ate esgotar as tentativas o ciclo continua aberto, porque o
+        // Mercado Pago renova o cartao sozinho.
+        status: exhausted ? "failed" : "awaiting_payment",
+        payment_attempts: attempts,
+        last_payment_failed_at: new Date().toISOString(),
+        error_message: exhausted
+          ? `Pagamento recusado no Mercado Pago apos ${MAX_PAYMENT_ATTEMPTS} tentativas (${statusDetail})`
+          : `Pagamento recusado no Mercado Pago - tentativa ${attempts} de ${MAX_PAYMENT_ATTEMPTS} (${statusDetail})`,
+        ...(exhausted ? { completed_at: new Date().toISOString() } : {}),
       })
       .eq("id", exec.id)
   }
+
+  await supabase
+    .from("recurring_subscriptions")
+    .update({
+      status: exhausted ? "payment_failed" : "past_due",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sub.id)
+    .neq("status", "cancelled")
 
   await logAuditEvent({
     partnerId: sub.partner_id,
@@ -820,16 +838,24 @@ export async function processPreapprovalPaymentFailed(params: {
     entityId: sub.id,
     actionType: "payment_failed",
     changeLines: [
-      `cobrança recusada no Mercado Pago (Status: ${params.paymentInfo.status}, Detalhe: ${params.paymentInfo.status_detail}, Pagamento: #${params.paymentId}).`,
-      `assinatura marcada como "Falha no pagamento".`
+      `cobrança recusada no Mercado Pago (${statusDetail}, Pagamento: #${params.paymentId}).`,
+      exhausted
+        ? `assinatura marcada como "Falha no Pagamento" após ${MAX_PAYMENT_ATTEMPTS} tentativas.`
+        : `tentativa ${attempts} de ${MAX_PAYMENT_ATTEMPTS}: assinatura marcada como "Pagamento Pendente".`,
     ],
     source: "webhook",
     metadata: {
       payment_id: params.paymentId,
-      status: params.paymentInfo.status,
-      status_detail: params.paymentInfo.status_detail
-    }
+      status: params.paymentInfo?.status,
+      status_detail: params.paymentInfo?.status_detail,
+      payment_attempts: attempts,
+    },
   })
 
-  return { success: true, message: "Falha de pagamento registrada" }
+  return {
+    success: true,
+    message: exhausted
+      ? "Tentativas de pagamento esgotadas"
+      : "Falha de pagamento registrada (nova tentativa pendente)",
+  }
 }

@@ -672,104 +672,118 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (!selectedAddress) return
         const addressStr = `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.complement ? `, ${selectedAddress.complement}` : ""} - ${selectedAddress.neighborhood}, ${selectedAddress.city} - ${selectedAddress.state}, ${selectedAddress.zip_code}`
 
-        Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
-            const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
-            const isServicesOnly = hasOnlyServices(data.items || [])
-            if (isServicesOnly || partnerItemsTotal <= 0) {
-                // Só serviços (ou nada selecionado): não cota frete próprio nem transportadora.
-                // Limpa estado antigo — senão um erro "raio" de quando havia produtos
-                // selecionados permaneceria e dispararia a cotação de transportadora.
+        const timer = setTimeout(() => {
+            Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
+                const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
+                const isServicesOnly = hasOnlyServices(data.items || [])
+                if (isServicesOnly || partnerItemsTotal <= 0) {
+                    // Só serviços (ou nada selecionado): não cota frete próprio nem transportadora.
+                    // Limpa estado antigo — senão um erro "raio" de quando havia produtos
+                    // selecionados permaneceria e dispararia a cotação de transportadora.
+                    deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
+                    delete carrierFetchedKeysRef.current[storeKey]
+                    setDeliveryQuotes(prev => {
+                        if (!(storeKey in prev)) return prev
+                        const next = { ...prev }
+                        delete next[storeKey]
+                        return next
+                    })
+                    setCarrierQuotes(prev => {
+                        if (!(storeKey in prev)) return prev
+                        const next = { ...prev }
+                        delete next[storeKey]
+                        return next
+                    })
+                    return
+                }
+
+                const targetPartnerId = data.partnerId || data.partner?.id || storeKey
+                const targetStoreId = data.storeId || data.store?.id || null
+
                 deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
-                delete carrierFetchedKeysRef.current[storeKey]
-                setDeliveryQuotes(prev => {
-                    if (!(storeKey in prev)) return prev
-                    const next = { ...prev }
-                    delete next[storeKey]
-                    return next
-                })
-                setCarrierQuotes(prev => {
-                    if (!(storeKey in prev)) return prev
-                    const next = { ...prev }
-                    delete next[storeKey]
-                    return next
-                })
-                return
-            }
+                const quoteSeq = deliveryQuoteSeqRef.current[storeKey]
 
-            const targetPartnerId = data.partnerId || data.partner?.id || storeKey
-            const targetStoreId = data.storeId || data.store?.id || null
+                setDeliveryQuotes(prev => ({
+                    ...prev,
+                    [storeKey]: { ...(prev[storeKey] || { fee: 0, distanceKm: null, breakdown: null }), loading: true, error: null }
+                }))
 
-            deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
-            const quoteSeq = deliveryQuoteSeqRef.current[storeKey]
+                const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
+                    ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                    : null
 
-            setDeliveryQuotes(prev => ({
-                ...prev,
-                [storeKey]: { ...(prev[storeKey] || { fee: 0, distanceKm: null, breakdown: null }), loading: true, error: null }
-            }))
-
-            const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
-                ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
-                : null
-
-            // Transportadora em PARALELO com o frete próprio: o SuperFrete já
-            // responde enquanto o geocoding/radi check roda; se o frete próprio
-            // cobrir, as opções simplesmente ficam escondidas (gate por "raio").
-            const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
-            if (destinationCep.length === 8 && data.partner?.mp_user_id) {
-                const carrierKey = `${targetPartnerId}:${destinationCep}`
-                if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
-                    carrierFetchedKeysRef.current[storeKey] = carrierKey
-                    setCarrierQuotes(prev => ({
-                        ...prev,
-                        [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: carrierKey },
-                    }))
-                    quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: destinationCep }).then(res => {
-                        if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
-                        setCarrierQuotes(prev => {
-                            const cur = prev[storeKey]
-                            if (!cur || cur.key !== carrierKey) return prev
-                            if (res.success && res.options.length > 0) {
+                // Transportadora em PARALELO com o frete próprio: o SuperFrete já
+                // responde enquanto o geocoding/radi check roda; se o frete próprio
+                // cobrir, as opções simplesmente ficam escondidas (gate por "raio").
+                const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
+                if (destinationCep.length === 8 && data.partner?.mp_user_id) {
+                    const carrierKey = `${targetPartnerId}:${destinationCep}`
+                    if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
+                        carrierFetchedKeysRef.current[storeKey] = carrierKey
+                        setCarrierQuotes(prev => ({
+                            ...prev,
+                            [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: carrierKey },
+                        }))
+                        quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: destinationCep }).then(res => {
+                            if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
+                            setCarrierQuotes(prev => {
+                                const cur = prev[storeKey]
+                                if (!cur || cur.key !== carrierKey) return prev
+                                if (res.success && res.options.length > 0) {
+                                    return {
+                                        ...prev,
+                                        [storeKey]: { options: res.options, loading: false, error: null, selectedServiceId: res.options[0].serviceId, key: carrierKey },
+                                    }
+                                }
                                 return {
                                     ...prev,
-                                    [storeKey]: { options: res.options, loading: false, error: null, selectedServiceId: res.options[0].serviceId, key: carrierKey },
+                                    [storeKey]: { options: [], loading: false, error: !res.success ? res.error : "Nenhuma transportadora disponível para este endereço.", selectedServiceId: null, key: carrierKey },
                                 }
-                            }
-                            return {
-                                ...prev,
-                                [storeKey]: { options: [], loading: false, error: !res.success ? res.error : "Nenhuma transportadora disponível para este endereço.", selectedServiceId: null, key: carrierKey },
-                            }
+                            })
+                        }).catch(() => {
+                            if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
+                            setCarrierQuotes(prev => {
+                                const cur = prev[storeKey]
+                                if (!cur || cur.key !== carrierKey) return prev
+                                return { ...prev, [storeKey]: { ...cur, loading: false, options: [], selectedServiceId: null, error: "Não foi possível calcular o frete agora." } }
+                            })
                         })
-                    }).catch(() => {
-                        if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
-                        setCarrierQuotes(prev => {
-                            const cur = prev[storeKey]
-                            if (!cur || cur.key !== carrierKey) return prev
-                            return { ...prev, [storeKey]: { ...cur, loading: false, options: [], selectedServiceId: null, error: "Não foi possível calcular o frete agora." } }
-                        })
-                    })
+                    }
                 }
-            }
 
-            quoteDeliveryFeeAction({
-                partnerId: targetPartnerId,
-                storeId: targetStoreId,
-                destinationAddress: addressStr,
-                destinationCoords,
-                orderSubtotal: partnerItemsTotal,
-            }).then(quote => {
-                if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
-                if (quote.success) {
-                    setDeliveryQuotes(prev => ({
-                        ...prev,
-                        [storeKey]: {
-                            fee: Number(quote.fee || 0),
-                            distanceKm: Number(quote.distanceKm || 0),
-                            breakdown: quote.breakdown || null,
-                            loading: false,
-                            error: null,
-                        }
-                    }))
-                } else {
+                quoteDeliveryFeeAction({
+                    partnerId: targetPartnerId,
+                    storeId: targetStoreId,
+                    destinationAddress: addressStr,
+                    destinationCoords,
+                    orderSubtotal: partnerItemsTotal,
+                }).then(quote => {
+                    if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
+                    if (quote.success) {
+                        setDeliveryQuotes(prev => ({
+                            ...prev,
+                            [storeKey]: {
+                                fee: Number(quote.fee || 0),
+                                distanceKm: Number(quote.distanceKm || 0),
+                                breakdown: quote.breakdown || null,
+                                loading: false,
+                                error: null,
+                            }
+                        }))
+                    } else {
+                        setDeliveryQuotes(prev => ({
+                            ...prev,
+                            [storeKey]: {
+                                fee: 0,
+                                distanceKm: null,
+                                breakdown: null,
+                                loading: false,
+                                error: quote.error || null,
+                            }
+                        }))
+                    }
+                }).catch(() => {
+                    if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                     setDeliveryQuotes(prev => ({
                         ...prev,
                         [storeKey]: {
@@ -777,24 +791,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                             distanceKm: null,
                             breakdown: null,
                             loading: false,
-                            error: quote.error || null,
+                            error: "Erro ao calcular entrega.",
                         }
                     }))
-                }
-            }).catch(() => {
-                if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
-                setDeliveryQuotes(prev => ({
-                    ...prev,
-                    [storeKey]: {
-                        fee: 0,
-                        distanceKm: null,
-                        breakdown: null,
-                        loading: false,
-                        error: "Erro ao calcular entrega.",
-                    }
-                }))
+                })
             })
-        })
+        }, 300)
+
+        return () => clearTimeout(timer)
     }, [selectedAddress, optimisticItems, itemsByPartner])
 
     const handleCarrierQuoteSelect = (storeKey: string, opt: CarrierFreightOption) => {

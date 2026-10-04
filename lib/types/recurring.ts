@@ -1,7 +1,20 @@
 export type RecurringPlanStatus = "active" | "inactive" | "archived"
 export type RecurringFrequencyType = "daily" | "weekly" | "monthly" | "yearly" | "custom"
-export type RecurringSubscriptionStatus = "active" | "paused" | "cancelled" | "expired" | "awaiting_restock"
-export type RecurringExecutionStatus = "pending" | "processing" | "completed" | "failed"
+export type RecurringSubscriptionStatus =
+  | "active"
+  | "paused"
+  | "cancelled"
+  | "expired"
+  | "awaiting_restock"
+  | "pending"
+  | "past_due"
+  | "payment_failed"
+export type RecurringExecutionStatus =
+  | "pending"
+  | "processing"
+  | "awaiting_payment"
+  | "completed"
+  | "failed"
 export type RecurringPlanItemType = "product" | "service"
 
 export type RecurringPlanItem = {
@@ -38,6 +51,7 @@ export type RecurringPlan = {
   showInMarketplace: boolean
   createdAt: string
   updatedAt: string
+  price?: number
   items?: RecurringPlanItemRow[]
   images?: string[] | null
   billingMode?: "manual" | "auto_mercado_pago"
@@ -113,6 +127,7 @@ export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
     showInMarketplace: row.show_in_marketplace !== false,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    price: row.price != null ? Number(row.price) : undefined,
     images: Array.isArray(row.images) ? (row.images as string[]) : null,
     billingMode: (row.billing_mode as "manual" | "auto_mercado_pago" | undefined) || "manual",
     creditExpirationPolicy: (row.credit_expiration_policy as "never" | "end_of_cycle" | "fixed_days" | undefined) || "end_of_cycle",
@@ -150,6 +165,20 @@ export function getRecurringStatusLabel(status: RecurringSubscriptionStatus): st
     case "cancelled": return "Cancelada"
     case "expired": return "Expirada"
     case "awaiting_restock": return "Aguardando Reposição"
+    case "pending": return "Aguardando Confirmação"
+    case "past_due": return "Pagamento Pendente"
+    case "payment_failed": return "Falha no Pagamento"
+    default: return status
+  }
+}
+
+export function getRecurringExecutionStatusLabel(status: RecurringExecutionStatus): string {
+  switch (status) {
+    case "pending": return "Agendada"
+    case "processing": return "Processando"
+    case "awaiting_payment": return "Aguardando Pagamento"
+    case "completed": return "Concluída"
+    case "failed": return "Falhou"
     default: return status
   }
 }

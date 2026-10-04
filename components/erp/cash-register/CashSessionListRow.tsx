@@ -21,6 +21,10 @@ interface CashSessionListItemProps {
     onSelect: (id: string) => void
     onDetails: (id: string) => void
     showCheckbox?: boolean
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const CashSessionListItem = React.memo(
@@ -31,6 +35,9 @@ const CashSessionListItem = React.memo(
         onSelect,
         onDetails,
         showCheckbox = false,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: CashSessionListItemProps) => {
 
         const tz = usePartnerTimezone()
@@ -121,6 +128,9 @@ const CashSessionListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetails(session.id)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 {showCheckbox && (
                     <td

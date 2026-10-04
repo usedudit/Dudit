@@ -17,6 +17,11 @@ import { isStaffSlotAvailable } from "@/lib/commerce/scheduling-availability"
 import { syncAppointmentReceivable } from "@/lib/services/appointment-receivable"
 import { onMarketplaceOrderPaid } from "@/lib/services/marketplace-metrics.service"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
+import { createMpPreapproval } from "@/lib/services/mercadopago/partner-preapproval"
+import {
+  computeNextExecutionAt,
+  toMpFrequency,
+} from "@/lib/services/recurring/frequency"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -629,7 +634,9 @@ async function createSubscriptionFromPlan(
 
   const { data: plan } = await supabase
     .from("recurring_plans")
-    .select("id, status, start_date, show_in_marketplace")
+    .select(
+      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day",
+    )
     .eq("id", params.recurringPlanId)
     .eq("partner_id", params.partnerId)
     .maybeSingle()
@@ -651,9 +658,10 @@ async function createSubscriptionFromPlan(
     throw new Error("Assinatura já ativa para este plano.")
   }
 
-  const nextExecutionAt = new Date(
-    Math.max(Date.now(), new Date(plan.start_date).getTime()),
-  ).toISOString()
+  // A RPC sempre devolve uma data posterior a currentRun: sem isso a execucao
+  // vencedora do ciclo 1 reagendaria a si mesma para "agora" e geraria uma
+  // cobranca dupla minutos depois.
+  const nextExecutionAt = await computeNextExecutionAt(supabase, plan, new Date())
 
   const { data: subscription, error: subError } = await supabase
     .from("recurring_subscriptions")
@@ -662,6 +670,7 @@ async function createSubscriptionFromPlan(
       customer_id: customerId,
       recurring_plan_id: params.recurringPlanId,
       status: "active",
+      billing_mode: plan.billing_mode === "auto_mercado_pago" ? "auto_mercado_pago" : "manual",
       next_execution_at: nextExecutionAt,
       last_execution_at: new Date().toISOString(),
       delivery_type: params.deliveryType,
@@ -691,7 +700,75 @@ async function createSubscriptionFromPlan(
 
   if (execError) throw execError
 
+  // Ciclo 1 ja foi pago no checkout do Dudit: o preapproval do MP cobrara a
+  // partir do proximo ciclo (nextExecutionAt).
+  if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) > 0) {
+    await linkMpPreapproval(supabase, {
+      partnerId: params.partnerId,
+      subscriptionId: subscription.id as string,
+      payerEmail: params.buyerEmail,
+      planName: plan.name || "Plano de assinatura",
+      amount: Number(plan.price),
+      frequencyPlan: plan,
+      startDate: nextExecutionAt,
+    })
+  }
+
   return { subscriptionId: subscription.id as string, executionId: execution.id as string }
+}
+
+async function linkMpPreapproval(
+  supabase: SupabaseClient,
+  params: {
+    partnerId: string
+    subscriptionId: string
+    payerEmail?: string | null
+    planName: string
+    amount: number
+    frequencyPlan: {
+      frequency_type?: string | null
+      frequency_interval?: number | null
+      start_date?: string | null
+      weekdays?: number[] | null
+      day_of_month?: number | null
+      use_last_day?: boolean | null
+      year_month?: number | null
+      year_day?: number | null
+    }
+    startDate: string
+  },
+): Promise<void> {
+  try {
+    const { frequency, frequency_type } = toMpFrequency(params.frequencyPlan)
+    const preapproval = await createMpPreapproval({
+      partnerId: params.partnerId,
+      payerEmail: params.payerEmail || "cliente@dudit.com.br",
+      planName: params.planName,
+      amount: params.amount,
+      frequency,
+      frequencyType: frequency_type,
+      externalReference: params.subscriptionId,
+      startDate: params.startDate,
+    })
+
+    await supabase
+      .from("recurring_subscriptions")
+      .update({
+        mp_preapproval_id: preapproval.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.subscriptionId)
+  } catch (e: unknown) {
+    // A assinatura e o pedido ja existem; sem o preapproval os ciclos seguintes
+    // nao serao cobrados automaticamente, mas o checkout nao pode falhar.
+    console.error("[linkMpPreapproval] Falha ao criar preapproval no Mercado Pago:", e)
+    captureError(e, {
+      module: "marketplace",
+      action: "create_subscription_preapproval",
+      entityId: params.subscriptionId,
+      metadata: { partnerId: params.partnerId },
+    })
+  }
 }
 
 export async function fulfillMarketplaceOrder(

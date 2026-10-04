@@ -193,8 +193,8 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
 
   const statusVariant = (status: string) => {
     if (status === "active") return "green" as const
-    if (status === "paused") return "orange" as const
-    if (status === "cancelled") return "red" as const
+    if (status === "paused" || status === "pending" || status === "past_due") return "orange" as const
+    if (status === "cancelled" || status === "payment_failed") return "red" as const
     if (status === "awaiting_restock") return "red" as const
     return "gray" as const
   }
@@ -202,6 +202,9 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
   const getStatusLabel = (status: string) => {
     if (status === "active") return "Ativa"
     if (status === "paused") return "Pausada"
+    if (status === "pending") return "Aguardando Confirmação"
+    if (status === "past_due") return "Pagamento Pendente"
+    if (status === "payment_failed") return "Falha no Pagamento"
     if (status === "cancelled") return "Cancelada"
     if (status === "awaiting_restock") return "Aguardando Reposição"
     return status

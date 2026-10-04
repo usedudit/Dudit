@@ -11,6 +11,7 @@ import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFr
 import { isUuid } from "@/lib/utils/short-id"
 import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { computeNextExecutionAt } from "@/lib/services/recurring/frequency"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -110,7 +111,9 @@ export async function subscribeToRecurringPlanAction(input: {
 
     const { data: plan } = await admin
       .from("recurring_plans")
-      .select("id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval")
+      .select(
+        "id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day",
+      )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
       .maybeSingle()
@@ -132,25 +135,7 @@ export async function subscribeToRecurringPlanAction(input: {
       return { success: false, error: "Você já possui uma assinatura ativa deste plano." }
     }
 
-    const now = new Date()
-    const freqType = plan.frequency_type || "month"
-    const freqInterval = Number(plan.frequency_interval || 1)
-    let nextExecutionAt: string
-    if (freqType === "day") {
-      nextExecutionAt = new Date(now.getTime() + freqInterval * 24 * 60 * 60 * 1000).toISOString()
-    } else if (freqType === "week") {
-      nextExecutionAt = new Date(now.getTime() + freqInterval * 7 * 24 * 60 * 60 * 1000).toISOString()
-    } else if (freqType === "month") {
-      const d = new Date(now)
-      d.setMonth(d.getMonth() + freqInterval)
-      nextExecutionAt = d.toISOString()
-    } else if (freqType === "year") {
-      const d = new Date(now)
-      d.setFullYear(d.getFullYear() + freqInterval)
-      nextExecutionAt = d.toISOString()
-    } else {
-      nextExecutionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    }
+    const nextExecutionAt = await computeNextExecutionAt(admin, plan, new Date())
 
     const { data, error } = await admin
       .from("recurring_subscriptions")
@@ -431,7 +416,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       items: data.recurring_plan_items || [],
       partners: partner,
       stores: rawStore,
-      price: computedPrice,
+      price: Number(data.price ?? 0) > 0 ? Number(data.price) : computedPrice,
       images: planImages,
     }
   } catch (e: unknown) {
