@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
-import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, RecurringFrequencyType } from "@/lib/types/recurring"
+import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, RecurringFrequencyType, RecurringShippingMode } from "@/lib/types/recurring"
 import { mapPlanRow } from "@/lib/types/recurring"
 import { sanitizeInput } from "@/lib/input-validator"
 
@@ -54,6 +54,26 @@ function validatePlanInput(input: {
   }
 
   return { name, interval }
+}
+
+const SHIPPING_MODES: RecurringShippingMode[] = ["included", "flat", "quote"]
+
+/**
+ * Normaliza a politica de frete do plano. O valor fixo so' existe quando o
+ * modo e' "flat"; nos demais modos ele e' zerado para nao vazar lixo.
+ */
+function normalizeShippingInput(input: {
+  shippingMode?: RecurringShippingMode
+  shippingFlatAmount?: number
+}): { mode: RecurringShippingMode; flatAmount: number } {
+  const mode: RecurringShippingMode = input.shippingMode || "included"
+  if (!SHIPPING_MODES.includes(mode)) throw new Error("Modo de frete inválido.")
+
+  const raw = Number(input.shippingFlatAmount ?? 0)
+  if (!Number.isFinite(raw) || raw < 0) throw new Error("Valor de frete inválido.")
+  if (mode === "flat" && raw <= 0) throw new Error("Informe o valor do frete fixo.")
+
+  return { mode, flatAmount: mode === "flat" ? Math.round(raw * 100) / 100 : 0 }
 }
 
 function mapItemsToDb(items: RecurringPlanItem[]) {
@@ -166,6 +186,8 @@ export async function createRecurringPlanAction(input: {
   billingMode?: "manual" | "auto_mercado_pago"
   creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
   creditExpirationDays?: number | null
+  shippingMode?: RecurringShippingMode
+  shippingFlatAmount?: number
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -181,6 +203,7 @@ export async function createRecurringPlanAction(input: {
     }
 
     const { name, interval } = validatePlanInput(input)
+    const shipping = normalizeShippingInput(input)
     const supabase = await getSupabaseServerClient()
 
     const { data: plan, error } = await supabase
@@ -204,6 +227,8 @@ export async function createRecurringPlanAction(input: {
         billing_mode: input.billingMode || "manual",
         credit_expiration_policy: input.creditExpirationPolicy || "end_of_cycle",
         credit_expiration_days: input.creditExpirationDays ?? null,
+        shipping_mode: shipping.mode,
+        shipping_flat_amount: shipping.flatAmount,
       })
       .select("*")
       .single()
@@ -269,6 +294,8 @@ export async function updateRecurringPlanAction(input: {
   billingMode?: "manual" | "auto_mercado_pago"
   creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
   creditExpirationDays?: number | null
+  shippingMode?: RecurringShippingMode
+  shippingFlatAmount?: number
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -313,6 +340,14 @@ export async function updateRecurringPlanAction(input: {
     if (input.billingMode) updatePayload.billing_mode = input.billingMode
     if (input.creditExpirationPolicy) updatePayload.credit_expiration_policy = input.creditExpirationPolicy
     if (input.creditExpirationDays !== undefined) updatePayload.credit_expiration_days = input.creditExpirationDays
+    if (input.shippingMode !== undefined) {
+      const shipping = normalizeShippingInput({
+        shippingMode: input.shippingMode,
+        shippingFlatAmount: input.shippingFlatAmount,
+      })
+      updatePayload.shipping_mode = shipping.mode
+      updatePayload.shipping_flat_amount = shipping.flatAmount
+    }
 
     const { data: plan, error } = await supabase
       .from("recurring_plans")

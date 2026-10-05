@@ -39,22 +39,38 @@ const DEFAULT_ANNOUNCEMENT_CONFIG: GlobalAnnouncementConfig = {
   link_text: null,
 }
 
+let memoryMaintenanceConfig: { config: MaintenanceConfig; expiresAt: number } | null = null
+let memoryAnnouncementConfig: { config: GlobalAnnouncementConfig; expiresAt: number } | null = null
+const SETTINGS_MEMORY_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes in-memory cache
+
+export function clearSystemSettingsMemoryCache(): void {
+  memoryMaintenanceConfig = null
+  memoryAnnouncementConfig = null
+}
+
 // ─── Maintenance Mode ────────────────────────────────────────────────────────
 
 /**
  * Get current maintenance configuration.
- * Reads from Redis first for low latency, falling back to Supabase DB.
+ * Reads from in-memory cache first, then Redis, falling back to Supabase DB.
  */
 export async function getMaintenanceConfig(): Promise<MaintenanceConfig> {
+  const now = Date.now()
+  if (memoryMaintenanceConfig && memoryMaintenanceConfig.expiresAt > now) {
+    return memoryMaintenanceConfig.config
+  }
+
   try {
     const cached = await redis.get<MaintenanceConfig | string>(REDIS_KEY_MAINTENANCE)
     if (cached) {
       const parsed = typeof cached === "string" ? JSON.parse(cached) : cached
       if (typeof parsed === "object" && parsed !== null && "enabled" in parsed) {
-        return {
+        const full = {
           ...DEFAULT_MAINTENANCE_CONFIG,
           ...parsed,
         }
+        memoryMaintenanceConfig = { config: full, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
+        return full
       }
     }
   } catch (err) {
@@ -77,6 +93,8 @@ export async function getMaintenanceConfig(): Promise<MaintenanceConfig> {
         updated_by: data.updated_by,
       }
 
+      memoryMaintenanceConfig = { config, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
+
       // Sync back to Redis asynchronously
       try {
         const p = redis.set(REDIS_KEY_MAINTENANCE, JSON.stringify(config))
@@ -88,6 +106,7 @@ export async function getMaintenanceConfig(): Promise<MaintenanceConfig> {
     console.error("[system-settings] Failed to fetch maintenance config from DB:", err)
   }
 
+  memoryMaintenanceConfig = { config: DEFAULT_MAINTENANCE_CONFIG, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
   return DEFAULT_MAINTENANCE_CONFIG
 }
 
@@ -136,7 +155,8 @@ export async function updateMaintenanceConfig(
       return { success: false, config: current, error: dbError.message }
     }
 
-    // 2. Sync to Redis and invalidate local memory cache
+    // 2. Sync to Redis and invalidate local memory caches
+    clearSystemSettingsMemoryCache()
     try {
       await redis.set(REDIS_KEY_MAINTENANCE, JSON.stringify(merged))
       const { clearMaintenanceMemoryCache } = await import("@/lib/system/maintenance-guard")
@@ -170,9 +190,18 @@ export async function updateMaintenanceConfig(
 
 /**
  * Get active global announcement banner configuration.
- * Checks for expiration timestamp.
+ * Checks for expiration timestamp and uses in-memory caching to prevent continuous Redis GETs on layout render.
  */
 export async function getGlobalAnnouncementConfig(): Promise<GlobalAnnouncementConfig> {
+  const now = Date.now()
+  if (memoryAnnouncementConfig && memoryAnnouncementConfig.expiresAt > now) {
+    const config = memoryAnnouncementConfig.config
+    if (config.active && config.expires_at && new Date(config.expires_at) < new Date()) {
+      return { ...config, active: false }
+    }
+    return config
+  }
+
   try {
     const cached = await redis.get<GlobalAnnouncementConfig | string>(REDIS_KEY_ANNOUNCEMENT)
     if (cached) {
@@ -182,6 +211,7 @@ export async function getGlobalAnnouncementConfig(): Promise<GlobalAnnouncementC
         if (config.active && config.expires_at && new Date(config.expires_at) < new Date()) {
           return { ...config, active: false }
         }
+        memoryAnnouncementConfig = { config, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
         return config
       }
     }
@@ -210,6 +240,8 @@ export async function getGlobalAnnouncementConfig(): Promise<GlobalAnnouncementC
         config.active = false
       }
 
+      memoryAnnouncementConfig = { config, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
+
       // Sync back to Redis asynchronously
       try {
         const p = redis.set(REDIS_KEY_ANNOUNCEMENT, JSON.stringify(config))
@@ -221,6 +253,7 @@ export async function getGlobalAnnouncementConfig(): Promise<GlobalAnnouncementC
     console.error("[system-settings] Failed to fetch announcement from DB:", err)
   }
 
+  memoryAnnouncementConfig = { config: DEFAULT_ANNOUNCEMENT_CONFIG, expiresAt: now + SETTINGS_MEMORY_CACHE_TTL_MS }
   return DEFAULT_ANNOUNCEMENT_CONFIG
 }
 
@@ -264,7 +297,8 @@ export async function updateGlobalAnnouncementConfig(
       return { success: false, config: current, error: dbError.message }
     }
 
-    // 2. Sync to Redis
+    // 2. Sync to Redis and invalidate local memory cache
+    clearSystemSettingsMemoryCache()
     try {
       await redis.set(REDIS_KEY_ANNOUNCEMENT, JSON.stringify(merged))
     } catch (redisErr) {

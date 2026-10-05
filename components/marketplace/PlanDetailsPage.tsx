@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon } from "@/lib/icons"
+import { ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -347,6 +347,8 @@ export function PlanDetailsPageClient({
     }, [plan])
 
     const planPrice = Number(plan.price || 0)
+    const planShippingMode = plan.shippingMode || plan.shipping_mode || "included"
+    const planShippingFlat = Number(plan.shippingFlatAmount ?? plan.shipping_flat_amount ?? 0)
 
     const handleWhatsApp = useCallback(() => {
         const cleaned = partner.phone?.replace(/\D/g, "") ?? ""
@@ -449,6 +451,20 @@ export function PlanDetailsPageClient({
                         ✓ Faturamento automático no cartão (Mercado Pago)
                     </span>
                 )}
+            </div>
+
+            {/* Freight policy */}
+            <div className="flex items-start gap-2 pb-6 mb-6 border-b border-brand-border text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                <TruckIcon size={14} className="text-brand-primary mt-0.5 shrink-0" />
+                <span>
+                    {planShippingMode === "flat" ? (
+                        <>Frete fixo de <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(planShippingFlat)}</strong> cobrado em cada ciclo, sem re-cotação.</>
+                    ) : planShippingMode === "quote" ? (
+                        <>Frete cotado uma única vez no cadastro, conforme o seu endereço, e mantido em todos os ciclos da assinatura.</>
+                    ) : (
+                        <>Frete incluso no valor da assinatura.</>
+                    )}
+                </span>
             </div>
 
             {isPlanOwner && (
@@ -1077,6 +1093,11 @@ export function PlanDetailsPageClient({
                                 {formatCurrency(planPrice)}
                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal"> / {plan.frequency_type === "monthly" ? "mês" : "período"}</span>
                             </span>
+                            {planShippingMode === "flat" && planShippingFlat > 0 && (
+                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                    + frete {formatCurrency(planShippingFlat)} por ciclo
+                                </span>
+                            )}
                         </div>
                         <button
                             onClick={handleSubscribe}

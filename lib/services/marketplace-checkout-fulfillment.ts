@@ -22,6 +22,7 @@ import {
   computeNextExecutionAt,
   toMpFrequency,
 } from "@/lib/services/recurring/frequency"
+import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -616,6 +617,10 @@ async function createSubscriptionFromPlan(
     deliveryType: "pickup" | "delivery"
     deliveryAddress?: string | null
     financeAccountId?: string | null
+    /** orders.delivery_fee ja resolvido no checkout (fonte do snapshot) */
+    deliveryFee?: number | null
+    /** orders.delivery_breakdown ja resolvido no checkout */
+    deliveryBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ subscriptionId: string; executionId: string }> {
   const customerId = await ensureMarketplaceCustomer({
@@ -635,7 +640,7 @@ async function createSubscriptionFromPlan(
   const { data: plan } = await supabase
     .from("recurring_plans")
     .select(
-      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day",
+      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, shipping_mode, shipping_flat_amount",
     )
     .eq("id", params.recurringPlanId)
     .eq("partner_id", params.partnerId)
@@ -643,6 +648,20 @@ async function createSubscriptionFromPlan(
 
   if (!plan?.id || plan.status !== "active" || !plan.show_in_marketplace) {
     throw new Error("Plano de assinatura indisponível.")
+  }
+
+  // Frete: resolvido UMA vez aqui e congelado na assinatura. A cobranca dos
+  // ciclos seguintes nunca re-cota.
+  const shipping = resolveSubscriptionShipping({
+    deliveryType: params.deliveryType,
+    shippingMode: plan.shipping_mode,
+    shippingFlatAmount: plan.shipping_flat_amount,
+    deliveryFee: params.deliveryFee,
+    deliveryBreakdown: params.deliveryBreakdown,
+  })
+
+  if (!shipping.resolved) {
+    throw new Error("Endereço fora da área de entrega.")
   }
 
   const { data: existing } = await supabase
@@ -676,6 +695,10 @@ async function createSubscriptionFromPlan(
       delivery_type: params.deliveryType,
       delivery_address: params.deliveryAddress || null,
       finance_account_id: params.financeAccountId || null,
+      shipping_amount: shipping.amount,
+      shipping_source: shipping.source,
+      shipping_quoted_at: new Date().toISOString(),
+      carrier_service_id: shipping.carrierServiceId,
       sales_channel: STOREFRONT_CHANNEL,
       notes: `Assinatura via checkout pedido ${params.orderId}`,
     })
@@ -694,6 +717,9 @@ async function createSubscriptionFromPlan(
       status: "completed",
       order_id: params.orderId,
       completed_at: new Date().toISOString(),
+      // Ciclo 1 registra o frete EFETIVAMENTE cobrado no pedido (o snapshot da
+      // assinatura pode diferir quando um cupom de frete foi aplicado).
+      shipping_amount: Number(params.deliveryFee ?? 0),
     })
     .select("id")
     .single()
@@ -702,13 +728,13 @@ async function createSubscriptionFromPlan(
 
   // Ciclo 1 ja foi pago no checkout do Dudit: o preapproval do MP cobrara a
   // partir do proximo ciclo (nextExecutionAt).
-  if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) > 0) {
+  if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) + shipping.amount > 0) {
     await linkMpPreapproval(supabase, {
       partnerId: params.partnerId,
       subscriptionId: subscription.id as string,
       payerEmail: params.buyerEmail,
       planName: plan.name || "Plano de assinatura",
-      amount: Number(plan.price),
+      amount: Number(plan.price) + shipping.amount,
       frequencyPlan: plan,
       startDate: nextExecutionAt,
     })
@@ -781,7 +807,7 @@ export async function fulfillMarketplaceOrder(
     .select(`
       id, partner_id, buyer_id, store_id, situation, customer_id, checkout_fulfillment,
       order_source, finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
-      paid_amount, amount_paid
+      paid_amount, amount_paid, delivery_fee, delivery_breakdown
     `)
     .eq("id", orderId)
     .single()
@@ -1071,6 +1097,8 @@ export async function fulfillMarketplaceOrder(
         deliveryType: subDeliveryType,
         deliveryAddress: order.delivery_address || payload.deliveryAddress,
         financeAccountId: order.finance_account_id,
+        deliveryFee: order.delivery_fee ?? 0,
+        deliveryBreakdown: (order.delivery_breakdown as Record<string, unknown> | null) ?? null,
       })
       result.subscriptionIds!.push(subscriptionId)
       result.executionIds!.push(executionId)

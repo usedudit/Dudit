@@ -133,6 +133,18 @@ async function createRecurringOrder(params: {
 }) {
   const { supabase, claim, items, customer, financeAccountId, situation = "pending" } = params
 
+  // Frete congelado no cadastro da assinatura: este ciclo NUNCA re-cota.
+  const { data: subShipping } = await supabase
+    .from("recurring_subscriptions")
+    .select("shipping_amount")
+    .eq("id", claim.subscriptionId)
+    .maybeSingle()
+
+  const shippingAmount =
+    claim.deliveryType === "delivery"
+      ? Math.max(Number(subShipping?.shipping_amount || 0), 0)
+      : 0
+
   const productItems = items.filter(i => i.item_type === "product")
   const serviceItems = items.filter(i => i.item_type === "service")
 
@@ -246,7 +258,7 @@ async function createRecurringOrder(params: {
 
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
-    shippingCost: 0,
+    shippingCost: shippingAmount,
   })
   const totalAmount = pricingResult.finalTotal
 
@@ -272,7 +284,7 @@ async function createRecurringOrder(params: {
     discount_value: 0,
     discount_type: "fixed",
     discount_amount: 0,
-    delivery_fee: 0,
+    delivery_fee: shippingAmount,
     additional_costs: 0,
     notes: "Pedido gerado automaticamente por assinatura recorrente.",
     payment_method: "A combinar",
@@ -293,6 +305,12 @@ async function createRecurringOrder(params: {
     .single()
 
   if (orderError) throw orderError
+
+  // Audit trail: qual frete foi efetivamente cobrado neste ciclo.
+  await supabase
+    .from("recurring_executions")
+    .update({ shipping_amount: shippingAmount })
+    .eq("id", claim.executionId)
 
   const itemsToInsert = orderItemsPayload.map((item) => ({
     ...item,

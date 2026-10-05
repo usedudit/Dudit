@@ -14,6 +14,7 @@ import {
   postponeMySubscriptionCycleAction,
   anticipateMySubscriptionCycleAction,
   updateMySubscriptionDetailsAction,
+  confirmMySubscriptionAddressChangeAction,
   getMySubscriptionCreditsAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
 import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
@@ -28,6 +29,7 @@ import {
   PlayIcon,
   CalendarIcon,
   MapPinIcon,
+  TruckIcon,
   InfoIcon,
   CheckCircleIcon,
   CancelCircleIcon
@@ -166,9 +168,35 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
       toast({ title: "Erro", description: res.error, variant: "destructive" })
       return
     }
-    toast({ title: "Detalhes de entrega atualizados com sucesso!" })
+    if (res.requiresConfirmation) {
+      toast({
+        title: "Confirme a mudança de endereço",
+        description: "O novo endereço tem frete mais caro. Aprove ou recuse abaixo para continuar.",
+      })
+    } else {
+      toast({ title: "Detalhes de entrega atualizados com sucesso!" })
+    }
     if (res.data) refreshItem(res.data)
     setEditingId(null)
+  }
+
+  const handleConfirmAddressChange = async (
+    subscriptionId: string,
+    decision: "accept" | "discard",
+  ) => {
+    setActionLoading((prev) => ({ ...prev, [subscriptionId]: true }))
+    const res = await confirmMySubscriptionAddressChangeAction(subscriptionId, decision)
+    setActionLoading((prev) => ({ ...prev, [subscriptionId]: false }))
+    if (!res.success) {
+      toast({ title: "Erro", description: res.error, variant: "destructive" })
+      return
+    }
+    toast({
+      title: decision === "accept"
+        ? "Mudança de endereço confirmada!"
+        : "Mudança de endereço descartada.",
+    })
+    if (res.data) refreshItem(res.data)
   }
 
   const openHistory = async (subscriptionId: string) => {
@@ -331,6 +359,14 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                             Entrega: <strong>{sub.deliveryType === "delivery" ? sub.deliveryAddress || "Não informado" : "Retirada no Local"}</strong>
                           </span>
                         </div>
+                        {sub.deliveryType === "delivery" && (
+                          <div className="flex items-center gap-1.5">
+                            <TruckIcon size={14} className="text-brand-primary" />
+                            <span>
+                              Frete: <strong>{formatCurrency(Number(sub.shippingAmount || 0))}</strong>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -420,6 +456,43 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
 
                     {actionLoading[sub.id] && <Spinner size={16} className="text-brand-primary self-center" />}
                   </div>
+
+                  {/* Pending address change: freight raised, needs consent */}
+                  {sub.pendingAddress && (
+                    <div className="border border-brand-orange/50 bg-orange-50 dark:bg-dark-surface rounded-xl p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <InfoIcon size={16} className="text-brand-orange mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-semibold text-brand-dark dark:text-dark-heading">
+                            Confirme a mudança de endereço
+                          </p>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed">
+                            O novo endereço <strong>{sub.pendingAddress}</strong> tem frete de{" "}
+                            <strong>{formatCurrency(Number(sub.pendingShippingAmount || 0))}</strong>,
+                            enquanto o atual é {formatCurrency(Number(sub.shippingAmount || 0))}.
+                            Nada muda na sua cobrança até você aceitar.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleConfirmAddressChange(sub.id, "discard")}
+                          disabled={!!actionLoading[sub.id]}
+                        >
+                          Manter endereço atual
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirmAddressChange(sub.id, "accept")}
+                          disabled={!!actionLoading[sub.id]}
+                        >
+                          {actionLoading[sub.id] ? "Salvando..." : "Aceitar e atualizar frete"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Collapsible Edit Details Panel */}
                   <AnimatePresence>

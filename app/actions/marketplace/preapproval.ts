@@ -13,6 +13,8 @@ import {
 } from "@/lib/services/mercadopago/partner-preapproval"
 import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { computeNextExecutionAt, toMpFrequency } from "@/lib/services/recurring/frequency"
+import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 interface CreatePreapprovalInput {
   partnerId: string
@@ -88,7 +90,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     const { data: plan } = await admin
       .from("recurring_plans")
       .select(
-        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode",
+        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode, shipping_mode, shipping_flat_amount",
       )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
@@ -101,6 +103,39 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     const billingMode = plan.billing_mode || "manual"
     if (billingMode !== "auto_mercado_pago") {
       return { success: false, error: "Este plano não suporta pagamento automático via Mercado Pago." }
+    }
+
+    // Frete: resolvido UMA vez aqui e congelado na assinatura.
+    const deliveryType = input.deliveryType || "pickup"
+    let deliveryFee: number | null = 0
+    let deliveryBreakdown: Record<string, unknown> | null = null
+
+    if (deliveryType === "delivery" && plan.shipping_mode === "quote") {
+      if (!input.deliveryAddress) {
+        return { success: false, error: "Informe o endereço de entrega para calcular o frete." }
+      }
+      const quote = await quoteDeliveryFeeAction({
+        partnerId: input.partnerId,
+        destinationAddress: input.deliveryAddress,
+        freeDeliveryCoupon: false,
+      })
+      if (!quote.success) {
+        return { success: false, error: quote.error }
+      }
+      deliveryFee = Number(quote.fee || 0)
+      deliveryBreakdown = (quote as { breakdown?: Record<string, unknown> }).breakdown ?? null
+    }
+
+    const shipping = resolveSubscriptionShipping({
+      deliveryType,
+      shippingMode: plan.shipping_mode,
+      shippingFlatAmount: plan.shipping_flat_amount,
+      deliveryFee,
+      deliveryBreakdown,
+    })
+
+    if (!shipping.resolved) {
+      return { success: false, error: "Endereço fora da área de entrega." }
     }
 
     const now = new Date()
@@ -116,8 +151,12 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
         status: "pending",
         billing_mode: "auto_mercado_pago",
         next_execution_at: nextExecutionAt,
-        delivery_type: input.deliveryType || "pickup",
+        delivery_type: deliveryType,
         delivery_address: input.deliveryAddress || null,
+        shipping_amount: shipping.amount,
+        shipping_source: shipping.source,
+        shipping_quoted_at: shipping.resolved ? new Date().toISOString() : null,
+        carrier_service_id: shipping.carrierServiceId,
         notes: sanitizeNotes(input.notes),
       })
       .select("*")
@@ -142,7 +181,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       partnerId: input.partnerId,
       payerEmail: user.email || "cliente@dudit.com.br",
       planName: plan.name,
-      amount: Number(plan.price || 0),
+      amount: Number(plan.price || 0) + shipping.amount,
       frequency,
       frequencyType,
       externalReference: sub.id,

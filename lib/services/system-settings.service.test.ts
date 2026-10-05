@@ -4,6 +4,7 @@ import {
   updateMaintenanceConfig,
   getGlobalAnnouncementConfig,
   updateGlobalAnnouncementConfig,
+  clearSystemSettingsMemoryCache,
 } from "./system-settings.service"
 import type { AdminUser } from "@/lib/admin/types"
 
@@ -51,6 +52,7 @@ const fakeAdminUser: AdminUser = {
 describe("SystemSettingsService", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearSystemSettingsMemoryCache()
   })
 
   describe("getMaintenanceConfig", () => {

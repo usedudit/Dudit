@@ -101,7 +101,13 @@ const OrderGridCard = React.memo(
                                         <Tooltip text={order.deliveryStatusLabel || "Não informado"}>
                                             <Badge
                                                 variant={order.deliveryStatusColor || "gray"}
-                                                icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}
+                                                icon={
+                                                    order.delivery_type === "pickup"
+                                                        ? <StoreIcon />
+                                                        : order.carrierBrandIcon
+                                                            ? <img src={order.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                                            : <TruckIcon />
+                                                }
                                                 className="whitespace-nowrap"
                                             />
                                         </Tooltip>

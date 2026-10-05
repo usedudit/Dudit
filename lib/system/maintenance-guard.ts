@@ -11,6 +11,8 @@ interface CachedMaintenance {
 const EXEMPT_PREFIXES = [
   "/manutencao",
   "/ddt-admin",
+  "/api/health",
+  "/api/monitoring",
   "/api/webhooks",
   "/api/mercadopago/webhook",
   "/api/system",
@@ -44,7 +46,7 @@ function isExemptPath(pathname: string): boolean {
 }
 
 let memoryCache: { data: CachedMaintenance | null; expiresAt: number } | null = null
-const MAINTENANCE_CACHE_TTL_MS = 30_000 // 30 seconds local in-memory cache
+const MAINTENANCE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes local in-memory cache (invalidated on-demand via admin toggle)
 
 export function clearMaintenanceMemoryCache(): void {
   memoryCache = null

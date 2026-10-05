@@ -34,7 +34,7 @@ import {
     updateRecurringPlanAction,
     getRecurringPlanFormDataAction
 } from "@/app/actions/erp/recurring-plans"
-import type { RecurringPlan, RecurringPlanItem, RecurringFrequencyType } from "@/lib/types/recurring"
+import type { RecurringPlan, RecurringPlanItem, RecurringFrequencyType, RecurringShippingMode } from "@/lib/types/recurring"
 import { useSidebar } from "@/lib/sidebar-context"
 import PlanItemFormSheet from "./PlanItemFormSheet"
 import { formatCurrency } from "@/lib/utils/formatters"
@@ -93,6 +93,10 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     const [billingMode, setBillingMode] = useState<"manual" | "auto_mercado_pago">("manual")
     const [creditExpirationPolicy, setCreditExpirationPolicy] = useState<"never" | "end_of_cycle" | "fixed_days">("end_of_cycle")
     const [creditExpirationDays, setCreditExpirationDays] = useState<number | null>(null)
+
+    // Politica de frete do plano (Fase 3 de assinaturas)
+    const [shippingMode, setShippingMode] = useState<RecurringShippingMode>("included")
+    const [shippingFlatAmount, setShippingFlatAmount] = useState("")
 
     // Plan images state (similar to AddProductPage.tsx)
     const [images, setImages] = useState<(string | File)[]>([])
@@ -169,6 +173,10 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             setBillingMode(plan.billingMode || plan.billing_mode || "manual")
             setCreditExpirationPolicy(plan.creditExpirationPolicy || plan.credit_expiration_policy || "end_of_cycle")
             setCreditExpirationDays(plan.creditExpirationDays != null ? Number(plan.creditExpirationDays) : (plan.credit_expiration_days != null ? Number(plan.credit_expiration_days) : null))
+            const planShippingMode = plan.shippingMode || plan.shipping_mode || "included"
+            setShippingMode(planShippingMode)
+            const planFlat = plan.shippingFlatAmount ?? plan.shipping_flat_amount
+            setShippingFlatAmount(planFlat != null ? String(Number(planFlat)) : "")
         }
     }, [plan])
 
@@ -188,10 +196,15 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             billingMode !== (plan.billingMode || plan.billing_mode || "manual") ||
             creditExpirationPolicy !== (plan.creditExpirationPolicy || plan.credit_expiration_policy || "end_of_cycle") ||
             creditExpirationDays !== (plan.creditExpirationDays != null ? Number(plan.creditExpirationDays) : (plan.credit_expiration_days != null ? Number(plan.credit_expiration_days) : null)) ||
+            shippingMode !== (plan.shippingMode || plan.shipping_mode || "included") ||
+            (shippingMode === "flat" ? shippingFlatAmount : "") !==
+            ((plan.shippingMode || plan.shipping_mode || "included") === "flat"
+                ? String(Number(plan.shippingFlatAmount ?? plan.shipping_flat_amount ?? 0))
+                : "") ||
             JSON.stringify(items) !== JSON.stringify(plan.items) ||
             JSON.stringify(images) !== JSON.stringify(plan.images || [])
         )
-    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, billingMode, creditExpirationPolicy, creditExpirationDays, items, images, plan])
+    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, billingMode, creditExpirationPolicy, creditExpirationDays, shippingMode, shippingFlatAmount, items, images, plan])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -387,6 +400,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 billingMode,
                 creditExpirationPolicy,
                 creditExpirationDays: creditExpirationPolicy === "fixed_days" ? creditExpirationDays : null,
+                shippingMode,
+                shippingFlatAmount: shippingMode === "flat" ? Number(shippingFlatAmount || 0) : 0,
                 items: items.map((item) => ({
                     itemType: item.itemType,
                     productId: item.productId,
@@ -456,6 +471,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         { value: "end_of_cycle", label: "Fim do ciclo" },
         { value: "fixed_days", label: "Dias fixos" },
         { value: "never", label: "Nunca expira" }
+    ]
+
+    const shippingModeOptions = [
+        { value: "included", label: "Incluso no preço" },
+        { value: "flat", label: "Valor fixo" },
+        { value: "quote", label: "Cotado na transportadora" }
     ]
 
     // Filter and sort items locally
@@ -570,9 +591,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         {/* Left Main Column */}
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                            <section className="space-y-6">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Identificação do Plano</h3>
-
+                                            <FormSection title="Identificação do Plano" className="space-y-6">
                                                 <div className="mb-6">
                                                     <ProductImagesSection
                                                         images={images}
@@ -634,7 +653,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         onChange={(checked) => setShowInMarketplace(checked)}
                                                     />
                                                 </div>
-                                            </section>
+                                            </FormSection>
                                         </div>
 
                                         {/* Right Sidebar Column */}
@@ -693,7 +712,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                 </div>
                                             </SidebarCard>
 
-                                            <SidebarCard hasSeparator title="Cobrança e Créditos">
+                                            <SidebarCard hasSeparator hasTopStrip title="Cobrança e Créditos">
                                                 <div className="space-y-5">
                                                     <FormDropdown
                                                         label="Modo de Cobrança"
@@ -722,6 +741,45 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                     )}
                                                 </div>
                                             </SidebarCard>
+
+                                            <SidebarCard hasSeparator hasTopStrip title="Frete">
+                                                <div className="space-y-5">
+                                                    <FormDropdown
+                                                        label="Como cobrar o frete"
+                                                        value={shippingMode}
+                                                        setValue={(val) => setShippingMode(val as RecurringShippingMode)}
+                                                        options={shippingModeOptions}
+                                                    />
+
+                                                    {shippingMode === "flat" && (
+                                                        <Input
+                                                            type="number"
+                                                            label="Valor do frete"
+                                                            placeholder="Ex: 12,90"
+                                                            value={shippingFlatAmount}
+                                                            onChange={(e) => {
+                                                                setShippingFlatAmount(e.target.value)
+                                                                setFieldErrors((prev) => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("shippingFlatAmount")
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            required
+                                                            min={0}
+                                                            error={fieldErrors.has("shippingFlatAmount")}
+                                                            errorMessage={fieldErrors.has("shippingFlatAmount") ? "Informe o valor do frete" : undefined}
+                                                            dataField="shippingFlatAmount"
+                                                        />
+                                                    )}
+
+                                                    <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
+                                                        {shippingMode === "included" && "O frete fica embutido no preço dos itens e é cobrado igual em todos os ciclos."}
+                                                        {shippingMode === "flat" && "O valor fixo é cobrado em todos os ciclos, sem re-cotação."}
+                                                        {shippingMode === "quote" && "O frete é cotado uma única vez no cadastro do cliente e permanece o mesmo até o fim da assinatura."}
+                                                    </p>
+                                                </div>
+                                            </SidebarCard>
                                         </div>
                                     </div>
                                 </FadeIn>
@@ -748,8 +806,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                         <div className="max-w-[1300px] mx-auto pb-20 relative">
                                             {/* Header Section */}
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                    Itens do Plano ({filteredAndSortedItems.length})
+                                                <h3 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
+                                                    Itens do Plano
                                                 </h3>
                                                 <Button variant="link" onClick={handleAddItemTrigger} className="flex items-center hidden md:flex">
                                                     + Adicionar Item

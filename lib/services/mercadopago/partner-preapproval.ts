@@ -209,3 +209,40 @@ export async function updateMpPreapprovalNextPaymentDate(
 
   return response.json()
 }
+
+/**
+ * Update the recurring amount of a subscription preapproval in Mercado Pago.
+ *
+ * Used when the recurring plan's price or freight changes; the caller is
+ * responsible for only doing so with the customer's consent.
+ */
+export async function updateMpPreapprovalAmount(
+  partnerId: string,
+  preapprovalId: string,
+  amount: number
+) {
+  const token = await getValidMercadoPagoAccessToken(partnerId)
+
+  const response = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      auto_recurring: {
+        transaction_amount: amount,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null)
+    console.error("Mercado Pago Preapproval amount update error:", errorData)
+    throw new Error(
+      errorData?.message || `MP Preapproval amount update failed with status ${response.status}`
+    )
+  }
+
+  return response.json()
+}

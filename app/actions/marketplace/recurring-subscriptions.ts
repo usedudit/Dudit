@@ -12,6 +12,9 @@ import { isUuid } from "@/lib/utils/short-id"
 import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
 import { computeNextExecutionAt } from "@/lib/services/recurring/frequency"
+import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import { updateMpPreapprovalAmount } from "@/lib/services/mercadopago/partner-preapproval"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -633,6 +636,85 @@ export async function anticipateMySubscriptionCycleAction(subscriptionId: string
   }
 }
 
+/**
+ * Resolve the freight for a new delivery address against the plan's shipping
+ * policy. Never called for repeated billing: freight is frozen at signup.
+ */
+async function quoteSubscriptionShippingForAddress(
+  partnerId: string,
+  address: string,
+  plan: { shipping_mode?: string | null; shipping_flat_amount?: number | null },
+): Promise<
+  | { ok: true; shipping: ReturnType<typeof resolveSubscriptionShipping> }
+  | { ok: false; error: string }
+> {
+  const mode = plan.shipping_mode || "included"
+
+  // Included/flat do not depend on the address, so there is nothing to quote.
+  if (mode !== "quote") {
+    return {
+      ok: true,
+      shipping: resolveSubscriptionShipping({
+        deliveryType: "delivery",
+        shippingMode: mode as any,
+        shippingFlatAmount: plan.shipping_flat_amount,
+      }),
+    }
+  }
+
+  const quote = await quoteDeliveryFeeAction({
+    partnerId,
+    destinationAddress: address,
+    freeDeliveryCoupon: false,
+  })
+  if (!quote.success) return { ok: false, error: quote.error }
+
+  const shipping = resolveSubscriptionShipping({
+    deliveryType: "delivery",
+    shippingMode: "quote",
+    shippingFlatAmount: plan.shipping_flat_amount,
+    deliveryFee: Number(quote.fee || 0),
+    deliveryBreakdown: (quote as { breakdown?: Record<string, unknown> }).breakdown ?? null,
+  })
+  if (!shipping.resolved) return { ok: false, error: "Endereço fora da área de entrega." }
+
+  return { ok: true, shipping }
+}
+
+/**
+ * Keeps the Mercado Pago preapproval in sync when the frozen freight changes.
+ * Returns an error when the amount could not be updated, so the caller can
+ * abort instead of leaving local state and the MP charge out of sync.
+ */
+async function syncMpPreapprovalAmountForShipping(opts: {
+  partnerId: string
+  preapprovalId: string | null
+  subscriptionStatus: string
+  planPrice: number
+  previousShipping: number
+  nextShipping: number
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!opts.preapprovalId) return { ok: true }
+  if (opts.subscriptionStatus === "cancelled" || opts.subscriptionStatus === "expired") {
+    return { ok: true }
+  }
+
+  const before = Math.round((opts.planPrice + opts.previousShipping) * 100) / 100
+  const after = Math.round((opts.planPrice + opts.nextShipping) * 100) / 100
+  if (before === after) return { ok: true }
+
+  try {
+    await updateMpPreapprovalAmount(opts.partnerId, opts.preapprovalId, after)
+    return { ok: true }
+  } catch (e) {
+    console.error("syncMpPreapprovalAmountForShipping error:", e)
+    return {
+      ok: false,
+      error: "Não foi possível atualizar a cobrança no Mercado Pago. Tente novamente.",
+    }
+  }
+}
+
 export async function updateMySubscriptionDetailsAction(
   subscriptionId: string,
   input: { deliveryAddress?: string | null; notes?: string | null }
@@ -647,8 +729,10 @@ export async function updateMySubscriptionDetailsAction(
     const { data: sub } = await admin
       .from("recurring_subscriptions")
       .select(`
-        id, partner_id,
-        customers!inner(user_id)
+        id, partner_id, delivery_type, delivery_address, status,
+        shipping_amount, shipping_source, mp_preapproval_id,
+        customers!inner(user_id),
+        recurring_plans(price, shipping_mode, shipping_flat_amount)
       `)
       .eq("id", subscriptionId)
       .single()
@@ -658,15 +742,64 @@ export async function updateMySubscriptionDetailsAction(
       return { success: false, error: "Assinatura não encontrada." }
     }
 
+    const plan = (sub as any).recurring_plans || {}
+    const planPrice = Number(plan.price || 0)
+    const previousShipping = Number(sub.shipping_amount || 0)
+
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString()
     }
     const changes: string[] = []
+    let requiresConfirmation = false
+    let pendingShippingAmount: number | null = null
 
-    if (input.deliveryAddress !== undefined) {
-      updatePayload.delivery_address = input.deliveryAddress
-      changes.push(`endereço de entrega alterado para "${input.deliveryAddress || "Retirada"}".`)
+    if (input.deliveryAddress !== undefined && sub.delivery_type === "delivery") {
+      const newAddress = String(input.deliveryAddress || "").trim()
+      if (!newAddress) {
+        return { success: false, error: "Informe o endereço de entrega." }
+      }
+
+      const previousAddress = String(sub.delivery_address || "").trim()
+      if (newAddress !== previousAddress) {
+        const quoted = await quoteSubscriptionShippingForAddress(
+          sub.partner_id,
+          newAddress,
+          plan,
+        )
+        if (!quoted.ok) return { success: false, error: quoted.error }
+
+        if (quoted.shipping.amount > previousShipping + 0.001) {
+          // Freight goes up: nothing is applied without the customer's consent.
+          requiresConfirmation = true
+          pendingShippingAmount = quoted.shipping.amount
+          updatePayload.pending_address = newAddress
+          updatePayload.pending_shipping_amount = quoted.shipping.amount
+          changes.push(
+            `solicitou mudança de endereço para "${newAddress}" (frete de R$ ${previousShipping.toFixed(2)} para R$ ${quoted.shipping.amount.toFixed(2)}), aguardando confirmação do cliente.`,
+          )
+        } else {
+          const mp = await syncMpPreapprovalAmountForShipping({
+            partnerId: sub.partner_id,
+            preapprovalId: sub.mp_preapproval_id || null,
+            subscriptionStatus: sub.status,
+            planPrice,
+            previousShipping,
+            nextShipping: quoted.shipping.amount,
+          })
+          if (!mp.ok) return { success: false, error: mp.error }
+
+          updatePayload.delivery_address = newAddress
+          updatePayload.shipping_amount = quoted.shipping.amount
+          updatePayload.shipping_source = quoted.shipping.source
+          updatePayload.shipping_quoted_at = new Date().toISOString()
+          updatePayload.carrier_service_id = quoted.shipping.carrierServiceId
+          updatePayload.pending_address = null
+          updatePayload.pending_shipping_amount = null
+          changes.push(`endereço de entrega alterado para "${newAddress}".`)
+        }
+      }
     }
+
     if (input.notes !== undefined) {
       updatePayload.notes = sanitizeNotes(input.notes)
       changes.push(`observações alteradas para "${input.notes || ""}".`)
@@ -693,10 +826,118 @@ export async function updateMySubscriptionDetailsAction(
       })
     }
 
-    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+    return {
+      success: true,
+      data: mapSubscriptionRow(data as Record<string, unknown>),
+      requiresConfirmation,
+      pendingAddress: requiresConfirmation ? updatePayload.pending_address : null,
+      pendingShippingAmount,
+      previousShippingAmount: previousShipping,
+    }
   } catch (e: unknown) {
     console.error("updateMySubscriptionDetailsAction error:", e)
     return { success: false, error: e instanceof Error ? e.message : "Erro ao atualizar dados" }
+  }
+}
+
+/**
+ * Applies or discards a pending address change that would raise the freight.
+ */
+export async function confirmMySubscriptionAddressChangeAction(
+  subscriptionId: string,
+  decision: "accept" | "discard",
+) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, status, pending_address, pending_shipping_amount,
+        shipping_amount, mp_preapproval_id,
+        customers!inner(user_id),
+        recurring_plans(price, shipping_mode, shipping_flat_amount)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    if (!sub.pending_address || sub.pending_shipping_amount == null) {
+      return { success: false, error: "Não há mudança de endereço pendente." }
+    }
+
+    const updatePayload: Record<string, any> = {
+      pending_address: null,
+      pending_shipping_amount: null,
+      updated_at: new Date().toISOString(),
+    }
+    const changes: string[] = []
+
+    if (decision === "accept") {
+      const plan = (sub as any).recurring_plans || {}
+      const previousShipping = Number(sub.shipping_amount || 0)
+      const nextShipping = Math.max(Number(sub.pending_shipping_amount || 0), 0)
+
+      const mp = await syncMpPreapprovalAmountForShipping({
+        partnerId: sub.partner_id,
+        preapprovalId: sub.mp_preapproval_id || null,
+        subscriptionStatus: sub.status,
+        planPrice: Number(plan.price || 0),
+        previousShipping,
+        nextShipping,
+      })
+      if (!mp.ok) return { success: false, error: mp.error }
+
+      const quoted = await quoteSubscriptionShippingForAddress(
+        sub.partner_id,
+        sub.pending_address,
+        plan,
+      )
+      if (!quoted.ok) return { success: false, error: quoted.error }
+
+      updatePayload.delivery_address = sub.pending_address
+      updatePayload.shipping_amount = quoted.shipping.amount
+      updatePayload.shipping_source = quoted.shipping.source
+      updatePayload.shipping_quoted_at = new Date().toISOString()
+      updatePayload.carrier_service_id = quoted.shipping.carrierServiceId
+      changes.push(
+        `confirmou mudança de endereço para "${sub.pending_address}" com frete de R$ ${quoted.shipping.amount.toFixed(2)}.`,
+      )
+    } else {
+      changes.push("recusou a mudança de endereço com frete superior.")
+    }
+
+    const { data, error } = await admin
+      .from("recurring_subscriptions")
+      .update(updatePayload)
+      .eq("id", subscriptionId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId: sub.partner_id,
+      actorUserId: user.id,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: changes,
+      source: "marketplace",
+    })
+
+    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("confirmMySubscriptionAddressChangeAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao confirmar endereço" }
   }
 }
 

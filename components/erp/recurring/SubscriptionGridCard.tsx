@@ -4,8 +4,8 @@ import React from "react"
 import { Badge, Button, Tooltip } from "@/components/reusable"
 import { ClockIcon, BlockedIcon, PlayIcon } from "@/lib/icons"
 import type { RecurringSubscription } from "@/lib/types/recurring"
-import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
-import { formatFullDate } from "@/lib/utils"
+import { getRecurringStatusLabel, getRecurringFrequencyLabel, getRecurringShippingSourceLabel } from "@/lib/types/recurring"
+import { formatFullDate, formatCurrency } from "@/lib/utils"
 
 interface SubscriptionGridCardProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
@@ -62,6 +62,12 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               Recorrência: {getRecurringFrequencyLabel(sub.plan.frequency_type, sub.plan.frequency_interval)}
             </div>
           )}
+          <div>
+            Frete: <span className="font-medium text-brand-dark dark:text-dark-heading">
+              {formatCurrency(Number(sub.shippingAmount || 0))}
+            </span>
+            <span className="text-brand-inactive-text"> · {getRecurringShippingSourceLabel(sub.shippingSource || "pickup")}</span>
+          </div>
         </div>
       </div>
 

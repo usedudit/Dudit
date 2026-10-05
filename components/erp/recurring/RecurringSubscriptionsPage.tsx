@@ -48,6 +48,7 @@ const COLUMNS = [
   { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "250px" },
   { id: "status", label: "Situação", align: "center" as const, width: "150px" },
   { id: "nextExecution", label: "Próxima Execução", align: "left" as const, width: "200px" },
+  { id: "shipping", label: "Frete", align: "left" as const, width: "150px" },
   { id: "actions", label: "Ações", align: "center" as const, width: "250px" },
 ]
 

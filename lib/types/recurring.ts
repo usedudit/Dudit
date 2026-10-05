@@ -26,6 +26,24 @@ export type RecurringSubscriptionStatusFilter =
   | "delinquent"
 export type RecurringPlanItemType = "product" | "service"
 
+/**
+ * How a plan handles freight.
+ * `included` - freight baked into the item price
+ * `flat`     - fixed amount defined by the seller
+ * `quote`    - quoted with the carrier once at signup, never re-quoted
+ */
+export type RecurringShippingMode = "included" | "flat" | "quote"
+
+/**
+ * Where the subscription's frozen freight value came from.
+ */
+export type RecurringShippingSource =
+  | "pickup"
+  | "included"
+  | "flat"
+  | "quote_own"
+  | "quote_carrier"
+
 export type RecurringPlanItem = {
   id?: string
   itemType: RecurringPlanItemType
@@ -66,6 +84,8 @@ export type RecurringPlan = {
   billingMode?: "manual" | "auto_mercado_pago"
   creditExpirationPolicy?: "never" | "end_of_cycle" | "fixed_days"
   creditExpirationDays?: number | null
+  shippingMode?: RecurringShippingMode
+  shippingFlatAmount?: number
 }
 
 export type RecurringPlanItemRow = RecurringPlanItem & {
@@ -94,6 +114,12 @@ export type RecurringSubscription = {
   updatedAt: string
   mpPreapprovalId?: string | null
   billingMode?: string | null
+  shippingAmount?: number
+  shippingSource?: RecurringShippingSource
+  shippingQuotedAt?: string | null
+  carrierServiceId?: string | null
+  pendingAddress?: string | null
+  pendingShippingAmount?: number | null
   plan?: RecurringPlan | null
   customer?: { id: string; name: string; email?: string | null } | null
 }
@@ -141,6 +167,8 @@ export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
     billingMode: (row.billing_mode as "manual" | "auto_mercado_pago" | undefined) || "manual",
     creditExpirationPolicy: (row.credit_expiration_policy as "never" | "end_of_cycle" | "fixed_days" | undefined) || "end_of_cycle",
     creditExpirationDays: row.credit_expiration_days != null ? Number(row.credit_expiration_days) : null,
+    shippingMode: (row.shipping_mode as RecurringShippingMode | undefined) || "included",
+    shippingFlatAmount: row.shipping_flat_amount != null ? Number(row.shipping_flat_amount) : 0,
   }
 }
 
@@ -164,6 +192,33 @@ export function mapSubscriptionRow(row: Record<string, unknown>): RecurringSubsc
     updatedAt: String(row.updated_at),
     mpPreapprovalId: row.mp_preapproval_id != null ? String(row.mp_preapproval_id) : null,
     billingMode: row.billing_mode != null ? String(row.billing_mode) : null,
+    shippingAmount: row.shipping_amount != null ? Number(row.shipping_amount) : 0,
+    shippingSource: (row.shipping_source as RecurringShippingSource | undefined) || "pickup",
+    shippingQuotedAt: row.shipping_quoted_at != null ? String(row.shipping_quoted_at) : null,
+    carrierServiceId: row.carrier_service_id != null ? String(row.carrier_service_id) : null,
+    pendingAddress: row.pending_address != null ? String(row.pending_address) : null,
+    pendingShippingAmount:
+      row.pending_shipping_amount != null ? Number(row.pending_shipping_amount) : null,
+  }
+}
+
+export function getRecurringShippingModeLabel(mode: RecurringShippingMode): string {
+  switch (mode) {
+    case "included": return "Incluso no preço"
+    case "flat": return "Valor fixo"
+    case "quote": return "Cotado na transportadora"
+    default: return mode
+  }
+}
+
+export function getRecurringShippingSourceLabel(source: RecurringShippingSource): string {
+  switch (source) {
+    case "pickup": return "Retirada"
+    case "included": return "Frete incluso"
+    case "flat": return "Frete fixo"
+    case "quote_own": return "Cotação própria"
+    case "quote_carrier": return "Cotação da transportadora"
+    default: return source
   }
 }
 

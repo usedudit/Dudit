@@ -4,8 +4,8 @@ import React from "react"
 import { Badge, Button } from "@/components/reusable"
 import { ClockIcon, BlockedIcon, PlayIcon } from "@/lib/icons"
 import type { RecurringSubscription } from "@/lib/types/recurring"
-import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
-import { formatFullDate } from "@/lib/utils"
+import { getRecurringStatusLabel, getRecurringFrequencyLabel, getRecurringShippingSourceLabel } from "@/lib/types/recurring"
+import { formatFullDate, formatCurrency } from "@/lib/utils"
 
 interface SubscriptionListRowProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
@@ -83,6 +83,17 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
             {formatFullDate(sub.nextExecutionAt).slice(0, 10)}
           </span>
+        )
+      case "shipping":
+        return (
+          <div className="flex flex-col">
+            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
+              {formatCurrency(Number(sub.shippingAmount || 0))}
+            </span>
+            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+              {getRecurringShippingSourceLabel(sub.shippingSource || "pickup")}
+            </span>
+          </div>
         )
       case "actions":
         return (
