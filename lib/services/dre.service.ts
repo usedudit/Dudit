@@ -3,6 +3,7 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getOrderRevenueBucket, isOrderDerivedTransaction } from "@/lib/services/dre-rules"
 
 export type DreRegime = "competencia" | "caixa"
 
@@ -193,7 +194,7 @@ async function computeDrePeriod(
   let ordersQuery = supabase
     .from("orders")
     .select(`
-      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at,
+      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at, order_source,
        payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_interest_amount, payment_method_discount_amount,
       order_items (id, product_id, variant_id, product_name, quantity, product_price, unit_cost, subtotal)
     `)
@@ -255,7 +256,7 @@ async function computeDrePeriod(
     .from("transactions")
     .select(`
       id, description, amount, paid_amount, discount_amount, interest_amount, fee_amount,
-      transaction_type, status, due_date, payment_date, transaction_date, created_at, origin,
+      transaction_type, status, due_date, payment_date, transaction_date, created_at, origin, kind,
       category_id, dre_group:financial_categories!category_id(id, name, dre_group, category_type)
     `)
     .eq("partner_id", partnerId)
@@ -361,13 +362,19 @@ async function computeDrePeriod(
       itemsGrossSum += itemSubtotal > 0 ? itemSubtotal : Number(item.quantity || 0) * Number(item.product_price || 0)
     }
 
+    const revenueBucket = getOrderRevenueBucket((o as any).order_source)
+    const addToRevenue = (value: number) => {
+      if (revenueBucket === "recurring") recurringRevenue += value
+      else productsRevenue += value
+    }
+
     if (itemsGrossSum > 0) {
-      productsRevenue += itemsGrossSum
+      addToRevenue(itemsGrossSum)
     } else {
       // Fallback: total_amount + descontos - taxa de entrega
       const deliveryFee = Number(o.delivery_fee || 0)
       const reconstructedGross = Math.max(0, Number(o.total_amount || 0) + totalOrderDiscount - deliveryFee)
-      productsRevenue += reconstructedGross
+      addToRevenue(reconstructedGross)
     }
 
     orderDiscounts += totalOrderDiscount
@@ -398,6 +405,8 @@ async function computeDrePeriod(
   let unclassifiedTransactionsAmount = 0
 
   for (const tx of transactionsList) {
+    if (isOrderDerivedTransaction(tx)) continue
+
     const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
     const g = (tx.dre_group as any)?.dre_group
 
@@ -446,7 +455,7 @@ async function computeDrePeriod(
 
   // 2.2 Impostos sobre faturamento (Simples Nacional / DAS-MEI)
   if (simplesProductTaxRate > 0 || simplesServiceTaxRate > 0) {
-    salesTaxes += productsRevenue * simplesProductTaxRate
+    salesTaxes += (productsRevenue + recurringRevenue) * simplesProductTaxRate
     salesTaxes += servicesRevenue * simplesServiceTaxRate
   } else if (meiFixedTax > 0) {
     salesTaxes += meiFixedTax
@@ -510,6 +519,8 @@ async function computeDrePeriod(
 
   // 3.3 Transações financeiras manuais de Custo Direto / CMV / Peças
   for (const tx of transactionsList) {
+    if (isOrderDerivedTransaction(tx)) continue
+
     if (tx.transaction_type === "expense") {
       const g = (tx.dre_group as any)?.dre_group
       const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
@@ -550,6 +561,8 @@ async function computeDrePeriod(
   let nonOperationalTotal = 0
 
   for (const tx of transactionsList) {
+    if (isOrderDerivedTransaction(tx)) continue
+
     const val = regime === "competencia" ? Number(tx.amount || 0) : Number(tx.paid_amount || tx.amount || 0)
     const g = (tx.dre_group as any)?.dre_group
     const catName = (tx.dre_group as any)?.name || tx.description || "Outras Despesas"

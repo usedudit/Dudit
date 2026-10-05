@@ -807,7 +807,7 @@ export function ExplorarPageClient({
     }, [dataToFilter, isStandardCategory])
 
     // In-memory filters for advanced filters (aplicados às listas local e distante)
-    const applyBrowseFilters = useCallback((source: any[]) => {
+    const applyBrowseFilters = useCallback((source: any[], opts?: { preserveOrder?: boolean }) => {
         let filtered = [...source]
         if (selectedCategories.length > 0) {
             const activeCat = selectedCategories[0]
@@ -861,6 +861,9 @@ export function ExplorarPageClient({
             filtered.sort((a, b) => (b.price || 0) - (a.price || 0))
         } else if (sortBy === "recentes") {
             filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        } else if (opts?.preserveOrder) {
+            // Mantém a ordem já definida pelo ranking/distance do servidor (ex.: itens distantes)
+            return filtered
         } else {
             return applySellerDiversity(
                 [...filtered].sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a)),
@@ -874,7 +877,8 @@ export function ExplorarPageClient({
         [applyBrowseFilters, dataToFilter]
     )
 
-    // Itens distantes: listados direto na página, respondendo aos mesmos filtros/ordenação
+    // Itens distantes: listados direto na página, respondendo aos mesmos filtros/ordenação.
+    // A ordem de relevância (texto + marketplace_score + distância) vem do servidor e é preservada.
     const filteredDistant = useMemo(() => {
         if (!query || moreDistantItems.length === 0) return []
         const typeFiltered = moreDistantItems.filter((item: any) => {
@@ -884,7 +888,7 @@ export function ExplorarPageClient({
             if (currentType === "planos") return item.itemType === "plano"
             return true
         })
-        return applyBrowseFilters(typeFiltered)
+        return applyBrowseFilters(typeFiltered, { preserveOrder: true })
     }, [query, moreDistantItems, currentType, applyBrowseFilters])
 
     const activeFiltersCount = useMemo(() => {
@@ -2044,26 +2048,6 @@ export function ExplorarPageClient({
                                         </div>
                                     )}
 
-                                    {/* Carrossel de Lojas Distantes na Busca */}
-                                    {!!query && currentType === 'tudo' && moreDistantSellers.length > 0 && (
-                                        <div className="mb-6">
-                                            <HorizontalCarousel
-                                                title="Lojas um pouco mais distantes do seu raio de busca"
-                                                items={moreDistantSellers}
-                                                renderItem={(vitrine) => (
-                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full" />
-                                                )}
-                                                onSeeAll={() => {
-                                                    const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
-                                                    setSelectedCitySlug(stateSlug)
-                                                    setCurrentType("vitrines")
-                                                    updateUrl(stateSlug, selectedCategories, query, "vitrines")
-                                                }}
-                                                itemWidthClass="w-[270px] sm:w-[320px]"
-                                            />
-                                        </div>
-                                    )}
-
                                     {/* View Controls and Results */}
                                     <ExplorarViewControls
                                         viewMode={viewMode}
@@ -2127,16 +2111,35 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : null}
 
-                                    {/* Itens Distantes na Busca — listados direto, respondendo aos filtros/ordenação da página */}
-                                    {!!query && filteredDistant.length > 0 && (
+                                    {/* Itens e Lojas distantes — listados direto, respondendo aos filtros/ordenação da página */}
+                                    {!!query && (moreDistantSellers.length > 0 || filteredDistant.length > 0) && (
                                         <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
                                             <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distantes do seu raio de busca</h2>
-                                            <div className={viewMode === "grid"
-                                                ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6"
-                                                : ""
-                                            }>
-                                                {filteredDistant.map((item) => renderDistantItem(item))}
-                                            </div>
+
+                                            {moreDistantSellers.length > 0 && (currentType === 'tudo' || currentType === 'vitrines' || currentType === 'negocios') && (
+                                                <>
+                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
+                                                    <div className={viewMode === "grid"
+                                                        ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6"
+                                                        : ""
+                                                    }>
+                                                        {moreDistantSellers.map((vitrine) => renderDistantItem(vitrine))}
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {filteredDistant.length > 0 && (
+                                                <>
+                                                    {moreDistantSellers.length > 0 && <div className="h-px bg-brand-border dark:border-dark-border my-4" />}
+                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Produtos e serviços</h3>
+                                                    <div className={viewMode === "grid"
+                                                        ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6"
+                                                        : ""
+                                                    }>
+                                                        {filteredDistant.map((item) => renderDistantItem(item))}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     )}
 

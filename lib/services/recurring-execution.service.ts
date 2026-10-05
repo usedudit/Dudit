@@ -358,7 +358,11 @@ async function createRecurringOrder(params: {
 
   increment_usage_counter(claim.partnerId, "orders_month_count").catch(console.error)
 
-  return order.id as string
+  return {
+    id: String(order.id),
+    order_number: String(order.order_number || ""),
+    total_amount: Number(order.total_amount || 0),
+  }
 }
 
 export async function executeRecurringClaim(claim: ClaimedRecurringExecution): Promise<void> {
@@ -478,12 +482,27 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
 
   // Mixed or Product / Service plans generate a billing order
   if (items.length > 0) {
-    orderId = await createRecurringOrder({
+    const createdOrder = await createRecurringOrder({
       supabase,
       claim,
       items: items as PlanItemRow[],
       customer,
       financeAccountId: financeAccountId!,
+    })
+    orderId = createdOrder.id
+
+    const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+    await syncReceivableForOrder(supabase, {
+      order_number: createdOrder.order_number,
+      partner_id: claim.partnerId,
+      total_amount: createdOrder.total_amount,
+      paid_amount: 0,
+      situation: "pending",
+      payment_method: "A combinar",
+      customer_id: customer.id,
+      customer_name: customer.name,
+      finance_account_id: financeAccountId!,
+      order_source: "Assinatura",
     })
   }
 
@@ -689,7 +708,7 @@ export async function processPreapprovalPaymentWebhook(params: {
     }
 
     // 7. Create paid order
-    const orderId = await createRecurringOrder({
+    const createdOrder = await createRecurringOrder({
       supabase,
       claim: claimMock,
       items: items as PlanItemRow[],
@@ -701,6 +720,7 @@ export async function processPreapprovalPaymentWebhook(params: {
       financeAccountId,
       situation: "paid",
     })
+    const orderId = createdOrder.id
 
     // Update payment method & breakdown references
     await supabase
@@ -727,6 +747,37 @@ export async function processPreapprovalPaymentWebhook(params: {
       p_appointment_ids: null,
     })
     if (completeError) throw completeError
+
+    // 8.5 Receita + saldo da conta financeira do ciclo cobrado automaticamente.
+    try {
+      const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+      const { data: paidOrder } = await supabase
+        .from("orders")
+        .select("order_number, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+        .eq("id", orderId)
+        .single()
+
+      if (paidOrder) {
+        await createTransactionFromOrder(supabase, {
+          order_id: orderId,
+          order_number: paidOrder.order_number,
+          partner_id: paidOrder.partner_id,
+          store_id: paidOrder.store_id || null,
+          total_amount: paidOrder.total_amount,
+          payment_method: paidOrder.payment_method || null,
+          payment_provider: paidOrder.payment_provider || null,
+          payment_breakdown: paidOrder.payment_breakdown || null,
+          payment_date: params.paymentInfo?.date_approved || new Date().toISOString(),
+          customer_id: paidOrder.customer_id || paidOrder.buyer_id || null,
+          customer_name: paidOrder.customer_name || null,
+          finance_account_id: paidOrder.finance_account_id || null,
+          order_source: paidOrder.order_source || "manual",
+          mp_payment_id: params.paymentId,
+        })
+      }
+    } catch (txErr: any) {
+      console.error("[RECURRING] Erro ao criar transacao financeira do ciclo:", txErr?.message)
+    }
 
     // 9. Update state based on stock shortage
     if (!stockStatus.available) {
@@ -791,6 +842,141 @@ export async function processPreapprovalPaymentWebhook(params: {
   }
 }
 
+const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
+
+async function reverseSubscriptionCycleFinancials(params: {
+  subscriptionId: string
+  partnerId: string
+  paymentId: string
+  paymentInfo: any
+}): Promise<{ reversed: number; orderCancelled: boolean }> {
+  const supabase = getAdminClient()
+  const nothing = { reversed: 0, orderCancelled: false }
+
+  const orderFields =
+    "id, order_number, partner_id, store_id, total_amount, paid_amount, situation, finance_account_id, customer_id, customer_name, payment_method, notes"
+
+  const { data: orderByPayment } = await supabase
+    .from("orders")
+    .select(orderFields)
+    .eq("partner_id", params.partnerId)
+    .eq("mp_payment_id", params.paymentId)
+    .maybeSingle()
+
+  let order: any = orderByPayment || null
+
+  if (!order) {
+    const { data: execRow } = await supabase
+      .from("recurring_executions")
+      .select("order_id")
+      .eq("subscription_id", params.subscriptionId)
+      .not("order_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (execRow?.order_id) {
+      const { data: execOrder } = await supabase
+        .from("orders")
+        .select(orderFields)
+        .eq("id", execRow.order_id)
+        .maybeSingle()
+      order = execOrder || null
+    }
+  }
+
+  if (!order || order.situation === "cancelled") return nothing
+
+  const paidAmount = round2(Number(order.paid_amount || 0))
+  if (paidAmount <= 0.009) return nothing
+
+  const { data: refundRows } = await supabase
+    .from("transactions")
+    .select("amount, status")
+    .eq("partner_id", params.partnerId)
+    .eq("reference_note", String(order.id))
+    .eq("kind", "refund")
+
+  const alreadyRefunded = round2(
+    (refundRows || [])
+      .filter((r: any) => String(r.status || "").toLowerCase() !== "cancelled")
+      .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0),
+  )
+
+  const informedAmount =
+    Number(params.paymentInfo?.transaction_amount_refunded || 0) ||
+    Number(params.paymentInfo?.transaction_amount || 0) ||
+    paidAmount
+  const refundAmount = round2(Math.max(0, Math.min(paidAmount - alreadyRefunded, informedAmount)))
+
+  const accountId = order.finance_account_id || null
+
+  if (refundAmount > 0.009 && accountId) {
+    const now = new Date().toISOString()
+    const { error: insertError } = await supabase.from("transactions").insert({
+      partner_id: params.partnerId,
+      store_id: order.store_id || null,
+      description: `Reembolso automático da venda ${order.order_number || order.id}`,
+      category: "Reembolso",
+      customer_id: order.customer_id || null,
+      contact_id: null,
+      contact_type: "customer",
+      amount: refundAmount,
+      original_amount: refundAmount,
+      due_date: null,
+      payment_date: now,
+      transaction_date: now,
+      status: "paid",
+      notes: `Estorno recebido do Mercado Pago (pagamento #${params.paymentId}).`,
+      payment_type: order.payment_method || "Reembolso",
+      interest_amount: null,
+      fee_amount: 0,
+      transaction_type: "refund",
+      origin: "system",
+      refund_kind: "revenue_refund",
+      reference_note: String(order.id),
+      account_id: accountId,
+      payment_method_id: null,
+      kind: "refund",
+    })
+
+    if (insertError) {
+      console.error("[RECURRING] Erro ao criar transacao de estorno:", insertError.message)
+    } else {
+      const { error: balanceError } = await supabase.rpc("apply_account_balance_delta", {
+        p_account_id: accountId,
+        p_partner_id: params.partnerId,
+        p_delta: -Math.abs(refundAmount),
+      })
+      if (balanceError) {
+        console.error("[RECURRING] Erro ao devolver saldo da conta:", balanceError.message)
+      }
+    }
+  }
+
+  const remaining = round2(paidAmount - alreadyRefunded - refundAmount)
+  let orderCancelled = false
+
+  if (remaining <= 0.009) {
+    const existingNotes = String(order.notes || "").trim()
+    const { error: cancelError } = await supabase
+      .from("orders")
+      .update({
+        situation: "cancelled",
+        previous_situation_before_cancel: order.situation,
+        notes: existingNotes
+          ? `${existingNotes} | Cancelado após estorno do Mercado Pago (pagamento #${params.paymentId}).`
+          : `Cancelado após estorno do Mercado Pago (pagamento #${params.paymentId}).`,
+      })
+      .eq("id", order.id)
+      .eq("partner_id", params.partnerId)
+
+    if (!cancelError) orderCancelled = true
+  }
+
+  return { reversed: refundAmount, orderCancelled }
+}
+
 /**
  * Handle failed preapproval payments (webhook/sync).
  */
@@ -809,6 +995,46 @@ export async function processPreapprovalPaymentFailed(params: {
     .single()
 
   if (!sub) return { success: false, message: "Subscription not found" }
+
+  const paymentStatus = String(params.paymentInfo?.status || "")
+
+  if (paymentStatus === "refunded" || paymentStatus === "charged_back") {
+    try {
+      const reversal = await reverseSubscriptionCycleFinancials({
+        subscriptionId: sub.id,
+        partnerId: sub.partner_id,
+        paymentId: params.paymentId,
+        paymentInfo: params.paymentInfo,
+      })
+
+      await logAuditEvent({
+        partnerId: sub.partner_id,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: sub.id,
+        actionType: "payment_refunded",
+        changeLines: [
+          `estorno recebido do Mercado Pago (Pagamento: #${params.paymentId}, Status: ${paymentStatus}).`,
+          reversal.reversed > 0
+            ? `R$ ${reversal.reversed.toFixed(2)} devolvidos ao financeiro${reversal.orderCancelled ? " e pedido cancelado." : "."}`
+            : "nenhum valor financeiro pendente de estorno.",
+        ],
+        source: "webhook",
+        metadata: {
+          payment_id: params.paymentId,
+          status: paymentStatus,
+          reversed_amount: reversal.reversed,
+          order_cancelled: reversal.orderCancelled,
+        },
+      })
+    } catch (err: any) {
+      console.error("[RECURRING] Erro ao estornar ciclo:", err?.message)
+    }
+
+    if (paymentStatus === "refunded") {
+      return { success: true, message: "Estorno registrado no financeiro" }
+    }
+  }
 
   const { data: exec } = await supabase
     .from("recurring_executions")
