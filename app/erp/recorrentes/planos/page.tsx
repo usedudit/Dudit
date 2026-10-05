@@ -29,7 +29,7 @@ export default async function RecurringPlansRoute() {
         )
     }
 
-    const result = await listRecurringPlansAction(partnerId, { status: "all" })
+    const result = await listRecurringPlansAction(partnerId, { status: "all", storeId: context.activeStoreId })
 
     if (!result.success || !result.data) {
         throw new Error(result.error || "Erro ao carregar planos recorrentes")

@@ -38,6 +38,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
             "appointment_reminder",
             "appointment_rescheduled",
             "service_return_reminder",
+            "subscription_price_change",
         ],
     },
   seller: {
@@ -52,6 +53,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
       "appointment_rescheduled",
       "low_stock",
       "replenishment_suggested",
+      "subscription_price_change_expired",
     ],
   },
   system: {
@@ -96,6 +98,8 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   appointment_rescheduled: "Agendamento remarcado",
   subscription_created: "Nova assinatura",
   subscription_renewed: "Assinatura renovada",
+  subscription_price_change: "Mudança na assinatura",
+  subscription_price_change_expired: "Mudança na assinatura (prazo vencido)",
   message_received: "Nova mensagem",
   admin_announcement: "Comunicados",
   low_stock: "Estoque baixo",

@@ -250,7 +250,9 @@ async function syncRecurringSubscriptionWithMp(
       return
     }
 
-    let query = supabase.from("recurring_subscriptions").select("id, status")
+    let query = supabase
+      .from("recurring_subscriptions")
+      .select("id, status, pending_cancellation_reason")
 
     if (ids.mpPreapprovalId) {
       query = query.eq("mp_preapproval_id", ids.mpPreapprovalId)
@@ -264,6 +266,12 @@ async function syncRecurringSubscriptionWithMp(
     if (sub.status === targetStatus) return
     // Cancelamento local e definitivo: um webhook atrasado nao pode reativar.
     if (sub.status === "cancelled" && targetStatus !== "cancelled") return
+    // Janela de consentimento expirada: cobranca congelada ate o cliente
+    // responder; so um cancelamento real derruba a assinatura.
+    if (sub.status === "awaiting_customer_decision" && targetStatus !== "cancelled") return
+    // Recusa da mudanca de plano: o MP foi cancelado de proposito para nao
+    // cobrar o proximo ciclo; a assinatura so encerra no fim do ciclo vigente.
+    if (targetStatus === "cancelled" && sub.pending_cancellation_reason) return
 
     const { error: updateError } = await supabase
       .from("recurring_subscriptions")

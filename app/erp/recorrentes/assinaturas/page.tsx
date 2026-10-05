@@ -29,7 +29,7 @@ export default async function RecurringSubscriptionsRoute() {
         )
     }
 
-    const result = await listRecurringSubscriptionsAction(partnerId, { status: "all" })
+    const result = await listRecurringSubscriptionsAction(partnerId, { status: "all", storeId: context.activeStoreId })
 
     if (!result.success || !result.data) {
         throw new Error(result.error || "Erro ao carregar assinaturas")

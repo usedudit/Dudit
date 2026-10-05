@@ -640,7 +640,7 @@ async function createSubscriptionFromPlan(
   const { data: plan } = await supabase
     .from("recurring_plans")
     .select(
-      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, shipping_mode, shipping_flat_amount",
+      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, shipping_mode, shipping_flat_amount, store_id",
     )
     .eq("id", params.recurringPlanId)
     .eq("partner_id", params.partnerId)
@@ -686,6 +686,7 @@ async function createSubscriptionFromPlan(
     .from("recurring_subscriptions")
     .insert({
       partner_id: params.partnerId,
+      store_id: plan.store_id || null,
       customer_id: customerId,
       recurring_plan_id: params.recurringPlanId,
       status: "active",

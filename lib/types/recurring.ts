@@ -6,6 +6,7 @@ export type RecurringSubscriptionStatus =
   | "cancelled"
   | "expired"
   | "awaiting_restock"
+  | "awaiting_customer_decision"
   | "pending"
   | "past_due"
   | "payment_failed"
@@ -114,12 +115,19 @@ export type RecurringSubscription = {
   updatedAt: string
   mpPreapprovalId?: string | null
   billingMode?: string | null
+  storeId?: string | null
   shippingAmount?: number
   shippingSource?: RecurringShippingSource
   shippingQuotedAt?: string | null
   carrierServiceId?: string | null
   pendingAddress?: string | null
   pendingShippingAmount?: number | null
+  contractedAmount?: number | null
+  contractedItemsHash?: string | null
+  priceChangeRequestedAt?: string | null
+  priceChangeExpiresAt?: string | null
+  priceChangeDecision?: "accepted" | "rejected" | null
+  pendingCancellationReason?: string | null
   plan?: RecurringPlan | null
   customer?: { id: string; name: string; email?: string | null } | null
 }
@@ -192,6 +200,7 @@ export function mapSubscriptionRow(row: Record<string, unknown>): RecurringSubsc
     updatedAt: String(row.updated_at),
     mpPreapprovalId: row.mp_preapproval_id != null ? String(row.mp_preapproval_id) : null,
     billingMode: row.billing_mode != null ? String(row.billing_mode) : null,
+    storeId: row.store_id != null ? String(row.store_id) : null,
     shippingAmount: row.shipping_amount != null ? Number(row.shipping_amount) : 0,
     shippingSource: (row.shipping_source as RecurringShippingSource | undefined) || "pickup",
     shippingQuotedAt: row.shipping_quoted_at != null ? String(row.shipping_quoted_at) : null,
@@ -199,6 +208,16 @@ export function mapSubscriptionRow(row: Record<string, unknown>): RecurringSubsc
     pendingAddress: row.pending_address != null ? String(row.pending_address) : null,
     pendingShippingAmount:
       row.pending_shipping_amount != null ? Number(row.pending_shipping_amount) : null,
+    contractedAmount: row.contracted_amount != null ? Number(row.contracted_amount) : null,
+    contractedItemsHash: row.contracted_items_hash != null ? String(row.contracted_items_hash) : null,
+    priceChangeRequestedAt:
+      row.price_change_requested_at != null ? String(row.price_change_requested_at) : null,
+    priceChangeExpiresAt:
+      row.price_change_expires_at != null ? String(row.price_change_expires_at) : null,
+    priceChangeDecision:
+      (row.price_change_decision as "accepted" | "rejected" | null | undefined) ?? null,
+    pendingCancellationReason:
+      row.pending_cancellation_reason != null ? String(row.pending_cancellation_reason) : null,
   }
 }
 
@@ -232,6 +251,7 @@ export function getRecurringStatusLabel(status: RecurringSubscriptionStatus): st
     case "pending": return "Aguardando Confirmação"
     case "past_due": return "Pagamento Pendente"
     case "payment_failed": return "Falha no Pagamento"
+    case "awaiting_customer_decision": return "Aguardando Cliente"
     default: return status
   }
 }

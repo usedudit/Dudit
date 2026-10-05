@@ -115,7 +115,7 @@ export async function subscribeToRecurringPlanAction(input: {
     const { data: plan } = await admin
       .from("recurring_plans")
       .select(
-        "id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day",
+        "id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, store_id",
       )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
@@ -144,6 +144,7 @@ export async function subscribeToRecurringPlanAction(input: {
       .from("recurring_subscriptions")
       .insert({
         partner_id: input.partnerId,
+        store_id: plan.store_id || null,
         customer_id: customerId,
         recurring_plan_id: input.planId,
         status: "active",
@@ -189,7 +190,7 @@ export async function getMyRecurringSubscriptionsAction() {
       .from("recurring_subscriptions")
       .select(`
         *,
-        recurring_plans(id, short_id, name, description, frequency_type, frequency_interval, status),
+        recurring_plans(id, short_id, name, description, price, frequency_type, frequency_interval, status),
         partners:partner_id(id),
         stores(id, short_id, name, slug, logo_url, addresses!store_id!left(city, state))
       `)
@@ -988,6 +989,165 @@ export async function getMySubscriptionCreditsAction() {
   } catch (e: unknown) {
     console.error("getMySubscriptionCreditsAction error:", e)
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar créditos" }
+  }
+}
+
+/**
+ * Resposta do cliente a uma mudanca de preco/itens do plano.
+ *  - accept: aplica os novos itens/valor (snapshot + baseline) e atualiza o
+ *    valor cobrado no Mercado Pago; destrava a cobranca se estava congelada.
+ *  - reject: usa o ciclo vigente e encerra a assinatura no fim dele (o
+ *    preapproval do MP e' cancelado agora para nao gerar nova cobranca).
+ */
+export async function respondToMySubscriptionPriceChangeAction(
+  subscriptionId: string,
+  decision: "accept" | "reject",
+) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    if (decision !== "accept" && decision !== "reject") {
+      return { success: false, error: "Resposta inválida." }
+    }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, store_id, status, billing_mode, mp_preapproval_id,
+        shipping_amount, price_change_decision, price_change_expires_at,
+        pending_cancellation_reason,
+        customers!inner(user_id, name),
+        recurring_plans(name, price)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    const customerUserId = (sub as any)?.customers?.user_id
+    if (!sub?.id || customerUserId !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+    if (sub.price_change_decision || !sub.price_change_expires_at) {
+      return { success: false, error: "Não há mudança de plano pendente." }
+    }
+
+    const wasFrozen = sub.status === "awaiting_customer_decision"
+
+    if (decision === "accept") {
+      // Mercado Pago primeiro: se falhar, nada muda localmente e o cliente
+      // pode tentar de novo.
+      if (sub.mp_preapproval_id && sub.status !== "cancelled" && sub.status !== "expired") {
+        const planPrice = Number((sub as any).recurring_plans?.price || 0)
+        const nextAmount = Math.round((planPrice + Number(sub.shipping_amount || 0)) * 100) / 100
+        const { updateMpPreapprovalAmount, resumeMpPreapproval } = await import(
+          "@/lib/services/mercadopago/partner-preapproval"
+        )
+        try {
+          if (nextAmount > 0) {
+            await updateMpPreapprovalAmount(sub.partner_id, sub.mp_preapproval_id, nextAmount)
+          }
+          if (wasFrozen) {
+            await resumeMpPreapproval(sub.partner_id, sub.mp_preapproval_id)
+          }
+        } catch (e) {
+          console.error("respondToMySubscriptionPriceChangeAction (MP) error:", e)
+          return {
+            success: false,
+            error: "Não foi possível atualizar a cobrança no Mercado Pago. Tente novamente.",
+          }
+        }
+      }
+
+      const { data: applied, error: applyErr } = await admin.rpc("apply_recurring_plan_change", {
+        p_subscription_id: subscriptionId,
+      })
+      if (applyErr) throw applyErr
+      if (!applied || (applied as any[]).length === 0) {
+        return { success: false, error: "Não foi possível aplicar a mudança. Tente novamente." }
+      }
+
+      await logAuditEvent({
+        partnerId: sub.partner_id,
+        actorUserId: user.id,
+        entityType: "recurring_subscription",
+        entityId: subscriptionId,
+        actionType: "updated",
+        changeLines: ["cliente aceitou a mudança de preço/itens do plano."],
+        source: "marketplace",
+        metadata: {
+          new_amount: Number((applied as any)[0]?.new_amount || 0),
+          was_frozen: wasFrozen,
+        },
+      })
+    } else {
+      if (sub.pending_cancellation_reason) {
+        return { success: false, error: "A recusa já foi registrada." }
+      }
+
+      if (sub.mp_preapproval_id) {
+        const { cancelMpPreapproval } = await import(
+          "@/lib/services/mercadopago/partner-preapproval"
+        )
+        try {
+          await cancelMpPreapproval(sub.partner_id, sub.mp_preapproval_id)
+        } catch (e) {
+          console.error("respondToMySubscriptionPriceChangeAction (cancel MP) error:", e)
+          return {
+            success: false,
+            error: "Não foi possível interromper a cobrança no Mercado Pago. Tente novamente.",
+          }
+        }
+      }
+
+      const { data: updated, error: rejectErr } = await admin
+        .from("recurring_subscriptions")
+        .update({
+          price_change_decision: "rejected",
+          price_change_requested_at: null,
+          price_change_expires_at: null,
+          pending_cancellation_reason: "price_change_rejected",
+          // Congelada: volta a ficar ativa (sem cobranca, o MP ja foi
+          // cancelado) para o cliente usar o ciclo vigente.
+          status: wasFrozen ? "active" : undefined,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subscriptionId)
+        .is("price_change_decision", null)
+        .select("*")
+        .single()
+      if (rejectErr) throw rejectErr
+      if (!updated) {
+        return { success: false, error: "Não há mudança de plano pendente." }
+      }
+
+      await logAuditEvent({
+        partnerId: sub.partner_id,
+        actorUserId: user.id,
+        entityType: "recurring_subscription",
+        entityId: subscriptionId,
+        actionType: "updated",
+        changeLines: [
+          "cliente recusou a mudança de plano; assinatura será encerrada ao final do ciclo vigente.",
+        ],
+        source: "marketplace",
+      })
+
+      return { success: true, data: mapSubscriptionRow(updated as Record<string, unknown>) }
+    }
+
+    const { data: finalRow } = await admin
+      .from("recurring_subscriptions")
+      .select("*")
+      .eq("id", subscriptionId)
+      .maybeSingle()
+
+    return { success: true, data: mapSubscriptionRow((finalRow || sub) as Record<string, unknown>) }
+  } catch (e: unknown) {
+    console.error("respondToMySubscriptionPriceChangeAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao responder mudança" }
   }
 }
 

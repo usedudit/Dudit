@@ -27,6 +27,9 @@ interface TemplateContext {
     returnInterval?: string
     itemCount?: number
     productNames?: string[]
+    planName?: string
+    oldAmount?: string
+    newAmount?: string
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -722,6 +725,32 @@ export function buildNotificationContent(
                 title: "🔄 Assinatura renovada!",
                 message: `Tudo certo! Sua assinatura em ${store} foi renovada com sucesso para mais um período.`,
             }
+        case "subscription_price_change": {
+            const plan = ctx.planName || "plano"
+            if (ctx.oldAmount && ctx.newAmount && ctx.oldAmount !== ctx.newAmount) {
+                return {
+                    title: "🔄 Sua assinatura vai mudar",
+                    message: `O plano "${plan}" em ${store} teve o preço atualizado: de ${ctx.oldAmount} para ${ctx.newAmount} por ciclo. Responda até ${formattedDate || "o prazo informado"} — até lá você continua sendo cobrado(a) no valor atual.`,
+                }
+            }
+            return {
+                title: "🔄 Sua assinatura vai mudar",
+                message: `Os itens do plano "${plan}" em ${store} foram atualizados. Responda até ${formattedDate || "o prazo informado"} para confirmar a mudança — até lá tudo continua como estava.`,
+            }
+        }
+        case "subscription_price_change_expired": {
+            const plan = ctx.planName || "plano"
+            if (audience === "seller") {
+                return {
+                    title: "⏳ Resposta pendente na assinatura",
+                    message: `O prazo de resposta do cliente sobre a mudança do plano "${plan}" venceu. A cobrança da assinatura ficou congelada até que ele responda.`,
+                }
+            }
+            return {
+                title: "⏳ Resposta pendente na assinatura",
+                message: `O prazo para responder sobre a mudança do plano "${plan}" venceu. Responda para reativar ou encerrar a cobrança.`,
+            }
+        }
         case "message_received":
             return {
                 title: "💬 Nova mensagem",

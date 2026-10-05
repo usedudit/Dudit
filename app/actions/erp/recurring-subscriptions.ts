@@ -43,6 +43,7 @@ export async function listRecurringSubscriptionsAction(
     customerId?: string | null
     planId?: string | null
     search?: string
+    storeId?: string | null
   },
 ) {
   try {
@@ -72,6 +73,7 @@ export async function listRecurringSubscriptionsAction(
     }
     if (options?.customerId) query = query.eq("customer_id", options.customerId)
     if (options?.planId) query = query.eq("recurring_plan_id", options.planId)
+    if (options?.storeId) query = query.eq("store_id", options.storeId)
     if (search) {
       query = query.or(`notes.ilike.%${search.replace(/[%_]/g, "")}%`)
     }
@@ -123,7 +125,7 @@ export async function createRecurringSubscriptionAction(input: {
 
     const { data: plan } = await supabase
       .from("recurring_plans")
-      .select("id, name, status, start_date")
+      .select("id, name, status, start_date, store_id")
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
       .maybeSingle()
@@ -147,6 +149,7 @@ export async function createRecurringSubscriptionAction(input: {
       .from("recurring_subscriptions")
       .insert({
         partner_id: input.partnerId,
+        store_id: plan.store_id || null,
         customer_id: input.customerId,
         recurring_plan_id: input.planId,
         status: "active",
@@ -314,14 +317,16 @@ export async function runDueRecurringSubscriptionsAction(limit = 100) {
   }
 }
 
-export async function getRecurringSubscriptionStatsAction(partnerId: string) {
+export async function getRecurringSubscriptionStatsAction(partnerId: string, options?: { storeId?: string | null }) {
   try {
     await requirePermission(partnerId, "recurring_subscriptions", "view")
     const admin = getAdminClient()
-    const { data } = await admin
+    let query = admin
       .from("recurring_subscriptions")
       .select("status")
       .eq("partner_id", partnerId)
+    if (options?.storeId) query = query.eq("store_id", options.storeId)
+    const { data } = await query
 
     const stats = {
       active: 0,
@@ -344,6 +349,21 @@ export async function getRecurringSubscriptionStatsAction(partnerId: string) {
     return { success: true, data: stats }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar estatísticas" }
+  }
+}
+
+/**
+ * Cron: janelas de consentimento de mudança de plano que venceram sem
+ * resposta congelam a cobrança e aviso a loja.
+ */
+export async function sweepExpiredPriceChangeWindowsAction(limit = 100) {
+  try {
+    const admin = getAdminClient()
+    const { expirePriceChangeWindows } = await import("@/lib/services/recurring/price-consent")
+    const result = await expirePriceChangeWindows(admin, { limit })
+    return { success: true, data: result }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao vencer janelas de mudança" }
   }
 }
 

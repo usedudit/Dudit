@@ -887,6 +887,57 @@ export async function onSubscriptionRenewed(_params: {
 }) {
 }
 
+export async function notifySubscriptionPriceChangeToCustomer(params: {
+  subscriptionId: string
+  partnerId: string
+  storeId?: string | null
+  customerId?: string | null
+  customerUserId: string
+  planName: string
+  storeName?: string | null
+  oldAmount: number
+  newAmount: number
+  deadline: string
+  windowExpiresAt: string
+}) {
+  await notifyCustomer({
+    userId: params.customerUserId,
+    type: "subscription_price_change",
+    entityType: "subscription",
+    entityId: params.subscriptionId,
+    partnerId: params.partnerId,
+    customerId: params.customerId,
+    ctx: {
+      planName: params.planName,
+      storeName: params.storeName || undefined,
+      oldAmount: formatCurrency(params.oldAmount),
+      newAmount: formatCurrency(params.newAmount),
+      date: params.deadline,
+    },
+    variant: `window-${params.windowExpiresAt}`,
+    origin: "automation",
+  })
+}
+
+export async function notifySubscriptionPriceChangeExpired(params: {
+  subscriptionId: string
+  partnerId: string
+  storeId?: string | null
+  planName: string
+  windowExpiresAt: string
+}) {
+  await notifyPartnerTeam({
+    partnerId: params.partnerId,
+    storeId: params.storeId,
+    type: "subscription_price_change_expired",
+    entityType: "subscription",
+    entityId: params.subscriptionId,
+    ctx: { planName: params.planName },
+    variant: `window-${params.windowExpiresAt}`,
+    origin: "automation",
+  })
+}
+
 export async function broadcastAdminAnnouncement(params: {
   title: string
   message: string

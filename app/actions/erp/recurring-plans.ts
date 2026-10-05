@@ -93,7 +93,7 @@ function mapItemsToDb(items: RecurringPlanItem[]) {
 
 export async function listRecurringPlansAction(
   partnerId: string,
-  options?: { cursor?: string | null; status?: RecurringPlanStatus | "all"; search?: string },
+  options?: { cursor?: string | null; status?: RecurringPlanStatus | "all"; search?: string; storeId?: string | null },
 ) {
   try {
     await requirePermission(partnerId, "recurring_plans", "view")
@@ -116,6 +116,10 @@ export async function listRecurringPlansAction(
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(PAGE_SIZE + 1)
+
+    if (options?.storeId) {
+      query = query.eq("store_id", options.storeId)
+    }
 
     if (options?.status && options.status !== "all") {
       query = query.eq("status", options.status)
@@ -188,6 +192,7 @@ export async function createRecurringPlanAction(input: {
   creditExpirationDays?: number | null
   shippingMode?: RecurringShippingMode
   shippingFlatAmount?: number
+  storeId?: string
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -206,10 +211,25 @@ export async function createRecurringPlanAction(input: {
     const shipping = normalizeShippingInput(input)
     const supabase = await getSupabaseServerClient()
 
+    const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
+    const context = await getCurrentPartnerContext()
+    let storeId: string | null = input.storeId?.trim() || context?.activeStoreId || null
+    if (!storeId) {
+      const { data: firstStore } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("partner_id", input.partnerId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      storeId = firstStore?.id || null
+    }
+
     const { data: plan, error } = await supabase
       .from("recurring_plans")
       .insert({
         partner_id: input.partnerId,
+        store_id: storeId,
         name,
         description: input.description?.trim() || null,
         status: input.status || "active",
@@ -370,6 +390,11 @@ export async function updateRecurringPlanAction(input: {
       const itemsPayload = mapItemsToDb(input.items).map((item) => ({ ...item, plan_id: input.planId }))
       const { error: itemsError } = await supabase.from("recurring_plan_items").insert(itemsPayload)
       if (itemsError) throw itemsError
+
+      // Mudou preco/itens: abre a janela de consentimento das assinaturas
+      // ativas (cobranca continua no valor antigo ate o cliente responder).
+      const { detectPlanPriceChange } = await import("@/lib/services/recurring/price-consent")
+      await detectPlanPriceChange(supabase, { planId: input.planId })
     }
 
     // Process image changes

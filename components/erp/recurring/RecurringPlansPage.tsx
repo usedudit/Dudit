@@ -37,6 +37,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getPlanUrl } from "@/lib/utils/url-generator"
 import { listRecurringPlansAction, deleteRecurringPlanAction } from "@/app/actions/erp/recurring-plans"
+import { useStore } from "@/lib/store-context"
 import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate } from "@/lib/utils"
@@ -68,8 +69,9 @@ export default function RecurringPlansPage({
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { canCreate, canEdit } = usePermissions()
     const canManage = canCreate("recurring_plans") || canEdit("recurring_plans")
+    const { selectedStore } = useStore()
 
-    const queryKey = useMemo(() => ["erp", "recurring_plans", partnerId] as const, [partnerId])
+    const queryKey = useMemo(() => ["erp", "recurring_plans", partnerId, selectedStore?.id] as const, [partnerId, selectedStore?.id])
 
     // useEntityPage Hook for managing URL state and query caching
     const entityPage = useEntityPage<any, any, string>({
@@ -80,7 +82,7 @@ export default function RecurringPlansPage({
         initialNextCursor,
         initialHasMore,
         fetchPageFn: async ({ cursor }) => {
-            const res = await listRecurringPlansAction(partnerId, { cursor })
+            const res = await listRecurringPlansAction(partnerId, { cursor, storeId: selectedStore?.id || undefined })
             if (!res.success || !res.data) throw new Error(res.error || "Erro ao carregar planos.")
             return { items: res.data.items, nextCursor: res.data.nextCursor, hasMore: res.data.hasMore }
         },

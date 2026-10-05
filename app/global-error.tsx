@@ -93,7 +93,6 @@ export default function GlobalError({
                     backgroundColor: pageBg,
                     fontFamily:
                         'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                    padding: "24px",
                     transition: "background-color 0.3s, color 0.3s",
                 }}
             >

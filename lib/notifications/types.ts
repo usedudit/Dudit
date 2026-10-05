@@ -12,6 +12,8 @@ export const NOTIFICATION_TYPES = [
   "appointment_rescheduled",
   "subscription_created",
   "subscription_renewed",
+  "subscription_price_change",
+  "subscription_price_change_expired",
   "message_received",
   "admin_announcement",
   "low_stock",

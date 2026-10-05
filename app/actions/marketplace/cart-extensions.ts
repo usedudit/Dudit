@@ -395,7 +395,7 @@ export async function addSubscriptionToCartAction(
   if (!acceptance.allowed) return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
   const { data: plan } = await admin
     .from("recurring_plans")
-    .select("id, status, show_in_marketplace, partner_id")
+    .select("id, status, show_in_marketplace, partner_id, store_id")
     .eq("id", input.recurringPlanId)
     .eq("partner_id", input.partnerId)
     .maybeSingle()
@@ -423,6 +423,7 @@ export async function addSubscriptionToCartAction(
     .insert({
       user_id: user.id,
       partner_id: input.partnerId,
+      store_id: plan.store_id || null,
       item_type: "subscription",
       recurring_plan_id: input.recurringPlanId,
       product_id: null,

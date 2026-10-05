@@ -36,8 +36,11 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
     if (status === "payment_failed") return "red" as const
     if (status === "cancelled") return "red" as const
     if (status === "awaiting_restock") return "red" as const
+    if (status === "awaiting_customer_decision") return "orange" as const
     return "gray" as const
   }
+
+  const priceChangePending = !!sub.priceChangeRequestedAt && !sub.priceChangeDecision
 
   const getJustifyClass = (align?: string) => {
     if (align === "center") return "justify-center"
@@ -74,9 +77,14 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
         )
       case "status":
         return (
-          <Badge variant={statusVariant(sub.status)}>
-            {getRecurringStatusLabel(sub.status)}
-          </Badge>
+          <div className="flex flex-col items-start gap-1.5">
+            <Badge variant={statusVariant(sub.status)}>
+              {getRecurringStatusLabel(sub.status)}
+            </Badge>
+            {priceChangePending && (
+              <Badge variant="blue">Mudança pendente</Badge>
+            )}
+          </div>
         )
       case "nextExecution":
         return (

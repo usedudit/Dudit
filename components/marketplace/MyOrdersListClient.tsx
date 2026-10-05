@@ -60,7 +60,7 @@ const getOutboundCarrierShipment = (order: any) => {
     if (outbound.length === 0) return null;
     return outbound.reduce((latest: any, s: any) =>
         !latest || String(s.created_at || "") > String(latest.created_at || "") ? s : latest,
-    null);
+        null);
 };
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
@@ -341,7 +341,7 @@ export function MyOrdersListClient({
                                         <TabsTrigger value="sent">
                                             Enviado <span className="ml-1.5 text-xs font-normal">({tabCounts.sent})</span>
                                         </TabsTrigger>
-                                         <TabsTrigger value="delivered">
+                                        <TabsTrigger value="delivered">
                                             Entregue <span className="ml-1.5 text-xs font-normal">({tabCounts.delivered})</span>
                                         </TabsTrigger>
                                         <TabsTrigger value="cancelled">
@@ -406,9 +406,7 @@ export function MyOrdersListClient({
                                                                     )}
                                                                     {returnHistoryCount > 0 && (
                                                                         <Tooltip text="Possui histórico de trocas/devoluções">
-                                                                            <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap inline-flex">
-                                                                                {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                                                            </Badge>
+                                                                            <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
                                                                         </Tooltip>
                                                                     )}
                                                                 </h3>

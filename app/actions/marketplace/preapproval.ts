@@ -90,7 +90,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     const { data: plan } = await admin
       .from("recurring_plans")
       .select(
-        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode, shipping_mode, shipping_flat_amount",
+        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode, shipping_mode, shipping_flat_amount, store_id",
       )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
@@ -146,6 +146,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       .from("recurring_subscriptions")
       .insert({
         partner_id: input.partnerId,
+        store_id: plan.store_id || null,
         customer_id: customerId,
         recurring_plan_id: input.planId,
         status: "pending",
@@ -218,7 +219,7 @@ export async function syncSubscriptionWithMpAction(partnerId: string, subscripti
 
     const { data: sub, error: subErr } = await admin
       .from("recurring_subscriptions")
-      .select("id, status, mp_preapproval_id, partner_id")
+      .select("id, status, mp_preapproval_id, partner_id, pending_cancellation_reason")
       .eq("id", subscriptionId)
       .eq("partner_id", partnerId)
       .single()
@@ -243,6 +244,13 @@ export async function syncSubscriptionWithMpAction(partnerId: string, subscripti
     } else if (mpStatus === "cancelled") {
       newStatus = "cancelled"
     }
+
+    // Guardas iguais as do webhook: cancelamento local e' definitivo; janela de
+    // consentimento vencida mantem a cobranca congelada; recusa da mudanca de
+    // plano so encerra a assinatura no fim do ciclo vigente.
+    if (sub.status === "cancelled" && newStatus !== "cancelled") newStatus = sub.status
+    if (sub.status === "awaiting_customer_decision" && newStatus !== "cancelled") newStatus = sub.status
+    if (newStatus === "cancelled" && sub.pending_cancellation_reason) newStatus = sub.status
 
     if (newStatus !== sub.status) {
       await admin

@@ -95,9 +95,7 @@ const OrderListItem = React.memo(
                                     </span>
                                     {Number(order.returnCount || 0) > 0 && (
                                         <Tooltip text="Possui histórico de trocas/devoluções">
-                                            <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
-                                                {Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
-                                            </Badge>
+                                            <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
                                         </Tooltip>
                                     )}
                                 </div>

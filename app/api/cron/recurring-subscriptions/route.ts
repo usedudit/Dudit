@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { runDueRecurringSubscriptionsAction } from "@/app/actions/erp/recurring-subscriptions"
+import { runDueRecurringSubscriptionsAction, sweepExpiredPriceChangeWindowsAction } from "@/app/actions/erp/recurring-subscriptions"
 
 export async function GET(req: Request) {
   try {
@@ -9,6 +9,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Congela janelas de consentimento vencidas ANTES de rodar os ciclos, para
+    // nao cobrar assinaturas que ficaram aguardando resposta do cliente.
+    const sweep = await sweepExpiredPriceChangeWindowsAction(100)
+
     const limit = 200
     const result = await runDueRecurringSubscriptionsAction(limit)
     if (!result.success || !result.data) {
@@ -17,6 +21,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      frozenPriceChanges: sweep.success ? sweep.data?.frozen ?? 0 : 0,
       claimed: result.data.claimed,
       completed: result.data.completed,
       failed: result.data.failed,

@@ -15,6 +15,7 @@ import {
   anticipateMySubscriptionCycleAction,
   updateMySubscriptionDetailsAction,
   confirmMySubscriptionAddressChangeAction,
+  respondToMySubscriptionPriceChangeAction,
   getMySubscriptionCreditsAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
 import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
@@ -92,7 +93,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
           ? {
             ...item,
             ...updated,
-            statusLabel: updated.status === "active" ? "Ativa" : updated.status === "paused" ? "Pausada" : "Cancelada",
+            statusLabel: getStatusLabel(updated.status),
           }
           : item
       )
@@ -224,6 +225,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
     if (status === "paused" || status === "pending" || status === "past_due") return "orange" as const
     if (status === "cancelled" || status === "payment_failed") return "red" as const
     if (status === "awaiting_restock") return "red" as const
+    if (status === "awaiting_customer_decision") return "orange" as const
     return "gray" as const
   }
 
@@ -235,7 +237,33 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
     if (status === "payment_failed") return "Falha no Pagamento"
     if (status === "cancelled") return "Cancelada"
     if (status === "awaiting_restock") return "Aguardando Reposição"
+    if (status === "awaiting_customer_decision") return "Aguardando Cliente"
     return status
+  }
+
+  const handlePriceChangeResponse = async (subscriptionId: string, decision: "accept" | "reject") => {
+    if (
+      decision === "reject" &&
+      !confirm(
+        "Recusar a mudança? Você continuará com as condições atuais até o fim do ciclo vigente e a assinatura será encerrada automaticamente ao final dele, sem nova cobrança.",
+      )
+    ) {
+      return
+    }
+    setActionLoading((prev) => ({ ...prev, [subscriptionId]: true }))
+    const res = await respondToMySubscriptionPriceChangeAction(subscriptionId, decision)
+    setActionLoading((prev) => ({ ...prev, [subscriptionId]: false }))
+    if (!res.success) {
+      toast({ title: "Erro", description: res.error, variant: "destructive" })
+      return
+    }
+    toast({
+      title:
+        decision === "accept"
+          ? "Nova condição aceita! Sua cobrança já usa os valores atualizados."
+          : "Mudança recusada. Sua assinatura será encerrada ao final do ciclo atual.",
+    })
+    if (res.data) refreshItem(res.data)
   }
 
   return (
@@ -489,6 +517,66 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                           disabled={!!actionLoading[sub.id]}
                         >
                           {actionLoading[sub.id] ? "Salvando..." : "Aceitar e atualizar frete"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending plan change: price/itens changed, needs customer consent */}
+                  {sub.priceChangeRequestedAt && !sub.priceChangeDecision && (
+                    <div className="border border-brand-blue/50 bg-blue-50 dark:bg-dark-surface rounded-xl p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <InfoIcon size={16} className="text-brand-blue mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-semibold text-brand-dark dark:text-dark-heading">
+                            {sub.status === "awaiting_customer_decision"
+                              ? "Plano atualizado - resposta pendente"
+                              : "O plano foi atualizado"}
+                          </p>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed">
+                            {sub.status === "awaiting_customer_decision" ? (
+                              <>
+                                O prazo para responder acabou e sua cobrança foi congelada em{" "}
+                                <strong>{formatCurrency(Number(sub.contractedAmount || 0))}</strong> até você
+                                decidir. O novo valor é{" "}
+                                <strong>
+                                  {formatCurrency(Number(sub.plan?.price || 0) + Number(sub.shippingAmount || 0))}
+                                </strong>
+                                .
+                              </>
+                            ) : (
+                              <>
+                                Novo valor:{" "}
+                                <strong>
+                                  {formatCurrency(Number(sub.plan?.price || 0) + Number(sub.shippingAmount || 0))}
+                                </strong>{" "}
+                                (hoje você paga {formatCurrency(Number(sub.contractedAmount || 0))}). Responda até{" "}
+                                <strong>
+                                  {sub.priceChangeExpiresAt
+                                    ? formatFullDate(sub.priceChangeExpiresAt).slice(0, 10)
+                                    : "o fim do prazo"}
+                                </strong>{" "}
+                                - até lá nada muda na sua cobrança.
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePriceChangeResponse(sub.id, "reject")}
+                          disabled={!!actionLoading[sub.id]}
+                        >
+                          Recusar e encerrar no fim do ciclo
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handlePriceChangeResponse(sub.id, "accept")}
+                          disabled={!!actionLoading[sub.id]}
+                        >
+                          {actionLoading[sub.id] ? "Aplicando..." : "Aceitar nova condição"}
                         </Button>
                       </div>
                     </div>

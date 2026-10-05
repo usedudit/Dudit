@@ -74,40 +74,28 @@ const OrderGridCard = React.memo(
                                 </h3>
                                 {Number(order.returnCount || 0) > 0 && (
                                     <Tooltip text="Possui histórico de trocas/devoluções">
-                                        <Badge variant="purple" icon={<ReturnIcon />} className="whitespace-nowrap">
-                                            {Number(order.returnCount || 0) > 1 && order.returnCount}
-                                        </Badge>
+                                        <Badge variant="purple" icon={<ReturnIcon />} className="whitespace-nowrap" />
                                     </Tooltip>
                                 )}
                                 <div className="flex items-center gap-1 shrink-0">
                                     {order.situation === "cancelled" ? (
                                         <Tooltip text="Cancelado">
-                                            <Badge
-                                                variant="red"
-                                                icon={<CancelCircleIcon />}
-                                                className="whitespace-nowrap"
-                                            />
+                                            <Badge variant="red" icon={<CancelCircleIcon />} className="whitespace-nowrap" />
                                         </Tooltip>
                                     ) : (
                                         <Tooltip text={order.statusLabel}>
-                                            <Badge
-                                                variant={order.statusColor}
-                                                icon={<MoneyIcon />}
-                                                className="whitespace-nowrap"
-                                            />
+                                            <Badge variant={order.statusColor} icon={<MoneyIcon />} className="whitespace-nowrap" />
                                         </Tooltip>
                                     )}
                                     {!order.hasOnlyServices && order.situation !== "cancelled" && (
                                         <Tooltip text={order.deliveryStatusLabel || "Não informado"}>
-                                            <Badge
-                                                variant={order.deliveryStatusColor || "gray"}
-                                                icon={
-                                                    order.delivery_type === "pickup"
-                                                        ? <StoreIcon />
-                                                        : order.carrierBrandIcon
-                                                            ? <img src={order.carrierBrandIcon} alt="Transportadora" className="object-contain" />
-                                                            : <TruckIcon />
-                                                }
+                                            <Badge variant={order.deliveryStatusColor || "gray"} icon={
+                                                order.delivery_type === "pickup"
+                                                    ? <StoreIcon />
+                                                    : order.carrierBrandIcon
+                                                        ? <img src={order.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                                        : <TruckIcon />
+                                            }
                                                 className="whitespace-nowrap"
                                             />
                                         </Tooltip>

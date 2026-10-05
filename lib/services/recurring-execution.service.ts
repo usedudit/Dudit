@@ -3,7 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { reserveOrderInventory } from "@/lib/stock/reservations"
+import { finalizeOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
@@ -134,9 +134,10 @@ async function createRecurringOrder(params: {
   const { supabase, claim, items, customer, financeAccountId, situation = "pending" } = params
 
   // Frete congelado no cadastro da assinatura: este ciclo NUNCA re-cota.
+  // store_id vem da assinatura (herda do plano) para os ciclos caírem na loja certa.
   const { data: subShipping } = await supabase
     .from("recurring_subscriptions")
-    .select("shipping_amount")
+    .select("shipping_amount, store_id")
     .eq("id", claim.subscriptionId)
     .maybeSingle()
 
@@ -273,6 +274,7 @@ async function createRecurringOrder(params: {
 
   const orderPayload: Record<string, unknown> = {
     partner_id: claim.partnerId,
+    store_id: subShipping?.store_id || null,
     buyer_id: customer.user_id || null,
     customer_name: customer.name,
     order_source: "Assinatura",
@@ -323,25 +325,57 @@ async function createRecurringOrder(params: {
     throw itemsError
   }
 
-  // Reserve stock for products if stock is sufficient and order is not immediately finalized
-  if (productItems.length > 0 && situation !== "paid") {
+  // Estoque igual a um pedido normal do ERP: reserva sempre e baixa fisica
+  // quando o pedido nasce pago ou com entrega ja concluida (retirada).
+  if (productItems.length > 0) {
     const stockItems = productItems.map((item) => ({
       product_id: item.product_id!,
       variant_id: item.variant_id || null,
       quantity: Number(item.quantity || 1),
     }))
+    const storeId = (subShipping?.store_id as string | null) || null
 
     const reserveResult = await reserveOrderInventory({
       client: supabase as any,
       partnerId: claim.partnerId,
       orderId: order.id,
       items: stockItems,
+      storeId,
     })
 
     if ("error" in reserveResult) {
-      await supabase.from("order_items").delete().eq("order_id", order.id)
-      await supabase.from("orders").delete().eq("id", order.id)
-      throw new Error(reserveResult.error)
+      if (situation === "paid") {
+        // Pagamento ja aconteceu no MP: nao derruba o pedido por falta de estoque
+        // (o fluxo de awaiting_restock/deficit ja cobre esta situacao).
+        console.error("[RECURRING] Falha ao reservar estoque do ciclo pago:", reserveResult.error)
+      } else {
+        await supabase.from("order_items").delete().eq("order_id", order.id)
+        await supabase.from("orders").delete().eq("id", order.id)
+        throw new Error(reserveResult.error)
+      }
+    } else if (shouldDeductInventory(orderPayload.delivery_status as string) || situation === "paid") {
+      const finalizeResult = await finalizeOrderInventory({
+        client: supabase as any,
+        partnerId: claim.partnerId,
+        orderId: order.id,
+        createdBy: null as any,
+        reason: "Venda de Produtos",
+        notes: "Pedido gerado automaticamente por assinatura recorrente.",
+        items: stockItems,
+        storeId,
+      })
+
+      if ("error" in finalizeResult) {
+        if (situation === "paid") {
+          console.error("[RECURRING] Falha ao baixar estoque do ciclo pago:", finalizeResult.error)
+        } else {
+          await supabase.from("order_items").delete().eq("order_id", order.id)
+          await supabase.from("orders").delete().eq("id", order.id)
+          throw new Error(finalizeResult.error)
+        }
+      } else {
+        await supabase.from("orders").update({ inventory_deducted: true }).eq("id", order.id)
+      }
     }
   }
 
@@ -372,11 +406,50 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
   const { data: subDetails } = await supabase
     .from("recurring_subscriptions")
     .select(`
-      id, billing_mode,
-      recurring_plans(billing_mode)
+      id, billing_mode, status, pending_cancellation_reason, mp_preapproval_id,
+      recurring_plans(billing_mode, name)
     `)
     .eq("id", claim.subscriptionId)
     .single()
+
+  // Recusa da mudanca de plano: o cliente usou o ciclo vigente; agora a
+  // assinatura encerra sem gerar nova cobranca.
+  if (subDetails?.pending_cancellation_reason) {
+    await supabase
+      .from("recurring_executions")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", claim.executionId)
+      .in("status", ["pending", "failed"])
+
+    await supabase
+      .from("recurring_subscriptions")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", claim.subscriptionId)
+      .in("status", ["active", "awaiting_customer_decision", "past_due", "payment_failed", "awaiting_restock", "paused"])
+
+    if (subDetails.mp_preapproval_id) {
+      try {
+        const { cancelMpPreapproval } = await import("@/lib/services/mercadopago/partner-preapproval")
+        await cancelMpPreapproval(claim.partnerId, subDetails.mp_preapproval_id)
+      } catch (e) {
+        console.error("[RECURRING] Falha ao cancelar preapproval no fim do ciclo:", e)
+      }
+    }
+
+    await logAuditEvent({
+      partnerId: claim.partnerId,
+      actorUserId: null,
+      entityType: "recurring_subscription",
+      entityId: claim.subscriptionId,
+      actionType: "cancelled",
+      changeLines: [
+        `assinatura encerrada ao final do ciclo após recusa da mudança do plano "${(subDetails.recurring_plans as any)?.name || "plano"}".`,
+      ],
+      source: "system",
+      metadata: { pending_cancellation_reason: subDetails.pending_cancellation_reason },
+    })
+    return
+  }
 
   const billingMode = subDetails?.billing_mode || (subDetails?.recurring_plans as any)?.billing_mode || "manual"
   if (billingMode === "auto_mercado_pago") {
@@ -1073,7 +1146,9 @@ export async function processPreapprovalPaymentFailed(params: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", sub.id)
-    .neq("status", "cancelled")
+    // Cancelada nao volta; congelada (janela de consentimento vencida) nao
+    // pode ser rebaixada por um evento atrasado do MP.
+    .not("status", "in", "(cancelled,awaiting_customer_decision)")
 
   await logAuditEvent({
     partnerId: sub.partner_id,

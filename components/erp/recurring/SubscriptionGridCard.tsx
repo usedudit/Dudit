@@ -34,8 +34,11 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
     if (status === "payment_failed") return "red" as const
     if (status === "cancelled") return "red" as const
     if (status === "awaiting_restock") return "red" as const
+    if (status === "awaiting_customer_decision") return "orange" as const
     return "gray" as const
   }
+
+  const priceChangePending = !!sub.priceChangeRequestedAt && !sub.priceChangeDecision
 
   return (
     <div
@@ -46,9 +49,14 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
           <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
             {sub.plan?.name || "Plano"}
           </h3>
-          <Tooltip text={`Status: ${getRecurringStatusLabel(sub.status)}`}>
-            <Badge variant={statusVariant(sub.status)} />
-          </Tooltip>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {priceChangePending && (
+              <Badge variant="blue" className="text-[10px]">Mudança pendente</Badge>
+            )}
+            <Tooltip text={`Status: ${getRecurringStatusLabel(sub.status)}`}>
+              <Badge variant={statusVariant(sub.status)} />
+            </Tooltip>
+          </div>
         </div>
         
         <p className="text-xs text-brand-inactive-text dark:text-dark-body font-semibold mb-3">

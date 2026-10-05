@@ -70,6 +70,7 @@ export default function RecurringSubscriptionsPage({
   const isTablet = useMediaQuery("(max-width: 1024px)")
   const { canEdit } = usePermissions()
   const canManage = canEdit("recurring_subscriptions")
+  const { selectedStore } = useStore()
 
   const [currentTab, setCurrentTab] = useState<"list" | "billing" | "forecast" | "credits">("list")
 
@@ -127,7 +128,7 @@ export default function RecurringSubscriptionsPage({
   }, [search])
 
   const loadStats = useCallback(async () => {
-    const res = await getRecurringSubscriptionStatsAction(partnerId)
+    const res = await getRecurringSubscriptionStatsAction(partnerId, { storeId: selectedStore?.id || null })
     if (res.success && res.data) {
       setTabCounts({
         all: res.data.total,
@@ -139,7 +140,7 @@ export default function RecurringSubscriptionsPage({
         cancelled: res.data.cancelled,
       })
     }
-  }, [partnerId])
+  }, [partnerId, selectedStore?.id])
 
   // Fetch / reload subscriptions when filters change
   const reload = useCallback(async (statusVal: typeof statusFilter, searchVal: string) => {
@@ -147,6 +148,7 @@ export default function RecurringSubscriptionsPage({
     const res = await listRecurringSubscriptionsAction(partnerId, {
       status: statusVal,
       search: searchVal,
+      storeId: selectedStore?.id || undefined,
     })
     setLoading(false)
     void loadStats()
@@ -156,7 +158,7 @@ export default function RecurringSubscriptionsPage({
       setNextCursor(res.data.nextCursor)
       setPage(1)
     }
-  }, [partnerId, loadStats])
+  }, [partnerId, loadStats, selectedStore?.id])
 
   useEffect(() => {
     if (currentTab === "list") {
@@ -202,6 +204,7 @@ export default function RecurringSubscriptionsPage({
       cursor: nextCursor,
       status: statusFilter,
       search: debouncedSearch,
+      storeId: selectedStore?.id || undefined,
     })
     setLoadingMore(false)
     if (res.success && res.data) {
@@ -209,7 +212,7 @@ export default function RecurringSubscriptionsPage({
       setHasMore(res.data.hasMore)
       setNextCursor(res.data.nextCursor)
     }
-  }, [partnerId, nextCursor, statusFilter, debouncedSearch, loadingMore])
+  }, [partnerId, nextCursor, statusFilter, debouncedSearch, loadingMore, selectedStore?.id])
 
   useInfiniteScrollObserver(observerTarget, {
     enabled: currentTab === "list",
@@ -308,8 +311,6 @@ export default function RecurringSubscriptionsPage({
       void loadMore()
     }
   }, [page, totalPages, hasMore, loadingMore, loadMore])
-
-  const { selectedStore } = useStore()
 
   const handleExport = useCallback(() => {
     void exportData({

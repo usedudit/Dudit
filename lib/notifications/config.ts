@@ -36,6 +36,8 @@ export const NOTIFICATION_TYPE_URGENCY_MAP: Record<NotificationType, Notificatio
   appointment_confirmed: "medium",
   appointment_rescheduled: "medium",
   service_return_reminder: "medium",
+  subscription_price_change: "medium",
+  subscription_price_change_expired: "medium",
 
   // Low / Informational Urgency
   subscription_created: "low",
