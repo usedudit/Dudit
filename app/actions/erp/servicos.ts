@@ -163,6 +163,11 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         await requirePermission(finalPartnerId, "services", "create", user)
 
+        const servicesLimitCheck = await checkLimit(finalPartnerId, "services")
+        if (!servicesLimitCheck.allowed) {
+            return errorResponse(servicesLimitCheck.message || "Seu plano não permite criar mais serviços.")
+        }
+
         let finalStoreId = data.storeId
         if (!finalStoreId) {
             const admin = getAdminClient()
@@ -754,6 +759,11 @@ export async function duplicateServiceAction(serviceId: string) {
         if (fetchError || !service) return errorResponse("Serviço não encontrado")
 
         await requirePermission(service.partner_id, "services", "create", user)
+
+        const servicesLimitCheck = await checkLimit(service.partner_id, "services")
+        if (!servicesLimitCheck.allowed) {
+            return errorResponse(servicesLimitCheck.message || "Seu plano não permite criar mais serviços.")
+        }
 
         const supabase = await getSupabaseServerClient()
 

@@ -926,10 +926,6 @@ async function importProductBatch(
     } else {
       created += inserted?.length ?? 0
 
-      if (inserted && inserted.length > 0) {
-        await increment_usage_counter(partnerId, "products_count", inserted.length)
-      }
-
       // Insert fiscal & logistics profiles and variants
       const fiscalToInsert: any[] = []
       const logisticsToInsert: any[] = []
@@ -1448,10 +1444,6 @@ async function importServiceBatch(
       errorMessage = error.message
     } else {
       created += inserted?.length ?? 0
-
-      if (inserted && inserted.length > 0) {
-        await increment_usage_counter(partnerId, "products_count", inserted.length)
-      }
     }
   }
 
@@ -1727,7 +1719,7 @@ async function importAppointmentBatch(
       const insertedCount = inserted?.length ?? 0
       created += insertedCount
       try {
-        await increment_usage_counter(partnerId, "monthly_appointments", insertedCount)
+        await increment_usage_counter(partnerId, "appointments_month_count", insertedCount)
       } catch (err: any) {
         console.warn("[BatchImport] Erro ao incrementar contador mensal de agendamentos:", err.message)
       }

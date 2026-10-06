@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { checkLimit, canUseFeature, getPartnerPlan, increment_usage_counter } from "@/lib/services/subscription.service"
 import { UNITS } from "@/lib/constants/product-constants"
 import { uploadBufferToR2 } from "@/lib/r2/server"
 import { R2_PREFIXES } from "@/lib/r2/config"
@@ -88,6 +89,23 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
     // SECURITY: Verify caller has product-create access for this partner
     await requirePermission(partnerId, "products", "create")
 
+    // Mesmos gates do fluxo novo (xml-import.ts)
+    const allowedFeature = await canUseFeature(partnerId, "xml_import")
+    if (!allowedFeature) {
+      return { success: false, error: "A importação de XML requer o plano Crescer ou superior." }
+    }
+
+    const plan = await getPartnerPlan(partnerId)
+    if (plan.slug.toLowerCase() !== "escalar") {
+      const xmlLimitCheck = await checkLimit(partnerId, "monthly_xml_imports")
+      if (!xmlLimitCheck.allowed) {
+        return {
+          success: false,
+          error: `Limite de importações XML atingido (${xmlLimitCheck.limit}/mês). Faça upgrade para o plano Escalar para importações ilimitadas.`,
+        }
+      }
+    }
+
     const validation = await validatePartnerCPFCNPJ(partnerId, xmlContent, supabase)
     if (!validation.isValid) {
       return {
@@ -108,6 +126,11 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
     }
 
     if (produtosBrutos.length === 0) return { success: false, error: "Nenhum produto encontrado no XML" }
+
+    const itemsLimitCheck = await checkLimit(partnerId, "items", produtosBrutos.length)
+    if (!itemsLimitCheck.allowed) {
+      return { success: false, error: itemsLimitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
+    }
 
     // Upload do XML da NF-e para o Cloudflare R2
     try {
@@ -250,6 +273,10 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
 
     if (errors.length > 0 && totalProcessed === 0) {
       return { success: false, error: "Falha total na importação", errors }
+    }
+
+    if (plan.slug.toLowerCase() !== "escalar" && importedProducts.length + updatedProducts.length > 0) {
+      increment_usage_counter(partnerId, "xml_imports_month_count").catch(console.error)
     }
 
     return {

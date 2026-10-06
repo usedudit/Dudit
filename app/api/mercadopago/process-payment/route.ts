@@ -8,6 +8,7 @@ import { revalidateProducts, revalidateMarketplace, revalidateCart } from "@/lib
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import {
   findMercadoPagoIntegration,
@@ -189,6 +190,7 @@ async function handler(request: NextRequest) {
     // The client partnerId is only a claim. Resolve the canonical partner
     // from owned cart/products before reading any Mercado Pago configuration.
     let canonicalPartnerId: string | undefined
+    let resolvedCartLines: any[] | null = null
     if (existingOrder) {
       canonicalPartnerId = existingOrder.partner_id
     } else if (useUnifiedCart) {
@@ -197,6 +199,7 @@ async function handler(request: NextRequest) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
       canonicalPartnerId = resolved.partnerId
+      resolvedCartLines = (resolved as any).lines || null
     } else {
       const productIds = items.filter(item => !item.variant_id && !item.service_id).map(item => item.id).filter(Boolean)
       const serviceIds = items.map(item => item.service_id).filter(Boolean) as string[]
@@ -264,6 +267,40 @@ async function handler(request: NextRequest) {
     }
 
     const partnerId = canonicalPartnerId
+
+    // Este request cria o pedido (fluxo temp-/unified cart): aplica os mesmos
+    // limites do checkout de carrinho ANTES de gerar a cobrança. Pedidos já
+    // existentes foram contados no checkout original. Lojas em fluxo WhatsApp
+    // seguem o mesmo bypass do checkoutCartAction (sem limite e sem contagem).
+    let isWhatsappOrderFlow = false
+    if (!existingOrderId) {
+      const { isPartnerWhatsappFlow } = await import("@/lib/partner-order-flow")
+      isWhatsappOrderFlow = await isPartnerWhatsappFlow(partnerId)
+
+      if (!isWhatsappOrderFlow) {
+        const ordersLimitCheck = await checkLimit(partnerId, "monthly_orders")
+        if (!ordersLimitCheck.allowed) {
+          return NextResponse.json(
+            { error: ordersLimitCheck.message || "A loja atingiu o limite mensal de pedidos." },
+            { status: 403 },
+          )
+        }
+      }
+
+      const hasBookingLines = (resolvedCartLines || []).some(
+        (line: any) => line?.itemType === "service_booking",
+      )
+      if (hasBookingLines) {
+        const bookingLimitCheck = await checkLimit(partnerId, "monthly_appointments")
+        if (!bookingLimitCheck.allowed) {
+          return NextResponse.json(
+            { error: bookingLimitCheck.message || "A agenda atingiu o limite mensal de agendamentos." },
+            { status: 403 },
+          )
+        }
+      }
+    }
+
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
       .select("id")
@@ -1276,6 +1313,10 @@ async function handler(request: NextRequest) {
     if (orderError || !newOrder) {
       SecureLogger.error("Failed to create/update order", { errorCode: orderError?.code, errorMessage: orderError?.message })
       return NextResponse.json({ error: "Erro ao processar pedido" }, { status: 500 })
+    }
+
+    if (!existingOrderId && !isWhatsappOrderFlow) {
+      increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
     }
 
     if (!existingOrderId && couponIdToSave) {

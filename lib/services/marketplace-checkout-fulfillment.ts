@@ -23,6 +23,7 @@ import {
   toMpFrequency,
 } from "@/lib/services/recurring/frequency"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import { increment_usage_counter } from "@/lib/services/subscription.service"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -367,6 +368,8 @@ async function createBookingFromMetadata(
   if (error) throw error
   const appointmentId = appointment.id as string
 
+  increment_usage_counter(params.partnerId, "appointments_month_count").catch(console.error)
+
   const items = await resolveAppointmentItemsFromServices(
     supabase,
     params.partnerId,
@@ -546,6 +549,8 @@ async function createGroupedBookingFromMetadata(
 
   if (error) throw error
   const appointmentId = appointment.id as string
+
+  increment_usage_counter(params.partnerId, "appointments_month_count").catch(console.error)
 
   const items = await resolveAppointmentItemsFromServices(
     supabase,

@@ -1059,6 +1059,14 @@ export async function checkoutCartAction(
     return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos.", whatsappFallback: true }
   }
 
+  // Linhas de agendamento consomem a cota mensal de agendamentos do vendedor
+  if (resolvedLines.some((l) => l.itemType === "service_booking")) {
+    const bookingLimitCheck = await checkLimit(partnerId, "monthly_appointments")
+    if (!bookingLimitCheck.allowed) {
+      return { error: bookingLimitCheck.message || "A agenda atingiu o limite mensal de agendamentos." }
+    }
+  }
+
   const buyerProfile = buyerProfileResult.data
   const products = productsResult.data
   const partner = partnerResult.data

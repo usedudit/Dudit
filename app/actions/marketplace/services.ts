@@ -449,6 +449,15 @@ export async function createPublicAppointment(data: {
 
     const supabase = getAdminClient()
 
+    const { checkLimit, increment_usage_counter } = await import("@/lib/services/subscription.service")
+    const bookingLimitCheck = await checkLimit(data.partnerId, "monthly_appointments")
+    if (!bookingLimitCheck.allowed) {
+      return {
+        success: false,
+        error: bookingLimitCheck.message || "A agenda atingiu o limite mensal de agendamentos.",
+      }
+    }
+
     // Get user profile
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -528,6 +537,10 @@ export async function createPublicAppointment(data: {
       .single()
 
     if (aptError) throw aptError
+
+    if (appointment?.id) {
+      increment_usage_counter(data.partnerId, "appointments_month_count").catch(console.error)
+    }
 
     // Create receivable (pending) for this appointment if price > 0
     if (data.price > 0.009 && appointment?.id) {

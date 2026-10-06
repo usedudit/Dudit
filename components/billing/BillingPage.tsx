@@ -87,7 +87,7 @@ const COLUMNS = [
     { id: "description", label: "Descrição", align: "left" as const },
     { id: "amount", label: "Valor", align: "right" as const, width: "120px" },
     { id: "status", label: "Status", align: "left" as const, width: "120px" },
-    { id: "payment_method", label: "Meio de Pagamento", align: "left" as const, width: "140px" },
+    { id: "payment_method", label: "Meio Pag.", align: "left" as const, width: "140px" },
     { id: "date", label: "Data", align: "left" as const, width: "140px" },
     { id: "actions", label: "", align: "center" as const, width: "60px" },
 ]
@@ -347,31 +347,31 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                             {data.map((p) => {
                                 const pm = paymentMethodForPurchase(p)
                                 return (
-                                <BillingGridCard
-                                    key={p.id}
-                                    id={p.id}
-                                    type={p.purchase_type}
-                                    typeLabel={getTypeLabel(p.purchase_type)}
-                                    description={p.description}
-                                    amount={p.amount}
-                                    totalAmount={p.total_amount}
-                                    status={p.status}
-                                    statusLabel={getStatusLabel(p.status, p.metadata)}
-                                    statusVariant={getStatusVariant(p.status, p.metadata)}
-                                    paymentMethodLabel={pm.name}
-                                    paymentMethodDetails={pm.detailsText}
-                                    paymentMethodIcon={pm.iconUrl}
-                                    createdAt={p.created_at}
-                                    invoiceId={p.invoice_id}
-                                    onDetails={() => handleViewDetails(p)}
-                                    onInvoice={handlePrintInvoiceById}
-                                />
+                                    <BillingGridCard
+                                        key={p.id}
+                                        id={p.id}
+                                        type={p.purchase_type}
+                                        typeLabel={getTypeLabel(p.purchase_type)}
+                                        description={p.description}
+                                        amount={p.amount}
+                                        totalAmount={p.total_amount}
+                                        status={p.status}
+                                        statusLabel={getStatusLabel(p.status, p.metadata)}
+                                        statusVariant={getStatusVariant(p.status, p.metadata)}
+                                        paymentMethodLabel={pm.name}
+                                        paymentMethodDetails={pm.detailsText}
+                                        paymentMethodIcon={pm.iconUrl}
+                                        createdAt={p.created_at}
+                                        invoiceId={p.invoice_id}
+                                        onDetails={() => handleViewDetails(p)}
+                                        onInvoice={handlePrintInvoiceById}
+                                    />
                                 )
                             }
                             )
-                        }
-                    </div>
-                ) : (
+                            }
+                        </div>
+                    ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -405,30 +405,30 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                     {data.map((p) => {
                                         const pm = paymentMethodForPurchase(p)
                                         return (
-                                        <BillingListRow
-                                            key={p.id}
-                                            id={p.id}
-                                            type={p.purchase_type}
-                                            typeLabel={getTypeLabel(p.purchase_type)}
-                                            description={p.description}
-                                            amount={p.amount}
-                                            totalAmount={p.total_amount}
-                                            status={p.status}
-                                            statusLabel={getStatusLabel(p.status, p.metadata)}
-                                            statusVariant={getStatusVariant(p.status, p.metadata)}
-                                            paymentMethodLabel={pm.name}
-                                            createdAt={p.created_at}
-                                            columns={filteredColumns}
-                                            invoiceId={p.invoice_id}
-                                        onDetails={() => handleViewDetails(p)}
-                                        onInvoice={handlePrintInvoiceById}
-                                    />
+                                            <BillingListRow
+                                                key={p.id}
+                                                id={p.id}
+                                                type={p.purchase_type}
+                                                typeLabel={getTypeLabel(p.purchase_type)}
+                                                description={p.description}
+                                                amount={p.amount}
+                                                totalAmount={p.total_amount}
+                                                status={p.status}
+                                                statusLabel={getStatusLabel(p.status, p.metadata)}
+                                                statusVariant={getStatusVariant(p.status, p.metadata)}
+                                                paymentMethodLabel={pm.name}
+                                                createdAt={p.created_at}
+                                                columns={filteredColumns}
+                                                invoiceId={p.invoice_id}
+                                                onDetails={() => handleViewDetails(p)}
+                                                onInvoice={handlePrintInvoiceById}
+                                            />
+                                        )
+                                    }
                                     )
-                                }
-                                )
-                            }
-                        </tbody>
-                    </table>
+                                    }
+                                </tbody>
+                            </table>
                         </div>
                     )}
 
