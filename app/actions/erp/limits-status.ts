@@ -2,6 +2,7 @@
 
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getUsageCounters, getLimit, getPartnerPlan } from "@/lib/services/subscription.service"
+import { countActiveRecurringPlans, countActiveRecurringSubscriptions } from "@/lib/services/recurring/limits"
 import { getNextPlanTarget } from "@/lib/subscription/limit-upgrade"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 
@@ -26,7 +27,8 @@ interface LimitConfig {
   key: string
   label: string
   limitName: string
-  counterField: string
+  /** Coluna de usage_counters; omitida quando a contagem vem de outra fonte. */
+  counterField?: string
   isMonthly: boolean
 }
 
@@ -37,6 +39,8 @@ const LIMITS_CONFIG: LimitConfig[] = [
   { key: "monthly_quotes", label: "Orçamentos/mês", limitName: "monthly_quotes", counterField: "quotes_month_count", isMonthly: true },
   { key: "monthly_service_orders", label: "Ordens de serviço/mês", limitName: "monthly_service_orders", counterField: "service_orders_month_count", isMonthly: true },
   { key: "users", label: "Usuários", limitName: "users", counterField: "users_count", isMonthly: false },
+  { key: "recurring_plans", label: "Planos recorrentes", limitName: "recurring_plans", isMonthly: false },
+  { key: "active_subscriptions", label: "Assinaturas recorrentes", limitName: "active_subscriptions", isMonthly: false },
 ]
 
 export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
@@ -44,9 +48,11 @@ export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
     const context = await getCurrentPartnerContext()
     if (!context?.partnerId) return null
 
-    const [counters, plan] = await Promise.all([
+    const [counters, plan, recurringPlans, recurringSubs] = await Promise.all([
       getUsageCounters(context.partnerId),
       getPartnerPlan(context.partnerId),
+      countActiveRecurringPlans(context.partnerId),
+      countActiveRecurringSubscriptions(context.partnerId),
     ])
 
     if (!counters) return null
@@ -55,11 +61,16 @@ export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
 
     for (const cfg of LIMITS_CONFIG) {
       const limit = await getLimit(context.partnerId, cfg.limitName)
-      const current = (counters as any)[cfg.counterField] ?? 0
+      const current = cfg.counterField
+        ? ((counters as any)[cfg.counterField] ?? 0)
+        : cfg.key === "recurring_plans"
+          ? recurringPlans
+          : recurringSubs
 
       let percentage = 0
-      if (limit !== "unlimited" && limit > 0) {
-        percentage = Math.min(Math.round((current / limit) * 100), 100)
+      if (limit !== "unlimited") {
+        // Limite 0 = recurso bloqueado no plano atual -> barra cheia (paywall)
+        percentage = limit > 0 ? Math.min(Math.round((current / limit) * 100), 100) : 100
       }
 
       items.push({

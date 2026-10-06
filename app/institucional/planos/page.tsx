@@ -107,16 +107,18 @@ const PricingCards = () => {
             "Controle de entregas e envios",
             "Campanhas promocionais",
             "Metas e desempenho da equipe",
-            "Lembretes e envios automáticos via WhatsApp",
-            "Importação de XML (NF-e)"
-         ],
-         limits: [
-            "Itens e pedidos ilimitados",
-            "Ordens de serviço ilimitadas",
-            "Agendamentos ilimitados",
-            "Até 15 imagens por item",
-            "10 usuários",
-         ],
+             "Lembretes e envios automáticos via WhatsApp",
+             "Importação de XML (NF-e)",
+             "Planos e assinaturas recorrentes"
+          ],
+          limits: [
+             "Itens e pedidos ilimitados",
+             "Ordens de serviço ilimitadas",
+             "Agendamentos ilimitados",
+             "Planos e assinaturas recorrentes ilimitados",
+             "Até 15 imagens por item",
+             "10 usuários",
+          ],
          variant: "outline" as const,
          popular: false
       }

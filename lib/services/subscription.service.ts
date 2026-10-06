@@ -139,6 +139,8 @@ async function getFreePlan(): Promise<Plan> {
         monthly_quotes: 10,
         monthly_service_orders: 15,
         users: 1,
+        recurring_plans: 0,
+        active_subscriptions: 0,
       },
       features_json: ["public_storefront", "technical_specs", "pdv_basic", "whatsapp_orders", "whatsapp_bookings", "qr_code_profile"],
       sort_order: 0,
@@ -553,6 +555,8 @@ const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
   monthly_xml_imports: "importações XML/mês",
   users: "usuários",
   customers: "clientes",
+  recurring_plans: "planos recorrentes",
+  active_subscriptions: "assinaturas ativas",
   // Aliases
   products: "itens",
   services: "serviços",

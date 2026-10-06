@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { finalizeOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
-import { increment_usage_counter } from "@/lib/services/subscription.service"
+import { increment_usage_counter, getPartnerPlan } from "@/lib/services/subscription.service"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getDateComponents, getDefaultTimezone } from "@/lib/date"
@@ -449,6 +450,40 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
       metadata: { pending_cancellation_reason: subDetails.pending_cancellation_reason },
     })
     return
+  }
+
+  // Backstop de tier: o hook de downgrade pode nao ter rodado ainda. Parceiro
+  // abaixo do Escalar nao inicia novo ciclo - pausa (reversivel) em vez de
+  // cobrar/gerar pedido.
+  try {
+    const partnerPlan = await getPartnerPlan(claim.partnerId)
+    if (!hasMinimumPlan(partnerPlan.slug, "escalar")) {
+      await supabase
+        .from("recurring_executions")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", claim.executionId)
+        .in("status", ["pending", "failed"])
+
+      const { pauseSubscriptionForPlanDowngrade } = await import("@/lib/services/recurring/limits")
+      await pauseSubscriptionForPlanDowngrade(claim.partnerId, {
+        id: claim.subscriptionId,
+        mp_preapproval_id: subDetails?.mp_preapproval_id || null,
+      })
+
+      await logAuditEvent({
+        partnerId: claim.partnerId,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: claim.subscriptionId,
+        actionType: "paused",
+        changeLines: ["ciclo interrompido e assinatura pausada: parceiro está abaixo do plano Escalar."],
+        source: "system",
+        metadata: { plan_slug: partnerPlan.slug },
+      })
+      return
+    }
+  } catch (tierErr) {
+    console.error("[RECURRING] Backstop de tier falhou:", tierErr)
   }
 
   const billingMode = subDetails?.billing_mode || (subDetails?.recurring_plans as any)?.billing_mode || "manual"

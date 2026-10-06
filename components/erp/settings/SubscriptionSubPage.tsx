@@ -19,6 +19,7 @@ import {
     AlertCircleIcon,
     ArrowUpIcon,
     ReturnIcon,
+    GiftIcon,
 } from "@/lib/icons"
 
 const CANCELLATION_REASONS = [
@@ -198,33 +199,87 @@ const PlanCardSkeleton = () => (
 // ─── Billing Toggle ────────────────────────────────────────────────────────
 
 const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onChange: (v: "monthly" | "annually") => void }) => (
-    <div className="flex justify-center mb-8">
-        <div className="bg-brand-gray dark:bg-dark-surface p-1 rounded-2xl border border-brand-border dark:border-dark-border flex items-center">
-            <button
-                type="button"
-                onClick={() => onChange("monthly")}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${value === "monthly"
-                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading"
-                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                    }`}
-            >
-                Mensal
-            </button>
-            <button
-                type="button"
-                onClick={() => onChange("annually")}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 ${value === "annually"
-                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading"
-                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
-                    }`}
-            >
-                Anual
-                <span className="bg-brand-green/10 text-brand-green text-[10px] px-2 py-0.5 rounded-full font-extrabold">
-                    20% OFF
-                </span>
-            </button>
-        </div>
+    <div className="flex items-center gap-2 bg-brand-gray dark:bg-dark-surface p-1 rounded-full border border-brand-border dark:border-dark-border shrink-0">
+        <button
+            type="button"
+            onClick={() => onChange("monthly")}
+            className={`px-4 md:px-5 py-2 rounded-full text-xs md:text-sm font-bold transition-all duration-200 ${value === "monthly"
+                ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-sm"
+                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                }`}
+        >
+            Mensal
+        </button>
+        <button
+            type="button"
+            onClick={() => onChange("annually")}
+            className={`px-4 md:px-5 py-2 rounded-full text-xs md:text-sm font-bold transition-all duration-200 flex items-center gap-2 ${value === "annually"
+                ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-sm"
+                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                }`}
+        >
+            Anual
+            <span className="bg-brand-green text-white text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                -20%
+            </span>
+        </button>
     </div>
+)
+
+// ─── Annual Promo Card ─────────────────────────────────────────────────────
+
+const AnnualPromoCard = ({
+    active,
+    onSwitch,
+}: {
+    active: boolean
+    onSwitch: () => void
+}) => (
+    <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        className={`rounded-2xl border p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 transition-colors duration-300 ${active
+            ? "border-brand-green/40 bg-brand-green/5 dark:bg-brand-green/10"
+            : "border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-surface"
+            }`}
+    >
+        <div className="flex items-start gap-3.5 flex-1 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-brand-green/10 border border-brand-green/20 flex items-center justify-center shrink-0">
+                <GiftIcon size={20} className="text-brand-green" />
+            </div>
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm md:text-base">
+                        2 meses grátis no plano anual
+                    </p>
+                    <span className="bg-brand-green text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0">
+                        Economize 20%
+                    </span>
+                </div>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                    Assine qualquer plano no anual hoje e os 2 primeiros meses são por nossa conta. É a
+                    melhor forma de começar economizando, sem perder a liberdade de cancelar quando quiser.
+                </p>
+            </div>
+        </div>
+
+        {active ? (
+            <div className="flex items-center gap-2 text-brand-green text-sm font-bold shrink-0 md:pl-4">
+                <CheckCircleIcon size={18} />
+                Anual ativo — desconto garantido
+            </div>
+        ) : (
+            <Button
+                variant="outline"
+                className="shrink-0 h-11 md:whitespace-nowrap"
+                onClick={onSwitch}
+                rightIcon={<ArrowRightIcon size={16} />}
+            >
+                Ir para o anual
+            </Button>
+        )}
+    </motion.div>
 )
 
 // ─── Main Component ────────────────────────────────────────────────────────
@@ -1005,27 +1060,40 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         >
                             <div className="relative flex flex-col w-full h-full bg-white dark:bg-dark-background">
                                 {/* Header */}
-                                <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                                    <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                        Planos de Assinatura
-                                    </h2>
-                                    <Button variant="filled" onClick={() => setPlansOpen(false)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                                        <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    </Button>
+                                <div className="shrink-0 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                    <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="w-2 h-2 rounded-full bg-brand-green shrink-0" />
+                                            <div>
+                                                <h2 className="text-lg md:text-xl font-bold leading-tight text-brand-dark dark:text-dark-heading">
+                                                    Escolha seu plano
+                                                </h2>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Cancele ou troque quando quiser, sem burocracia.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between md:justify-end gap-3">
+                                            <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+                                            <Button variant="filled" onClick={() => setPlansOpen(false)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                                                <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Content */}
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto">
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center mb-6">
-                                            Escolha o plano ideal para as necessidades do seu negócio. Cancele ou altere a qualquer momento.
-                                        </p>
-
-                                        {/* Billing Toggle */}
-                                        <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+                                        {/* Annual promo */}
+                                        <AnnualPromoCard
+                                            active={billingCycle === "annually"}
+                                            onSwitch={() => setBillingCycle("annually")}
+                                        />
 
                                         {/* Plans Grid */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch my-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mt-6">
                                             {loading ? (
                                                 <>
                                                     <PlanCardSkeleton />

@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -199,6 +200,14 @@ export async function createRecurringPlanAction(input: {
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePermission(input.partnerId, "recurring_plans", "manage")
+    await requireMinimumPlan(input.partnerId, "escalar")
+
+    // Limite de planos recorrentes ativos (0 fora do Escalar)
+    const { checkRecurringPlanCreateLimit } = await import("@/lib/services/recurring/limits")
+    const recurringLimitCheck = await checkRecurringPlanCreateLimit(input.partnerId)
+    if (!recurringLimitCheck.allowed) {
+      return { success: false, error: recurringLimitCheck.message || "Seu plano não permite criar mais planos recorrentes." }
+    }
 
     // Check images limit
     const { checkLimit, increment_usage_counter } = await import("@/lib/services/subscription.service")
@@ -322,6 +331,7 @@ export async function updateRecurringPlanAction(input: {
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePermission(input.partnerId, "recurring_plans", "manage")
+    await requireMinimumPlan(input.partnerId, "escalar")
 
     // Check images limit
     const { checkLimit, increment_usage_counter, decrement_usage_counter } = await import("@/lib/services/subscription.service")
@@ -476,6 +486,7 @@ export async function deleteRecurringPlanAction(partnerId: string, planId: strin
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePermission(partnerId, "recurring_plans", "manage")
+    await requireMinimumPlan(partnerId, "escalar")
     const supabase = await getSupabaseServerClient()
 
     // 1. Delete items first

@@ -125,6 +125,17 @@ export async function subscribeToRecurringPlanAction(input: {
       return { success: false, error: "Plano indisponível para assinatura." }
     }
 
+    // Modulo recorrente exclusivo do Escalar: recusa amigavel ao comprador
+    const { getRecurringModuleAccess, checkActiveSubscriptionCreateLimit } = await import("@/lib/services/recurring/limits")
+    const access = await getRecurringModuleAccess(input.partnerId)
+    if (!access.allowed) {
+      return { success: false, error: "Este lojista não possui assinaturas recorrentes disponíveis no momento." }
+    }
+    const subLimit = await checkActiveSubscriptionCreateLimit(input.partnerId)
+    if (!subLimit.allowed) {
+      return { success: false, error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
+    }
+
     const { data: existing } = await admin
       .from("recurring_subscriptions")
       .select("id, status")

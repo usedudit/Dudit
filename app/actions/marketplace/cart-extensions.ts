@@ -404,6 +404,17 @@ export async function addSubscriptionToCartAction(
     return { error: "Plano indisponível." }
   }
 
+  // Modulo recorrente exclusivo do Escalar: recusa amigavel ao comprador
+  const { getRecurringModuleAccess, checkActiveSubscriptionCreateLimit } = await import("@/lib/services/recurring/limits")
+  const access = await getRecurringModuleAccess(input.partnerId)
+  if (!access.allowed) {
+    return { error: "Este lojista não possui assinaturas recorrentes disponíveis no momento." }
+  }
+  const subLimit = await checkActiveSubscriptionCreateLimit(input.partnerId)
+  if (!subLimit.allowed) {
+    return { error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
+  }
+
   const { data: existing } = await supabase
     .from("cart_items")
     .select("id")

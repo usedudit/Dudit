@@ -2,6 +2,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { buildArchivePayload } from "@/lib/supabase/query-helpers"
 import { removeFromExploreRedis } from "@/lib/redis-sync"
 import { getPartnerPlan, invalidatePartnerPlanCache } from "@/lib/services/subscription.service"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 
 export interface ArchivingSummary {
   archivedProductsCount: number
@@ -146,6 +147,24 @@ export async function enforcePlanLimitsAndArchiveExcess(
         }
       }
     }
+  }
+
+  // 5. Assinaturas recorrentes: modulo exclusivo do Escalar. Ao cair de plano,
+  //    pausa as assinaturas vivas + preapprovals do MP (reversivel; nao corta
+  //    o vinculo de cobranca do cliente final).
+  try {
+    const currentPlan = await getPartnerPlan(partnerId)
+    if (currentPlan?.slug && !hasMinimumPlan(currentPlan.slug, "escalar")) {
+      const { pauseRecurringForPlanDowngrade } = await import("@/lib/services/recurring/limits")
+      const { paused } = await pauseRecurringForPlanDowngrade(partnerId)
+      if (paused > 0) {
+        console.warn(
+          `[SUBSCRIPTION-ARCHIVER] Partner ${partnerId} (plano ${currentPlan.slug}): ${paused} assinatura(s) recorrente(s) pausada(s) por downgrade.`,
+        )
+      }
+    }
+  } catch (recurErr: any) {
+    console.error("[SUBSCRIPTION-ARCHIVER] Error pausing recurring subscriptions on downgrade:", recurErr.message)
   }
 
   invalidatePartnerPlanCache(partnerId)

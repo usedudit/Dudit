@@ -23,6 +23,8 @@ const PAGE_LIMIT_MAP: Record<string, PageLimitConfig> = {
     "/erp/agendamentos": { key: "monthly_appointments", label: "Agendamentos/mês", limitName: "monthly_appointments", isMonthly: true },
     "/erp/orcamentos": { key: "monthly_quotes", label: "Orçamentos/mês", limitName: "monthly_quotes", isMonthly: true },
     "/erp/ordens-de-servico": { key: "monthly_service_orders", label: "Ordens de serviço/mês", limitName: "monthly_service_orders", isMonthly: true },
+    "/erp/recorrentes/planos": { key: "recurring_plans", label: "Planos recorrentes", limitName: "recurring_plans", isMonthly: false },
+    "/erp/recorrentes/assinaturas": { key: "active_subscriptions", label: "Assinaturas recorrentes", limitName: "active_subscriptions", isMonthly: false },
 }
 
 export function LimitStatusWidget() {
@@ -118,7 +120,7 @@ export function LimitStatusWidget() {
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Limite quase atingido
+                                        {limitItem.limit === 0 ? "Recurso não incluído no plano" : "Limite quase atingido"}
                                     </h3>
                                     <p className="text-xs text-brand-inactive-text">
                                         {pageConfig.label}
@@ -145,12 +147,17 @@ export function LimitStatusWidget() {
                                     style={{ width: `${limitItem.percentage}%` }}
                                 />
                             </div>
-                            {limitItem.isMonthly && (
+                            {limitItem.limit === 0 && (
+                                <p className="text-xs text-brand-inactive-text mt-2">
+                                    Faça upgrade para liberar este recurso no seu plano.
+                                </p>
+                            )}
+                            {limitItem.isMonthly && limitItem.limit !== 0 && (
                                 <p className="text-xs text-brand-inactive-text mt-2">
                                     Sua cota mensal está quase no fim. Os limites resetam no início do próximo mês.
                                 </p>
                             )}
-                            {!limitItem.isMonthly && (
+                            {!limitItem.isMonthly && limitItem.limit !== 0 && (
                                 <p className="text-xs text-brand-inactive-text mt-2">
                                     Seu limite de {pageConfig.label.toLowerCase()} está quase no fim.
                                 </p>

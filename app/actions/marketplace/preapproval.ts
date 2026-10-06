@@ -100,6 +100,17 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       return { success: false, error: "Plano indisponível para assinatura." }
     }
 
+    // Modulo recorrente exclusivo do Escalar: recusa amigavel ao comprador
+    const { getRecurringModuleAccess, checkActiveSubscriptionCreateLimit } = await import("@/lib/services/recurring/limits")
+    const access = await getRecurringModuleAccess(input.partnerId)
+    if (!access.allowed) {
+      return { success: false, error: "Este lojista não possui assinaturas recorrentes disponíveis no momento." }
+    }
+    const subLimit = await checkActiveSubscriptionCreateLimit(input.partnerId)
+    if (!subLimit.allowed) {
+      return { success: false, error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
+    }
+
     const billingMode = plan.billing_mode || "manual"
     if (billingMode !== "auto_mercado_pago") {
       return { success: false, error: "Este plano não suporta pagamento automático via Mercado Pago." }

@@ -110,13 +110,15 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Campanhas promocionais",
       "Metas e desempenho da equipe",
       "Lembretes e envios automáticos via WhatsApp",
-      "Importação de XML (NF-e)"
+      "Importação de XML (NF-e)",
+      "Planos e assinaturas recorrentes"
     ],
     limits: [
       "Itens e pedidos ilimitados",
       "Ordens de serviço ilimitadas",
       "Agendamentos ilimitados",
       "Importações XML ilimitadas",
+      "Planos e assinaturas recorrentes ilimitados",
       "Até 15 imagens por item",
       "10 usuários",
     ],

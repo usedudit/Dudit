@@ -3,6 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requirePermission } from "@/lib/permissions/access"
+import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -121,6 +122,15 @@ export async function createRecurringSubscriptionAction(input: {
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePermission(input.partnerId, "recurring_subscriptions", "manage")
+    await requireMinimumPlan(input.partnerId, "escalar")
+
+    // Limite de assinaturas nao terminais (0 fora do Escalar)
+    const { checkActiveSubscriptionCreateLimit } = await import("@/lib/services/recurring/limits")
+    const subLimitCheck = await checkActiveSubscriptionCreateLimit(input.partnerId)
+    if (!subLimitCheck.allowed) {
+      return { success: false, error: subLimitCheck.message || "Seu plano não permite criar mais assinaturas." }
+    }
+
     const supabase = await getSupabaseServerClient()
 
     const { data: plan } = await supabase
