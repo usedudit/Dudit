@@ -6,7 +6,7 @@ import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
-    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon, EditIcon, TrashIcon
+    HomeIcon, SearchIcon, Package, MenuIcon, UserIcon, StoreIcon, HeartIcon, StarIcon, HelpCircleIcon, ChevronRightIcon, LogoutIcon, InfoIcon, MoneyIcon, FileTextIcon, ShieldIcon, EditIcon, TrashIcon, RepeatIcon
 } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
@@ -307,6 +307,12 @@ export function MarketplaceBottomMenu() {
                                     label="Favoritos"
                                     href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
                                     icon={HeartIcon}
+                                    onClose={() => setIsMenuOpen(false)}
+                                />
+                                <MenuItem
+                                    label="Minhas Assinaturas"
+                                    href={user ? "/assinaturas" : "/auth/login?next=/assinaturas"}
+                                    icon={RepeatIcon}
                                     onClose={() => setIsMenuOpen(false)}
                                 />
                                 <MenuItem

@@ -148,6 +148,45 @@ export type RecurringExecution = {
 
 export type RecurringListCursor = { createdAt: string; id: string }
 
+export type RecurringStatusVariant = "green" | "red" | "orange" | "blue" | "gray"
+
+export type RecurringSubscriptionDetailCustomer = {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+}
+
+export type RecurringSubscriptionDetailItem = {
+  id: string
+  itemType: RecurringPlanItemType
+  quantity: number
+  unitPrice: number
+  sortOrder: number
+  preferredTime: string | null
+  durationMinutes: number | null
+  product: { id: string; name: string; images?: string[] | null } | null
+  service: { id: string; name: string; images?: string[] | null } | null
+}
+
+export type RecurringSubscriptionDetailCredit = {
+  id: string
+  serviceName: string
+  quantity: number
+  consumed: number
+  remaining: number
+  expiresAt: string | null
+}
+
+export type RecurringSubscriptionDetail = {
+  subscription: RecurringSubscription
+  plan: (RecurringPlan & { items: RecurringPlanItemRow[] }) | null
+  customer: RecurringSubscriptionDetailCustomer | null
+  items: RecurringSubscriptionDetailItem[]
+  credits: RecurringSubscriptionDetailCredit[]
+}
+
 export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
   return {
     id: String(row.id),
@@ -253,6 +292,22 @@ export function getRecurringStatusLabel(status: RecurringSubscriptionStatus): st
     case "payment_failed": return "Falha no Pagamento"
     case "awaiting_customer_decision": return "Aguardando Cliente"
     default: return status
+  }
+}
+
+export function getRecurringStatusVariant(
+  status: RecurringSubscriptionStatus | string,
+): RecurringStatusVariant {
+  switch (status) {
+    case "active": return "green"
+    case "paused": return "orange"
+    case "pending": return "blue"
+    case "past_due": return "orange"
+    case "payment_failed": return "red"
+    case "cancelled": return "red"
+    case "awaiting_restock": return "red"
+    case "awaiting_customer_decision": return "orange"
+    default: return "gray"
   }
 }
 

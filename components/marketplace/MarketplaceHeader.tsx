@@ -1006,6 +1006,7 @@ const Header: React.FC<HeaderProps> = ({
                             {([
                                 { label: "Meu Perfil", href: "/perfil", prefetch: false },
                                 { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
+                                { label: "Minhas Assinaturas", href: "/assinaturas", prefetch: false },
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
                                 { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
                                 { label: "Central do Vendedor", href: "/erp/trocar-erp", prefetch: false },
@@ -1214,6 +1215,7 @@ const Header: React.FC<HeaderProps> = ({
                                         {([
                                             { label: "Meu Perfil", href: "/perfil", prefetch: false },
                                             { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
+                                            { label: "Minhas Assinaturas", href: "/assinaturas", prefetch: false },
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
                                             { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
                                             { label: "Central do Vendedor", href: "/erp/trocar-erp", prefetch: false },

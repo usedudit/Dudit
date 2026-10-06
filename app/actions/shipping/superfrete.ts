@@ -1667,6 +1667,94 @@ export async function createOrderShippingLabelAction(payload: {
   }
 }
 
+// Estado dos botões de etiqueta (Rastrear/Imprimir/Gerar) em UMA action:
+// uma única cadeia de auth, consultas em paralelo e SEM chamada remota ao
+// SuperFrete — o saldo é carregado à parte (getSuperFreteBalanceAction).
+export async function getOrderCarrierLabelStateAction(payload: { orderId: string }): Promise<{
+  success: true
+  connected: boolean
+  planAllowed: boolean
+  shipment: OrderShipmentSummary | null
+} | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "view", user)
+
+  try {
+    const supabase = getAdminClient()
+    const [plan, integration, shipmentRes] = await Promise.all([
+      getPartnerPlan(ctx.partnerId),
+      getSuperFreteIntegration(supabase, ctx.partnerId),
+      supabase
+        .from("order_shipments")
+        .select(
+          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+        )
+        .eq("order_id", payload.orderId)
+        .eq("partner_id", ctx.partnerId)
+        .eq("kind", "outbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    return {
+      success: true,
+      connected: integration?.status === "connected" && Boolean(integration?.access_token_encrypted),
+      planAllowed: hasMinimumPlan(plan?.slug || "free", "escalar"),
+      shipment: (shipmentRes.data as OrderShipmentSummary) || null,
+    }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "get_order_carrier_label_state",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao verificar frete." }
+  }
+}
+
+// Saldo da carteira SuperFrete (chamada remota) — carregar em background,
+// nunca bloquear a exibição dos botões de etiqueta.
+export async function getSuperFreteBalanceAction(): Promise<{
+  success: true
+  balance: number | null
+} | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "view", user)
+
+  try {
+    const supabase = getAdminClient()
+    const integration = await getSuperFreteIntegration(supabase, ctx.partnerId)
+    const connected = integration?.status === "connected" && Boolean(integration?.access_token_encrypted)
+    const client = createClientFromIntegration(integration)
+    if (!connected || !client) return { success: true, balance: null }
+    try {
+      const info = await client.getUserInfo()
+      return { success: true, balance: Number(info?.balance ?? 0) }
+    } catch (err) {
+      captureError(err, {
+        module: "shipping",
+        action: "get_superfrete_balance",
+        partnerId: ctx.partnerId,
+      })
+      return { success: true, balance: null }
+    }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "get_superfrete_balance",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao consultar saldo." }
+  }
+}
+
 export async function getOrderShippingGateAction(): Promise<{
   success: true
   data: { connected: boolean; planAllowed: boolean; balance?: number }

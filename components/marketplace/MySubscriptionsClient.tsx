@@ -329,9 +329,9 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                   )}
 
                   <div className="flex items-start gap-4">
-                    {sub.partner?.store_image_url && (
+                    {sub.partner?.logo_url && (
                       <img
-                        src={getR2ImageUrl(sub.partner.store_image_url)}
+                        src={getR2ImageUrl(sub.partner.logo_url)}
                         alt={sub.partner?.name || sub.partner?.store_name}
                         className="w-16 h-16 rounded-[16px] object-cover border border-brand-border dark:border-dark-border"
                       />
@@ -398,6 +398,58 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                       </div>
                     </div>
                   </div>
+
+                  {/* Items included in this subscription */}
+                  {sub.items?.length > 0 && (
+                    <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body mb-3">
+                        Itens da assinatura
+                      </h4>
+                      <div className="space-y-2">
+                        {sub.items.map((item: any) => {
+                          const details = item.itemType === "product" ? item.product : item.service
+                          const name = details?.name || (item.itemType === "product" ? "Produto" : "Serviço")
+                          const images = details?.images
+                          const imgUrl = (Array.isArray(images) && images[0]) || null
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-surface"
+                            >
+                              {imgUrl ? (
+                                <div className="w-12 h-12 rounded-[10px] bg-white dark:bg-dark-card border border-brand-border overflow-hidden shrink-0">
+                                  <img
+                                    src={getR2ImageUrl(imgUrl)}
+                                    alt={name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-12 h-12 rounded-[10px] bg-white dark:bg-dark-card border border-brand-border flex items-center justify-center shrink-0 text-brand-primary">
+                                  {item.itemType === "product" ? <TruckIcon size={18} /> : <CalendarIcon size={18} />}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
+                                  {name}
+                                </p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">
+                                  Quantidade: <strong>{item.quantity}x</strong> •{" "}
+                                  {item.itemType === "product" ? "Produto" : "Serviço"}
+                                </p>
+                              </div>
+                              {item.unitPrice != null && (
+                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                                  {formatCurrency(item.unitPrice)}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Main actions line */}
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-brand-border dark:border-dark-border">

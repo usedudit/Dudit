@@ -4,45 +4,34 @@ import React from "react"
 import { Badge, Button, Tooltip } from "@/components/reusable"
 import { ClockIcon, BlockedIcon, PlayIcon } from "@/lib/icons"
 import type { RecurringSubscription } from "@/lib/types/recurring"
-import { getRecurringStatusLabel, getRecurringFrequencyLabel, getRecurringShippingSourceLabel } from "@/lib/types/recurring"
+import {
+  getRecurringStatusLabel,
+  getRecurringFrequencyLabel,
+  getRecurringShippingSourceLabel,
+  getRecurringStatusVariant,
+} from "@/lib/types/recurring"
 import { formatFullDate, formatCurrency } from "@/lib/utils"
+import type { SubscriptionRowTab } from "./SubscriptionListRow"
 
 interface SubscriptionGridCardProps {
   sub: RecurringSubscription & { plan?: any; customer?: any }
   canManage: boolean
-  selectedId: string | null
-  loadingExecutions: boolean
-  executions: any[]
-  onToggleHistory: (id: string) => void
+  onOpen: (id: string, tab?: SubscriptionRowTab) => void
   onRunAction: (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", id: string) => void
 }
 
 export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
   sub,
   canManage,
-  selectedId,
-  loadingExecutions,
-  executions,
-  onToggleHistory,
+  onOpen,
   onRunAction
 }) => {
-  const statusVariant = (status: string) => {
-    if (status === "active") return "green" as const
-    if (status === "paused") return "orange" as const
-    if (status === "pending") return "blue" as const
-    if (status === "past_due") return "orange" as const
-    if (status === "payment_failed") return "red" as const
-    if (status === "cancelled") return "red" as const
-    if (status === "awaiting_restock") return "red" as const
-    if (status === "awaiting_customer_decision") return "orange" as const
-    return "gray" as const
-  }
-
   const priceChangePending = !!sub.priceChangeRequestedAt && !sub.priceChangeDecision
 
   return (
     <div
-      className="border border-brand-border dark:border-dark-border rounded-xl p-5 bg-white dark:bg-dark-surface shadow-sm flex flex-col justify-between"
+      onClick={() => onOpen(sub.id)}
+      className="border border-brand-border dark:border-dark-border rounded-[24px] p-6 bg-white dark:bg-dark-surface flex flex-col justify-between cursor-pointer hover:border-brand-green/60 transition-colors"
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-2">
@@ -54,11 +43,11 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               <Badge variant="blue" className="text-[10px]">Mudança pendente</Badge>
             )}
             <Tooltip text={`Status: ${getRecurringStatusLabel(sub.status)}`}>
-              <Badge variant={statusVariant(sub.status)} />
+              <Badge variant={getRecurringStatusVariant(sub.status)} />
             </Tooltip>
           </div>
         </div>
-        
+
         <p className="text-xs text-brand-inactive-text dark:text-dark-body font-semibold mb-3">
           {sub.customer?.name || sub.customerId}
         </p>
@@ -80,13 +69,16 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="border-t border-brand-border dark:border-dark-border pt-4 flex flex-col gap-2">
+      <div
+        className="border-t border-brand-border dark:border-dark-border pt-4 flex flex-col gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             className="flex-1 h-9"
-            onClick={() => onToggleHistory(sub.id)}
+            onClick={() => onOpen(sub.id, "history")}
           >
             <ClockIcon size={14} className="mr-1" /> Histórico
           </Button>
@@ -127,37 +119,6 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
           </Button>
         )}
       </div>
-
-      {/* Expandable History inline in Grid Card */}
-      {selectedId === sub.id && (
-        <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-3 space-y-2">
-          <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading">Histórico de execuções</h4>
-          {loadingExecutions ? (
-            <p className="text-xs text-brand-inactive-text animate-pulse">Carregando...</p>
-          ) : executions.length === 0 ? (
-            <p className="text-xs text-brand-inactive-text">Nenhuma execução registrada.</p>
-          ) : (
-            <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-              {executions.map((exec) => (
-                <div key={exec.id} className="text-xs flex flex-col gap-1 border-b border-brand-border dark:border-dark-border pb-1.5 last:border-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{formatFullDate(exec.scheduled_for).slice(0, 10)}</span>
-                    <Tooltip text={`Status: ${exec.status}`}>
-                      <Badge variant={exec.status === "completed" ? "green" : exec.status === "failed" ? "red" : "gray"} />
-                    </Tooltip>
-                  </div>
-                  {exec.orders?.order_number && (
-                    <div className="text-[11px] text-brand-inactive-text">Pedido #{exec.orders.order_number}</div>
-                  )}
-                  {exec.error_message && (
-                    <div className="text-[11px] text-brand-red font-medium">{exec.error_message}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

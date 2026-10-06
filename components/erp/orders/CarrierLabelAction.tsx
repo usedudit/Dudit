@@ -5,10 +5,9 @@ import { Button } from "@/components/reusable"
 import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
 import {
-    getOrderShippingGateAction,
+    getOrderCarrierLabelStateAction,
     createOrderShippingLabelAction,
     checkoutSuperFreteLabelAction,
-    getOrderShipmentAction,
     printSuperFreteLabelAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
@@ -21,7 +20,7 @@ interface CarrierLabelActionProps {
 }
 
 export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLabelActionProps) {
-    const [gate, setGate] = useState<{ connected: boolean; planAllowed: boolean; balance?: number } | null>(null)
+    const [gate, setGate] = useState<{ connected: boolean; planAllowed: boolean } | null>(null)
     const [gateLoaded, setGateLoaded] = useState(false)
     const [shipment, setShipment] = useState<OrderShipmentSummary | null>(null)
     const [shipmentLoaded, setShipmentLoaded] = useState(false)
@@ -30,38 +29,35 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     const [printing, setPrinting] = useState(false)
     const [docModalOpen, setDocModalOpen] = useState(false)
 
-    const loadGate = useCallback(async () => {
+    // Uma única action rápida: gate + shipment numa cadeia de auth só e sem
+    // chamada remota ao SuperFrete.
+    const load = useCallback(async () => {
         try {
-            const res = await getOrderShippingGateAction()
-            if (res.success) setGate(res.data)
+            const res = await getOrderCarrierLabelStateAction({ orderId })
+            if (res.success) {
+                setGate({ connected: res.connected, planAllowed: res.planAllowed })
+                setShipment(res.shipment)
+            } else {
+                setGate(null)
+                setShipment(null)
+            }
         } catch {
             setGate(null)
-        } finally {
-            setGateLoaded(true)
-        }
-    }, [])
-
-    const loadShipment = useCallback(async () => {
-        try {
-            const res = await getOrderShipmentAction({ orderId })
-            if (res.success) setShipment(res.shipment)
-        } catch {
             setShipment(null)
         } finally {
+            setGateLoaded(true)
             setShipmentLoaded(true)
         }
     }, [orderId])
 
     useEffect(() => {
-        loadGate()
-        loadShipment()
-    }, [loadGate, loadShipment])
+        load()
+    }, [load])
 
     const refresh = useCallback(async () => {
         await onRefresh()
-        loadGate()
-        loadShipment()
-    }, [onRefresh, loadGate, loadShipment])
+        load()
+    }, [onRefresh, load])
 
     const handleCreate = async () => {
         setCreating(true)

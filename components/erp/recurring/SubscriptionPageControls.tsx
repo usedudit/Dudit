@@ -46,7 +46,7 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
   return (
     <>
       {/* Tabs */}
-      <div className="mb-6 px-4 md:px-8">
+      <div className="mb-6">
         <Tabs value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
           <TabsList className="px-0">
             <TabsTrigger value="all" icon={Users} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
@@ -75,7 +75,7 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none">
         {/* Mobile Controls */}
         <div className="md:hidden flex items-center gap-2 w-full">
           <div className="flex-1 min-w-0">

@@ -201,7 +201,19 @@ export async function getMyRecurringSubscriptionsAction() {
       .from("recurring_subscriptions")
       .select(`
         *,
-        recurring_plans(id, short_id, name, description, price, frequency_type, frequency_interval, status),
+        recurring_plans(
+          id, short_id, name, description, price, frequency_type, frequency_interval, status,
+          recurring_plan_items(
+            id, item_type, product_id, service_id, quantity, unit_price, sort_order,
+            products:product_id(id, name, images),
+            services:service_id(id, name, images)
+          )
+        ),
+        recurring_subscription_items(
+          id, item_type, product_id, service_id, quantity, unit_price, sort_order,
+          products:product_id(id, name, images),
+          services:service_id(id, name, images)
+        ),
         partners:partner_id(id),
         stores(id, short_id, name, slug, logo_url, addresses!store_id!left(city, state))
       `)
@@ -213,24 +225,41 @@ export async function getMyRecurringSubscriptionsAction() {
 
     return {
       success: true,
-      data: (data || []).map((row: any) => ({
-        ...mapSubscriptionRow(row as Record<string, unknown>),
-        statusLabel: getRecurringStatusLabel(row.status),
-        frequencyLabel: row.recurring_plans
-          ? getRecurringFrequencyLabel(row.recurring_plans.frequency_type, row.recurring_plans.frequency_interval)
-          : "",
-        plan: row.recurring_plans,
-        partner: row.stores ? {
-          ...row.stores,
-          id: row.stores.id || row.partners?.id,
-          short_id: row.stores.short_id,
-          slug: row.stores.slug,
-          name: row.stores.name,
-          store_name: row.stores.name,
-          city: row.stores.addresses?.[0]?.city || null,
-          state: row.stores.addresses?.[0]?.state || null,
-        } : row.partners,
-      })),
+      data: (data || []).map((row: any) => {
+        const snapshotItems = row.recurring_subscription_items || []
+        const planItems = row.recurring_plans?.recurring_plan_items || []
+        const items = (snapshotItems.length ? snapshotItems : planItems)
+          .slice()
+          .sort((a: any, b: any) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+          .map((item: any) => ({
+            id: item.id,
+            itemType: item.item_type,
+            quantity: Number(item.quantity || 1),
+            unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
+            product: item.products || null,
+            service: item.services || null,
+          }))
+
+        return {
+          ...mapSubscriptionRow(row as Record<string, unknown>),
+          statusLabel: getRecurringStatusLabel(row.status),
+          frequencyLabel: row.recurring_plans
+            ? getRecurringFrequencyLabel(row.recurring_plans.frequency_type, row.recurring_plans.frequency_interval)
+            : "",
+          plan: row.recurring_plans,
+          items,
+          partner: row.stores ? {
+            ...row.stores,
+            id: row.stores.id || row.partners?.id,
+            short_id: row.stores.short_id,
+            slug: row.stores.slug,
+            name: row.stores.name,
+            store_name: row.stores.name,
+            city: row.stores.addresses?.[0]?.city || null,
+            state: row.stores.addresses?.[0]?.state || null,
+          } : row.partners,
+        }
+      }),
     }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar assinaturas" }

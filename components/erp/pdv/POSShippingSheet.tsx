@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { XIcon, TruckIcon } from "@/lib/icons"
 import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -112,6 +112,8 @@ export default function POSShippingSheet({
     const [carrierLoading, setCarrierLoading] = useState(false)
     const [carrierError, setCarrierError] = useState<string | null>(null)
     const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
+    const carrierFetchedCepRef = useRef<string | null>(null)
+    const carrierFetchIdRef = useRef(0)
 
     const [zipCode, setZipCode] = useState("")
     const [street, setStreet] = useState("")
@@ -146,6 +148,8 @@ export default function POSShippingSheet({
         setCarrierLoading(false)
         setCarrierError(null)
         setSelectedCarrierServiceId(null)
+        carrierFetchedCepRef.current = null
+        carrierFetchIdRef.current++
         if (hasOrderAddress) setUseOrderAddress(true)
     }, [isOpen, currentShippingFee, hasOrderAddress])
 
@@ -229,37 +233,6 @@ export default function POSShippingSheet({
         setIsQuoteLoading(true)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
-
-        // Transportadora em paralelo com o frete próprio; só aparece na UI
-        // quando o frete próprio não cobre o endereço.
-        const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
-        setCarrierOptions([])
-        setSelectedCarrierServiceId(null)
-        if (destinationCep.length === 8) {
-            setCarrierLoading(true)
-            setCarrierError(null)
-            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
-                .then((res) => {
-                    if (!active) return
-                    if (res.success && res.options.length > 0) {
-                        setCarrierOptions(res.options)
-                        setCarrierError(null)
-                    } else {
-                        setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este CEP.")
-                    }
-                })
-                .catch(() => {
-                    if (!active) return
-                    setCarrierError("Não foi possível calcular o frete da transportadora.")
-                })
-                .finally(() => {
-                    if (active) setCarrierLoading(false)
-                })
-        } else {
-            setCarrierLoading(false)
-            setCarrierError("Informe o CEP para cotar a transportadora.")
-        }
-
             ; (async () => {
                 const quote = await quoteDeliveryFeeAction({
                     partnerId,
@@ -309,6 +282,45 @@ export default function POSShippingSheet({
         deliveryAddress?.zipCode,
         orderSubtotal,
     ])
+
+    // Transportadora em paralelo com o frete próprio; só aparece na UI quando
+    // o frete próprio não cobre o endereço. Efeito separado com deps só de
+    // identidade (CEP/cliente) — trocar de aba ou subtotal não refaz a cotação.
+    const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
+    useEffect(() => {
+        if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
+        if (carrierFetchedCepRef.current === destinationCep && !carrierError) return
+        carrierFetchedCepRef.current = destinationCep
+        const fetchId = ++carrierFetchIdRef.current
+
+        setCarrierOptions([])
+        setSelectedCarrierServiceId(null)
+        if (destinationCep.length === 8) {
+            setCarrierLoading(true)
+            setCarrierError(null)
+            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+                .then((res) => {
+                    if (carrierFetchIdRef.current !== fetchId) return
+                    if (res.success && res.options.length > 0) {
+                        setCarrierOptions(res.options)
+                        setCarrierError(null)
+                    } else {
+                        setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este CEP.")
+                    }
+                })
+                .catch(() => {
+                    if (carrierFetchIdRef.current !== fetchId) return
+                    setCarrierError("Não foi possível calcular o frete da transportadora.")
+                })
+                .finally(() => {
+                    if (carrierFetchIdRef.current !== fetchId) return
+                    setCarrierLoading(false)
+                })
+        } else {
+            setCarrierLoading(false)
+            setCarrierError("Informe o CEP para cotar a transportadora.")
+        }
+    }, [isOpen, hasSelectedCustomer, activeHasStreet, destinationCep, partnerId])
 
     const content = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">

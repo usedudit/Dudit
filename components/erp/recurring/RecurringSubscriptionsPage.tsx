@@ -6,24 +6,31 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityState } from "@/hooks/use-entity-state"
 
 // Reusable Components
 import {
   IconPlaceholder,
-  ThreeDotsLoader,
+  Input,
   Pagination,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/reusable"
+import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
+import { ReportTableCard } from "@/components/erp/reports/widgets"
 
 // Specific components
 import SubscriptionPageControls from "./SubscriptionPageControls"
 import SubscriptionGridCard from "./SubscriptionGridCard"
 import SubscriptionListRow from "./SubscriptionListRow"
+import SubscriptionDetailPage from "./SubscriptionDetailPage"
 
 // Utils
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
   cancelRecurringSubscriptionAction,
-  getRecurringSubscriptionExecutionsAction,
   listRecurringSubscriptionsAction,
   pauseRecurringSubscriptionAction,
   resumeRecurringSubscriptionAction,
@@ -35,12 +42,23 @@ import {
   getRecurringSubscriptionStatsAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import type { RecurringSubscription, RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
-import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
-import { formatFullDate, formatCurrency } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { useStore } from "@/lib/store-context"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
-import { ExportFileIcon, CalendarIcon, MoneyIcon, Users, ListIcon } from "@/lib/icons"
+import {
+  ExportFileIcon,
+  CalendarIcon,
+  MoneyIcon,
+  Users,
+  ListIcon,
+  CreditCardIcon,
+  CheckCircleIcon,
+  CancelCircleIcon,
+  AlertTriangleIcon,
+  RepeatIcon,
+  SearchIcon,
+} from "@/lib/icons"
 import { Button, Badge } from "@/components/reusable"
 
 const COLUMNS = [
@@ -51,6 +69,10 @@ const COLUMNS = [
   { id: "shipping", label: "Frete", align: "left" as const, width: "150px" },
   { id: "actions", label: "Ações", align: "center" as const, width: "250px" },
 ]
+
+const PulseBlock = ({ className = "" }: { className?: string }) => (
+  <div className={`animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20 ${className}`} />
+)
 
 export default function RecurringSubscriptionsPage({
   partnerId,
@@ -88,22 +110,17 @@ export default function RecurringSubscriptionsPage({
   const effectiveViewMode = isTablet ? "grid" : viewMode
   const [page, setPage] = useState(1)
 
-  // Execution history state
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [executions, setExecutions] = useState<any[]>([])
-  const [loadingExecutions, setLoadingExecutions] = useState(false)
-
   // Billing Panel States
   const [billingData, setBillingData] = useState<any[]>([])
-  const [loadingBilling, setLoadingBilling] = useState(false)
+  const [loadingBilling, setLoadingBilling] = useState(true)
 
   // Forecast States
   const [forecastData, setForecastData] = useState<any[]>([])
-  const [loadingForecast, setLoadingForecast] = useState(false)
+  const [loadingForecast, setLoadingForecast] = useState(true)
 
   // Credits States
   const [creditsData, setCreditsData] = useState<any[]>([])
-  const [loadingCredits, setLoadingCredits] = useState(false)
+  const [loadingCredits, setLoadingCredits] = useState(true)
   const [creditsSearch, setCreditsSearch] = useState("")
 
   const [tabCounts, setTabCounts] = useState<{
@@ -214,8 +231,21 @@ export default function RecurringSubscriptionsPage({
     }
   }, [partnerId, nextCursor, statusFilter, debouncedSearch, loadingMore, selectedStore?.id])
 
+  // Full-screen detail (?view=<id>, ?view=<id>&type=history)
+  const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+  const isDetailOpen = entityState.isOpen && entityState.action === "view" && !!entityState.entityId
+  const detailSubscriptionId = isDetailOpen ? entityState.entityId : null
+  const detailInitialTab = entityState.entityType === "history" ? "history" : "general"
+
+  const openDetail = useCallback(
+    (subscriptionId: string, tab: "general" | "history" = "general") => {
+      openEntity("view", subscriptionId, tab === "history" ? "history" : undefined)
+    },
+    [openEntity],
+  )
+
   useInfiniteScrollObserver(observerTarget, {
-    enabled: currentTab === "list",
+    enabled: currentTab === "list" && !isDetailOpen,
     hasNextPage: !!hasMore,
     isFetchingNextPage: loadingMore,
     fetchNextPage: loadMore,
@@ -241,23 +271,6 @@ export default function RecurringSubscriptionsPage({
     window.addEventListener("resize", checkScroll)
     return () => window.removeEventListener("resize", checkScroll)
   }, [checkScroll, viewMode, subscriptions, currentTab])
-
-  // Toggle/Open execution history
-  const toggleHistory = async (subscriptionId: string) => {
-    if (selectedId === subscriptionId) {
-      setSelectedId(null)
-      return
-    }
-    setSelectedId(subscriptionId)
-    setLoadingExecutions(true)
-    const res = await getRecurringSubscriptionExecutionsAction(partnerId, subscriptionId)
-    setLoadingExecutions(false)
-    if (res.success) {
-      setExecutions(res.data || [])
-    } else {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-    }
-  }
 
   // Action execution: pause, resume, cancel, resolve_stock, sync
   const runAction = async (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", subscriptionId: string) => {
@@ -325,27 +338,116 @@ export default function RecurringSubscriptionsPage({
     })
   }, [exportData, partnerId, selectedStore?.id, statusFilter, debouncedSearch])
 
+  const kpis = useMemo(() => {
+    if (!tabCounts) return []
+    return [
+      { title: "Assinaturas Ativas", value: String(tabCounts.active), trend: "", icon: CheckCircleIcon },
+      { title: "Pausadas", value: String(tabCounts.paused), trend: "", icon: CancelCircleIcon },
+      { title: "Com Pendência", value: String(tabCounts.delinquent), trend: "", icon: AlertTriangleIcon },
+      { title: "Total", value: String(tabCounts.all), trend: "", icon: RepeatIcon },
+    ]
+  }, [tabCounts])
+
+  const billingColumns = useMemo(
+    () => [
+      {
+        key: "order_number",
+        header: "Pedido",
+        render: (value: any, row: any) => <span className="font-bold">#{value || row.id.slice(0, 8)}</span>,
+      },
+      { key: "customer_name", header: "Cliente" },
+      { key: "created_at", header: "Data", render: (value: any) => new Date(value).toLocaleDateString("pt-BR") },
+      {
+        key: "total_amount",
+        header: "Valor",
+        align: "right" as const,
+        render: (value: any) => <span className="font-semibold">{formatCurrency(value)}</span>,
+      },
+      {
+        key: "situation",
+        header: "Status Pagamento",
+        align: "center" as const,
+        render: (value: any) => (
+          <Badge variant={value === "paid" ? "green" : value === "cancelled" ? "red" : "orange"}>
+            {value === "paid" ? "Pago" : value === "cancelled" ? "Cancelado" : "Pendente"}
+          </Badge>
+        ),
+      },
+    ],
+    [],
+  )
+
+  const creditColumns = useMemo(
+    () => [
+      { key: "customerName", header: "Cliente" },
+      { key: "serviceName", header: "Serviço do Plano" },
+      { key: "quantity", header: "Concedido", align: "center" as const },
+      {
+        key: "consumed",
+        header: "Consumido",
+        align: "center" as const,
+        render: (value: any) => <span className="text-brand-inactive-text">{value}</span>,
+      },
+      {
+        key: "remaining",
+        header: "Saldo Restante",
+        align: "center" as const,
+        render: (value: any) => (
+          <span
+            className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${value > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
+          >
+            {value}
+          </span>
+        ),
+      },
+      {
+        key: "expiresAt",
+        header: "Validade",
+        render: (value: any) =>
+          value ? (
+            <span className="font-semibold text-brand-orange">{new Date(value).toLocaleDateString("pt-BR")}</span>
+          ) : (
+            <span className="text-brand-inactive-text font-medium">Não expira</span>
+          ),
+      },
+    ],
+    [],
+  )
+
   return (
-    <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+    <FadeIn className="w-full">
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
         .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .sub-table tbody tr:last-child > td { border-bottom: none; }
       `}</style>
 
-      <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-
+      <AnimatePresence mode="wait">
+        {detailSubscriptionId ? (
+          <SubscriptionDetailPage
+            key={`detail-${detailSubscriptionId}`}
+            partnerId={partnerId}
+            subscriptionId={detailSubscriptionId}
+            onBack={closeEntity}
+            canManage={canManage}
+            initialTab={detailInitialTab}
+            onChanged={() => reload(statusFilter, debouncedSearch)}
+          />
+        ) : (
+          <FadeIn key="list" className="block w-full">
+      <div className="w-full space-y-6 pt-4 px-4 md:px-8 pb-8">
         {/* Header */}
-        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-          <div className="flex flex-col gap-2 pt-1">
-            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none flex items-center gap-3">
-              <CalendarIcon size={32} /> Assinaturas Recorrentes
+        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+              Assinaturas Recorrentes
             </h1>
-            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
               Gestão integrada de assinaturas, cobranças, estoque futuro e créditos de serviços.
             </p>
           </div>
@@ -354,43 +456,38 @@ export default function RecurringSubscriptionsPage({
               {isExporting ? "Exportando..." : "Exportar"}
             </Button>
           )}
+        </header>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+          <div className="lg:col-span-12">
+            {kpis.length > 0 ? (
+              <SummaryCards metrics={kpis} variant="horizontal" />
+            ) : (
+              <PulseBlock className="h-[120px] w-full" />
+            )}
+          </div>
         </div>
 
-        {/* Inner Page Tabs */}
-        <div className="flex border-b border-brand-border dark:border-dark-border mb-6 px-4 md:px-8 shrink-0 overflow-x-auto scrollbar-none gap-2">
-          <button
-            className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "list" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
-            onClick={() => setCurrentTab("list")}
-          >
-            Assinaturas
-            {currentTab === "list" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
-          </button>
-          <button
-            className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "billing" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
-            onClick={() => setCurrentTab("billing")}
-          >
-            Faturamento / Cobranças
-            {currentTab === "billing" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
-          </button>
-          <button
-            className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "forecast" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
-            onClick={() => setCurrentTab("forecast")}
-          >
-            Calendário & Demanda
-            {currentTab === "forecast" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
-          </button>
-          <button
-            className={`pb-3 px-4 font-semibold text-sm transition-all relative ${currentTab === "credits" ? "text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark"}`}
-            onClick={() => setCurrentTab("credits")}
-          >
-            Saldos de Créditos
-            {currentTab === "credits" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-full" />}
-          </button>
-        </div>
+        {/* Sections */}
+        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as typeof currentTab)} className="w-full">
+          <TabsList className="mb-8">
+            <TabsTrigger value="list" icon={ListIcon}>
+              Assinaturas
+            </TabsTrigger>
+            <TabsTrigger value="billing" icon={MoneyIcon}>
+              Faturamento / Cobranças
+            </TabsTrigger>
+            <TabsTrigger value="forecast" icon={CalendarIcon}>
+              Calendário & Demanda
+            </TabsTrigger>
+            <TabsTrigger value="credits" icon={CreditCardIcon}>
+              Saldos de Créditos
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab 1: Subscriptions list (original view) */}
-        {currentTab === "list" && (
-          <>
+          {/* Tab 1: Subscriptions list */}
+          <TabsContent value="list">
             <SubscriptionPageControls
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
@@ -401,90 +498,82 @@ export default function RecurringSubscriptionsPage({
               tabCounts={tabCounts || undefined}
             />
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-              <AnimatePresence mode="wait">
-                {loading ? (
-                  <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
-                    <ThreeDotsLoader />
-                  </FadeIn>
-                ) : subscriptions.length === 0 ? (
-                  <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
-                    <IconPlaceholder
-                      placeholderType="image"
-                      imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                      imageAlt="Nenhuma assinatura"
-                      title="Nenhuma assinatura encontrada"
-                      subtitle="Tente ajustar a busca ou os filtros de status."
-                      itemButton={search ? {
-                        text: "Limpar busca",
-                        action: () => setSearch(""),
-                        variant: "outline"
-                      } : undefined}
-                    />
-                  </FadeIn>
-                ) : (
-                  <FadeIn key={statusFilter + effectiveViewMode} className="w-full">
-                    {effectiveViewMode === "grid" ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                        {paginated.map((sub: any) => (
-                          <SubscriptionGridCard
-                            key={sub.id}
-                            sub={sub}
-                            canManage={canManage}
-                            selectedId={selectedId}
-                            loadingExecutions={loadingExecutions}
-                            executions={executions}
-                            onToggleHistory={toggleHistory}
-                            onRunAction={runAction}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border relative">
-                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <FadeIn key="loading" className="w-full">
+                  <PulseBlock className="h-[480px] w-full" />
+                </FadeIn>
+              ) : subscriptions.length === 0 ? (
+                <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
+                  <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                    imageAlt="Nenhuma assinatura"
+                    title="Nenhuma assinatura encontrada"
+                    subtitle="Tente ajustar a busca ou os filtros de status."
+                    itemButton={search ? {
+                      text: "Limpar busca",
+                      action: () => setSearch(""),
+                      variant: "outline"
+                    } : undefined}
+                  />
+                </FadeIn>
+              ) : (
+                <FadeIn key={statusFilter + effectiveViewMode} className="w-full">
+                  {effectiveViewMode === "grid" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                      {paginated.map((sub: any) => (
+                        <SubscriptionGridCard
+                          key={sub.id}
+                          sub={sub}
+                          canManage={canManage}
+                          onOpen={openDetail}
+                          onRunAction={runAction}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="w-full bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border relative">
+                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                        <div className="overflow-x-auto pb-2 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                          <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                            <thead>
-                              <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                {COLUMNS.map((col) => (
-                                  <th
-                                    key={col.id}
-                                    className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border"
-                                    style={{ width: col.width }}
-                                  >
-                                    <div className={`flex items-center ${col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                      {col.label}
-                                    </div>
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {paginated.map((sub: any) => (
-                                <SubscriptionListRow
-                                  key={sub.id}
-                                  sub={sub}
-                                  columns={COLUMNS}
-                                  canManage={canManage}
-                                  selectedId={selectedId}
-                                  loadingExecutions={loadingExecutions}
-                                  executions={executions}
-                                  onToggleHistory={toggleHistory}
-                                  onRunAction={runAction}
-                                />
+                      <div className="overflow-x-auto custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                        <table className="sub-table w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                          <thead>
+                            <tr>
+                              {COLUMNS.map((col) => (
+                                <th
+                                  key={col.id}
+                                  className="pb-3 pr-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border"
+                                  style={{ width: col.width }}
+                                >
+                                  <div className={`flex items-center ${col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                    {col.label}
+                                  </div>
+                                </th>
                               ))}
-                            </tbody>
-                          </table>
-                        </div>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginated.map((sub: any) => (
+                              <SubscriptionListRow
+                                key={sub.id}
+                                sub={sub}
+                                columns={COLUMNS}
+                                canManage={canManage}
+                                onOpen={openDetail}
+                                onRunAction={runAction}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
-                  </FadeIn>
-                )}
-              </AnimatePresence>
-              {hasMore ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-            </div>
+                    </div>
+                  )}
+                </FadeIn>
+              )}
+            </AnimatePresence>
+            {hasMore ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
 
             {subscriptions.length > 0 && paginated.length > 0 && (
               <Pagination
@@ -498,163 +587,110 @@ export default function RecurringSubscriptionsPage({
                 }}
               />
             )}
-          </>
-        )}
+          </TabsContent>
 
-        {/* Tab 2: Billing / Faturamento Panel */}
-        {currentTab === "billing" && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-8">
-            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
-              <MoneyIcon size={20} /> Painel de Cobranças e Notas
-            </h2>
+          {/* Tab 2: Billing / Faturamento Panel */}
+          <TabsContent value="billing">
             {loadingBilling ? (
-              <div className="flex items-center justify-center min-h-[300px]">
-                <ThreeDotsLoader />
-              </div>
-            ) : billingData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[300px] border border-dashed border-brand-border dark:border-dark-border rounded-xl p-8">
-                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum faturamento gerado por assinaturas ainda.</span>
-              </div>
+              <PulseBlock className="h-[360px] w-full" />
             ) : (
-              <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text font-semibold border-b border-brand-border dark:border-dark-border">
-                      <th className="py-3 px-6">Pedido</th>
-                      <th className="py-3 px-6">Cliente</th>
-                      <th className="py-3 px-6">Data</th>
-                      <th className="py-3 px-6 text-right">Valor</th>
-                      <th className="py-3 px-6 text-center">Status Pagamento</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                    {billingData.map((order) => (
-                      <tr key={order.id} className="hover:bg-brand-gray/10 dark:hover:bg-dark-border/10 transition-colors">
-                        <td className="py-3 px-6 font-bold">#{order.order_number || order.id.slice(0, 8)}</td>
-                        <td className="py-3 px-6 font-medium">{order.customer_name}</td>
-                        <td className="py-3 px-6">{new Date(order.created_at).toLocaleDateString("pt-BR")}</td>
-                        <td className="py-3 px-6 text-right font-semibold">{formatCurrency(order.total_amount)}</td>
-                        <td className="py-3 px-6 text-center">
-                          <Badge variant={order.situation === "paid" ? "green" : order.situation === "cancelled" ? "red" : "orange"}>
-                            {order.situation === "paid" ? "Pago" : order.situation === "cancelled" ? "Cancelado" : "Pendente"}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ReportTableCard
+                title="Painel de Cobranças e Notas"
+                icon={MoneyIcon}
+                columns={billingColumns}
+                data={billingData}
+                pageSize={8}
+                emptyMessage="Nenhum faturamento gerado por assinaturas ainda."
+              />
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {/* Tab 3: Forecast / Calendário & Demanda */}
-        {currentTab === "forecast" && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-8">
-            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
-              <CalendarIcon size={20} /> Calendário de Entregas & Execuções Futuras
-            </h2>
-            <p className="text-sm text-brand-inactive-text mb-6">Execuções e entregas agendadas nos próximos 30 dias de assinaturas ativas.</p>
+          {/* Tab 3: Forecast / Calendário & Demanda */}
+          <TabsContent value="forecast">
             {loadingForecast ? (
-              <div className="flex items-center justify-center min-h-[300px]">
-                <ThreeDotsLoader />
-              </div>
-            ) : forecastData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[300px] border border-dashed border-brand-border dark:border-dark-border rounded-xl p-8">
-                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma entrega ou cobrança prevista nos próximos 30 dias.</span>
-              </div>
+              <PulseBlock className="h-[360px] w-full" />
             ) : (
-              <div className="grid gap-4">
-                {forecastData.map((f, idx) => (
-                  <div key={idx} className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 bg-brand-primary/10 rounded-full flex items-center justify-center text-brand-primary font-bold">
-                        {new Date(f.scheduledFor).getDate()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{f.customerName}</p>
-                        <p className="text-xs text-brand-inactive-text">{f.planName}</p>
-                      </div>
+              <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                      <CalendarIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold text-brand-primary">
-                        Previsão: {new Date(f.scheduledFor).toLocaleDateString("pt-BR")}
-                      </span>
+                    <div>
+                      <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        Calendário de Entregas & Execuções Futuras
+                      </h3>
+                      <p className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        Execuções e entregas agendadas nos próximos 30 dias de assinaturas ativas.
+                      </p>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {forecastData.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center">
+                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                      Nenhuma entrega ou cobrança prevista nos próximos 30 dias.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
+                    {forecastData.map((f, idx) => (
+                      <div key={idx} className="py-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="h-10 w-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold shrink-0">
+                            {new Date(f.scheduledFor).getDate()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{f.customerName}</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{f.planName}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
+                          Previsão: {new Date(f.scheduledFor).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {/* Tab 4: Saldos de Créditos de Clientes */}
-        {currentTab === "credits" && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-8 flex flex-col">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                <Users size={20} /> Saldo de Créditos dos Clientes
-              </h2>
-              <div className="w-full md:w-72">
-                <input
-                  type="text"
+          {/* Tab 4: Saldos de Créditos de Clientes */}
+          <TabsContent value="credits">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+              <div className="w-full md:w-80">
+                <Input
+                  name="creditsSearch"
                   placeholder="Buscar por cliente..."
                   value={creditsSearch}
                   onChange={(e) => setCreditsSearch(e.target.value)}
-                  className="w-full px-4 py-2 border border-brand-border dark:border-dark-border rounded-lg text-sm bg-brand-gray/20 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  className="h-[42px] w-full"
+                  variant="full-rounded"
+                  prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                 />
               </div>
             </div>
 
             {loadingCredits ? (
-              <div className="flex items-center justify-center min-h-[300px]">
-                <ThreeDotsLoader />
-              </div>
-            ) : creditsData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[300px] border border-dashed border-brand-border dark:border-dark-border rounded-xl p-8">
-                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum saldo de crédito de serviço encontrado.</span>
-              </div>
+              <PulseBlock className="h-[360px] w-full" />
             ) : (
-              <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border overflow-hidden flex-1 overflow-y-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text font-semibold border-b border-brand-border dark:border-dark-border">
-                      <th className="py-3 px-6">Cliente</th>
-                      <th className="py-3 px-6">Serviço do Plano</th>
-                      <th className="py-3 px-6 text-center">Concedido</th>
-                      <th className="py-3 px-6 text-center">Consumido</th>
-                      <th className="py-3 px-6 text-center">Saldo Restante</th>
-                      <th className="py-3 px-6">Validade</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                    {creditsData.map((cred) => (
-                      <tr key={cred.id} className="hover:bg-brand-gray/10 dark:hover:bg-dark-border/10 transition-colors">
-                        <td className="py-3 px-6 font-bold">{cred.customerName}</td>
-                        <td className="py-3 px-6 font-medium">{cred.serviceName}</td>
-                        <td className="py-3 px-6 text-center">{cred.quantity}</td>
-                        <td className="py-3 px-6 text-center text-brand-inactive-text">{cred.consumed}</td>
-                        <td className="py-3 px-6 text-center">
-                          <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${cred.remaining > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}>
-                            {cred.remaining}
-                          </span>
-                        </td>
-                        <td className="py-3 px-6">
-                          {cred.expiresAt ? (
-                            <span className="font-semibold text-brand-orange">{new Date(cred.expiresAt).toLocaleDateString("pt-BR")}</span>
-                          ) : (
-                            <span className="text-brand-inactive-text font-medium">Não expira</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ReportTableCard
+                title="Saldo de Créditos dos Clientes"
+                icon={Users}
+                columns={creditColumns}
+                data={creditsData}
+                pageSize={8}
+                emptyMessage="Nenhum saldo de crédito de serviço encontrado."
+              />
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </div>
+          </FadeIn>
+        )}
+      </AnimatePresence>
 
       <ExportColumnSelectionModal
           isOpen={columnSelectionModal.isOpen}

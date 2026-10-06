@@ -16,12 +16,12 @@ import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { isCarrierDeliveryOrder } from "@/components/erp/shared/DeliveryTabContent"
 import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
-    getOrderShippingGateAction,
+    getOrderCarrierLabelStateAction,
+    getSuperFreteBalanceAction,
     createOrderShippingLabelAction,
     checkoutSuperFreteLabelAction,
     printSuperFreteLabelAction,
     cancelSuperFreteLabelAction,
-    getOrderShipmentAction,
     getOrderShippingQuoteAction,
     type OrderShipmentSummary,
 } from "@/app/actions/shipping/superfrete"
@@ -60,38 +60,52 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [quotesError, setQuotesError] = useState<string | null>(null)
     const [selectedService, setSelectedService] = useState<number | null>(null)
 
-    const loadGate = useCallback(async () => {
+    // Uma única action rápida: gate + shipment numa cadeia de auth só e sem
+    // chamada remota ao SuperFrete.
+    const load = useCallback(async () => {
         try {
-            const res = await getOrderShippingGateAction()
-            if (res.success) setGate(res.data)
+            const res = await getOrderCarrierLabelStateAction({ orderId })
+            if (res.success) {
+                setGate({ connected: res.connected, planAllowed: res.planAllowed })
+                setShipment(res.shipment)
+            } else {
+                setGate(null)
+                setShipment(null)
+            }
         } catch {
             setGate(null)
-        } finally {
-            setGateLoaded(true)
-        }
-    }, [])
-
-    const loadShipment = useCallback(async () => {
-        try {
-            const res = await getOrderShipmentAction({ orderId })
-            if (res.success) setShipment(res.shipment)
-        } catch {
             setShipment(null)
         } finally {
+            setGateLoaded(true)
             setShipmentLoaded(true)
         }
     }, [orderId])
 
     useEffect(() => {
-        loadGate()
-        loadShipment()
-    }, [loadGate, loadShipment])
+        load()
+    }, [load])
+
+    // Saldo é exibição apenas: busca em background pra não atrasar os botões.
+    // Roda sempre que o gate muda (ex.: após refresh) e ainda não tem saldo.
+    useEffect(() => {
+        if (!gate?.connected || gate.balance !== undefined) return
+        let active = true
+        getSuperFreteBalanceAction()
+            .then((res) => {
+                if (!active || !res.success || res.balance == null) return
+                const balance = res.balance
+                setGate((prev) => (prev ? { ...prev, balance } : prev))
+            })
+            .catch(() => {})
+        return () => {
+            active = false
+        }
+    }, [gate])
 
     const refresh = useCallback(async () => {
         await onRefresh()
-        loadGate()
-        loadShipment()
-    }, [onRefresh, loadGate, loadShipment])
+        load()
+    }, [onRefresh, load])
 
     const labelId: string | null = shipment?.external_label_id || null
     const shippingStatus: string | null = shipment?.status || null

@@ -13,10 +13,13 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { processDueRecurringExecutions } from "@/lib/services/recurring-execution.service"
 import type {
   RecurringListCursor,
+  RecurringPlanItemType,
+  RecurringSubscriptionDetail,
+  RecurringSubscriptionDetailItem,
   RecurringSubscriptionStatus,
   RecurringSubscriptionStatusFilter,
 } from "@/lib/types/recurring"
-import { mapSubscriptionRow } from "@/lib/types/recurring"
+import { mapPlanRow, mapSubscriptionRow } from "@/lib/types/recurring"
 
 const PAGE_SIZE = 20
 
@@ -315,6 +318,117 @@ export async function getRecurringSubscriptionExecutionsAction(partnerId: string
     return { success: true, data: data || [] }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar histórico" }
+  }
+}
+
+export async function getRecurringSubscriptionDetailAction(partnerId: string, subscriptionId: string) {
+  try {
+    await requirePermission(partnerId, "recurring_subscriptions", "view")
+    const supabase = await getSupabaseServerClient()
+
+    const { data, error } = await supabase
+      .from("recurring_subscriptions")
+      .select(`
+        *,
+        recurring_plans(
+          id, short_id, partner_id, name, description, price, images, status, frequency_type,
+          frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day,
+          start_date, end_date, show_in_marketplace, billing_mode, credit_expiration_policy,
+          credit_expiration_days, shipping_mode, shipping_flat_amount, created_at, updated_at,
+          recurring_plan_items(
+            id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+            staff_partner_user_id, preferred_time, duration_minutes, sort_order,
+            products:product_id(id, name, price),
+            services:service_id(id, name, price, duration_minutes)
+          )
+        ),
+        customers:customer_id(id, name, email, phone, address),
+        recurring_subscription_items(
+          id, item_type, product_id, service_id, quantity, unit_price,
+          preferred_time, duration_minutes, sort_order,
+          products:product_id(id, name, images),
+          services:service_id(id, name, images)
+        )
+      `)
+      .eq("id", subscriptionId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) throw new Error("Assinatura não encontrada")
+
+    const row = data as Record<string, any>
+    const planRow = row.recurring_plans as Record<string, any> | null
+
+    const { data: creditRows, error: creditsError } = await supabase
+      .from("subscription_item_credits")
+      .select("id, quantity, consumed, expires_at, services(name)")
+      .eq("partner_id", partnerId)
+      .eq("subscription_id", subscriptionId)
+      .order("expires_at", { ascending: true, nullsFirst: false })
+
+    if (creditsError) throw creditsError
+
+    const plan: RecurringSubscriptionDetail["plan"] = planRow
+      ? {
+          ...mapPlanRow(planRow as Record<string, unknown>),
+          items: ((planRow.recurring_plan_items || []) as Record<string, any>[]).map((item) => ({
+            id: String(item.id),
+            planId: String(planRow.id),
+            itemType: item.item_type as RecurringPlanItemType,
+            productId: item.product_id ?? null,
+            variantId: item.variant_id ?? null,
+            serviceId: item.service_id ?? null,
+            quantity: Number(item.quantity || 0),
+            unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
+            staffPartnerUserId: item.staff_partner_user_id ?? null,
+            preferredTime: item.preferred_time ?? null,
+            durationMinutes: item.duration_minutes != null ? Number(item.duration_minutes) : null,
+            sortOrder: Number(item.sort_order || 0),
+            product: item.products || null,
+            service: item.services || null,
+          })),
+        }
+      : null
+
+    const items: RecurringSubscriptionDetailItem[] = (
+      (row.recurring_subscription_items || []) as Record<string, any>[]
+    )
+      .map((item) => ({
+        id: String(item.id),
+        itemType: item.item_type as RecurringPlanItemType,
+        quantity: Number(item.quantity || 0),
+        unitPrice: item.unit_price != null ? Number(item.unit_price) : 0,
+        sortOrder: Number(item.sort_order || 0),
+        preferredTime: item.preferred_time ?? null,
+        durationMinutes: item.duration_minutes != null ? Number(item.duration_minutes) : null,
+        product: item.products || null,
+        service: item.services || null,
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+    const credits: RecurringSubscriptionDetail["credits"] = (
+      (creditRows || []) as Record<string, any>[]
+    ).map((credit) => ({
+      id: String(credit.id),
+      serviceName: credit.services?.name || "Serviço",
+      quantity: Number(credit.quantity || 0),
+      consumed: Number(credit.consumed || 0),
+      remaining: Math.max(Number(credit.quantity || 0) - Number(credit.consumed || 0), 0),
+      expiresAt: credit.expires_at != null ? String(credit.expires_at) : null,
+    }))
+
+    const detail: RecurringSubscriptionDetail = {
+      subscription: mapSubscriptionRow(row),
+      plan,
+      customer: row.customers || null,
+      items,
+      credits,
+    }
+
+    return { success: true, data: detail }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar assinatura" }
   }
 }
 
