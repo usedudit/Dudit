@@ -42,18 +42,6 @@ export async function POST(req: Request) {
 		return authResult.error
 	}
 
-	// 2. Concurrency lock
-	const lock = await acquireExecutionLock(JOB_NAME, 55)
-	if (!lock.acquired) {
-		cronLogger.warn(JOB_NAME, "Execution skipped - lock held", {
-			lockKey: lock.lockKey,
-		})
-		return NextResponse.json(
-			{ success: false, skipped: true, reason: "lock_held" },
-			{ status: 409 },
-		)
-	}
-
 	cronLogger.start(JOB_NAME)
 	const startTime = Date.now()
 
@@ -64,7 +52,7 @@ export async function POST(req: Request) {
 			process.env.NEXT_PUBLIC_SITE_URL ||
 			"http://localhost:3000"
 
-		// 3. Claim a batch of pending events (FIFO)
+		// 2. Fast check: Claim a batch of pending events (FIFO)
 		const { data: events, error: fetchError } = await admin
 			.from("pending_webhook_events")
 			.select("*")
@@ -94,81 +82,97 @@ export async function POST(req: Request) {
 			})
 		}
 
-		let processed = 0
-		let failed = 0
+		// 3. Concurrency lock ONLY when there are actual events to process
+		const lock = await acquireExecutionLock(JOB_NAME, 55)
+		if (!lock.acquired) {
+			cronLogger.warn(JOB_NAME, "Execution skipped - lock held", {
+				lockKey: lock.lockKey,
+			})
+			return NextResponse.json(
+				{ success: false, skipped: true, reason: "lock_held" },
+				{ status: 409 },
+			)
+		}
 
-		for (const event of events as PendingWebhookEvent[]) {
-			try {
-				// Re-play to the existing Next.js webhook endpoint
-				// It will re-validate the signature and run full business logic
-				const webhookRes = await fetch(
-					`${appUrl}/api/mercadopago/webhook`,
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"User-Agent": "Dudit-Webhook-Drain/1.0",
-							"x-signature": event.signature || "",
-							"x-request-id": event.request_id,
-							"x-forwarded-from": "edge-function-drain",
+		try {
+			let processed = 0
+			let failed = 0
+
+			for (const event of events as PendingWebhookEvent[]) {
+				try {
+					// Re-play to the existing Next.js webhook endpoint
+					// It will re-validate the signature and run full business logic
+					const webhookRes = await fetch(
+						`${appUrl}/api/mercadopago/webhook`,
+						{
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								"User-Agent": "Dudit-Webhook-Drain/1.0",
+								"x-signature": event.signature || "",
+								"x-request-id": event.request_id,
+								"x-forwarded-from": "edge-function-drain",
+							},
+							body: JSON.stringify(event.payload),
+							signal: AbortSignal.timeout(25_000),
 						},
-						body: JSON.stringify(event.payload),
-						signal: AbortSignal.timeout(25_000),
-					},
-				)
+					)
 
-				if (webhookRes.ok) {
-					processed++
-					await admin
-						.from("pending_webhook_events")
-						.update({
-							status: "completed",
-							processed_at: new Date().toISOString(),
+					if (webhookRes.ok) {
+						processed++
+						await admin
+							.from("pending_webhook_events")
+							.update({
+								status: "completed",
+								processed_at: new Date().toISOString(),
+							})
+							.eq("idempotency_key", event.idempotency_key)
+					} else {
+						failed++
+						cronLogger.warn(JOB_NAME, "Webhook reprocessing returned non-200", {
+							idempotencyKey: event.idempotency_key,
+							status: webhookRes.status,
 						})
-						.eq("idempotency_key", event.idempotency_key)
-				} else {
+						await admin
+							.from("pending_webhook_events")
+							.update({
+								status: "failed",
+								processing_error: `HTTP ${webhookRes.status}`,
+								attempts: event.attempts + 1,
+							})
+							.eq("idempotency_key", event.idempotency_key)
+					}
+				} catch (err: unknown) {
 					failed++
-					cronLogger.warn(JOB_NAME, "Webhook reprocessing returned non-200", {
+					const message = err instanceof Error ? err.message : String(err)
+					cronLogger.error(JOB_NAME, "Error processing event", {
 						idempotencyKey: event.idempotency_key,
-						status: webhookRes.status,
+						error: message,
 					})
 					await admin
 						.from("pending_webhook_events")
 						.update({
 							status: "failed",
-							processing_error: `HTTP ${webhookRes.status}`,
+							processing_error: message,
 							attempts: event.attempts + 1,
 						})
 						.eq("idempotency_key", event.idempotency_key)
 				}
-			} catch (err: unknown) {
-				failed++
-				const message = err instanceof Error ? err.message : String(err)
-				cronLogger.error(JOB_NAME, "Error processing event", {
-					idempotencyKey: event.idempotency_key,
-					error: message,
-				})
-				await admin
-					.from("pending_webhook_events")
-					.update({
-						status: "failed",
-						processing_error: message,
-						attempts: event.attempts + 1,
-					})
-					.eq("idempotency_key", event.idempotency_key)
 			}
+
+			const elapsed = Date.now() - startTime
+			cronLogger.success(JOB_NAME, { processed, failed, total: events.length }, elapsed)
+
+			return NextResponse.json({
+				success: true,
+				processed,
+				failed,
+				total: events.length,
+				elapsedMs: elapsed,
+			})
+		} finally {
+			await releaseExecutionLock(lock.lockKey)
 		}
-
-		const elapsed = Date.now() - startTime
-		cronLogger.success(JOB_NAME, { processed, failed, total: events.length }, elapsed)
-
-		return NextResponse.json({
-			success: true,
-			processed,
-			failed,
-			total: events.length,
-			elapsedMs: elapsed,
-		})
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : String(err)
 		const elapsed = Date.now() - startTime
@@ -177,7 +181,5 @@ export async function POST(req: Request) {
 			{ success: false, error: message },
 			{ status: 500 },
 		)
-	} finally {
-		await releaseExecutionLock(lock.lockKey)
 	}
 }

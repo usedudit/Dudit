@@ -10,10 +10,9 @@ import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSu
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { usePartnerTimezone } from "@/lib/store-context"
-import { useMediaQuery } from "@/components/erp/hooks"
-import { downloadPdf } from "@/lib/pdf/download"
 import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, MoneyBagIcon, ShoppingCartIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
 import OrderListItem from "@/components/erp/orders/OrderListRow"
+import CashSessionPrintModal from "./CashSessionPrintModal"
 
 type DetailPayload = {
     session: any
@@ -50,7 +49,6 @@ const getDifferenceTone = (value: number | null) => value == null ? "text-brand-
 export default function CashSessionDetailPage({ partnerId, details: initialDetails, isLoading, onBack }: { partnerId: string; details: DetailPayload | null; isLoading?: boolean; onBack?: () => void }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const tz = usePartnerTimezone()
-    const isMobileDevice = useMediaQuery("(max-width: 1023px)")
     const [details, setDetails] = useState<DetailPayload | null>(initialDetails)
     const [activeTab, setActiveTab] = useState<"summary" | "movements" | "returns">("summary")
 
@@ -73,6 +71,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [closeOpen, setCloseOpen] = useState(false)
+    const [printOpen, setPrintOpen] = useState(false)
     const [closeSummary, setCloseSummary] = useState<any>(null)
     const [countedByPm, setCountedByPm] = useState<Record<string, string>>({})
     const [closingNotes, setClosingNotes] = useState("")
@@ -182,18 +181,6 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         setMovModal(null)
         resetMovementForm()
     }, [resetMovementForm])
-
-    const handlePrintCoupon = useCallback(() => {
-        if (!session?.id) return
-        const couponType = isOpen ? "opening" : "closing"
-        const params = new URLSearchParams({ type: couponType })
-        if (isMobileDevice) {
-            downloadPdf(`/api/pdf/caixa/${session.id}?${params.toString()}`, `cupom-caixa-${session.id.slice(0, 8)}.pdf`)
-                .catch(() => window.open(`/print/caixa/${session.id}?${params.toString()}`, "_blank"))
-            return
-        }
-        window.open(`/print/caixa/${session.id}?${params.toString()}`, "_blank")
-    }, [session?.id, isOpen, isMobileDevice])
 
     useEffect(() => setDetails(initialDetails), [initialDetails])
 
@@ -483,7 +470,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                 {!isOpen && <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Fechamento</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{session.closed_at ? formatLongDateTime(session.closed_at, tz) : "-"}</span></div>}
                                                 <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo calculado</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.calculatedDrawerTotal)}</span></div>
                                                 <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
-                                                    <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={handlePrintCoupon}>{isOpen ? "Imprimir cupom de abertura" : "Imprimir cupom de fechamento"}</button>
+                                                    <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={() => setPrintOpen(true)}>{isOpen ? "Imprimir cupom de abertura" : "Imprimir cupom de fechamento"}</button>
                                                     <Link href="/erp/transacoes" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
                                                 </div>
                                             </div>
@@ -746,6 +733,13 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             </div>
                         </div>
                     </DefaultModal>
+
+                    <CashSessionPrintModal
+                        isOpen={printOpen}
+                        onClose={() => setPrintOpen(false)}
+                        sessionId={session.id}
+                        partnerId={partnerId}
+                    />
 
                     <DefaultModal isOpen={movModal !== null} onClose={closeMovementModal} title={movementModalTitle}>
                         <div className="space-y-3">

@@ -702,18 +702,51 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
     // Read with admin client after authz so invited users can load POS datasets.
     const supabase = createAdminClient()
 
-    // Use listStoreProducts and listStoreServices when storeId is provided for store-aware catalog listing
-    let products: any[] = []
-    let rawServices: any[] = []
+    let draftsQuery = supabase
+        .from("pre_sales")
+        .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at, coupon_id, coupon_code, coupon_discount_amount")
+        .eq("partner_id", partnerId)
+        .eq("status", "draft")
     if (storeId) {
-        const [pList, sList] = await Promise.all([
+        draftsQuery = draftsQuery.eq("store_id", storeId)
+    }
+    const draftsPromise = draftsQuery.order("created_at", { ascending: false }).limit(20)
+
+    let accountsQuery = supabase
+        .from("finance_accounts")
+        .select("id, name, type, is_default, is_active")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .eq("type", "cash")
+    if (storeId) {
+        accountsQuery = accountsQuery.eq("store_id", storeId)
+    } else {
+        accountsQuery = accountsQuery.is("store_id", null)
+    }
+    const accountsPromise = accountsQuery.order("is_default", { ascending: false })
+
+    const customersPromise = supabase
+        .from("customers")
+        .select("id, name, image_url")
+        .eq("partner_id", partnerId)
+        .order("name")
+        .limit(120)
+
+    const paymentMethodsPromise = supabase
+        .from("payment_methods")
+        .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority, store_id")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("priority", { ascending: false })
+        .order("name")
+
+    const catalogPromise = storeId
+        ? Promise.all([
             listStoreProducts(partnerId, storeId, { isActive: true, includeVariants: true }),
             listStoreServices(partnerId, storeId, { isActive: true }).catch(() => []),
-        ])
-        products = pList || []
-        rawServices = sList || []
-    } else {
-        const [productsRes, servicesRes] = await Promise.all([
+        ]).then(([pList, sList]) => ({ products: pList || [], rawServices: sList || [], error: null }))
+        : Promise.all([
             supabase
                 .from("products")
                 .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, addon_groups, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
@@ -728,11 +761,23 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
                 .or("status.eq.ativo,is_active.eq.true")
                 .order("created_at", { ascending: false })
                 .limit(150),
-        ])
-        if (productsRes.error) return { success: false as const, error: productsRes.error.message }
-        products = productsRes.data || []
-        rawServices = servicesRes.error ? [] : (servicesRes.data || [])
-    }
+        ]).then(([productsRes, servicesRes]) => ({
+            products: productsRes.data || [],
+            rawServices: servicesRes.error ? [] : (servicesRes.data || []),
+            error: productsRes.error ? productsRes.error.message : null,
+        }))
+
+    const [catalogRes, draftsRes, customersRes, accountsRes, paymentMethodsRes] = await Promise.all([
+        catalogPromise,
+        draftsPromise,
+        customersPromise,
+        accountsPromise,
+        paymentMethodsPromise,
+    ])
+
+    if (catalogRes.error) return { success: false as const, error: catalogRes.error }
+    let products: any[] = catalogRes.products
+    let rawServices: any[] = catalogRes.rawServices
 
     const formattedProducts = (products || []).map((p: any) => {
         const rawVariants = Array.isArray(p.product_variants) && p.product_variants.length > 0
@@ -813,48 +858,6 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
     })
 
     products = [...formattedProducts, ...formattedServices]
-
-    // Build pre_sales query with optional store_id filter
-    let draftsQuery = supabase
-        .from("pre_sales")
-        .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at, coupon_id, coupon_code, coupon_discount_amount")
-        .eq("partner_id", partnerId)
-        .eq("status", "draft")
-    if (storeId) {
-        draftsQuery = draftsQuery.eq("store_id", storeId)
-    }
-    const draftsRes = await draftsQuery.order("created_at", { ascending: false }).limit(20)
-
-    let accountsQuery = supabase
-        .from("finance_accounts")
-        .select("id, name, type, is_default, is_active")
-        .eq("partner_id", partnerId)
-        .eq("is_active", true)
-        .eq("type", "cash")
-    if (storeId) {
-        accountsQuery = accountsQuery.eq("store_id", storeId)
-    } else {
-        accountsQuery = accountsQuery.is("store_id", null)
-    }
-    accountsQuery = accountsQuery.order("is_default", { ascending: false })
-
-    const [customersRes, accountsRes, paymentMethodsRes] = await Promise.all([
-        supabase
-            .from("customers")
-            .select("id, name, image_url")
-            .eq("partner_id", partnerId)
-            .order("name")
-            .limit(120),
-        accountsQuery,
-        supabase
-            .from("payment_methods")
-            .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority, store_id")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .order("is_default", { ascending: false })
-            .order("priority", { ascending: false })
-            .order("name"),
-    ])
 
     const rawMethods = paymentMethodsRes.error ? [] : (paymentMethodsRes.data || [])
     const filteredMethods = storeId
@@ -1417,9 +1420,9 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     // These post-sale side effects are independent after the order exists.
     // Start them together so the slowest one, rather than their sum, determines
     // the remaining time shown by the PDV.
-    const cashMovementsPromise = capabilities.hasFinancial && activeSessionResult.data?.id
-        ? Promise.all(
-            breakdownForOrder.map((entry) => supabase.from("cash_movements").insert({
+    const cashMovementsPromise = capabilities.hasFinancial && activeSessionResult.data?.id && breakdownForOrder.length > 0
+        ? supabase.from("cash_movements").insert(
+            breakdownForOrder.map((entry) => ({
                 partner_id: input.partnerId,
                 store_id: input.storeId || null,
                 cash_session_id: activeSessionResult.data!.id,
@@ -1474,21 +1477,20 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         )
         : Promise.resolve()
 
-    // Invalidate product & order caches
+    // Invalidate product & order caches asynchronously in background (non-blocking for PDV response)
     const productIds = new Set<string>(
         erpItems.map((item) => item.productId).filter(Boolean) as string[]
     )
-    const productCachePromise = Promise.all(
-        Array.from(productIds).map((productId) =>
+    Promise.all([
+        ...Array.from(productIds).map((productId) =>
             invalidateProductCache(productId, input.partnerId, "update", { silent: true })
-        )
-    )
-
-    const revalidationPromise = Promise.all([
+        ),
         revalidateOrders(input.partnerId),
         revalidateTransactions(input.partnerId),
         revalidateStockMovements(input.partnerId),
-    ])
+    ]).catch((err) => {
+        console.error("[finalizePreSaleAction] Background cache invalidation error:", err)
+    })
 
     await Promise.all([
         cashMovementsPromise,
@@ -1496,8 +1498,6 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         goalsPromise,
         preSaleCompletionPromise,
         couponUsagePromise,
-        productCachePromise,
-        revalidationPromise,
     ])
 
     return { success: true as const, data: { saleId: orderId, saleNumber: orderNumber, orderId } }

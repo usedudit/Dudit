@@ -1989,7 +1989,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                     trigger={<Button variant="outline" className="flex-1">
                         <ThreeDotsIcon className="w-4 h-4 mr-2" />
-                        Opcoes
+                        Opções
                     </Button>}
                 />
             </div>

@@ -479,6 +479,11 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
             storeId,
         })
 
+        const { invalidateStoreCache } = await import("@/lib/cache/invalidation")
+        await invalidateStoreCache(storeId, partnerId, store?.slug)
+        const { removeFromExploreRedis } = await import("@/lib/redis-sync")
+        await removeFromExploreRedis(storeId, "loja", true)
+
         await safeRevalidateTag(TAGS.partner(partnerId))
         await safeRevalidateTag(TAGS.storeProfile(storeId))
         if (store?.slug) await safeRevalidateTag(`store-${store.slug}`)

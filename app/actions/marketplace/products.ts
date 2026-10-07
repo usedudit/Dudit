@@ -490,22 +490,32 @@ const BRAZIL_UFS = new Set([
 /**
  * Resolves a city-uf slug to capitalized/accented city name and state.
  * Queries unique addresses in the DB to match them. Fallback to formatting.
+ *
+ * Performance: the state-wide scan is expensive (no index on addresses.state), so it runs
+ * behind unstable_cache (shared across instances) and behind a cheap targeted lookup that
+ * answers most cities with a single row. React cache() dedupes concurrent calls per request.
  */
-export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city: string; state: string } | null> {
-  if (!slug) return null
-  if (cityResolveCache.has(slug)) {
-    return cityResolveCache.get(slug) || null
-  }
-
+const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: string; state: string } | null> => {
   const parts = slug.split("-")
   const state = parts.pop()?.toUpperCase()
   const citySlugWithoutState = parts.join("-")
-  if (!state || state.length !== 2 || !BRAZIL_UFS.has(state) || !citySlugWithoutState) {
-    cityResolveCache.set(slug, null)
-    return null
-  }
+  if (!state || state.length !== 2 || !BRAZIL_UFS.has(state) || !citySlugWithoutState) return null
 
   const supabase = getAdminClient()
+  const guess = citySlugWithoutState.split("-").join(" ")
+
+  // Fast path: exact (case-insensitive) match — 1 row instead of the whole state.
+  const fast = await supabase
+    .from("addresses")
+    .select("city, state")
+    .eq("state", state)
+    .not("city", "is", null)
+    .ilike("city", guess)
+    .limit(1)
+  if (!fast.error && fast.data && fast.data.length > 0) {
+    return { city: fast.data[0].city, state: fast.data[0].state }
+  }
+
   const { data: addresses } = await supabase
     .from("addresses")
     .select("city, state")
@@ -525,17 +535,49 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
       return addrSlug === targetSlug && a.state === state
     })
     if (match) {
-      const result = { city: match.city, state: match.state }
-      cityResolveCache.set(slug, result)
-      return result
+      return { city: match.city, state: match.state }
     }
   }
 
   const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
-  const result = { city: fallbackCityName, state }
+  return { city: fallbackCityName, state }
+}
+
+const resolveCityAndStateFromSlugCached = unstable_cache(
+  (slug: string) => resolveCityAndStateFromSlugDb(slug),
+  ["marketplace-city-resolve"],
+  { revalidate: 86400, tags: ["addresses"] }
+)
+
+export const resolveCityAndStateFromSlug = cache(async (slug: string): Promise<{ city: string; state: string } | null> => {
+  if (!slug) return null
+  if (cityResolveCache.has(slug)) {
+    return cityResolveCache.get(slug) || null
+  }
+
+  const parts = slug.split("-")
+  const state = parts.pop()?.toUpperCase()
+  const citySlugWithoutState = parts.join("-")
+  if (!state || state.length !== 2 || !BRAZIL_UFS.has(state) || !citySlugWithoutState) {
+    cityResolveCache.set(slug, null)
+    return null
+  }
+
+  let result: { city: string; state: string } | null = null
+  try {
+    result = await resolveCityAndStateFromSlugCached(slug)
+  } catch (err) {
+    console.error("[resolveCityAndStateFromSlug] cache lookup failed:", err)
+  }
+
+  if (!result) {
+    const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
+    result = { city: fallbackCityName, state }
+  }
+
   cityResolveCache.set(slug, result)
   return result
-}
+})
 
 /**
  * Fetches products and vitrines (stores) located in the specified city and state.

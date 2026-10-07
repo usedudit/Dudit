@@ -1422,14 +1422,14 @@ export const IntegrationsSubPage = ({
                                 {waKnowMoreStep === 2 ? (
                                     <Button
                                         className="flex-1 h-[46px]"
-                                        onClick={() => {
-                                            if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                setWaActiveModal(null)
-                                                openPlanUpgrade("escalar")
-                                                return
-                                            }
-                                            setWaActiveModal("info")
-                                        }}
+                                    onClick={() => {
+                                             if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                 setWaActiveModal(null)
+                                                 openPlanUpgrade("escalar")
+                                                 return
+                                             }
+                                             setWaActiveModal(null)
+                                         }}
                                     >
                                         Entendido
                                     </Button>
@@ -1673,13 +1673,13 @@ export const IntegrationsSubPage = ({
                                     <Button
                                         className="flex-1 h-[46px]"
                                         onClick={() => {
-                                            if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                setActiveModal(null)
-                                                openPlanUpgrade("crescer")
-                                                return
-                                            }
-                                            setActiveModal("info")
-                                        }}
+                                             if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                 setActiveModal(null)
+                                                 openPlanUpgrade("crescer")
+                                                 return
+                                             }
+                                             setActiveModal(null)
+                                         }}
                                     >
                                         Entendido
                                     </Button>

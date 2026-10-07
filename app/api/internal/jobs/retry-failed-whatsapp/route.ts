@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
-import { validateCronRequest, acquireExecutionLock, releaseExecutionLock, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
+import { validateCronRequest, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { getLimiter, RateLimitCategory } from "@/lib/rate-limiter"
 import { processWhatsappMessageById } from "@/lib/services/whatsapp-dispatch.service"
 
 const JOB_NAME = "retry-failed-whatsapp"
@@ -17,13 +16,12 @@ const MAX_PERMANENT_RETRIES = 5
  *
  * Flow:
  * 1. Validate Bearer INTERNAL_CRON_SECRET
- * 2. Rate limit by IP
- * 3. Acquire idempotency lock
- * 4. Query failed messages that are retryable (retry_count < max, next_retry_at <= NOW())
- * 5. Mark messages that exceeded max retries as dead-letter (failed_permanently)
- * 6. Enqueue retryable messages to Trigger.dev with jitter delay
- * 7. Fallback: If Trigger.dev is unavailable or fails, execute processWhatsappMessageById directly
- * 8. Return summary
+ * 2. Query failed messages that are retryable (retry_count < max, next_retry_at <= NOW())
+ * 3. If idle (0 messages), return immediately with 0 Redis/overhead
+ * 4. Mark messages that exceeded max retries as dead-letter (failed_permanently)
+ * 5. Enqueue retryable messages to Trigger.dev with jitter delay
+ * 6. Fallback: If Trigger.dev is unavailable or fails, execute processWhatsappMessageById directly
+ * 7. Return summary
  */
 export async function POST(req: Request) {
   const startTime = Date.now()
@@ -31,32 +29,6 @@ export async function POST(req: Request) {
   // 1. Auth validation
   const auth = validateCronRequest(req, JOB_NAME)
   if (!auth.ok) return auth.error
-
-  // 2. Rate limit by job (the bearer secret authenticates the caller)
-  const ip = `job:${JOB_NAME}`
-  try {
-    const limiter = getLimiter(RateLimitCategory.WEBHOOK)
-    const { success } = await limiter.limit(`internal-cron:${ip}`)
-    if (!success) {
-      cronLogger.warn(JOB_NAME, "Rate limited", { ip })
-      return NextResponse.json(
-        { success: false, error: "Rate limited" },
-        { status: 429 },
-      )
-    }
-  } catch {
-    // Rate limiter failure should not block cron execution
-  }
-
-  // 3. Idempotency lock
-  const lock = await acquireExecutionLock(JOB_NAME)
-  if (!lock.acquired) {
-    return NextResponse.json({
-      success: true,
-      skipped: true,
-      reason: "lock_active",
-    })
-  }
 
   try {
     cronLogger.start(JOB_NAME)
@@ -232,7 +204,5 @@ export async function POST(req: Request) {
       { success: false, error: errorMessage },
       { status: 500 },
     )
-  } finally {
-    await releaseExecutionLock(lock.lockKey)
   }
 }

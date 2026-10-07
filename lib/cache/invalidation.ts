@@ -129,3 +129,84 @@ export async function invalidateStoreCache(
     console.error(`[CACHE] Erro ao revalidar store cache:`, error)
   }
 }
+
+export async function invalidateServiceCache(
+  serviceId: string,
+  partnerId: string,
+  action: 'create' | 'update' | 'delete' = 'update',
+  options?: { silent?: boolean }
+) {
+  console.log(`[CACHE] INVALIDATING service:${serviceId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
+  if (!options?.silent) {
+    await incrementCacheVersion()
+  }
+
+  try {
+    if (action === 'delete') {
+      await removeFromExploreRedis(serviceId, "servico", true)
+    } else {
+      await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+    }
+  } catch (error) {
+    console.error(`[CACHE] Erro ao sincronizar servico no Redis:`, error)
+  }
+
+  try {
+    const { revalidateTag, revalidatePath } = await import('next/cache')
+    const safeRevalidateTag = (tag: string) => {
+      try {
+        (revalidateTag as any)(tag, 'max')
+      } catch {
+        // Silently ignore
+      }
+    }
+
+    safeRevalidateTag(`service-${serviceId}`)
+    safeRevalidateTag(`partner-${partnerId}`)
+    safeRevalidateTag(TAGS.services(partnerId))
+    safeRevalidateTag('services')
+    safeRevalidateTag(TAGS.marketplace)
+
+    try {
+      revalidatePath('/erp/servicos')
+    } catch {}
+  } catch (error) {
+    console.error(`[CACHE] Erro ao revalidar Next.js cache layers para servico:`, error)
+  }
+}
+
+export async function invalidateRecurringPlanCache(
+  planId: string,
+  partnerId: string,
+  action: 'create' | 'update' | 'delete' = 'update',
+  options?: { silent?: boolean }
+) {
+  console.log(`[CACHE] INVALIDATING recurring_plan:${planId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
+  if (!options?.silent) {
+    await incrementCacheVersion()
+  }
+
+  try {
+    const { revalidateTag, revalidatePath } = await import('next/cache')
+    const safeRevalidateTag = (tag: string) => {
+      try {
+        (revalidateTag as any)(tag, 'max')
+      } catch {
+        // Silently ignore
+      }
+    }
+
+    safeRevalidateTag(`recurring-plan-${planId}`)
+    safeRevalidateTag(`partner-${partnerId}`)
+    safeRevalidateTag(TAGS.partner(partnerId))
+    safeRevalidateTag('recurring-plans')
+    safeRevalidateTag('marketplace-search')
+    safeRevalidateTag(TAGS.marketplace)
+
+    try {
+      revalidatePath('/erp/recorrentes/planos')
+    } catch {}
+  } catch (error) {
+    console.error(`[CACHE] Erro ao revalidar Next.js cache layers para plano recorrente:`, error)
+  }
+}

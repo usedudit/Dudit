@@ -274,30 +274,14 @@ export function ExplorarPageClient({
     const [maxPrice, setMaxPrice] = useState<number | string>("")
     const [selectedCondition, setSelectedCondition] = useState<string>("")
 
-    const [isFilterLoading, setIsFilterLoading] = useState(false)
-    const filterLoadingTimerRef = useRef<NodeJS.Timeout | null>(null)
     const isFirstMountParamsRef = useRef(true)
     const prevParamsKeyRef = useRef("")
 
-    const triggerFilterLoading = useCallback((customMinDuration?: number) => {
-        if (filterLoadingTimerRef.current) {
-            clearTimeout(filterLoadingTimerRef.current)
-        }
-        setIsFilterLoading(true)
-        // Quick, slightly randomized natural duration between 220ms and 380ms
-        const randomDuration = customMinDuration ?? (Math.floor(Math.random() * 160) + 220)
-        filterLoadingTimerRef.current = setTimeout(() => {
-            setIsFilterLoading(false)
-            filterLoadingTimerRef.current = null
-        }, randomDuration)
-    }, [])
-
-    useEffect(() => {
-        return () => {
-            if (filterLoadingTimerRef.current) {
-                clearTimeout(filterLoadingTimerRef.current)
-            }
-        }
+    const triggerFilterLoading = useCallback(() => {
+        // Feedback de carregamento é 100% real: vem do react-query (isLoading/isFetching)
+        // quando a query key muda. Um delay artificial aqui só adicionava latência
+        // percebida (220-380ms de skeleton) e remontava a grade inteira a cada troca
+        // de filtro — algo especialmente ruim em mobile/tablet.
     }, [])
 
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -535,7 +519,7 @@ export function ExplorarPageClient({
     }, [fetchType])
 
     // Query fetch
-    const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isFetching } = useInfiniteList<
+    const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteList<
         any,
         MarketplaceListCursor
     >({
@@ -601,7 +585,10 @@ export function ExplorarPageClient({
         refetchOnWindowFocus: false,
     })
 
-    const isContentLoading = isFilterLoading || isLoading || (isFetching && !isFetchingNextPage)
+    // Esqueleto apenas quando ainda não há dados da query atual (isPending && isFetching).
+    // Usar `isFetching` aqui trocava a grade inteira por esqueleto em todo refetch de
+    // fundo (reconexão/invalidação), causando um flash que é muito pior em mobile.
+    const isContentLoading = isLoading
 
     const rawItems = useMemo(() => {
         const all = rawItemsUncapped || []
@@ -1506,7 +1493,7 @@ export function ExplorarPageClient({
                 className="group grid grid-cols-[100px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
             >
                 <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
-                    <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
+                    <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                 </div>
                 <div className="min-w-0 py-1">
                     {isStore ? (
@@ -1667,18 +1654,18 @@ export function ExplorarPageClient({
         if (viewMode === "list") return renderListRow(item)
 
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
+            return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
-        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full" />
+        return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
     }
 
     const renderDistantItem = (item: any) => {
         if (viewMode === "list") return renderListRow(item, true)
 
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full" />
+            return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
-        return <ItemCard key={`dist-${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} preferCityLabel locationOnly className="w-full" />
+        return <ItemCard key={`dist-${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} preferCityLabel locationOnly className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
     }
 
     // Renders the category discovery sections
@@ -2074,7 +2061,7 @@ export function ExplorarPageClient({
                                                     {isFetchingNextPage ? (
                                                         <div className="flex flex-col items-center gap-2">
                                                             <SkeletonLoader height={24} width={180} className="rounded" />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opcoes...</span>
+                                                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opções...</span>
                                                         </div>
                                                     ) : null}
                                                 </div>

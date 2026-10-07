@@ -1811,8 +1811,22 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                 stockVariant = "orange"
                                             }
 
+                                            const variantPricesList = hasVariants
+                                                ? variantsList
+                                                    .map((v: any) => {
+                                                        const vp = v.price !== undefined && v.price !== null
+                                                            ? Number(v.price)
+                                                            : Number(product.price || 0) + Number(v.price_adjustment || 0)
+                                                        return vp
+                                                    })
+                                                    .filter((p: number) => !isNaN(p) && p > 0)
+                                                : []
+                                            const variantPriceRange = variantPricesList.length > 0
+                                                ? { min: Math.min(...variantPricesList), max: Math.max(...variantPricesList) }
+                                                : null
+
                                             return (
-                                                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
+                                                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface flex h-full flex-col">
                                                     <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
                                                         <img
                                                             src={getPrimaryProductDisplayImage(product, "thumbnail")}
@@ -1836,7 +1850,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div>
+                                                    <div className="flex-1 flex flex-col">
                                                         <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
                                                         {hasVariants && (
                                                             <p className="text-sm text-brand-inactive-text">{variantsList.length} variação(ões)</p>
@@ -1845,7 +1859,22 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                             <p className="text-sm text-brand-inactive-text">{rawAddonGroups.length} grupo(s) de complementos</p>
                                                         )}
 
-                                                        {pr.referencePrice ? (
+                                                        {hasVariants && variantPriceRange ? (
+                                                            variantPriceRange.min === variantPriceRange.max ? (
+                                                                <span className="mt-1 block font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                    {formatCurrency(variantPriceRange.min)}
+                                                                </span>
+                                                            ) : (
+                                                                <div className="mt-1 flex flex-col">
+                                                                    <span className="text-xs text-brand-inactive-text">
+                                                                        De: {formatCurrency(variantPriceRange.min)}
+                                                                    </span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                        Até: {formatCurrency(variantPriceRange.max)}
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        ) : pr.referencePrice ? (
                                                             <div className="flex flex-col gap-0.5 mt-1">
                                                                 <span className="text-xs text-brand-inactive-text line-through">
                                                                     {formatCurrency(pr.referencePrice)}
@@ -1862,19 +1891,21 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                             </div>
                                                         )}
 
-                                                        <Button
-                                                            variant="outline"
-                                                            className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
-                                                            onClick={() => {
-                                                                if (hasVariants || hasAddons) {
-                                                                    setVariantPickerProduct(product)
-                                                                    return
-                                                                }
-                                                                addToCart(product)
-                                                            }}
-                                                        >
-                                                            Adicionar
-                                                        </Button>
+                                                        <div className="mt-auto pt-3">
+                                                            <Button
+                                                                variant="outline"
+                                                                className="h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
+                                                                onClick={() => {
+                                                                    if (hasVariants || hasAddons) {
+                                                                        setVariantPickerProduct(product)
+                                                                        return
+                                                                    }
+                                                                    addToCart(product)
+                                                                }}
+                                                            >
+                                                                Adicionar
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )

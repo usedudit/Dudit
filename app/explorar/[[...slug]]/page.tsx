@@ -495,41 +495,64 @@ export default async function ExplorarPage({
 
     // Para estados, passa apenas o slug do estado; a função searchMarketplaceByCity filtrará por estado
     const searchSlug = stateSlug ? stateSlug : cidade
-    let exploreItems: any[] = []
-    let moreDistantSellers: any[] = []
-    let moreDistantItems: any[] = []
+    const isSpecificCityRoute = cidade && cidade !== "brasil" && !cidade.startsWith("estado-")
 
-    try {
-        const fetched = await getCachedExploreProducts(query, serverFetchType, searchSlug, section)
-        exploreItems = fetched.items || []
-        moreDistantSellers = fetched.moreDistantSellers || []
-        moreDistantItems = fetched.moreDistantItems || []
-    } catch (err) {
-        console.error("[ExplorarPage] Error fetching explore products:", err)
-    }
+    // Tudo que não depende um do outro sobe em paralelo: busca, nome da cidade,
+    // coordenadas, escopo do cookie e vídeos da comunidade. Só os anúncios esperam,
+    // porque precisam da localização já resolvida.
+    const explorePromise = getCachedExploreProducts(query, serverFetchType, searchSlug, section)
+        .then((fetched) => ({
+            items: fetched.items || [],
+            moreDistantSellers: fetched.moreDistantSellers || [],
+            moreDistantItems: fetched.moreDistantItems || [],
+        }))
+        .catch((err) => {
+            console.error("[ExplorarPage] Error fetching explore products:", err)
+            return { items: [] as any[], moreDistantSellers: [] as any[], moreDistantItems: [] as any[] }
+        })
 
-    let resolvedCityName: string | null = null
-    if (cidade && cidade !== "brasil" && !cidade.startsWith("estado-")) {
-        try {
-            const resolved = await resolveCityAndStateFromSlug(cidade)
-            if (resolved) {
-                resolvedCityName = `${resolved.city} - ${resolved.state}`
-            }
-        } catch (err) {
-            console.error("[ExplorarPage] Error resolving city:", err)
-        }
-    }
+    const cityPromise: Promise<{ city: string; state: string } | null> = isSpecificCityRoute
+        ? resolveCityAndStateFromSlug(cidade).catch(() => null)
+        : Promise.resolve(null)
 
-    let refCoords = userProfile?.latitude && userProfile?.longitude
-        ? { lat: userProfile.latitude, lng: userProfile.longitude }
-        : null
-    if (!refCoords && searchSlug) {
-        try {
-            refCoords = await resolveCityCoordsFromSlug(searchSlug)
-        } catch (err) {
-            console.error("[ExplorarPage] Error resolving coords:", err)
-        }
-    }
+    const coordsPromise = (userProfile?.latitude && userProfile?.longitude)
+        ? Promise.resolve({ lat: userProfile.latitude, lng: userProfile.longitude })
+        : (searchSlug ? resolveCityCoordsFromSlug(searchSlug).catch(() => null) : Promise.resolve(null))
+
+    const cookieScopePromise = (async () => {
+        if (userProfile?.city && userProfile?.state) return null
+        const cookieStore = await cookies()
+        const cookieCity = cookieStore.get("dudit_city")?.value
+        if (!cookieCity || cookieCity === "brasil" || cookieCity.startsWith("estado-")) return null
+        const needsCoords = !userProfile?.latitude || !userProfile?.longitude
+        const [resolved, coords] = await Promise.all([
+            resolveCityAndStateFromSlug(cookieCity).catch(() => null),
+            needsCoords ? resolveCityCoordsFromSlug(cookieCity).catch(() => null) : Promise.resolve(null),
+        ])
+        return { cookieCity, resolved, coords }
+    })()
+
+    const videosPromise = getCommunityVideos(searchSlug || undefined)
+        .catch((err) => {
+            console.error("[ExplorarPage] Error fetching community videos:", err)
+            return { items: [] as Awaited<ReturnType<typeof getCommunityVideos>>["items"], nextCursor: null, hasMore: false }
+        })
+
+    const [fetched, resolvedCity, coordsResolved, cookieScope, communityVideosData] = await Promise.all([
+        explorePromise,
+        cityPromise,
+        coordsPromise,
+        cookieScopePromise,
+        videosPromise,
+    ])
+
+    let exploreItems: any[] = fetched.items
+    let moreDistantSellers: any[] = fetched.moreDistantSellers
+    let moreDistantItems: any[] = fetched.moreDistantItems
+
+    let resolvedCityName: string | null = resolvedCity ? `${resolvedCity.city} - ${resolvedCity.state}` : null
+
+    let refCoords = coordsResolved
 
     let productsWithDistance = exploreItems
     let moreDistantSellersWithDistance = moreDistantSellers
@@ -562,27 +585,17 @@ export default async function ExplorarPage({
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)/g, "")
         userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
-    } else {
-        const cookieStore = await cookies()
-        const cookieCity = cookieStore.get("dudit_city")?.value
-        if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
-            userCitySlug = cookieCity
-            const resolved = await resolveCityAndStateFromSlug(cookieCity)
-            if (resolved) {
-                userCityName = resolved.city
-                userStateName = resolved.state
-            }
-            if (!userLat || !userLng) {
-                const cookieCoords = await resolveCityCoordsFromSlug(cookieCity)
-                if (cookieCoords) {
-                    userLat = cookieCoords.lat
-                    userLng = cookieCoords.lng
-                }
-            }
+    } else if (cookieScope) {
+        userCitySlug = cookieScope.cookieCity
+        if (cookieScope.resolved) {
+            userCityName = cookieScope.resolved.city
+            userStateName = cookieScope.resolved.state
+        }
+        if ((!userLat || !userLng) && cookieScope.coords) {
+            userLat = cookieScope.coords.lat
+            userLng = cookieScope.coords.lng
         }
     }
-
-    const isSpecificCityRoute = cidade && cidade !== "brasil" && !cidade.startsWith("estado-")
 
     let targetCitySlug: string | null = null
     let targetCity: string | null = null
@@ -616,10 +629,9 @@ export default async function ExplorarPage({
         state: targetState,
     }
 
-    const [exploreAds, searchAds, communityVideosData] = await Promise.all([
+    const [exploreAds, searchAds] = await Promise.all([
         getSponsoredAdsForSlot("explore", adLocation),
         query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
-        getCommunityVideos(searchSlug || undefined),
     ])
 
     // BreadcrumbList Schema

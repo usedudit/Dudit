@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
-import { validateCronRequest, acquireExecutionLock, releaseExecutionLock, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
+import { validateCronRequest, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { getLimiter, RateLimitCategory } from "@/lib/rate-limiter"
 import { runScheduledWhatsappJob } from "@/lib/services/whatsapp-automation.service"
 
 const JOB_NAME = "process-whatsapp-reminders"
@@ -14,13 +13,12 @@ const BATCH_SIZE = 100
  *
  * Flow:
  * 1. Validate Bearer INTERNAL_CRON_SECRET
- * 2. Rate limit by IP (60 req/min)
- * 3. Acquire idempotency lock
- * 4. Claim due scheduled jobs from DB (WHERE run_at <= NOW())
- * 5. Enqueue each to Trigger.dev "whatsapp-scheduled-job"
- * 6. Fallback: If Trigger.dev is unavailable/unconfigured or fails to enqueue,
+ * 2. Claim due scheduled jobs from DB (WHERE run_at <= NOW()) via atomic RPC
+ * 3. If idle (0 jobs), return immediately with 0 Redis/overhead
+ * 4. Enqueue each to Trigger.dev "whatsapp-scheduled-job"
+ * 5. Fallback: If Trigger.dev is unavailable/unconfigured or fails to enqueue,
  *    execute runScheduledWhatsappJob directly in Next.js.
- * 7. Return summary
+ * 6. Return summary
  */
 export async function POST(req: Request) {
   const startTime = Date.now()
@@ -29,36 +27,10 @@ export async function POST(req: Request) {
   const auth = validateCronRequest(req, JOB_NAME)
   if (!auth.ok) return auth.error
 
-  // 2. Rate limit by job (the bearer secret authenticates the caller)
-  const ip = `job:${JOB_NAME}`
-  try {
-    const limiter = getLimiter(RateLimitCategory.WEBHOOK)
-    const { success } = await limiter.limit(`internal-cron:${ip}`)
-    if (!success) {
-      cronLogger.warn(JOB_NAME, "Rate limited", { ip })
-      return NextResponse.json(
-        { success: false, error: "Rate limited" },
-        { status: 429 },
-      )
-    }
-  } catch {
-    // Rate limiter failure should not block cron execution
-  }
-
-  // 3. Idempotency lock
-  const lock = await acquireExecutionLock(JOB_NAME)
-  if (!lock.acquired) {
-    return NextResponse.json({
-      success: true,
-      skipped: true,
-      reason: "lock_active",
-    })
-  }
-
   try {
     cronLogger.start(JOB_NAME)
 
-    // 4. Claim due scheduled jobs using the existing DB RPC
+    // 2. Claim due scheduled jobs using the existing atomic DB RPC
     // The RPC atomically sets status to 'processing' and returns claimed rows
     // Uses run_at <= NOW() - never exact time matching
     const admin = getAdminClient()
@@ -178,7 +150,5 @@ export async function POST(req: Request) {
       { success: false, error: errorMessage },
       { status: 500 },
     )
-  } finally {
-    await releaseExecutionLock(lock.lockKey)
   }
 }

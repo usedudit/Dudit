@@ -177,7 +177,7 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
         const urlObj = new URL(url)
         const formatParam = urlObj.searchParams.get("format")
         const isThermal58 = formatParam === "thermal-58"
-        const isThermal = formatParam === "thermal" || isThermal58 || urlObj.pathname.includes("/print/caixa")
+        const isThermal = formatParam === "thermal" || isThermal58 || (formatParam !== "a4" && urlObj.pathname.includes("/print/caixa"))
 
         // Forward raw Cookie header directly to ensure all requests made by Chromium include session authentication
         if (Array.isArray(nextCookies) && nextCookies.length > 0) {

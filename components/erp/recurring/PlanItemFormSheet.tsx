@@ -2,19 +2,22 @@
 
 import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon, ClockIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder, FormDropdown } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, FormDropdown, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { formatCurrency } from "@/lib/utils/formatters"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+
+const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 interface SelectPlanItemSheetProps {
     isOpen: boolean
     onClose: () => void
     formData: {
-        products: Array<{ id: string; name: string; price: number }>
-        services: Array<{ id: string; name: string; price: number; duration_minutes?: number }>
+        products: Array<{ id: string; name: string; price: number; images?: string[] | null }>
+        services: Array<{ id: string; name: string; price: number; duration_minutes?: number; images?: string[] | null }>
         staff: Array<{ id: string; display_name: string }>
     }
     onSave: (item: {
@@ -60,6 +63,11 @@ export default function PlanItemFormSheet({
     // Check if partner provides services
     const hasServices = formData.services.length > 0
 
+    const getImageUrl = (item: any): string => {
+        const img = item?.images?.[0]
+        return img ? getR2ImageUrl(img, "thumbnail") || PLACEHOLDER_IMAGE : PLACEHOLDER_IMAGE
+    }
+
     // Handle populating form fields when editing or changing item
     useEffect(() => {
         if (editingItem) {
@@ -103,6 +111,12 @@ export default function PlanItemFormSheet({
         }
     }
 
+    const handleTabChange = (value: string) => {
+        setActiveTab(value as "product" | "service")
+        setSelectedItem(null)
+        setSearch("")
+    }
+
     const handleSaveItem = () => {
         if (!selectedItem) return
 
@@ -138,39 +152,43 @@ export default function PlanItemFormSheet({
 
             {/* Tabs list (if not editing) */}
             {!editingItem && hasServices && (
-                <div className="flex border-b border-brand-border dark:border-dark-border bg-brand-gray/20 p-2 gap-2">
-                    <button
-                        onClick={() => { setActiveTab("product"); setSelectedItem(null); setSearch("") }}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === "product" ? "bg-white dark:bg-dark-surface text-brand-primary shadow-sm" : "text-brand-inactive-text hover:text-brand-dark"}`}
-                    >
-                        Produtos
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab("service"); setSelectedItem(null); setSearch("") }}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === "service" ? "bg-white dark:bg-dark-surface text-brand-primary shadow-sm" : "text-brand-inactive-text hover:text-brand-dark"}`}
-                    >
-                        Serviços
-                    </button>
+                <div className="z-10 shrink-0 border-b border-brand-border bg-white px-6 pt-3 dark:border-dark-border dark:bg-dark-surface overflow-x-auto">
+                    <Tabs value={activeTab} onValueChange={handleTabChange}>
+                        <TabsList className="bg-transparent p-0 gap-4 justify-start border-b-0">
+                            <TabsTrigger value="product">Produtos</TabsTrigger>
+                            <TabsTrigger value="service">Serviços</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </div>
             )}
 
             {/* Item details config screen */}
             {selectedItem ? (
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    <div className="bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl p-4 flex items-center justify-between">
-                        <div>
-                            <span className="text-[11px] font-bold text-brand-primary uppercase tracking-wider">
-                                {activeTab === "product" ? "Produto Selecionado" : "Serviço Selecionado"}
-                            </span>
-                            <h4 className="font-bold text-brand-dark dark:text-dark-heading text-base leading-tight mt-0.5">
-                                {selectedItem.name}
-                            </h4>
-                            <p className="text-xs text-brand-inactive-text mt-1">
-                                Preço Padrão: {formatCurrency(selectedItem.price)}
-                            </p>
+                    <div className="bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                <img
+                                    src={getImageUrl(selectedItem)}
+                                    alt=""
+                                    className="w-full h-full object-cover rounded-full"
+                                    loading="lazy"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <span className="text-[11px] font-bold text-brand-primary uppercase tracking-wider">
+                                    {activeTab === "product" ? "Produto Selecionado" : "Serviço Selecionado"}
+                                </span>
+                                <h4 className="font-bold text-brand-dark dark:text-dark-heading text-base leading-tight mt-0.5 truncate">
+                                    {selectedItem.name}
+                                </h4>
+                                <p className="text-xs text-brand-inactive-text mt-1">
+                                    Preço Padrão: {formatCurrency(selectedItem.price)}
+                                </p>
+                            </div>
                         </div>
                         {!editingItem && (
-                            <Button variant="outline" size="sm" onClick={() => setSelectedItem(null)}>
+                            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSelectedItem(null)}>
                                 Alterar
                             </Button>
                         )}
@@ -233,30 +251,44 @@ export default function PlanItemFormSheet({
                     <div className="custom-scrollbar flex-1 overflow-y-auto p-0">
                         {filteredItems.length > 0 ? (
                             <div className="flex flex-col px-2 pb-2">
-                                {filteredItems.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => handleSelectItem(item)}
-                                        className="group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                            {activeTab === "product" ? <BoxIcon size={18} className="text-brand-primary" /> : <ClockIcon size={18} className="text-brand-primary" />}
+                                {filteredItems.map((item) => {
+                                    const isSelected = selectedItem?.id === item.id
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => handleSelectItem(item)}
+                                            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40 ${isSelected ? "bg-brand-primary/5 dark:bg-brand-primary/10" : ""}`}
+                                        >
+                                            <img
+                                                src={getImageUrl(item)}
+                                                alt=""
+                                                className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${item?.images?.[0] ? "object-cover" : "object-contain"}`}
+                                                loading="lazy"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                    {item.name}
+                                                </span>
+                                                <p className="truncate text-xs font-semibold text-brand-primary dark:text-dark-body">
+                                                    {formatCurrency(item.price)}
+                                                </p>
+                                            </div>
+                                            <div className="flex shrink-0 items-center justify-center">
+                                                {isSelected ? (
+                                                    <div className="flex h-8 w-8 items-center justify-center text-brand-green">
+                                                        <CheckCircleIcon size={18} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                                                        <PlusIcon size={18} />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {item.name}
-                                            </span>
-                                            <p className="truncate text-xs font-semibold text-brand-primary dark:text-dark-body">
-                                                {formatCurrency(item.price)}
-                                            </p>
-                                        </div>
-                                        <div className="flex shrink-0 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                                            <PlusIcon size={18} />
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         ) : (
                             <div className="px-4 py-12">

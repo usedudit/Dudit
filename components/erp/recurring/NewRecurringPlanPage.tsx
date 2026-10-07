@@ -20,9 +20,11 @@ import {
     DatePicker,
     FormSection,
     SidebarCard,
+    ThreeDotsLoader,
+    ActionsDropdown,
 } from "@/components/reusable"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
-import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, ClockIcon, SearchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, SearchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -40,6 +42,9 @@ import PlanItemFormSheet from "./PlanItemFormSheet"
 import { formatCurrency } from "@/lib/utils/formatters"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+
+const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 interface NewRecurringPlanPageProps {
     onBack: () => void
@@ -50,8 +55,8 @@ interface NewRecurringPlanPageProps {
 }
 
 type FormData = {
-    products: Array<{ id: string; name: string; price: number }>
-    services: Array<{ id: string; name: string; price: number; duration_minutes?: number }>
+    products: Array<{ id: string; name: string; price: number; images?: string[] | null }>
+    services: Array<{ id: string; name: string; price: number; duration_minutes?: number; images?: string[] | null }>
     staff: Array<{ id: string; display_name: string }>
 }
 
@@ -520,6 +525,23 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         })
     }
 
+    const getItemImage = (item: any): string => {
+        const entry = item.itemType === "product"
+            ? formData.products.find(p => p.id === item.productId)
+            : formData.services.find(s => s.id === item.serviceId)
+        const img = entry?.images?.[0] || item.product?.images?.[0] || item.service?.images?.[0]
+        return img ? getR2ImageUrl(img, "thumbnail") : PLACEHOLDER_IMAGE
+    }
+
+    const renderItemActions = (item: any, index: number) => (
+        <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+            <ActionsDropdown
+                onEdit={() => handleEditItemTrigger(item, index)}
+                onDelete={() => handleRemoveItem(index)}
+            />
+        </div>
+    )
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
@@ -581,8 +603,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                         {/* Content Body */}
                         <div className={`px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px] relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}>
                             {isEditLoadingLocked && (
-                                <div className="absolute inset-0 z-20 bg-white/65 dark:bg-dark-background/65 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
-                                    <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Carregando dados...</div>
+                                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                    <ThreeDotsLoader />
                                 </div>
                             )}
 
@@ -878,8 +900,13 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                     onChange={() => handleSelectRowItem(item.originalIndex)}
                                                                 />
                                                             </div>
-                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                {item.itemType === "product" ? <BoxIcon size={18} className="text-brand-primary" /> : <ClockIcon size={18} className="text-brand-primary" />}
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                                <img
+                                                                    src={getItemImage(item)}
+                                                                    alt=""
+                                                                    className="w-full h-full object-cover rounded-full"
+                                                                    loading="lazy"
+                                                                />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -889,13 +916,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                     {item.itemType === "product" ? "Produto" : "Serviço"} • {formatQuantityWithUnit(item.quantity, item.unit)}
                                                                 </span>
                                                             </div>
-                                                            <div className="shrink-0 flex items-center gap-2">
-                                                                <Button variant="outline" size="sm" onClick={() => handleEditItemTrigger(item, item.originalIndex)}>
-                                                                    Editar
-                                                                </Button>
-                                                                <Button variant="outline" size="sm" className="border-brand-red text-brand-red" onClick={() => handleRemoveItem(item.originalIndex)}>
-                                                                    Remover
-                                                                </Button>
+                                                            <div className="shrink-0">
+                                                                {renderItemActions(item, item.originalIndex)}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -953,8 +975,13 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                     </td>
                                                                     <td className="py-4 px-6 border-b border-brand-border">
                                                                         <div className="flex items-center gap-3">
-                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                {item.itemType === "product" ? <BoxIcon size={18} className="text-brand-primary" /> : <ClockIcon size={18} className="text-brand-primary" />}
+                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                                                <img
+                                                                                    src={getItemImage(item)}
+                                                                                    alt=""
+                                                                                    className="w-full h-full object-cover rounded-full"
+                                                                                    loading="lazy"
+                                                                                />
                                                                             </div>
                                                                             <div className="flex flex-col text-left">
                                                                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
@@ -984,14 +1011,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                                         </span>
                                                                     </td>
                                                                     <td className="py-4 px-6 border-b border-brand-border text-center">
-                                                                        <div className="flex justify-center gap-2">
-                                                                            <Button variant="outline" size="sm" onClick={() => handleEditItemTrigger(item, item.originalIndex)}>
-                                                                                Editar
-                                                                            </Button>
-                                                                            <Button variant="outline" size="sm" className="border-brand-red text-brand-red hover:bg-red-50" onClick={() => handleRemoveItem(item.originalIndex)}>
-                                                                                Remover
-                                                                            </Button>
-                                                                        </div>
+                                                                        {renderItemActions(item, item.originalIndex)}
                                                                     </td>
                                                                 </tr>
                                                             ))}

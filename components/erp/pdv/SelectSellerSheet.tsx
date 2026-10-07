@@ -7,6 +7,8 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import { ROLE_LABELS } from "@/lib/permissions/partner-roles"
+import type { PartnerRole } from "@/lib/permissions/types"
 import { useModalLayer } from "@/lib/modal-stack"
 import {
   fetchPartnerTeamMembersBucket,
@@ -48,6 +50,11 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
       setSelectedId(initialSelectedId)
     }
   }, [isOpen, initialSelectedId])
+
+  const roleLabel = (role: string): string => {
+    const key = String(role || "").toUpperCase() as PartnerRole
+    return ROLE_LABELS[key] ?? role
+  }
 
   const matchesSearch = useCallback((member: PartnerTeamMemberBucketItem, q: string) => {
     return (
@@ -144,9 +151,9 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initia
                   <div className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                     {member.fullName || member.email || "Membro"}
                   </div>
-                  <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                    {member.role || "Equipe"}
-                  </p>
+                    <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                     {roleLabel(member.role)}
+                   </p>
                 </div>
                 <RadioButton
                   name="seller-select"

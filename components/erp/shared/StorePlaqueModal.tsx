@@ -350,7 +350,7 @@ export function StorePlaqueModal({
                     </div>
 
                     {/* Dica de Uso */}
-                    <InfoCard title="Dica para o seu balcão" message="Imprima em papel couchê ou fotográfico (180g+) e coloque em um display de acrílico no balcão ou nas mesas para seus clientes escanearem." />
+                    <InfoCard title="Dica para o seu balcão" message="Imprima em papel couchê ou fotográfico (180g+) e coloque em um display de acrílico no balcão ou nas mesas para seus clientes escanearem." color="blue" />
                 </div>
             </div>
         </DefaultModal>

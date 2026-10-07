@@ -313,6 +313,14 @@ export async function revalidateExploreSearch(options?: { silent?: boolean }) {
         }
     }
 
+    // Always clear the in-memory version cache on the Next.js server instance
+    try {
+        const { invalidateInMemoryVersionCache } = await import("@/app/actions/marketplace/search")
+        invalidateInMemoryVersionCache()
+    } catch {
+        // Silently ignore if import fails in non-server contexts
+    }
+
     // 2. Clear Next.js cache tags for lists
     await safeRevalidateTag('marketplace-search')
     await safeRevalidateTag('home-products')

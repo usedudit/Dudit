@@ -301,39 +301,41 @@ export async function applySaleToGoals(params: {
     progressByGoal.set(String(p.goal_id), list)
   }
 
-  for (const goal of goals) {
-    const goalProgress = progressByGoal.get(goal.id) || []
-    const currentSellerProgress = goalProgress.find((p: any) => p.user_id === params.sellerUserId)
+  await Promise.all(
+    goals.map(async (goal) => {
+      const goalProgress = progressByGoal.get(goal.id) || []
+      const currentSellerProgress = goalProgress.find((p: any) => p.user_id === params.sellerUserId)
 
-    const prevTotal = goalProgress.reduce((sum, p) => sum + money(Number(p.current_amount || 0)), 0)
+      const prevTotal = goalProgress.reduce((sum, p) => sum + money(Number(p.current_amount || 0)), 0)
 
-    const currentAmount = money(Number(currentSellerProgress?.current_amount || 0))
-    const nextAmount = money(currentAmount + amount)
-    const alreadyAchieved = Boolean(currentSellerProgress?.achieved)
-    const justAchieved = !alreadyAchieved && nextAmount >= Number(goal.target_amount || 0)
+      const currentAmount = money(Number(currentSellerProgress?.current_amount || 0))
+      const nextAmount = money(currentAmount + amount)
+      const alreadyAchieved = Boolean(currentSellerProgress?.achieved)
+      const justAchieved = !alreadyAchieved && nextAmount >= Number(goal.target_amount || 0)
 
-    await params.supabase
-      .from("sales_goal_progress")
-      .upsert({
-        goal_id: goal.id,
-        user_id: params.sellerUserId,
-        current_amount: nextAmount,
-        achieved: alreadyAchieved || justAchieved,
-        achieved_at: justAchieved ? new Date().toISOString() : (currentSellerProgress as any)?.achieved_at || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "goal_id,user_id" })
+      await params.supabase
+        .from("sales_goal_progress")
+        .upsert({
+          goal_id: goal.id,
+          user_id: params.sellerUserId,
+          current_amount: nextAmount,
+          achieved: alreadyAchieved || justAchieved,
+          achieved_at: justAchieved ? new Date().toISOString() : (currentSellerProgress as any)?.achieved_at || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "goal_id,user_id" })
 
-    await processGoalBonus({
-      supabase: params.supabase,
-      partnerId: params.partnerId,
-      goal,
-      sellerUserId: params.sellerUserId,
-      prevTotal,
-      newTotal: prevTotal + amount,
-      createdByUserId: params.createdByUserId || null,
-      accountId: params.accountId || null,
+      await processGoalBonus({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        goal,
+        sellerUserId: params.sellerUserId,
+        prevTotal,
+        newTotal: prevTotal + amount,
+        createdByUserId: params.createdByUserId || null,
+        accountId: params.accountId || null,
+      })
     })
-  }
+  )
 }
 
 export async function applyServiceOrderToGoals(params: {

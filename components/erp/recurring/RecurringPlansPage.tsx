@@ -34,21 +34,33 @@ import {
     TrashIcon,
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getPlanUrl } from "@/lib/utils/url-generator"
 import { listRecurringPlansAction, deleteRecurringPlanAction } from "@/app/actions/erp/recurring-plans"
 import { useStore } from "@/lib/store-context"
 import type { RecurringPlan } from "@/lib/types/recurring"
-import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
-import { formatFullDate } from "@/lib/utils"
+import { getRecurringFrequencyLabel, getRecurringBillingModeLabel } from "@/lib/types/recurring"
 
-type SortKey = "name" | "frequency" | "status"
+type SortKey = "name" | "frequency" | "billing" | "startDate" | "endDate" | "status"
 type SortDirection = "asc" | "desc"
 
-const COLUMNS = [
-    { id: "name", label: "Plano", align: "left" as const, width: "350px", sortable: true, key: "name" },
-    { id: "frequency", label: "Frequência", align: "left" as const, width: "250px", sortable: true, key: "frequency" },
-    { id: "status", label: "Status", align: "center" as const, width: "150px", sortable: true, key: "status" },
+type PlanColumn = {
+    id: string
+    label: string
+    align?: "left" | "center" | "right"
+    width?: string
+    sortable: boolean
+    key?: SortKey
+}
+
+const COLUMNS: PlanColumn[] = [
+    { id: "name", label: "Plano", align: "left" as const, width: "320px", sortable: true, key: "name" },
+    { id: "frequency", label: "Frequência", align: "left" as const, width: "150px", sortable: true, key: "frequency" },
+    { id: "billing", label: "Cobrança", align: "left" as const, width: "210px", sortable: true, key: "billing" },
+    { id: "startDate", label: "Início", align: "left" as const, width: "120px", sortable: true, key: "startDate" },
+    { id: "endDate", label: "Fim", align: "left" as const, width: "130px", sortable: true, key: "endDate" },
+    { id: "status", label: "Status", align: "center" as const, width: "130px", sortable: true, key: "status" },
     { id: "actions", label: "Ações", align: "center" as const, width: "100px", sortable: false },
 ]
 
@@ -197,6 +209,15 @@ export default function RecurringPlansPage({
                 } else if (key === "frequency") {
                     aVal = getRecurringFrequencyLabel(a.frequencyType, a.frequencyInterval)
                     bVal = getRecurringFrequencyLabel(b.frequencyType, b.frequencyInterval)
+                } else if (key === "billing") {
+                    aVal = getRecurringBillingModeLabel(a.billingMode || a.billing_mode)
+                    bVal = getRecurringBillingModeLabel(b.billingMode || b.billing_mode)
+                } else if (key === "startDate") {
+                    aVal = a.startDate || a.start_date || ""
+                    bVal = b.startDate || b.start_date || ""
+                } else if (key === "endDate") {
+                    aVal = a.endDate || a.end_date || ""
+                    bVal = b.endDate || b.end_date || ""
                 } else if (key === "status") {
                     aVal = a.status || ""
                     bVal = b.status || ""
@@ -326,15 +347,19 @@ export default function RecurringPlansPage({
             <AnimatePresence mode="wait">
                 {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
                     <FadeIn key="form" className="w-full h-full">
-                        <NewRecurringPlanPage
-                            partnerId={partnerId}
-                            plan={selectedPlan}
-                            onBack={() => closeEntity()}
-                            onSuccess={() => {
-                                afterMutation()
-                                closeEntity()
-                            }}
-                        />
+                        {!isCreating && !selectedPlan && isListLoading ? (
+                            <ERPDetailLoading />
+                        ) : (
+                            <NewRecurringPlanPage
+                                partnerId={partnerId}
+                                plan={selectedPlan}
+                                onBack={() => closeEntity()}
+                                onSuccess={() => {
+                                    afterMutation()
+                                    closeEntity()
+                                }}
+                            />
+                        )}
                     </FadeIn>
                 ) : (
                     <FadeIn
@@ -454,16 +479,16 @@ export default function RecurringPlansPage({
                                                 </div>
                                             ) : (
                                                 /* Desktop List Layout */
-                                                <div className="w-full overflow-hidden rounded-xl border border-transparent dark:border-dark-border/20 bg-white dark:bg-dark-surface relative">
+                                                <div className="w-full overflow-hidden rounded-xl relative">
                                                     <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                                                     <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                                                    <div className="overflow-x-auto pb-2 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                     {/* Checkbox Column */}
-                                                                    <th className="py-3 px-6 w-12 bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border sticky left-0 z-20">
+                                                                    <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                                                                         <Checkbox
                                                                             checked={selectedIds.size === paginated.length && paginated.length > 0}
                                                                             onChange={handleSelectAll}
@@ -472,17 +497,26 @@ export default function RecurringPlansPage({
                                                                     </th>
                                                                     {COLUMNS.map((col) => {
                                                                         const isSorted = sortConfig?.key === col.key
+                                                                        const isLast = col.id === COLUMNS[COLUMNS.length - 1].id
                                                                         return (
                                                                             <th
                                                                                 key={col.id}
-                                                                                className={`py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border relative ${col.sortable ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-border transition-colors select-none group" : ""}`}
+                                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
                                                                                 style={{ width: col.width }}
-                                                                                onClick={() => col.sortable && col.key && handleSort(col.key as SortKey)}
+                                                                                onClick={() => {
+                                                                                    if (!col.sortable || !col.key) return
+                                                                                    handleSort(col.key as SortKey)
+                                                                                }}
                                                                             >
-                                                                                <div className={`flex items-center gap-1 ${col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
                                                                                     <span>{col.label}</span>
                                                                                     {col.sortable && (
-                                                                                        <ArrowUpDownIcon className={`w-3.5 h-3.5 transition-all duration-200 ${isSorted ? "text-brand-primary block" : "text-gray-400 hidden group-hover:block opacity-40"}`} />
+                                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                            <ArrowUpDownIcon
+                                                                                                size={14}
+                                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                            />
+                                                                                        </div>
                                                                                     )}
                                                                                 </div>
                                                                             </th>

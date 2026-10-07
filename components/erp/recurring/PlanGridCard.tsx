@@ -3,9 +3,12 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import type { RecurringPlan } from "@/lib/types/recurring"
-import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
-import { formatFullDate } from "@/lib/utils"
+import { getRecurringFrequencyLabel, getRecurringBillingModeLabel } from "@/lib/types/recurring"
+import { formatDate } from "@/lib/utils"
+
+const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 interface PlanGridCardProps {
   plan: RecurringPlan
@@ -40,6 +43,12 @@ export const PlanGridCard: React.FC<PlanGridCardProps> = ({
     return "Arquivado"
   }
 
+  const imageUrl = plan.images?.[0]
+    ? getR2ImageUrl(plan.images[0], "thumbnail")
+    : PLACEHOLDER_IMAGE
+
+  const billingLabel = plan.billingMode === "auto_mercado_pago" ? "Automático (MP)" : getRecurringBillingModeLabel(plan.billingMode)
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -50,8 +59,13 @@ export const PlanGridCard: React.FC<PlanGridCardProps> = ({
       onClick={() => onDetails(plan)}
     >
       <div className="flex gap-4 mb-2">
-        <div className="w-12 h-12 shrink-0 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-lg select-none">
-          {plan.name.charAt(0).toUpperCase()}
+        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border">
+          <img
+            src={imageUrl}
+            alt=""
+            className="w-full h-full object-cover rounded-full"
+            loading="lazy"
+          />
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -68,31 +82,42 @@ export const PlanGridCard: React.FC<PlanGridCardProps> = ({
               <Checkbox checked={selected} onChange={onSelect} />
             </div>
           </div>
-          <p className="text-xs font-semibold text-brand-primary dark:text-dark-body mt-0.5">
+          <p className="text-xs font-semibold text-brand-primary dark:text-dark-body mt-0.5 truncate">
             {getRecurringFrequencyLabel(plan.frequencyType, plan.frequencyInterval)}
           </p>
         </div>
       </div>
 
-      {plan.description && (
-        <p className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-3 my-3">
-          {plan.description}
-        </p>
-      )}
-
-      <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Início</span>
-          <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-            {formatFullDate(plan.startDate).slice(0, 10)}
-          </span>
+      <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Início</span>
+            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+              {formatDate(plan.startDate) || "-"}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5 items-end">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Fim</span>
+            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+              {plan.endDate ? formatDate(plan.endDate) : "Sem prazo"}
+            </span>
+          </div>
         </div>
-        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-          <ActionsDropdown
-            onEdit={canManage ? () => onEdit(plan) : undefined}
-            onShare={onShare ? () => onShare(plan) : undefined}
-            onDelete={canManage ? () => onDelete(plan) : undefined}
-          />
+
+        <div className="flex items-end justify-between">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cobrança</span>
+            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+              {billingLabel}
+            </span>
+          </div>
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ActionsDropdown
+              onEdit={canManage ? () => onEdit(plan) : undefined}
+              onShare={onShare ? () => onShare(plan) : undefined}
+              onDelete={canManage ? () => onDelete(plan) : undefined}
+            />
+          </div>
         </div>
       </div>
     </motion.div>

@@ -1073,9 +1073,8 @@ export async function createFinancialTransactionsForReceivedAmount(
             return
         }
 
-        for (let i = 0; i < newBreakdown.length; i++) {
-            const newEntry = newBreakdown[i]
-            if (!newEntry?.method) continue
+        const breakdownPromises = newBreakdown.map(async (newEntry, i) => {
+            if (!newEntry?.method) return
 
             const newReceived = Number(newEntry.amount ?? newEntry.amountReceived ?? newEntry.effectiveAmount ?? 0)
 
@@ -1126,7 +1125,8 @@ export async function createFinancialTransactionsForReceivedAmount(
                     reference_note: refNote,
                 })
             }
-        }
+        })
+        await Promise.all(breakdownPromises)
     } catch (error) {
         console.error("[orders_financial] createFinancialTransactionsForReceivedAmount:", error)
     }
@@ -1725,11 +1725,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (!user) return { error: "Não autenticado" }
 
     const partnerId = data.partnerId
-    await requirePermission(partnerId, "orders", "create")
-    const capabilities = await getPartnerCapabilities(partnerId, { storeId: data.storeId })
-
-    // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
-    data.financeAccountId = capabilities.hasFinancial && data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
+    const permissionPromise = requirePermission(partnerId, "orders", "create")
+    const capabilitiesPromise = getPartnerCapabilities(partnerId, { storeId: data.storeId })
 
     // Validate discount permission if a discount is being applied
     if (data.discountValue > 0 || data.couponCode) {
@@ -1742,72 +1739,51 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
     }
 
-    const limitCheck = await checkLimit(partnerId, "monthly_orders")
-    if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
-
-    const supabase = createAdminClient()
-    let customerId: string | null
-    try {
-        customerId = await resolvePartnerCustomerId(supabase, partnerId, data.customerId)
-    } catch (error: any) {
-        return { error: error?.message || "Cliente inválido para este parceiro." }
-    }
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
-    const financeAccountPromise = (capabilities.hasFinancial && data.financeAccountId) ? supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("id", data.financeAccountId)
-        .eq("partner_id", partnerId)
-        .limit(1)
-        .maybeSingle() : Promise.resolve({ data: null })
-    const partnerRowPromise = supabase
-        .from("partners")
-        .select("business_info")
-        .eq("id", partnerId)
-        .single()
 
-    const [{ data: financeAccount }, { data: partnerRow }] = await Promise.all([
-        financeAccountPromise,
-        partnerRowPromise,
-    ])
+    const [capabilities] = await Promise.all([capabilitiesPromise, permissionPromise])
+    data.financeAccountId = capabilities.hasFinancial && data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
 
-    const partnerInfo = normalizeBusinessInfo(partnerRow?.business_info)
-    const salesSettings: SalesSettings = {
-        ...DEFAULT_SALES_SETTINGS,
-        ...((partnerInfo as any)?.salesSettings || {}),
-    }
+    const supabase = createAdminClient()
 
-    if (salesSettings.requireSeller && !data.sellerPartnerUserId) {
-        return { error: "É obrigatório selecionar um vendedor para concluir a venda." }
-    }
+    // ── Consolidate all independent pre-order reads into parallel execution ──
+    const limitCheckPromise = checkLimit(partnerId, "monthly_orders")
+    const customerIdPromise = resolvePartnerCustomerId(supabase, partnerId, data.customerId)
+        .then(id => ({ id, error: null }))
+        .catch(err => ({ id: null, error: err?.message || "Cliente inválido para este parceiro." }))
 
-    const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({
-        supabase,
-        partnerId,
-        items: sanitizedItems,
-        salesSettings,
-    }) : null
-    if (stockValidationError) return { error: stockValidationError }
-    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
-        return { error: "Conta de recebimento inválida para esta venda." }
-    }
+    const financeAccountPromise = (capabilities.hasFinancial && data.financeAccountId)
+        ? supabase.from("finance_accounts").select("id").eq("id", data.financeAccountId).eq("partner_id", partnerId).limit(1).maybeSingle()
+        : Promise.resolve({ data: null })
 
-    if (Number(data.totalAmount || 0) <= 0) {
-        return { error: "A venda não pode ser salva com valor total zerado." }
-    }
+    const partnerRowPromise = supabase.from("partners").select("business_info").eq("id", partnerId).single()
+    const deliveryRowPromise = resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
 
-    // Leituras usadas apenas para montar o snapshot do pedido podem ocorrer
-    // enquanto o cupom e as promoções são recalculados.
     const preparationEstimatePromise = resolveOrderPreparationEstimate({
         supabase,
         partnerId,
         items: sanitizedItems,
         deliveryMethod: data.deliveryMethod,
     })
-    const deliveryRowPromise = resolveDeliverySettingsRow(supabase, partnerId, data.storeId)
+
+    const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
+    const serviceIds = sanitizedItems.filter(item => (item as any).serviceId).map(item => (item as any).serviceId)
+    const variantIds = sanitizedItems.filter(item => item.variantId).map(item => item.variantId)
+
+    const itemCostPromise = Promise.all([
+        productIds.length > 0
+            ? supabase.from("products").select("id, cost_price").eq("partner_id", partnerId).in("id", productIds)
+            : Promise.resolve({ data: [] as any[] }),
+        variantIds.length > 0
+            ? supabase.from("product_variants").select("id, product_id").in("id", variantIds)
+            : Promise.resolve({ data: [] as any[] }),
+        serviceIds.length > 0
+            ? supabase.from("services").select("id, cost_price").eq("partner_id", partnerId).in("id", serviceIds)
+            : Promise.resolve({ data: [] as any[] }),
+    ])
+
     const sellerCommissionPromise = (async () => {
         if (!user.id || !capabilities.hasProductivity) return 0
         const { calculateCommission } = await import("@/lib/services/commission.service")
@@ -1827,6 +1803,70 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         })
     })()
 
+    const promotionsPromise = (async () => {
+        if (!capabilities.hasCampaigns) return { rawPromotions: [] as any[], filteredPromotions: [] as any[] }
+        const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock } = await import("@/app/actions/shared/promotions")
+        const raw = await listActivePromotionsForMarketplaceAction(partnerId, data.customerId || null)
+        const filtered = (raw && raw.length > 0) ? await filterRawPromotionsByGiftStock(raw, supabase) : []
+        return { rawPromotions: raw, filteredPromotions: filtered }
+    })()
+
+    const [
+        limitCheck,
+        customerResolved,
+        { data: financeAccount },
+        { data: partnerRow },
+        deliveryRow,
+        preparationEstimate,
+        [{ data: productsCost }, { data: variantsCost }, { data: servicesCost }],
+        sellerCommissionAmount,
+        { filteredPromotions },
+    ] = await Promise.all([
+        limitCheckPromise,
+        customerIdPromise,
+        financeAccountPromise,
+        partnerRowPromise,
+        deliveryRowPromise,
+        preparationEstimatePromise,
+        itemCostPromise,
+        sellerCommissionPromise,
+        promotionsPromise,
+    ])
+
+    if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
+    if (customerResolved.error) return { error: customerResolved.error }
+    const customerId = customerResolved.id
+
+    const partnerInfo = normalizeBusinessInfo(partnerRow?.business_info)
+    const salesSettings: SalesSettings = {
+        ...DEFAULT_SALES_SETTINGS,
+        ...((partnerInfo as any)?.salesSettings || {}),
+    }
+
+    if (salesSettings.requireSeller && !data.sellerPartnerUserId) {
+        return { error: "É obrigatório selecionar um vendedor para concluir a venda." }
+    }
+
+    if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
+        return { error: "Conta de recebimento inválida para esta venda." }
+    }
+
+    if (Number(data.totalAmount || 0) <= 0) {
+        return { error: "A venda não pode ser salva com valor total zerado." }
+    }
+
+    if (capabilities.hasStockMovements) {
+        const stockValidationError = await validateERPItemsStock({
+            supabase,
+            partnerId,
+            items: sanitizedItems,
+            salesSettings,
+        })
+        if (stockValidationError) return { error: stockValidationError }
+    }
+
+    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
+
     let couponIdToSave: string | null = capabilities.hasCoupons ? (data.couponId || null) : null
     let couponDiscountAmount = capabilities.hasCoupons ? Math.max(0, Number(data.couponDiscountAmount || 0)) : 0
     let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
@@ -1844,7 +1884,6 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         couponDiscountAmount = Number(couponValidation.discountAmount || 0)
         couponPricingData = couponValidation.pricingCoupon || null
     } else if (capabilities.hasCoupons && couponIdToSave) {
-        // Re-validate existing coupon by ID
         const couponValidation = await validateCouponById(couponIdToSave, {
             partnerId,
             customerId,
@@ -1856,17 +1895,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             couponDiscountAmount = Number(couponValidation.discountAmount || 0)
             couponPricingData = couponValidation.pricingCoupon || null
         } else {
-            // Coupon no longer valid - clear it silently
             couponIdToSave = null
             couponDiscountAmount = 0
         }
     }
 
     // ── Server-side pricing recalculation ────────────────────────────────
-    const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = capabilities.hasCampaigns ? await listActivePromotionsForMarketplaceAction(partnerId, customerId) : []
-    const filteredPromotions = (capabilities.hasCampaigns && rawPromotions.length > 0) ? await filterRawPromotionsByGiftStock(rawPromotions, supabase) : []
-
+    const { buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
     const pricingResult = calculateOrderPricing({
         items: sanitizedItems.map((item) => ({
             productId: item.productId || null,
@@ -1883,7 +1918,6 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const giftIds = pricingResult.appliedGiftProductIds || []
     const giftItems = (capabilities.hasCampaigns && giftIds.length > 0) ? await buildGiftOrderItems(supabase, giftIds, filteredPromotions) : []
 
-    // Override client-sent values with server-computed ones
     couponDiscountAmount = pricingResult.couponDiscountAmount
     const serverComputedTotal = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
@@ -1912,9 +1946,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const amtRec = Number(e.amountReceived || 0)
         return s + (amtRec > 0.005 ? amtRec : 0)
     }, 0)
-    const hasBreakdown = sanitizedPaymentBreakdown.length > 0
 
-    // Extract individual adjustment totals from payment breakdown for separate columns
     let paymentMethodInterestAmount = 0
     let paymentMethodFeeAmount = 0
     let paymentMethodFixedFeeAmount = 0
@@ -1998,37 +2030,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryAddressStr = buildFormattedAddress(data.address)
     }
 
-    const preparationEstimate = await preparationEstimatePromise
-
-    // Fetch delivery_payer setting for snapshot (store-aware)
-    const deliveryRow = await deliveryRowPromise
     const deliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
-    if (data.storeId && deliveryRow?.store_id === data.storeId) {
-        console.log(`[delivery_payer] ERP order using store override: store=${data.storeId}, partner=${partnerId}, payer=${deliveryPayer}`)
-    }
-
-    // Commission is part of the persisted snapshot, but its read is already
-    // running in parallel with coupon/promotion validation.
-    const sellerCommissionAmount = await sellerCommissionPromise
-
     const effectiveDeliveryPayer = (data.deliveryBreakdown?.deliveryPayer as "seller" | "customer") || deliveryPayer
 
-    // Cost snapshots are read-only and do not depend on the order id. Start
-    // them before the order insert so this latency overlaps the write.
-    const productIds = sanitizedItems.filter(item => item.productId).map(item => item.productId)
-    const serviceIds = sanitizedItems.filter(item => (item as any).serviceId).map(item => (item as any).serviceId)
-    const variantIds = sanitizedItems.filter(item => item.variantId).map(item => item.variantId)
-    const itemCostPromise = Promise.all([
-        productIds.length > 0
-            ? supabase.from("products").select("id, cost_price").eq("partner_id", partnerId).in("id", productIds)
-            : Promise.resolve({ data: [] as any[] }),
-        variantIds.length > 0
-            ? supabase.from("product_variants").select("id, product_id").in("id", variantIds)
-            : Promise.resolve({ data: [] as any[] }),
-        serviceIds.length > 0
-            ? supabase.from("services").select("id, cost_price").eq("partner_id", partnerId).in("id", serviceIds)
-            : Promise.resolve({ data: [] as any[] }),
-    ])
+    const isImmediateInventoryDeduction = shouldDeductInventory(data.deliveryStatus) || paymentState.situation === 'paid' || paymentState.situation === 'partially_paid'
 
     let paymentExpiresAt: string | null = null
     if (paymentState.situation === "pending" && salesSettings.autoCancelManualOrdersHours > 0) {
@@ -2074,6 +2079,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         pricing_version: pricingResult.pricingVersion,
         delivery_payer: effectiveDeliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
+        inventory_deducted: isImmediateInventoryDeduction,
         ...(paymentExpiresAt ? { payment_expires_at: paymentExpiresAt } : {}),
         ...(preparationEstimate || {}),
     }
@@ -2104,20 +2110,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
 
-    if (paymentMethodStoreCreditAmount > 0 && customerId) {
-        await applyStoreCreditDeduction(supabase, {
-            partnerId,
-            customerId,
-            amount: paymentMethodStoreCreditAmount,
-        })
-    }
-
-    // Fetch cost prices for product/service unit_cost snapshots.
-    const [{ data: products }, { data: variants }, { data: services }] = await itemCostPromise
-
-    const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
-    const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; product_id: string }) => [v.id, Number(productCostMap.get(v.product_id) || 0)]))
-    const serviceCostMap = new Map<string, number>((services || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
+    const productCostMap = new Map<string, number>((productsCost || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
+    const variantCostMap = new Map<string, number>((variantsCost || []).map((v: { id: string; product_id: string }) => [v.id, Number(productCostMap.get(v.product_id) || 0)]))
+    const serviceCostMap = new Map<string, number>((servicesCost || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
 
     const giftItemsToInsert = giftItems.map((item, idx) => ({
         order_id: order.id,
@@ -2190,21 +2185,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     ]
 
     if (capabilities.hasStockMovements && stockItems.length > 0) {
-        const reserveResult = await reserveOrderInventory({
-            client: supabase,
-            partnerId,
-            orderId: order.id,
-            items: stockItems,
-            storeId: data.storeId,
-        })
-
-        if ("error" in reserveResult) {
-            await supabase.from("order_items").delete().eq("order_id", order.id)
-            await supabase.from("orders").delete().eq("id", order.id)
-            return { error: reserveResult.error }
-        }
-
-        if (shouldDeductInventory(data.deliveryStatus) || paymentState.situation === 'paid' || paymentState.situation === 'partially_paid') {
+        if (isImmediateInventoryDeduction) {
+            // Direct finalization in 1 single RPC without redundant reservation
             const finalizeResult = await finalizeOrderInventory({
                 client: supabase,
                 partnerId,
@@ -2217,65 +2199,54 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             })
 
             if ("error" in finalizeResult) {
-                await releaseOrderInventory({
-                    client: supabase,
-                    partnerId,
-                    orderId: order.id,
-                    items: stockItems,
-                    storeId: data.storeId,
-                })
                 await supabase.from("order_items").delete().eq("order_id", order.id)
                 await supabase.from("orders").delete().eq("id", order.id)
                 return { error: finalizeResult.error }
             }
+        } else {
+            const reserveResult = await reserveOrderInventory({
+                client: supabase,
+                partnerId,
+                orderId: order.id,
+                items: stockItems,
+                storeId: data.storeId,
+            })
 
-            await supabase
-                .from("orders")
-                .update({ inventory_deducted: true })
-                .eq("id", order.id)
-                .eq("partner_id", partnerId)
+            if ("error" in reserveResult) {
+                await supabase.from("order_items").delete().eq("order_id", order.id)
+                await supabase.from("orders").delete().eq("id", order.id)
+                return { error: reserveResult.error }
+            }
         }
     }
 
-    const skippedGifts = filteredPromotions.filter(
-        (p) => p.giftUnavailable && pricingResult.appliedPromotionIds.includes(p.id)
-    )
-    const auditPromises = [
-        logAuditEvent({
-            partnerId,
-            actorUserId: user.id,
-            entityType: "order",
-            entityId: order.id,
-            actionType: "created",
-            changeLines: ["criou venda"],
-            source: "manual",
-        }),
-        ...skippedGifts.map((promo) => logAuditEvent({
-            partnerId,
-            actorUserId: user.id,
-            entityType: "order",
-            entityId: order.id,
-            actionType: "created",
-            changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
-            source: "manual",
-        })),
-    ]
-    const couponUsagePromise = capabilities.hasCoupons && couponIdToSave
-        ? createAdminClient().from("coupon_usages").upsert(
-            {
-                coupon_id: couponIdToSave,
-                customer_id: customerId,
-                order_id: order.id,
-            },
-            { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
-        )
-        : Promise.resolve()
+    // ── Launch all remaining write operations simultaneously in parallel ──
+    const postOrderPromises: Promise<any>[] = []
 
-    await Promise.all([
-        Promise.all(auditPromises),
-        increment_usage_counter(partnerId, "orders_month_count"),
-        couponUsagePromise,
-    ])
+    if (paymentMethodStoreCreditAmount > 0 && customerId) {
+        postOrderPromises.push(
+            applyStoreCreditDeduction(supabase, {
+                partnerId,
+                customerId,
+                amount: paymentMethodStoreCreditAmount,
+            })
+        )
+    }
+
+    if (capabilities.hasCoupons && couponIdToSave) {
+        postOrderPromises.push(
+            createAdminClient().from("coupon_usages").upsert(
+                {
+                    coupon_id: couponIdToSave,
+                    customer_id: customerId,
+                    order_id: order.id,
+                },
+                { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+            )
+        )
+    }
+
+    postOrderPromises.push(increment_usage_counter(partnerId, "orders_month_count"))
 
     if (capabilities.hasFinancial && paymentState.paidAmount > 0.009) {
         const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
@@ -2287,71 +2258,68 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                 effectiveAmount: paymentState.paidAmount,
             }]
 
-        await createFinancialTransactionsForReceivedAmount(supabase, {
-            orderId: order.id,
-            orderNumber: order.order_number,
-            partnerId,
-            storeId: order.store_id || data.storeId || null,
-            totalAmount: Number(order.total_amount || 0),
-            newBreakdown: finalBreakdown,
-            oldBreakdown: [],
-            customerId: order.customer_id || order.buyer_id || null,
-            customerName: order.customer_name,
-            financeAccountId: order.finance_account_id || data.financeAccountId,
-            orderSource: order.order_source || "manual",
-            paymentMethod: paymentMethodSummary || data.paymentMethod || "Método não definido",
-        })
+        postOrderPromises.push(
+            createFinancialTransactionsForReceivedAmount(supabase, {
+                orderId: order.id,
+                orderNumber: order.order_number,
+                partnerId,
+                storeId: order.store_id || data.storeId || null,
+                totalAmount: Number(order.total_amount || 0),
+                newBreakdown: finalBreakdown,
+                oldBreakdown: [],
+                customerId: order.customer_id || order.buyer_id || null,
+                customerName: order.customer_name,
+                financeAccountId: order.finance_account_id || data.financeAccountId,
+                orderSource: order.order_source || "manual",
+                paymentMethod: paymentMethodSummary || data.paymentMethod || "Método não definido",
+            })
+        )
     }
 
-    // A newly created paid order cannot have an existing receivable to sync;
-    // avoid an extra read in the hot path. Keep it for partial/unpaid orders
-    // and callers that explicitly provide an existing order id.
     if (capabilities.hasFinancial && (paymentState.situation !== "paid" || data.id)) {
-        const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
-        await syncReceivableForOrder(supabase, {
-            order_number: order.order_number,
-            partner_id: partnerId,
-            store_id: order.store_id || data.storeId || null,
-            total_amount: Number(order.total_amount || 0),
-            paid_amount: Number(paymentState.paidAmount || 0),
-            situation: paymentState.situation,
-            payment_method: paymentMethodSummary || data.paymentMethod,
-            customer_id: order.customer_id || order.buyer_id || null,
-            customer_name: order.customer_name,
-            finance_account_id: order.finance_account_id || data.financeAccountId,
-            order_source: order.order_source || "manual",
-        })
+        postOrderPromises.push(
+            (async () => {
+                const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+                return syncReceivableForOrder(supabase, {
+                    order_number: order.order_number,
+                    partner_id: partnerId,
+                    store_id: order.store_id || data.storeId || null,
+                    total_amount: Number(order.total_amount || 0),
+                    paid_amount: Number(paymentState.paidAmount || 0),
+                    situation: paymentState.situation,
+                    payment_method: paymentMethodSummary || data.paymentMethod,
+                    customer_id: order.customer_id || order.buyer_id || null,
+                    customer_name: order.customer_name,
+                    finance_account_id: order.finance_account_id || data.financeAccountId,
+                    order_source: order.order_source || "manual",
+                })
+            })()
+        )
     }
 
     if (paymentState.situation === "paid") {
-        // PDV orders are already finalized locally and never need the
-        // marketplace booking lookup. Keep fulfillment for other channels.
-        const fulfillmentPromise = data.salesChannel === "Presencial"
-            ? Promise.resolve()
-            : fulfillMarketplaceOrderIfNeeded(supabase, order.id)
-        const sellerSideEffectsPromise = (data.skipPostPaymentSellerSideEffects || !capabilities.hasProductivity)
-            ? Promise.resolve()
-            : createSellerCommissionForPaidOrder({
-                supabase,
-                partnerId,
-                orderId: order.id,
-                sellerUserId: user.id,
-                saleAmount: Number(order.total_amount || 0),
-                accountId: order.finance_account_id || data.financeAccountId,
-                createdByUserId: user.id,
-                storeId: order.store_id || data.storeId || null,
-            })
-        await Promise.all([
-            fulfillmentPromise,
-            sellerSideEffectsPromise,
-        ])
+        if (data.salesChannel !== "Presencial") {
+            postOrderPromises.push(fulfillMarketplaceOrderIfNeeded(supabase, order.id))
+        }
+        if (!data.skipPostPaymentSellerSideEffects && capabilities.hasProductivity) {
+            postOrderPromises.push(
+                createSellerCommissionForPaidOrder({
+                    supabase,
+                    partnerId,
+                    orderId: order.id,
+                    sellerUserId: user.id,
+                    saleAmount: Number(order.total_amount || 0),
+                    accountId: order.finance_account_id || data.financeAccountId,
+                    createdByUserId: user.id,
+                    storeId: order.store_id || data.storeId || null,
+                })
+            )
+        }
     }
 
-    // Sync payment status to linked appointments and service orders
     if (paymentState.situation === "paid" || paymentState.situation === "partially_paid" || paymentState.situation === "pending") {
-        const syncPromises: Promise<any>[] = []
         if (capabilities.hasAppointments) {
-            syncPromises.push(
+            postOrderPromises.push(
                 supabase
                     .from("appointments")
                     .update({ payment_status: paymentState.situation })
@@ -2360,7 +2328,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             )
         }
         if (capabilities.hasServiceOrders) {
-            syncPromises.push(
+            postOrderPromises.push(
                 supabase
                     .from("service_orders")
                     .update({ payment_status: paymentState.situation })
@@ -2368,27 +2336,55 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                     .eq("partner_id", partnerId)
             )
         }
-        if (syncPromises.length > 0) {
-            await Promise.all(syncPromises)
-        }
     }
 
-    if (!data.skipPostCreateRevalidation) {
-        await Promise.all([
-            capabilities.hasStockMovements ? invalidateInventoryItems(partnerId, stockItems) : Promise.resolve(),
-            revalidateOrders(partnerId),
-        ])
-    }
-    import("@/lib/services/notification-automation.service")
-        .then(({ onOrderStatusChanged }) =>
-            onOrderStatusChanged(
+    await Promise.all(postOrderPromises)
+
+    // ── Non-blocking background side effects (audit, cache invalidate, notifications) ──
+    const skippedGifts = filteredPromotions.filter(
+        (p: any) => p.giftUnavailable && pricingResult.appliedPromotionIds.includes(p.id)
+    )
+
+    void (async () => {
+        try {
+            const auditPromises = [
+                logAuditEvent({
+                    partnerId,
+                    actorUserId: user.id,
+                    entityType: "order",
+                    entityId: order.id,
+                    actionType: "created",
+                    changeLines: ["criou venda"],
+                    source: "manual",
+                }),
+                ...skippedGifts.map((promo: any) => logAuditEvent({
+                    partnerId,
+                    actorUserId: user.id,
+                    entityType: "order",
+                    entityId: order.id,
+                    actionType: "created",
+                    changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
+                    source: "manual",
+                })),
+            ]
+            await Promise.all(auditPromises)
+            if (!data.skipPostCreateRevalidation) {
+                await Promise.all([
+                    capabilities.hasStockMovements ? invalidateInventoryItems(partnerId, stockItems) : Promise.resolve(),
+                    revalidateOrders(partnerId),
+                ])
+            }
+            const { onOrderStatusChanged } = await import("@/lib/services/notification-automation.service")
+            await onOrderStatusChanged(
                 { ...order, partner_id: partnerId },
                 paymentState.situation,
                 order.delivery_status,
                 "manual",
-            ),
-        )
-        .catch(console.error)
+            )
+        } catch (err) {
+            console.error("[createERPOrderAction_background_tasks_error]", err)
+        }
+    })()
 
     return { success: true, orderId: order.id, orderNumber: order.order_number }
 }

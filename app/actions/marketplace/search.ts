@@ -1,13 +1,10 @@
 "use server"
 
-
 import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { redis } from "@/lib/redis"
 import { unstable_cache } from "next/cache"
-
-// Funções Helpers
 import { cache } from "react"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { getCurrentUser } from "@/lib/auth/server-user"
@@ -256,29 +253,36 @@ export const searchMarketplaceDirectFull = cache(async (
         section?: string;
     } = {}
 ) => {
-    const user = await getCurrentUser()
-    const sessionData = user ? await getUserSessionData(user.id) : null
-    let coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
-        ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
-        : null
-
-    if (!coords && limits.latitude && limits.longitude) {
-        coords = { lat: limits.latitude, lng: limits.longitude }
-    }
-
-    let finalCoords = coords
-    if (!finalCoords && limits.cidade) {
-        finalCoords = await resolveCityCoordsFromSlug(limits.cidade)
-    }
-
     const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
     const shouldFetchDistant = isCity && !limits.cursor && !limits.lastId && query && query.trim() !== ""
 
-    // Executa em paralelo a busca local e a nacional
-    const localPromise = _searchMarketplaceCore(query, type, {
-        ...limits,
-        centerCoords: finalCoords
-    })
+    // Coordenadas conhecidas sem rede (repassadoras pelo cliente) — usadas direto quando possível.
+    const immediateCoords = limits.latitude && limits.longitude
+        ? { lat: limits.latitude, lng: limits.longitude }
+        : null
+
+    // Sessão/coords só são obrigatórias antes da busca quando há filtro de raio
+    // (o cálculo de distância usa o resultado ao final, não o início).
+    const sessionCoordsPromise = (async () => {
+        const user = await getCurrentUser()
+        const sessionData = user ? await getUserSessionData(user.id) : null
+        if (sessionData?.profile?.latitude && sessionData?.profile?.longitude) {
+            return { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+        }
+        if (immediateCoords) return immediateCoords
+        if (limits.cidade) return await resolveCityCoordsFromSlug(limits.cidade)
+        return null
+    })()
+
+    const localPromise = limits.radius
+        ? sessionCoordsPromise.then((finalCoords) => _searchMarketplaceCore(query, type, {
+            ...limits,
+            centerCoords: finalCoords
+        }))
+        : _searchMarketplaceCore(query, type, {
+            ...limits,
+            centerCoords: immediateCoords
+        })
 
     const distantPromise = shouldFetchDistant
         ? _searchMarketplaceCore(query, type, {
@@ -290,10 +294,18 @@ export const searchMarketplaceDirectFull = cache(async (
         })
         : Promise.resolve({ results: [] })
 
-    const [localRes, distantRes] = await Promise.all([localPromise, distantPromise])
+    // Escopo local roda junto com a busca: só é consumido no filtro pós-busca.
+    const localScopePromise = isCity && limits.cidade
+        ? resolveCityAndStateFromSlug(limits.cidade)
+        : Promise.resolve(null)
 
-    // Escopo local: remove itens cuja loja fica em outra cidade/fora do raio buscado.
-    const localScopeCity = isCity && limits.cidade ? await resolveCityAndStateFromSlug(limits.cidade) : null
+    const [finalCoords, localRes, distantRes, localScopeCity] = await Promise.all([
+        sessionCoordsPromise,
+        localPromise,
+        distantPromise,
+        localScopePromise,
+    ])
+
     const localResults = (localRes.results || []).filter((item) =>
         isItemWithinSearchScope(item, {
             city: localScopeCity?.city ?? null,
@@ -352,7 +364,7 @@ export const searchMarketplaceDirectFull = cache(async (
             resultsCount: finalResults.length,
             citySlug: limits.cidade || null,
             itemType: type,
-        }).catch(() => {})
+        }).catch(() => { })
     }
 
     return {
@@ -439,8 +451,6 @@ export const searchMarketplace = async (
     return { items, nextCursor, hasMore, moreDistantSellers, moreDistantItems }
 }
 
-
-
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 let cachedGlobalVersion: { version: number; expiresAt: number } | null = null
@@ -452,7 +462,7 @@ async function getCachedGlobalVersion(): Promise<number> {
     }
     let version = 3
     try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch { }
-    cachedGlobalVersion = { version, expiresAt: now + 30_000 } // 30s in-memory TTL
+    cachedGlobalVersion = { version, expiresAt: now + 5 * 60 * 1000 } // 5min in-memory TTL (invalidated via invalidateInMemoryVersionCache)
     return version
 }
 
@@ -463,7 +473,7 @@ export async function invalidateInMemoryVersionCache(): Promise<void> {
     searchMemoryCache.clear()
 }
 
-const SEARCH_MEMORY_TTL_MS = 20_000 // 20s in-memory SWR cache
+const SEARCH_MEMORY_TTL_MS = 60_000 // 60s in-memory SWR cache
 
 const serializeSearchKey = (query: string, type: string, limits: any) => {
     return [
@@ -1183,7 +1193,8 @@ async function searchMarketplaceByCity(
         if (!centerCoords && limits.latitude && limits.longitude) {
             centerCoords = { lat: limits.latitude, lng: limits.longitude }
         }
-        if (!centerCoords && !cidadeSlug.startsWith("estado-")) {
+        // Só resolve coordenadas da cidade quando o filtro de raio realmente vai usá-las.
+        if (!centerCoords && limits.radius && !cidadeSlug.startsWith("estado-")) {
             centerCoords = await resolveCityCoordsFromSlug(cidadeSlug)
         }
 

@@ -5,8 +5,6 @@ import { syncToExploreRedis, getExploreRedisDataKey } from '@/lib/redis-sync'
 import { removeFromExploreRedis } from '@/lib/redis-sync'
 import { isExploreItemProjection, isExploreProductPublic, isExploreServicePublic, isExploreStorePublic } from '@/lib/redis-explore-serializer'
 import { revalidateExploreSearch } from '@/lib/utils/revalidation'
-import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
-import { RateLimitCategory } from '@/lib/rate-limiter'
 
 const ORPHAN_AUDIT_LIMIT = 250
 
@@ -98,10 +96,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const rateLimitResult = await checkRateLimitForAPI(RateLimitCategory.INTERNAL_CRON, 'sync-redis')
-    if (rateLimitResult.limited) {
-      return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
-    }
 
     const supabase = getAdminClient()
     

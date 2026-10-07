@@ -16,7 +16,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 import { revalidatePath } from "next/cache"
 import { revalidateServices } from "@/lib/utils/revalidation"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
-import { incrementCacheVersion } from "@/lib/cache/invalidation"
+import { invalidateServiceCache, incrementCacheVersion } from "@/lib/cache/invalidation"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
@@ -302,7 +302,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         if (insertError) return errorResponse(insertError.message)
 
-        if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
+        if (inserted?.id) await invalidateServiceCache(inserted.id, finalPartnerId, 'create')
         await revalidateServices(finalPartnerId, inserted?.id)
         revalidatePath("/erp/servicos")
         return successResponse(inserted)
@@ -432,8 +432,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
             Promise.all(cleanup).catch(console.error)
         }
 
-        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
-        await incrementCacheVersion()
+        await invalidateServiceCache(serviceId, existing.partner_id, 'update')
         await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse(updated)
@@ -459,7 +458,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
-        await removeFromExploreRedis(serviceId, "servico", true)
+        await invalidateServiceCache(serviceId, existing.partner_id, 'delete')
 
         // 2. Fetch IP and write to audit logs (logAuditEvent)
         const reqHeaders = await headers()
@@ -505,7 +504,7 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
-        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+        await invalidateServiceCache(serviceId, existing.partner_id, 'update')
 
         const reqHeaders = await headers()
         const ip = getTrustedClientIP(reqHeaders)
@@ -549,23 +548,7 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
 
-        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
-
-        const reqHeaders = await headers()
-        const ip = getTrustedClientIP(reqHeaders)
-
-        await logAuditEvent({
-            partnerId: existing.partner_id,
-            actorUserId: user.id,
-            entityType: "service",
-            entityId: serviceId,
-            actionType: "updated",
-            changeLines: [`Arquivou o serviço: ${existing.name} (SKU: ${existing.sku || 'N/A'})`],
-            metadata: { ip_address: ip, name: existing.name, sku: existing.sku },
-            source: "manual"
-        })
-
-        await removeFromExploreRedis(serviceId, "servico")
+        await invalidateServiceCache(serviceId, existing.partner_id, 'delete')
         await revalidateServices(existing.partner_id, serviceId)
         revalidatePath("/erp/servicos")
         return successResponse({ archived: true })
@@ -822,7 +805,7 @@ export async function duplicateServiceAction(serviceId: string) {
             }
         }
 
-        if (inserted?.id) await syncToExploreRedis({ id: inserted.id, type: "servico", data: {}, silent: true })
+        if (inserted?.id) await invalidateServiceCache(inserted.id, service.partner_id, 'create')
         await revalidateServices(service.partner_id, inserted?.id)
         revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })

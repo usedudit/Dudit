@@ -14,7 +14,7 @@ import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
-import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
 import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
@@ -161,6 +161,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                     alt={storeName}
                     className="w-full h-full object-cover object-center transition-transform duration-500"
                     loading="lazy"
+                    decoding="async"
                 />
                 <div className="absolute inset-0" />
             </div>
@@ -272,6 +273,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({ vitrines = [] }) => 
                                     alt={cat.name}
                                     className="w-full h-full object-cover transition-transform duration-500"
                                     loading="lazy"
+                                    decoding="async"
                                 />
                             </div>
                             <span className="font-semibold text-gray-800 text-xs md:text-sm group-hover:text-brand-green transition-colors dark:text-dark-heading">{cat.name}</span>
@@ -351,18 +353,42 @@ interface ItemCardProps {
 const promotionsCache: Record<string, Promise<any[]>> = {}
 const promotionsValueCache: Record<string, any[]> = {}
 
+// Todos os cards montados no mesmo commit pedem promoções ao mesmo tempo; em vez de
+// uma Server Action por parceiro (N POSTs concorrentes na abertura da busca), agrupamos
+// os IDs pendentes e fazemos UMA chamada em lote no fim do commit.
+const pendingPromotions = new Map<string, { resolve: (value: any[]) => void }>()
+let promotionsBatchTimer: ReturnType<typeof setTimeout> | null = null
+
+function flushPromotionsBatch() {
+    promotionsBatchTimer = null
+    const entries = Array.from(pendingPromotions.entries())
+    pendingPromotions.clear()
+    if (entries.length === 0) return
+
+    listActivePromotionsInBatch(entries.map(([partnerId]) => partnerId))
+        .then((result) => {
+            for (const [partnerId, { resolve }] of entries) {
+                const promos = Array.isArray(result?.[partnerId]) ? result[partnerId] : []
+                promotionsValueCache[partnerId] = promos
+                resolve(promos)
+            }
+        })
+        .catch(() => {
+            for (const [partnerId, { resolve }] of entries) {
+                promotionsValueCache[partnerId] = []
+                resolve([])
+            }
+        })
+}
+
 function getCachedPartnerPromotions(partnerId: string) {
     if (!promotionsCache[partnerId]) {
-        promotionsCache[partnerId] = listActivePromotionsForMarketplaceAction(partnerId)
-            .then(res => {
-                const arr = Array.isArray(res) ? res : []
-                promotionsValueCache[partnerId] = arr
-                return arr
-            })
-            .catch(() => {
-                promotionsValueCache[partnerId] = []
-                return []
-            })
+        promotionsCache[partnerId] = new Promise<any[]>((resolve) => {
+            pendingPromotions.set(partnerId, { resolve })
+            if (promotionsBatchTimer === null) {
+                promotionsBatchTimer = setTimeout(flushPromotionsBatch, 0)
+            }
+        })
     }
     return promotionsCache[partnerId]
 }
@@ -563,6 +589,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         alt={product.name}
                         className="w-full h-full object-cover transition-transform duration-500"
                         loading="lazy"
+                        decoding="async"
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {!hidePromoBadge && showPrice && pricing.badgeVariant && (
@@ -785,6 +812,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                                             alt={store.store_name || "Loja"}
                                             className="w-full h-full object-cover"
                                             loading="lazy"
+                                            decoding="async"
                                         />
                                     </div>
                                     <div className="text-center min-w-0 w-full">

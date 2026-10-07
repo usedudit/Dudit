@@ -4,8 +4,9 @@ import { formatCurrency } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { usePartnerTimezone } from "@/lib/store-context"
 import { DashedLine, ReceiptRow } from "@/components/erp/orders/receipt/ReceiptComponents"
+import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 
-type CashSessionCouponData = {
+export type CashSessionCouponData = {
     partnerName: string
     partnerDoc: string
     partnerPhone?: string | null
@@ -33,6 +34,7 @@ type CashSessionCouponPreviewProps = {
     data: CashSessionCouponData
     type: "opening" | "closing"
     printMode?: boolean
+    thermalWidth?: "80mm" | "58mm"
 }
 
 const formatShortDateTime = (iso: string, tz?: string) => {
@@ -41,7 +43,7 @@ const formatShortDateTime = (iso: string, tz?: string) => {
     } catch { return iso }
 }
 
-export default function CashSessionCouponPreview({ data, type, printMode = false }: CashSessionCouponPreviewProps) {
+export default function CashSessionCouponPreview({ data, type, printMode = false, thermalWidth = "80mm" }: CashSessionCouponPreviewProps) {
     const tz = usePartnerTimezone()
     const partnerAddressFormatted = data.partnerAddress
         .split('\n')
@@ -51,9 +53,33 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
 
     return (
         <div
-            className={`mx-auto bg-white text-black font-mono text-[11px] leading-snug break-inside-avoid print:bg-white print:text-black ${printMode ? "sale-receipt-thermal-print" : ""}`}
-            style={{ width: printMode ? "80mm" : "320px", maxWidth: "100%", boxSizing: "border-box" }}
+            className={`thermal-receipt-root mx-auto bg-white text-black font-mono text-[11px] leading-snug break-inside-avoid print:bg-white print:text-black ${printMode ? "sale-receipt-thermal-print" : ""}`}
+            style={{
+                width: printMode ? thermalWidth : (thermalWidth === "58mm" ? "220px" : "320px"),
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                color: "#000000",
+                backgroundColor: "#ffffff",
+                fontFamily: "Consolas, 'Courier New', Monaco, monospace",
+                fontWeight: 500,
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+            }}
         >
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                        .thermal-receipt-root,
+                        .thermal-receipt-root * {
+                            color: #000000 !important;
+                            border-color: #000000 !important;
+                            -webkit-text-fill-color: #000000 !important;
+                            text-shadow: none !important;
+                            box-sizing: border-box !important;
+                        }
+                    `,
+                }}
+            />
             <div className="px-3 py-4">
                 <div className="text-center mb-2">
                     <p className="font-bold text-[13px] uppercase tracking-tight">{data.partnerName}</p>
@@ -140,4 +166,35 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
             </div>
         </div>
     )
+}
+
+export function buildCashSessionCouponData(details: any, partnerHeader: SaleReceiptPartnerHeader): CashSessionCouponData {
+    return {
+        partnerName: partnerHeader.fantasyName,
+        partnerDoc: partnerHeader.taxIdLine,
+        partnerPhone: partnerHeader.phone || null,
+        partnerAddress: partnerHeader.addressLine,
+        sessionId: details.session.id,
+        status: details.session.status,
+        openedAt: details.session.opened_at,
+        closedAt: details.session.closed_at || null,
+        openOperator: details.operators.open_name,
+        closeOperator: details.operators.close_name,
+        initialAmount: details.totals.initial,
+        summaryByPaymentMethod: (details.summaryByPaymentMethod || []).map((row: any) => ({
+            label: row.label,
+            calculated: row.calculated,
+            counted: row.counted,
+            difference: row.difference,
+        })),
+        totals: {
+            totalSalesAllMethods: details.totals.totalSalesAllMethods,
+            totalWithdrawals: details.totals.totalWithdrawals,
+            totalDeposits: details.totals.totalDeposits,
+            calculatedDrawerTotal: details.totals.calculatedDrawerTotal,
+            informedDrawerTotal: details.totals.informedDrawerTotal,
+            difference: details.totals.difference,
+        },
+        notes: details.session.notes || null,
+    }
 }

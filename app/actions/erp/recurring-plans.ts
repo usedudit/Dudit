@@ -9,6 +9,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, RecurringFrequencyType, RecurringShippingMode } from "@/lib/types/recurring"
 import { mapPlanRow } from "@/lib/types/recurring"
 import { sanitizeInput } from "@/lib/input-validator"
+import { invalidateRecurringPlanCache } from "@/lib/cache/invalidation"
 
 const PAGE_SIZE = 20
 
@@ -109,8 +110,8 @@ export async function listRecurringPlansAction(
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           staff_partner_user_id, preferred_time, duration_minutes, sort_order,
-          products:product_id(id, name, price),
-          services:service_id(id, name, price, duration_minutes)
+          products:product_id(id, name, price, images),
+          services:service_id(id, name, price, duration_minutes, images)
         )
       `)
       .eq("partner_id", partnerId)
@@ -285,6 +286,8 @@ export async function createRecurringPlanAction(input: {
       source: "manual",
     })
 
+    await invalidateRecurringPlanCache(plan.id, input.partnerId, "create")
+
     return { success: true, data: mapPlanRow(plan as Record<string, unknown>) }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao criar plano" }
@@ -435,6 +438,8 @@ export async function updateRecurringPlanAction(input: {
       source: "manual",
     })
 
+    await invalidateRecurringPlanCache(input.planId, input.partnerId, "update")
+
     return { success: true, data: mapPlanRow(plan as Record<string, unknown>) }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao atualizar plano" }
@@ -447,8 +452,8 @@ export async function getRecurringPlanFormDataAction(partnerId: string) {
     const supabase = await getSupabaseServerClient()
 
     const [productsRes, servicesRes, staffRes] = await Promise.all([
-      supabase.from("products").select("id, name, price").eq("partner_id", partnerId).eq("is_active", true).order("name").limit(500),
-      supabase.from("services").select("id, name, price, duration_minutes").eq("partner_id", partnerId).eq("is_active", true).order("name").limit(500),
+      supabase.from("products").select("id, name, price, images").eq("partner_id", partnerId).eq("is_active", true).order("name").limit(500),
+      supabase.from("services").select("id, name, price, duration_minutes, images").eq("partner_id", partnerId).eq("is_active", true).order("name").limit(500),
       supabase.from("partner_users").select("id, user_id, role_id").eq("partner_id", partnerId).order("created_at"),
     ])
 
@@ -510,6 +515,8 @@ export async function deleteRecurringPlanAction(partnerId: string, planId: strin
       changeLines: [`excluiu plano recorrente id "${planId}".`],
       source: "manual",
     })
+
+    await invalidateRecurringPlanCache(planId, partnerId, "delete")
 
     return { success: true }
   } catch (e: unknown) {

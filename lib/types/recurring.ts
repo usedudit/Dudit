@@ -92,8 +92,8 @@ export type RecurringPlan = {
 export type RecurringPlanItemRow = RecurringPlanItem & {
   id: string
   planId: string
-  product?: { id: string; name: string; price?: number } | null
-  service?: { id: string; name: string; price?: number; duration?: number } | null
+  product?: { id: string; name: string; price?: number; images?: string[] | null } | null
+  service?: { id: string; name: string; price?: number; duration?: number; images?: string[] | null } | null
 }
 
 export type RecurringSubscription = {
@@ -267,6 +267,10 @@ export function getRecurringShippingModeLabel(mode: RecurringShippingMode): stri
     case "quote": return "Cotado na transportadora"
     default: return mode
   }
+}
+
+export function getRecurringBillingModeLabel(mode?: string | null): string {
+  return mode === "auto_mercado_pago" ? "Automático (Mercado Pago)" : "Manual"
 }
 
 export function getRecurringShippingSourceLabel(source: RecurringShippingSource): string {
