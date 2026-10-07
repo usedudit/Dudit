@@ -15,6 +15,7 @@ import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integr
 import { computeNextExecutionAt, toMpFrequency } from "@/lib/services/recurring/frequency"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 
 interface CreatePreapprovalInput {
   partnerId: string
@@ -90,7 +91,7 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
     const { data: plan } = await admin
       .from("recurring_plans")
       .select(
-        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode, shipping_mode, shipping_flat_amount, store_id",
+        "id, name, status, price, frequency_type, frequency_interval, start_date, weekdays, day_of_month, use_last_day, year_month, year_day, billing_mode, shipping_mode, shipping_flat_amount, fulfillment_modes, store_id",
       )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
@@ -118,6 +119,15 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
 
     // Frete: resolvido UMA vez aqui e congelado na assinatura.
     const deliveryType = input.deliveryType || "pickup"
+    const planModes = normalizeFulfillmentModes(plan.fulfillment_modes, ["delivery", "pickup"])
+    if (!planModes.includes(deliveryType)) {
+      return {
+        success: false,
+        error: deliveryType === "delivery"
+          ? "Este plano é somente para retirada no local."
+          : "Este plano é somente para entrega e não aceita retirada.",
+      }
+    }
     let deliveryFee: number | null = 0
     let deliveryBreakdown: Record<string, unknown> | null = null
 

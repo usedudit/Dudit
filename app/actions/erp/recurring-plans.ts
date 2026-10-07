@@ -10,6 +10,7 @@ import type { RecurringListCursor, RecurringPlanItem, RecurringPlanStatus, Recur
 import { mapPlanRow } from "@/lib/types/recurring"
 import { sanitizeInput } from "@/lib/input-validator"
 import { invalidateRecurringPlanCache } from "@/lib/cache/invalidation"
+import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 
 const PAGE_SIZE = 20
 
@@ -76,6 +77,24 @@ function normalizeShippingInput(input: {
   if (mode === "flat" && raw <= 0) throw new Error("Informe o valor do frete fixo.")
 
   return { mode, flatAmount: mode === "flat" ? Math.round(raw * 100) / 100 : 0 }
+}
+
+const PLAN_FULFILLMENT_MODES: FulfillmentMode[] = ["delivery", "pickup"]
+
+/**
+ * Modalidades aceitas pelo plano (entrega e/ou retirada). A coluna e' NOT NULL
+ * e aceita no minimo uma modalidade; valores desconhecidos sao descartados e a
+ * lista vazia e' um erro de validacao.
+ */
+function normalizePlanFulfillmentModes(
+  input: FulfillmentMode[] | string[] | null | undefined,
+): FulfillmentMode[] {
+  if (input == null) return [...PLAN_FULFILLMENT_MODES]
+  const valid = (Array.isArray(input) ? input : []).filter((mode): mode is FulfillmentMode =>
+    PLAN_FULFILLMENT_MODES.includes(mode as FulfillmentMode),
+  )
+  if (valid.length === 0) throw new Error("Selecione ao menos uma modalidade: entrega ou retirada.")
+  return [...new Set(valid)]
 }
 
 function mapItemsToDb(items: RecurringPlanItem[]) {
@@ -194,6 +213,7 @@ export async function createRecurringPlanAction(input: {
   creditExpirationDays?: number | null
   shippingMode?: RecurringShippingMode
   shippingFlatAmount?: number
+  fulfillmentModes?: FulfillmentMode[]
   storeId?: string
 }) {
   try {
@@ -218,7 +238,12 @@ export async function createRecurringPlanAction(input: {
     }
 
     const { name, interval } = validatePlanInput(input)
-    const shipping = normalizeShippingInput(input)
+    const fulfillmentModes = normalizePlanFulfillmentModes(input.fulfillmentModes)
+    // Plano so de retirada nunca cobra frete.
+    const shipping = normalizeShippingInput({
+      shippingMode: fulfillmentModes.includes("delivery") ? input.shippingMode : "included",
+      shippingFlatAmount: fulfillmentModes.includes("delivery") ? input.shippingFlatAmount : 0,
+    })
     const supabase = await getSupabaseServerClient()
 
     const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
@@ -259,6 +284,7 @@ export async function createRecurringPlanAction(input: {
         credit_expiration_days: input.creditExpirationDays ?? null,
         shipping_mode: shipping.mode,
         shipping_flat_amount: shipping.flatAmount,
+        fulfillment_modes: fulfillmentModes,
       })
       .select("*")
       .single()
@@ -328,6 +354,7 @@ export async function updateRecurringPlanAction(input: {
   creditExpirationDays?: number | null
   shippingMode?: RecurringShippingMode
   shippingFlatAmount?: number
+  fulfillmentModes?: FulfillmentMode[]
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -373,10 +400,17 @@ export async function updateRecurringPlanAction(input: {
     if (input.billingMode) updatePayload.billing_mode = input.billingMode
     if (input.creditExpirationPolicy) updatePayload.credit_expiration_policy = input.creditExpirationPolicy
     if (input.creditExpirationDays !== undefined) updatePayload.credit_expiration_days = input.creditExpirationDays
-    if (input.shippingMode !== undefined) {
+    let fulfillmentModes: FulfillmentMode[] | null = null
+    if (input.fulfillmentModes !== undefined) {
+      fulfillmentModes = normalizePlanFulfillmentModes(input.fulfillmentModes)
+      updatePayload.fulfillment_modes = fulfillmentModes
+    }
+    // Plano so de retirada nunca cobra frete: a politica e zerada junto.
+    const deliveryEnabled = fulfillmentModes ? fulfillmentModes.includes("delivery") : true
+    if (input.shippingMode !== undefined || !deliveryEnabled) {
       const shipping = normalizeShippingInput({
-        shippingMode: input.shippingMode,
-        shippingFlatAmount: input.shippingFlatAmount,
+        shippingMode: deliveryEnabled ? input.shippingMode : "included",
+        shippingFlatAmount: deliveryEnabled ? input.shippingFlatAmount : 0,
       })
       updatePayload.shipping_mode = shipping.mode
       updatePayload.shipping_flat_amount = shipping.flatAmount
@@ -494,8 +528,58 @@ export async function deleteRecurringPlanAction(partnerId: string, planId: strin
     await requireMinimumPlan(partnerId, "escalar")
     const supabase = await getSupabaseServerClient()
 
+    // Planos referenciados por assinaturas/pedidos nao podem ser removidos do
+    // banco (FK restrict/no action). Nesses casos arquivamos: sai da vitrine e
+    // da listagem ativa, mas preserva historico de cobrancas.
+    const [subsRef, ordersRef] = await Promise.all([
+      supabase.from("recurring_subscriptions").select("id", { count: "exact", head: true }).eq("recurring_plan_id", planId),
+      supabase.from("order_items").select("id", { count: "exact", head: true }).eq("recurring_plan_id", planId),
+    ])
+
+    const referencedBySubscriptions = (subsRef.count || 0) > 0
+    const referencedByOrders = (ordersRef.count || 0) > 0
+
+    if (referencedBySubscriptions || referencedByOrders) {
+      const { error: archiveError } = await supabase
+        .from("recurring_plans")
+        .update({
+          status: "archived",
+          show_in_marketplace: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", planId)
+        .eq("partner_id", partnerId)
+
+      if (archiveError) throw archiveError
+
+      await logAuditEvent({
+        partnerId,
+        actorUserId: null,
+        entityType: "recurring_plan",
+        entityId: planId,
+        actionType: "updated",
+        changeLines: [
+          `arquivou plano recorrente id "${planId}" (mantido por ${
+            referencedBySubscriptions ? "assinaturas" : "pedidos"
+          } vinculados).`,
+        ],
+        source: "manual",
+      })
+
+      await invalidateRecurringPlanCache(planId, partnerId, "update")
+
+      return {
+        success: true,
+        archived: true,
+        message: referencedBySubscriptions
+          ? "O plano tinha assinaturas vinculadas, então foi arquivado em vez de excluído. Ele saiu da vitrine e continua disponível apenas no histórico."
+          : "O plano tinha pedidos vinculados, então foi arquivado em vez de excluído. Ele saiu da vitrine e continua disponível apenas no histórico.",
+      }
+    }
+
     // 1. Delete items first
-    await supabase.from("recurring_plan_items").delete().eq("plan_id", planId)
+    const { error: itemsError } = await supabase.from("recurring_plan_items").delete().eq("plan_id", planId)
+    if (itemsError) throw itemsError
 
     // 2. Delete plan
     const { error } = await supabase

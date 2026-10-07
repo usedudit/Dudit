@@ -381,8 +381,11 @@ export async function resolveCheckoutCartLines(
 
     if (itemType === "subscription") {
       const planRow = row.recurring_plans
-      if (!planRow || planRow.status !== "active" || !planRow.show_in_marketplace) {
-        return { success: false, error: "Plano de assinatura indisponível." }
+      if (!planRow) {
+        return { success: false, error: "Plano de assinatura não encontrado. Atualize a página e tente novamente." }
+      }
+      if (planRow.status !== "active" || !planRow.show_in_marketplace) {
+        return { success: false, error: "Este plano não está mais disponível para novas assinaturas." }
       }
 
       const planItems = planRow.recurring_plan_items || []

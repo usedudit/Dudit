@@ -15,8 +15,6 @@ import {
   Pagination,
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { ReportTableCard } from "@/components/erp/reports/widgets"
@@ -58,10 +56,11 @@ import {
   AlertTriangleIcon,
   RepeatIcon,
   SearchIcon,
+  ChevronLeftIcon,
 } from "@/lib/icons"
-import { Button, Badge } from "@/components/reusable"
+import { Button, Badge, ListItem } from "@/components/reusable"
 
-const COLUMNS = [
+const COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
   { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
   { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "250px" },
   { id: "status", label: "Situação", align: "center" as const, width: "150px" },
@@ -73,6 +72,58 @@ const COLUMNS = [
 const PulseBlock = ({ className = "" }: { className?: string }) => (
   <div className={`animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20 ${className}`} />
 )
+
+type SectionKey = "home" | "list" | "billing" | "forecast" | "credits"
+
+const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
+  home: {
+    title: "Assinaturas Recorrentes",
+    subtitle: "Gestão integrada de assinaturas, cobranças, estoque futuro e créditos de serviços.",
+  },
+  list: {
+    title: "Assinaturas",
+    subtitle: "Clientes, próximas execuções e situação de cada assinatura.",
+  },
+  billing: {
+    title: "Faturamento / Cobranças",
+    subtitle: "Pedidos gerados por assinaturas e situação dos pagamentos.",
+  },
+  forecast: {
+    title: "Calendário & Demanda",
+    subtitle: "Execuções e entregas previstas para os próximos 30 dias.",
+  },
+  credits: {
+    title: "Saldos de Créditos",
+    subtitle: "Saldo de serviços disponíveis em cada cliente.",
+  },
+}
+
+const SECTIONS: { key: Exclude<SectionKey, "home">; title: string; description: string; icon: typeof ListIcon }[] = [
+  {
+    key: "list",
+    title: "Assinaturas",
+    description: "Clientes, próximas execuções e ações de pausar, retomar ou cancelar.",
+    icon: ListIcon,
+  },
+  {
+    key: "billing",
+    title: "Faturamento / Cobranças",
+    description: "Pedidos gerados pelas assinaturas e status de pagamento.",
+    icon: MoneyIcon,
+  },
+  {
+    key: "forecast",
+    title: "Calendário & Demanda",
+    description: "Execuções e entregas previstas nos próximos 30 dias.",
+    icon: CalendarIcon,
+  },
+  {
+    key: "credits",
+    title: "Saldos de Créditos",
+    description: "Saldo de serviços disponível em cada cliente.",
+    icon: CreditCardIcon,
+  },
+]
 
 export default function RecurringSubscriptionsPage({
   partnerId,
@@ -94,7 +145,7 @@ export default function RecurringSubscriptionsPage({
   const canManage = canEdit("recurring_subscriptions")
   const { selectedStore } = useStore()
 
-  const [currentTab, setCurrentTab] = useState<"list" | "billing" | "forecast" | "credits">("list")
+  const [currentTab, setCurrentTab] = useState<"home" | "list" | "billing" | "forecast" | "credits">("home")
 
   const [subscriptions, setSubscriptions] = useState<RecurringSubscription[]>(initialSubscriptions)
   const [hasMore, setHasMore] = useState(initialHasMore)
@@ -159,6 +210,10 @@ export default function RecurringSubscriptionsPage({
     }
   }, [partnerId, selectedStore?.id])
 
+  useEffect(() => {
+    void loadStats()
+  }, [loadStats])
+
   // Fetch / reload subscriptions when filters change
   const reload = useCallback(async (statusVal: typeof statusFilter, searchVal: string) => {
     setLoading(true)
@@ -185,6 +240,9 @@ export default function RecurringSubscriptionsPage({
 
   // Load other tab details
   const loadTabDetails = useCallback(async () => {
+    if (currentTab === "home" || currentTab === "list") {
+      return
+    }
     if (currentTab === "billing") {
       setLoadingBilling(true)
       const res = await getSubscriptionBillingPanelAction(partnerId)
@@ -443,13 +501,25 @@ export default function RecurringSubscriptionsPage({
       <div className="w-full space-y-6 pt-4 px-4 md:px-8 pb-8">
         {/* Header */}
         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-              Assinaturas Recorrentes
-            </h1>
-            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-              Gestão integrada de assinaturas, cobranças, estoque futuro e créditos de serviços.
-            </p>
+          <div className="flex items-start gap-3">
+            {currentTab !== "home" && (
+              <Button
+                variant="outline"
+                onClick={() => setCurrentTab("home")}
+                leftIcon={<ChevronLeftIcon size={18} />}
+                className="mt-1 shrink-0"
+              >
+                Voltar
+              </Button>
+            )}
+            <div>
+              <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                {SECTION_META[currentTab].title}
+              </h1>
+              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                {SECTION_META[currentTab].subtitle}
+              </p>
+            </div>
           </div>
           {currentTab === "list" && (
             <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
@@ -459,32 +529,39 @@ export default function RecurringSubscriptionsPage({
         </header>
 
         {/* KPI row */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-          <div className="lg:col-span-12">
-            {kpis.length > 0 ? (
-              <SummaryCards metrics={kpis} variant="horizontal" />
-            ) : (
-              <PulseBlock className="h-[120px] w-full" />
-            )}
+        {(currentTab === "home" || currentTab === "list") && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+            <div className="lg:col-span-12">
+              {kpis.length > 0 ? (
+                <SummaryCards metrics={kpis} variant="horizontal" />
+              ) : (
+                <PulseBlock className="h-[120px] w-full" />
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Landing: secoes no estilo configuracoes */}
+        {currentTab === "home" && (
+          <FadeIn key="home-sections" className="w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {SECTIONS.map((section) => (
+                <ListItem
+                  key={section.key}
+                  icon={section.icon}
+                  title={section.title}
+                  description={section.description}
+                  onClick={() => setCurrentTab(section.key)}
+                  showChevron
+                  className="px-4 py-3 gap-4"
+                />
+              ))}
+            </div>
+          </FadeIn>
+        )}
 
         {/* Sections */}
-        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as typeof currentTab)} className="w-full">
-          <TabsList className="mb-8">
-            <TabsTrigger value="list" icon={ListIcon}>
-              Assinaturas
-            </TabsTrigger>
-            <TabsTrigger value="billing" icon={MoneyIcon}>
-              Faturamento / Cobranças
-            </TabsTrigger>
-            <TabsTrigger value="forecast" icon={CalendarIcon}>
-              Calendário & Demanda
-            </TabsTrigger>
-            <TabsTrigger value="credits" icon={CreditCardIcon}>
-              Saldos de Créditos
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as SectionKey)} className="w-full">
 
           {/* Tab 1: Subscriptions list */}
           <TabsContent value="list">
@@ -538,16 +615,16 @@ export default function RecurringSubscriptionsPage({
                       <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                       <div className="overflow-x-auto custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                        <table className="sub-table w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                        <table className="sub-table w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                           <thead>
-                            <tr>
-                              {COLUMNS.map((col) => (
+                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                              {COLUMNS.map((col, index) => (
                                 <th
                                   key={col.id}
-                                  className="pb-3 pr-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border"
+                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
                                   style={{ width: col.width }}
                                 >
-                                  <div className={`flex items-center ${col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                  <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
                                     {col.label}
                                   </div>
                                 </th>

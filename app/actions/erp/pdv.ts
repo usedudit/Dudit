@@ -1118,15 +1118,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     // A new POS cart can be finalized directly. Existing saved drafts still
     // use the persisted pre-sale as the source of truth and remain idempotent.
     let preSaleDraft: any = null
-    if (input.preSaleId) {
-        const { data } = await supabase
-            .from("pre_sales")
-            .select("*")
-            .eq("id", input.preSaleId)
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
-        preSaleDraft = data
-    } else if (input.draft) {
+    if (input.draft) {
         preSaleDraft = {
             status: "draft",
             customer_id: input.draft.customerId || null,
@@ -1142,6 +1134,14 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             coupon_code: input.draft.couponCode || null,
             coupon_discount_amount: input.draft.couponDiscountAmount || 0,
         }
+    } else if (input.preSaleId) {
+        const { data } = await supabase
+            .from("pre_sales")
+            .select("*")
+            .eq("id", input.preSaleId)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+        preSaleDraft = data
     }
 
     if (!preSaleDraft) {

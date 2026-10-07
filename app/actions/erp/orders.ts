@@ -1811,6 +1811,64 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { rawPromotions: raw, filteredPromotions: filtered }
     })()
 
+    const couponPromise = (async () => {
+        if (!capabilities.hasCoupons) return { couponIdToSave: null, couponDiscountAmount: 0, couponPricingData: null as import("@/lib/services/pricing-engine").PricingCoupon | null, error: null as string | null }
+        if (data.couponCode?.trim()) {
+            const resolvedCustId = await customerIdPromise.then(r => r.id).catch(() => null)
+            const couponValidation = await validateCoupon({
+                partnerId,
+                code: data.couponCode,
+                customerId: resolvedCustId,
+                subtotal: Number(data.subtotal || 0),
+                shippingCost: Number(data.shippingCost || 0),
+                items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+            })
+            if (!couponValidation.valid) {
+                return { couponIdToSave: null, couponDiscountAmount: 0, couponPricingData: null, error: couponValidation.errorMessage || "Cupom inválido." }
+            }
+            return {
+                couponIdToSave: couponValidation.couponId || null,
+                couponDiscountAmount: Number(couponValidation.discountAmount || 0),
+                couponPricingData: couponValidation.pricingCoupon || null,
+                error: null,
+            }
+        } else if (data.couponId) {
+            const resolvedCustId = await customerIdPromise.then(r => r.id).catch(() => null)
+            const couponValidation = await validateCouponById(data.couponId, {
+                partnerId,
+                customerId: resolvedCustId,
+                subtotal: Number(data.subtotal || 0),
+                shippingCost: Number(data.shippingCost || 0),
+                items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+            })
+            if (couponValidation.valid) {
+                return {
+                    couponIdToSave: data.couponId,
+                    couponDiscountAmount: Number(couponValidation.discountAmount || 0),
+                    couponPricingData: couponValidation.pricingCoupon || null,
+                    error: null,
+                }
+            }
+        }
+        return { couponIdToSave: null, couponDiscountAmount: 0, couponPricingData: null, error: null }
+    })()
+
+    const stockValidationPromise = (async () => {
+        if (!capabilities.hasStockMovements) return null
+        const partnerRowRes = await partnerRowPromise
+        const pInfo = normalizeBusinessInfo(partnerRowRes.data?.business_info)
+        const settings: SalesSettings = {
+            ...DEFAULT_SALES_SETTINGS,
+            ...((pInfo as any)?.salesSettings || {}),
+        }
+        return validateERPItemsStock({
+            supabase,
+            partnerId,
+            items: sanitizedItems,
+            salesSettings: settings,
+        })
+    })()
+
     const [
         limitCheck,
         customerResolved,
@@ -1821,6 +1879,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         [{ data: productsCost }, { data: variantsCost }, { data: servicesCost }],
         sellerCommissionAmount,
         { filteredPromotions },
+        couponResult,
+        stockValidationError,
     ] = await Promise.all([
         limitCheckPromise,
         customerIdPromise,
@@ -1831,6 +1891,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         itemCostPromise,
         sellerCommissionPromise,
         promotionsPromise,
+        couponPromise,
+        stockValidationPromise,
     ])
 
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
@@ -1855,50 +1917,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { error: "A venda não pode ser salva com valor total zerado." }
     }
 
-    if (capabilities.hasStockMovements) {
-        const stockValidationError = await validateERPItemsStock({
-            supabase,
-            partnerId,
-            items: sanitizedItems,
-            salesSettings,
-        })
-        if (stockValidationError) return { error: stockValidationError }
-    }
+    if (stockValidationError) return { error: stockValidationError }
+    if (couponResult.error) return { error: couponResult.error }
 
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-
-    let couponIdToSave: string | null = capabilities.hasCoupons ? (data.couponId || null) : null
-    let couponDiscountAmount = capabilities.hasCoupons ? Math.max(0, Number(data.couponDiscountAmount || 0)) : 0
-    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
-    if (capabilities.hasCoupons && data.couponCode?.trim()) {
-        const couponValidation = await validateCoupon({
-            partnerId,
-            code: data.couponCode,
-            customerId,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (!couponValidation.valid) return { error: couponValidation.errorMessage || "Cupom inválido." }
-        couponIdToSave = couponValidation.couponId || null
-        couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-        couponPricingData = couponValidation.pricingCoupon || null
-    } else if (capabilities.hasCoupons && couponIdToSave) {
-        const couponValidation = await validateCouponById(couponIdToSave, {
-            partnerId,
-            customerId,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (couponValidation.valid) {
-            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-            couponPricingData = couponValidation.pricingCoupon || null
-        } else {
-            couponIdToSave = null
-            couponDiscountAmount = 0
-        }
-    }
+    let couponIdToSave: string | null = couponResult.couponIdToSave
+    let couponDiscountAmount = couponResult.couponDiscountAmount
+    let couponPricingData = couponResult.couponPricingData
 
     // ── Server-side pricing recalculation ────────────────────────────────
     const { buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
@@ -2835,17 +2860,17 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     const supabase = createAdminClient()
-    const capabilities = await getPartnerCapabilities(data.partnerId, { storeId: data.storeId })
-    let customerId: string | null
-    try {
-        customerId = await resolvePartnerCustomerId(supabase, data.partnerId, data.customerId)
-    } catch (error: any) {
-        return { error: error?.message || "Cliente inválido para este parceiro." }
-    }
+    const capabilitiesPromise = getPartnerCapabilities(data.partnerId, { storeId: data.storeId })
+
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
-    const { data: currentOrder, error: currentOrderError } = await supabase
+
+    const customerIdPromise = resolvePartnerCustomerId(supabase, data.partnerId, data.customerId)
+        .then(id => ({ id, error: null }))
+        .catch(err => ({ id: null, error: err?.message || "Cliente inválido para este parceiro." }))
+
+    const currentOrderPromise = supabase
         .from("orders")
         .select(`
             id,
@@ -2879,17 +2904,101 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .eq("partner_id", data.partnerId)
         .single()
 
+    const partnerRowPromise = supabase
+        .from("partners")
+        .select("business_info")
+        .eq("id", data.partnerId)
+        .single()
+
+    const financeAccountPromise = data.financeAccountId
+        ? supabase.from("finance_accounts").select("id").eq("id", data.financeAccountId).eq("partner_id", data.partnerId).limit(1).maybeSingle()
+        : Promise.resolve({ data: null })
+
+    const preparationEstimatePromise = resolveOrderPreparationEstimate({
+        supabase,
+        partnerId: data.partnerId,
+        items: sanitizedItems,
+        deliveryMethod: data.deliveryMethod,
+    })
+
+    const promotionsPromise = (async () => {
+        const caps = await capabilitiesPromise
+        if (!caps.hasCampaigns) return { rawPromotions: [] as any[], filteredPromotions: [] as any[] }
+        const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock } = await import("@/app/actions/shared/promotions")
+        const resolvedCust = await customerIdPromise
+        const raw = await listActivePromotionsForMarketplaceAction(data.partnerId, resolvedCust.id)
+        const filtered = (raw && raw.length > 0) ? await filterRawPromotionsByGiftStock(raw, supabase) : []
+        return { rawPromotions: raw, filteredPromotions: filtered }
+    })()
+
+    const couponPromise = (async () => {
+        const caps = await capabilitiesPromise
+        if (!caps.hasCoupons) return { couponIdToSave: null, couponDiscountAmount: 0, couponPricingData: null as import("@/lib/services/pricing-engine").PricingCoupon | null }
+        const resolvedCust = await customerIdPromise
+        if (data.couponCode?.trim()) {
+            const couponValidation = await validateCoupon({
+                partnerId: data.partnerId,
+                code: data.couponCode,
+                customerId: resolvedCust.id,
+                subtotal: Number(data.subtotal || 0),
+                shippingCost: Number(data.shippingCost || 0),
+                items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+            })
+            if (couponValidation.valid) {
+                return {
+                    couponIdToSave: couponValidation.couponId || null,
+                    couponDiscountAmount: Number(couponValidation.discountAmount || 0),
+                    couponPricingData: couponValidation.pricingCoupon || null,
+                }
+            }
+        } else if (data.couponId) {
+            const couponValidation = await validateCouponById(data.couponId, {
+                partnerId: data.partnerId,
+                customerId: resolvedCust.id,
+                subtotal: Number(data.subtotal || 0),
+                shippingCost: Number(data.shippingCost || 0),
+                items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+            })
+            if (couponValidation.valid) {
+                return {
+                    couponIdToSave: data.couponId,
+                    couponDiscountAmount: Number(couponValidation.discountAmount || 0),
+                    couponPricingData: couponValidation.pricingCoupon || null,
+                }
+            }
+        }
+        return { couponIdToSave: null, couponDiscountAmount: 0, couponPricingData: null }
+    })()
+
+    const [
+        capabilities,
+        customerResolved,
+        { data: currentOrder, error: currentOrderError },
+        { data: partnerRow },
+        { data: financeAccount },
+        preparationEstimate,
+        { filteredPromotions },
+        couponResult,
+    ] = await Promise.all([
+        capabilitiesPromise,
+        customerIdPromise,
+        currentOrderPromise,
+        partnerRowPromise,
+        financeAccountPromise,
+        preparationEstimatePromise,
+        promotionsPromise,
+        couponPromise,
+    ])
+
+    if (customerResolved.error) return { error: customerResolved.error }
+    const customerId = customerResolved.id
+
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
 
     if (currentOrder.situation === "cancelled") {
         return { error: "Pedidos cancelados não podem ser editados." }
     }
 
-    const { data: partnerRow } = await supabase
-        .from("partners")
-        .select("business_info")
-        .eq("id", data.partnerId)
-        .single()
     const partnerInfo = normalizeBusinessInfo(partnerRow?.business_info)
     const salesSettings: SalesSettings = {
         ...DEFAULT_SALES_SETTINGS,
@@ -2976,48 +3085,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         }
     }
 
-    // ── Coupon validation and promotions fetch for updates ─────────────────────────────────────
-    let couponIdToSave: string | null = capabilities.hasCoupons ? (data.couponId || null) : null
-    let couponDiscountAmount = capabilities.hasCoupons ? Math.max(0, Number(data.couponDiscountAmount || 0)) : 0
-    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
-
-    if (capabilities.hasCoupons && data.couponCode?.trim()) {
-        const couponValidation = await validateCoupon({
-            partnerId: data.partnerId,
-            code: data.couponCode,
-            customerId,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (couponValidation.valid) {
-            couponIdToSave = couponValidation.couponId || null
-            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-            couponPricingData = couponValidation.pricingCoupon || null
-        } else {
-            couponIdToSave = null
-            couponDiscountAmount = 0
-        }
-    } else if (capabilities.hasCoupons && couponIdToSave) {
-        const couponValidation = await validateCouponById(couponIdToSave, {
-            partnerId: data.partnerId,
-            customerId,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (couponValidation.valid) {
-            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-            couponPricingData = couponValidation.pricingCoupon || null
-        } else {
-            couponIdToSave = null
-            couponDiscountAmount = 0
-        }
-    }
-
-    const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
-    const rawPromotions = capabilities.hasCampaigns ? await listActivePromotionsForMarketplaceAction(data.partnerId, customerId) : []
-    const filteredPromotions = (capabilities.hasCampaigns && rawPromotions.length > 0) ? await filterRawPromotionsByGiftStock(rawPromotions, supabase) : []
+    let couponIdToSave: string | null = couponResult.couponIdToSave
+    let couponDiscountAmount = couponResult.couponDiscountAmount
+    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = couponResult.couponPricingData
+    const { buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
 
     const updatePricingResult = calculateOrderPricing({
         items: sanitizedItems.map((item) => ({
@@ -3083,14 +3154,6 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         baselineQuantities,
     }) : null
     if (stockValidationError) return { error: stockValidationError }
-    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const { data: financeAccount } = (capabilities.hasFinancial && data.financeAccountId) ? await supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("id", data.financeAccountId)
-        .eq("partner_id", data.partnerId)
-        .limit(1)
-        .maybeSingle() : { data: null }
     if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
@@ -3104,12 +3167,6 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
         deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
     }
-    const preparationEstimate = await resolveOrderPreparationEstimate({
-        supabase,
-        partnerId: data.partnerId,
-        items: sanitizedItems,
-        deliveryMethod: data.deliveryMethod,
-    })
 
     const changeLines = buildOrderChangeLines(currentOrder, { ...data, items: sanitizedItems })
     if (changeLines.length === 0) {
@@ -3118,6 +3175,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
     let updateServerTotal = updatePricingResult.finalTotal
+    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
     let adjustedPaymentBreakdown = sanitizedPaymentBreakdown
 
     const isUnpaidOrder = currentOrder.situation !== 'paid' && currentOrder.situation !== 'partially_paid'

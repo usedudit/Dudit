@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon, ClockIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, FormDropdown, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, FormDropdown, Tabs, TabsList, TabsTrigger, MoneyInput } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -165,7 +165,7 @@ export default function PlanItemFormSheet({
             {/* Item details config screen */}
             {selectedItem ? (
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    <div className="bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                 <img
@@ -176,9 +176,6 @@ export default function PlanItemFormSheet({
                                 />
                             </div>
                             <div className="min-w-0">
-                                <span className="text-[11px] font-bold text-brand-primary uppercase tracking-wider">
-                                    {activeTab === "product" ? "Produto Selecionado" : "Serviço Selecionado"}
-                                </span>
                                 <h4 className="font-bold text-brand-dark dark:text-dark-heading text-base leading-tight mt-0.5 truncate">
                                     {selectedItem.name}
                                 </h4>
@@ -203,14 +200,11 @@ export default function PlanItemFormSheet({
                             min={1}
                             required
                         />
-                        <Input
-                            type="number"
+                        <MoneyInput
                             label="Preço Unitário Customizado"
-                            placeholder={`Padrão: ${selectedItem.price.toFixed(2)}`}
                             value={unitPrice}
-                            onChange={(e) => setUnitPrice(e.target.value)}
+                            onChange={(val) => setUnitPrice(val > 0 ? String(val) : "")}
                             min={0}
-                            step="0.01"
                         />
                     </div>
 

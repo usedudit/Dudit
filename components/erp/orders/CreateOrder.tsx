@@ -1508,28 +1508,28 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
                     const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
-                    const autoDeliveryResult = await createERPDeliveryAction({
+                    const deliveryPromise = createERPDeliveryAction({
                         partnerId,
                         orderIds: [createdOrderId],
                         deliveryPersonId: isPlatformDriver ? null : (selectedDeliveryPersonId || null),
                         status: payload.deliveryStatus as any,
                         startedAt: new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString(),
                         notes: notes?.trim() || undefined,
+                    }).then(async (autoDeliveryResult) => {
+                        if (!autoDeliveryResult.success) {
+                            notifyError("Pedido criado, mas a entrega automática falhou", autoDeliveryResult.error)
+                        } else if (platformDriverId && autoDeliveryResult.deliveryId) {
+                            const assignmentResult = await assignPlatformDriverToDeliveryAction({
+                                partnerId,
+                                deliveryId: autoDeliveryResult.deliveryId,
+                                orderIds: [createdOrderId],
+                                driverId: platformDriverId,
+                                notes: notes?.trim() || undefined,
+                            })
+                            if (!assignmentResult.success) notifyError("Pedido criado, mas não foi possível atribuir o entregador Dudit", assignmentResult.error)
+                        }
                     })
-                    await attachmentPromise
-
-                    if (!autoDeliveryResult.success) {
-                        notifyError("Pedido criado, mas a entrega automática falhou", autoDeliveryResult.error)
-                    } else if (platformDriverId && autoDeliveryResult.deliveryId) {
-                        const assignmentResult = await assignPlatformDriverToDeliveryAction({
-                            partnerId,
-                            deliveryId: autoDeliveryResult.deliveryId,
-                            orderIds: [createdOrderId],
-                            driverId: platformDriverId,
-                            notes: notes?.trim() || undefined,
-                        })
-                        if (!assignmentResult.success) notifyError("Pedido criado, mas não foi possível atribuir o entregador Dudit", assignmentResult.error)
-                    }
+                    await Promise.all([deliveryPromise, attachmentPromise])
                 } else if (editOrderId) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
                     const [syncResult] = await Promise.all([

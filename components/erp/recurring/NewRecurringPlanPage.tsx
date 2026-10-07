@@ -41,6 +41,8 @@ import { useSidebar } from "@/lib/sidebar-context"
 import PlanItemFormSheet from "./PlanItemFormSheet"
 import { formatCurrency } from "@/lib/utils/formatters"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
+import { normalizeFulfillmentModes, type FulfillmentMode } from "@/lib/commerce/capabilities"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -102,6 +104,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     // Politica de frete do plano (Fase 3 de assinaturas)
     const [shippingMode, setShippingMode] = useState<RecurringShippingMode>("included")
     const [shippingFlatAmount, setShippingFlatAmount] = useState("")
+    const [fulfillmentModes, setFulfillmentModes] = useState<FulfillmentMode[]>(["delivery", "pickup"])
 
     // Plan images state (similar to AddProductPage.tsx)
     const [images, setImages] = useState<(string | File)[]>([])
@@ -182,6 +185,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             setShippingMode(planShippingMode)
             const planFlat = plan.shippingFlatAmount ?? plan.shipping_flat_amount
             setShippingFlatAmount(planFlat != null ? String(Number(planFlat)) : "")
+            setFulfillmentModes(
+                normalizeFulfillmentModes(
+                    (plan.fulfillmentModes ?? plan.fulfillment_modes) as string[] | null | undefined,
+                    ["delivery", "pickup"],
+                ),
+            )
         }
     }, [plan])
 
@@ -206,10 +215,16 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             ((plan.shippingMode || plan.shipping_mode || "included") === "flat"
                 ? String(Number(plan.shippingFlatAmount ?? plan.shipping_flat_amount ?? 0))
                 : "") ||
+            JSON.stringify(fulfillmentModes) !== JSON.stringify(
+                normalizeFulfillmentModes(
+                    (plan.fulfillmentModes ?? plan.fulfillment_modes) as string[] | null | undefined,
+                    ["delivery", "pickup"],
+                ),
+            ) ||
             JSON.stringify(items) !== JSON.stringify(plan.items) ||
             JSON.stringify(images) !== JSON.stringify(plan.images || [])
         )
-    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, billingMode, creditExpirationPolicy, creditExpirationDays, shippingMode, shippingFlatAmount, items, images, plan])
+    }, [name, description, status, frequencyType, frequencyInterval, startDate, endDate, showInMarketplace, billingMode, creditExpirationPolicy, creditExpirationDays, shippingMode, shippingFlatAmount, fulfillmentModes, items, images, plan])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -405,8 +420,9 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 billingMode,
                 creditExpirationPolicy,
                 creditExpirationDays: creditExpirationPolicy === "fixed_days" ? creditExpirationDays : null,
-                shippingMode,
-                shippingFlatAmount: shippingMode === "flat" ? Number(shippingFlatAmount || 0) : 0,
+                shippingMode: fulfillmentModes.includes("delivery") ? shippingMode : "included",
+                shippingFlatAmount: fulfillmentModes.includes("delivery") && shippingMode === "flat" ? Number(shippingFlatAmount || 0) : 0,
+                fulfillmentModes,
                 items: items.map((item) => ({
                     itemType: item.itemType,
                     productId: item.productId,
@@ -766,40 +782,55 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 
                                             <SidebarCard hasSeparator hasTopStrip title="Frete">
                                                 <div className="space-y-5">
-                                                    <FormDropdown
-                                                        label="Como cobrar o frete"
-                                                        value={shippingMode}
-                                                        setValue={(val) => setShippingMode(val as RecurringShippingMode)}
-                                                        options={shippingModeOptions}
+                                                    <FulfillmentModesEditor
+                                                        label="Como o cliente pode receber"
+                                                        allowedModes={["delivery", "pickup"]}
+                                                        value={fulfillmentModes}
+                                                        onChange={(modes) => setFulfillmentModes(modes)}
                                                     />
 
-                                                    {shippingMode === "flat" && (
-                                                        <Input
-                                                            type="number"
-                                                            label="Valor do frete"
-                                                            placeholder="Ex: 12,90"
-                                                            value={shippingFlatAmount}
-                                                            onChange={(e) => {
-                                                                setShippingFlatAmount(e.target.value)
-                                                                setFieldErrors((prev) => {
-                                                                    const next = new Set(prev)
-                                                                    next.delete("shippingFlatAmount")
-                                                                    return next
-                                                                })
-                                                            }}
-                                                            required
-                                                            min={0}
-                                                            error={fieldErrors.has("shippingFlatAmount")}
-                                                            errorMessage={fieldErrors.has("shippingFlatAmount") ? "Informe o valor do frete" : undefined}
-                                                            dataField="shippingFlatAmount"
-                                                        />
-                                                    )}
+                                                    {fulfillmentModes.includes("delivery") ? (
+                                                        <>
+                                                            <FormDropdown
+                                                                label="Como cobrar o frete"
+                                                                value={shippingMode}
+                                                                setValue={(val) => setShippingMode(val as RecurringShippingMode)}
+                                                                options={shippingModeOptions}
+                                                            />
 
-                                                    <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
-                                                        {shippingMode === "included" && "O frete fica embutido no preço dos itens e é cobrado igual em todos os ciclos."}
-                                                        {shippingMode === "flat" && "O valor fixo é cobrado em todos os ciclos, sem re-cotação."}
-                                                        {shippingMode === "quote" && "O frete é cotado uma única vez no cadastro do cliente e permanece o mesmo até o fim da assinatura."}
-                                                    </p>
+                                                            {shippingMode === "flat" && (
+                                                                <Input
+                                                                    type="number"
+                                                                    label="Valor do frete"
+                                                                    placeholder="Ex: 12,90"
+                                                                    value={shippingFlatAmount}
+                                                                    onChange={(e) => {
+                                                                        setShippingFlatAmount(e.target.value)
+                                                                        setFieldErrors((prev) => {
+                                                                            const next = new Set(prev)
+                                                                            next.delete("shippingFlatAmount")
+                                                                            return next
+                                                                        })
+                                                                    }}
+                                                                    required
+                                                                    min={0}
+                                                                    error={fieldErrors.has("shippingFlatAmount")}
+                                                                    errorMessage={fieldErrors.has("shippingFlatAmount") ? "Informe o valor do frete" : undefined}
+                                                                    dataField="shippingFlatAmount"
+                                                                />
+                                                            )}
+
+                                                            <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
+                                                                {shippingMode === "included" && "O frete fica embutido no preço dos itens e é cobrado igual em todos os ciclos."}
+                                                                {shippingMode === "flat" && "O valor fixo é cobrado em todos os ciclos, sem re-cotação."}
+                                                                {shippingMode === "quote" && "O frete é cotado uma única vez no cadastro do cliente e permanece o mesmo até o fim da assinatura."}
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
+                                                            Este plano é somente para retirada no local: nenhuma cobrança de frete é feita e o cliente não terá a opção de entrega.
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </SidebarCard>
                                         </div>
@@ -811,7 +842,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                 <FadeIn key="items">
                                     {items.length === 0 ? (
                                         <div className="space-y-6">
-                                            <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                            <div className="flex flex-col items-center justify-center text-center">
                                                 <IconPlaceholder
                                                     icon={BoxIcon}
                                                     title="Não há itens no plano"

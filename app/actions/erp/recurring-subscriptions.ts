@@ -342,7 +342,7 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
             services:service_id(id, name, price, duration_minutes)
           )
         ),
-        customers:customer_id(id, name, email, phone, address),
+        customers:customer_id(id, name, email, phone),
         recurring_subscription_items(
           id, item_type, product_id, service_id, quantity, unit_price,
           preferred_time, duration_minutes, sort_order,

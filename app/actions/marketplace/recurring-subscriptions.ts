@@ -15,6 +15,7 @@ import { computeNextExecutionAt } from "@/lib/services/recurring/frequency"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
 import { updateMpPreapprovalAmount } from "@/lib/services/mercadopago/partner-preapproval"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -115,7 +116,7 @@ export async function subscribeToRecurringPlanAction(input: {
     const { data: plan } = await admin
       .from("recurring_plans")
       .select(
-        "id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, store_id",
+        "id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, fulfillment_modes, store_id",
       )
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
@@ -123,6 +124,17 @@ export async function subscribeToRecurringPlanAction(input: {
 
     if (!plan?.id || plan.status !== "active" || !plan.show_in_marketplace) {
       return { success: false, error: "Plano indisponível para assinatura." }
+    }
+
+    const deliveryType = input.deliveryType || "pickup"
+    const planModes = normalizeFulfillmentModes(plan.fulfillment_modes, ["delivery", "pickup"])
+    if (!planModes.includes(deliveryType)) {
+      return {
+        success: false,
+        error: deliveryType === "delivery"
+          ? "Este plano é somente para retirada no local."
+          : "Este plano é somente para entrega e não aceita retirada.",
+      }
     }
 
     // Modulo recorrente exclusivo do Escalar: recusa amigavel ao comprador
@@ -160,7 +172,7 @@ export async function subscribeToRecurringPlanAction(input: {
         recurring_plan_id: input.planId,
         status: "active",
         next_execution_at: nextExecutionAt,
-        delivery_type: input.deliveryType || "pickup",
+        delivery_type: deliveryType,
         delivery_address: input.deliveryAddress || null,
       })
       .select("*")

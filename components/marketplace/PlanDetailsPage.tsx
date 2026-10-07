@@ -4,15 +4,19 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon } from "@/lib/icons"
+import { ShareIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon, FlagIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, CepInput, Spinner, InfoCard } from "@/components/reusable"
+import { Button, Input, CepInput, Spinner, InfoCard, DefaultModal } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
+import { StorePoliciesModal } from "./StorePoliciesModal"
+import { ReportModal } from "./ReportModal"
+import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import type { SponsoredAd } from "@/lib/ads/types"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
@@ -22,6 +26,7 @@ import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/a
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getStoreUrl, getPlanUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 
 interface PlanDetailsPageClientProps {
     plan: any
@@ -29,6 +34,7 @@ interface PlanDetailsPageClientProps {
     userProfile?: any
     cartCount?: number
     hideHeaderAndFooter?: boolean
+    sponsoredAd?: SponsoredAd | null
 }
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
@@ -45,6 +51,7 @@ export function PlanDetailsPageClient({
     userProfile,
     cartCount,
     hideHeaderAndFooter = false,
+    sponsoredAd = null,
 }: PlanDetailsPageClientProps) {
     const router = useRouter()
     const { user, supabase } = useSupabase()
@@ -54,9 +61,27 @@ export function PlanDetailsPageClient({
     const [submitting, setSubmitting] = useState(false)
     const [deliveryType, setDeliveryType] = useState<"pickup" | "delivery">("pickup")
     const [showShareModal, setShowShareModal] = useState(false)
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
+    const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+
+    // Modalidades aceitas pelo plano (entrega/retirada). Sem delivery o plano
+    // nunca cobra frete e o cliente so' pode retirar.
+    const planModes = useMemo(
+        () => normalizeFulfillmentModes(plan?.fulfillmentModes ?? plan?.fulfillment_modes, ["delivery", "pickup"]),
+        [plan],
+    )
+    const acceptsDelivery = planModes.includes("delivery")
+    const acceptsPickup = planModes.includes("pickup")
+
+    useEffect(() => {
+        if (!acceptsDelivery && acceptsPickup) setDeliveryType("pickup")
+        if (acceptsDelivery && !acceptsPickup) setDeliveryType("delivery")
+    }, [acceptsDelivery, acceptsPickup])
 
     // Image gallery states
     const [activeImgIndex, setActiveImgIndex] = useState(0)
@@ -92,7 +117,8 @@ export function PlanDetailsPageClient({
         const p = plan.partners || {}
         const store = plan.stores || p.stores || p.store
         const address = store?.addresses?.[0] || p.addresses?.[0] || {}
-        const storeId = store?.id || p.store_id || plan.store_id || p.id || plan.partner_id || "1"
+        const realPartnerId = p.id || plan.partner_id || plan.partnerId || "1"
+        const storeId = store?.id || p.store_id || plan.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.storeName || "Vendedor da Dudit"
         const isShowcaseActive = (store?.is_showcase_active ?? p.is_showcase_active ?? plan.is_showcase_active ?? true) !== false
         const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p.accept_orders_when_closed ?? plan.accept_orders_when_closed ?? true) !== false
@@ -102,12 +128,12 @@ export function PlanDetailsPageClient({
             isShowcaseActive,
             acceptOrdersWhenClosed,
             timezone,
-            id: storeId,
+            id: realPartnerId,
             short_id: store?.short_id || p.short_id || plan.store_short_id || p?.store?.short_id,
             slug: store?.slug || p.slug,
             store_id: storeId,
             name: storeName,
-            partner_id: p.id || plan.partner_id,
+            partner_id: realPartnerId,
             user_id: p.user_id,
             store_name: storeName,
             city: address?.city || store?.city || p.city || "Brasil",
@@ -296,7 +322,7 @@ export function PlanDetailsPageClient({
             const token = await fetchCSRFTokenSingleton() || ""
             const result = await addSubscriptionToCartAction({
                 recurringPlanId: plan.id,
-                partnerId: partner.id,
+                partnerId: partner.partner_id || partner.id,
                 csrf_token: token,
             })
 
@@ -304,7 +330,8 @@ export function PlanDetailsPageClient({
                 invalidateCartCache()
                 const checkoutData = {
                     source: "cart",
-                    partnerId: partner.id,
+                    partnerId: partner.partner_id || partner.id,
+                    storeId: plan.stores ? partner.store_id : undefined,
                     products: [{
                         id: plan.id,
                         name: plan.name,
@@ -418,46 +445,44 @@ export function PlanDetailsPageClient({
 
     const BuyPanel = (
         <div className="bg-white dark:bg-dark-surface relative">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-[#ecfdf5] text-brand-green font-bold text-xs rounded-full uppercase tracking-wider">
-                        Assinatura {frequencyLabel}
-                    </span>
-                </div>
+            <div className="flex items-center gap-2 mb-4">
+                <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                    Assinatura
+                </span>
+                <span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
+                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                    {frequencyLabel}
+                </span>
             </div>
 
             <h1 className="text-lg md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {plan.name}
             </h1>
 
-            {/* Price details */}
-            <div className="mb-6 pb-6 border-b border-brand-border">
-                <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                    Valor da assinatura
-                </span>
-                <div className="flex items-baseline gap-1.5">
-                    <span className="text-[32px] lg:text-[40px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tight">
-                        {formatCurrency(planPrice)}
-                    </span>
-                    <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body uppercase">
-                        / {plan.frequency_type === "monthly" ? "mês" : plan.frequency_type === "weekly" ? "semana" : plan.frequency_type === "daily" ? "dia" : "período"}
-                    </span>
+            {/* Price */}
+            <div className="mb-6">
+                <div className="space-y-1">
+                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                        {formatCurrency(planPrice)}{plan.frequency_type === "monthly" ? "/mês" : plan.frequency_type === "weekly" ? "/semana" : plan.frequency_type === "daily" ? "/dia" : plan.frequency_type === "yearly" ? "/ano" : "/período"}
+                    </p>
+                    <p className="text-xs md:text-[0.875rem] text-brand-inactive-text dark:text-dark-body mt-1">
+                        Cobrança recorrente {frequencyLabel}
+                    </p>
+                    {plan.billingMode === "auto_mercado_pago" && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">
+                            ✓ Faturamento automático no cartão (Mercado Pago)
+                        </p>
+                    )}
                 </div>
-                <span className="text-xs text-brand-green font-semibold mt-2 block">
-                    ✓ Cobrança recorrente {frequencyLabel}
-                </span>
-                {plan.billingMode === "auto_mercado_pago" && (
-                    <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 block">
-                        ✓ Faturamento automático no cartão (Mercado Pago)
-                    </span>
-                )}
             </div>
 
             {/* Freight policy */}
             <div className="flex items-start gap-2 pb-6 mb-6 border-b border-brand-border text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
                 <TruckIcon size={14} className="text-brand-primary mt-0.5 shrink-0" />
                 <span>
-                    {planShippingMode === "flat" ? (
+                    {!acceptsDelivery ? (
+                        <>Somente retirada no local — nenhuma cobrança de frete.</>
+                    ) : planShippingMode === "flat" ? (
                         <>Frete fixo de <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(planShippingFlat)}</strong> cobrado em cada ciclo, sem re-cotação.</>
                     ) : planShippingMode === "quote" ? (
                         <>Frete cotado uma única vez no cadastro, conforme o seu endereço, e mantido em todos os ciclos da assinatura.</>
@@ -498,24 +523,28 @@ export function PlanDetailsPageClient({
                     <div className="mb-6">
                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Como deseja receber?</h3>
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => setDeliveryType("pickup")}
-                                className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "pickup"
-                                    ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                    : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
-                                    }`}
-                            >
-                                Retirar no Local
-                            </button>
-                            <button
-                                onClick={() => setDeliveryType("delivery")}
-                                className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "delivery"
-                                    ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                    : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
-                                    }`}
-                            >
-                                Entrega
-                            </button>
+                            {acceptsPickup && (
+                                <button
+                                    onClick={() => setDeliveryType("pickup")}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "pickup"
+                                        ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
+                                        : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
+                                        }`}
+                                >
+                                    Retirar no Local
+                                </button>
+                            )}
+                            {acceptsDelivery && (
+                                <button
+                                    onClick={() => setDeliveryType("delivery")}
+                                    className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "delivery"
+                                        ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
+                                        : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
+                                        }`}
+                                >
+                                    Entrega
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -647,32 +676,195 @@ export function PlanDetailsPageClient({
                     )}
 
                     {/* Subscribe button */}
-                    <button
-                        onClick={handleSubscribe}
-                        disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
-                        className="w-full py-4 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-[15px]"
-                    >
-                        {partner.isShowcaseActive === false ? (
-                            "Vitrine Inativa"
-                        ) : isClosedAndBlocking ? (
-                            "Loja Fechada"
-                        ) : submitting ? (
-                            <>
-                                <Spinner size={16} className="text-white" />
-                                Processando assinatura...
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircleIcon size={18} />
-                                Assinar Agora
-                            </>
-                        )}
-                    </button>
+                    <div className="hidden lg:block mb-4">
+                        <Button
+                            onClick={handleSubscribe}
+                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
+                            className="w-full h-[46px]"
+                        >
+                            {partner.isShowcaseActive === false ? (
+                                "Vitrine Inativa"
+                            ) : isClosedAndBlocking ? (
+                                "Loja Fechada"
+                            ) : submitting ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Processando assinatura...
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                    <CheckCircleIcon size={18} />
+                                    Assinar Agora
+                                </span>
+                            )}
+                        </Button>
 
-                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body text-center mt-4 leading-relaxed font-medium">
-                        Ao assinar, você concorda com os termos da Dudit e autoriza cobranças recorrentes no período selecionado. Cancele quando quiser.
-                    </p>
+                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body text-center mt-4 leading-relaxed font-medium">
+                            Ao assinar, você concorda com os termos da Dudit e autoriza cobranças recorrentes no período selecionado. Cancele quando quiser.
+                        </p>
+                    </div>
                 </>
+            )}
+
+            {/* Informações importantes Accordion */}
+            <div className="border-t border-brand-border pt-4 mb-4">
+                <div className="border-b border-brand-border pb-3">
+                    <button
+                        type="button"
+                        onClick={() => setExpandedAccordion(expandedAccordion === "important_info" ? null : "important_info")}
+                        className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
+                    >
+                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Informações importantes</span>
+                        <ChevronDownIcon
+                            size={18}
+                            className={`text-brand-inactive-text dark:text-dark-body transition-transform duration-200 ${expandedAccordion === "important_info" ? "rotate-180" : ""}`}
+                        />
+                    </button>
+                    <AnimatePresence initial={false}>
+                        {expandedAccordion === "important_info" && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                className="overflow-hidden"
+                            >
+                                <div className="pt-2 pb-1 flex flex-col gap-3">
+                                    {/* Item 1 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPaymentModal(true)}
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
+                                    >
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Pagamento direto ao vendedor</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Entenda onde vai o seu dinheiro nesta compra</span>
+                                    </button>
+                                    {/* Item 2 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowResponsibilityModal(true)}
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
+                                    >
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Quem cuida do seu pedido?</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Entenda sobre a entrega, garantia e pós-venda</span>
+                                    </button>
+                                    {/* Item 3 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPoliciesModal(true)}
+                                        className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 transition-colors flex flex-col gap-0.5"
+                                    >
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Políticas da loja</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">Informações sobre devoluções, trocas e cancelamentos</span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Store (Reputation & Levels Card) */}
+            <div className="mb-8 mt-4">
+                {(() => {
+                    const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
+                    const sellerBannerFallback = sellerAvatarImage
+                        ? getDefaultBannerSeeded(partner.id || partner.store_name || "Vendedor")
+                        : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"));
+                    const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
+                        ? getR2ImageUrl(partner.banner_url, "large")
+                        : sellerBannerFallback;
+
+                    return (
+                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
+                            {/* Top clickable block linking to partner profile */}
+                            <Link href={getStoreUrl(partner)} prefetch={false} className="block group">
+                                {/* Banner */}
+                                <div className="aspect-[1400/300] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
+                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover object-center" />
+                                    <div className="absolute inset-0" />
+                                </div>
+
+                                {/* Profile Header */}
+                                <div className="px-4 pt-0 relative flex flex-col">
+                                    {/* Avatar Container overlapping the banner */}
+                                    <div className="w-14 h-14 rounded-full border-2 border-white overflow-hidden bg-white -mt-7 z-10 self-start shadow-xs">
+                                        <UserProfileImage
+                                            fullName={partner.store_name}
+                                            imageUrl={sellerAvatarImage}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+
+                                    {/* Store Name and Details */}
+                                    <div className="mt-2 min-w-0">
+                                        <div className="flex items-center gap-1.5 justify-between">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-base truncate">
+                                                {partner.store_name}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
+                                            {partner.city} - {partner.state}
+                                        </p>
+                                    </div>
+                                </div>
+                            </Link>
+
+                            <div className="px-4 pb-4">
+                                {/* Reputation & Levels Bar */}
+                                <div className="my-6 flex flex-col gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base leading-none">{reputationLevel.badge}</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Horizontal segment bars */}
+                                    <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
+                                        {[1, 2, 3, 4, 5].map((lvl) => (
+                                            <div
+                                                key={lvl}
+                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"
+                                                    }`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 3 columns metrics */}
+                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
+                                    </div>
+                                    <div className="flex flex-col items-center border-x border-brand-border">
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            {/* Sponsored ad below seller card */}
+            <SponsoredAdDetailSlot ad={sponsoredAd} />
+
+            {!isPlanOwner && (
+                <button
+                    onClick={() => setShowReportModal(true)}
+                    className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] transition-colors"
+                >
+                    <FlagIcon size={14} />
+                    Comunicar algo errado
+                </button>
             )}
         </div>
     )
@@ -687,9 +879,114 @@ export function PlanDetailsPageClient({
     }
 
     return (
-        <div className="bg-white dark:bg-dark-background min-h-screen text-brand-dark dark:text-dark-heading flex flex-col pt-4">
-            {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
+        <>
+            <ShareModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
+                url={isMounted ? `${window.location.origin}${getPlanUrl(plan, partner)}` : ""}
+                title={plan.name}
+                shareMessage={`Gostou? Espalhe a novidade!\n\n*${plan.name}*\nAssinatura recorrente na Dudit:`}
+                label="Link do plano"
+            />
 
+            <StorePoliciesModal
+                isOpen={showPoliciesModal}
+                onClose={() => setShowPoliciesModal(false)}
+                partnerId={partner.partner_id || partner.id}
+                storeName={partner.store_name}
+            />
+
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                targetType="partner"
+                targetId={partner.partner_id || partner.id}
+                targetName={partner.store_name}
+            />
+
+            <DefaultModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                maxWidth="md"
+                hideHeader={true}
+            >
+                <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
+                    <button
+                        onClick={() => setShowPaymentModal(false)}
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
+                        title="Fechar"
+                    >
+                        <XIcon size={18} />
+                    </button>
+                    {/* Header with Dual Squares */}
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
+                            alt="Pagamento"
+                            className="w-64 h-auto object-contain transform translate-y-7"
+                        />
+                    </div>
+
+                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Onde vai o seu dinheiro?</h4>
+                    <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
+                        <p>
+                            Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra.
+                        </p>
+                        <p>
+                            Isso significa que o seu dinheiro vai direto para o vendedor, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!
+                        </p>
+                    </div>
+                    <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8 h-12">Entendi</Button>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showResponsibilityModal}
+                onClose={() => setShowResponsibilityModal(false)}
+                maxWidth="md"
+                hideHeader={true}
+            >
+                <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
+                    <Button
+                        variant="filled"
+                        onClick={() => setShowResponsibilityModal(false)}
+                        className="absolute top-3 right-3 z-10 w-10 h-10 hidden md:flex"
+                        title="Fechar"
+                    >
+                        <XIcon size={18} />
+                    </Button>
+                    {/* Header with Dual Squares */}
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/Responsabilidade.png"
+                            alt="Responsabilidade"
+                            className="w-64 h-auto object-contain transform translate-y-7"
+                        />
+                    </div>
+
+                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Quem cuida do seu pedido?</h4>
+                    <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
+                        <p>
+                            A Dudit é a ponte que conecta você ao vendedor. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução da venda é por conta do vendedor.
+                        </p>
+                        <p>
+                            A responsabilidade por separar o produto, realizar a entrega, oferecer garantia e resolver trocas ou devoluções é exclusivamente do vendedor. Se tiver qualquer dúvida sobre o seu item, o melhor caminho é chamar o vendedor no WhatsApp para alinhar tudo, beleza?
+                        </p>
+                    </div>
+                    <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8 h-12">Entendi</Button>
+                </div>
+            </DefaultModal>
+
+            {!hideHeaderAndFooter && (
+                <MarketplaceHeader
+                    userProfile={userProfile}
+                    cartCount={cartCount}
+                    productName={plan.name}
+                    onShare={() => setShowShareModal(true)}
+                />
+            )}
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -716,7 +1013,11 @@ export function PlanDetailsPageClient({
                                     <span className="text-white text-sm font-semibold">
                                         {lightboxActiveImg + 1}/{galleryItems.length}
                                     </span>
-                                    <div className="w-10 h-10"></div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                            <ShareIcon size={20} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Desktop layout */}
@@ -814,60 +1115,70 @@ export function PlanDetailsPageClient({
                                     ))}
                                 </div>
 
-                                <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
-                                    {/* Desktop Prev Button */}
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {galleryItems.length > 1 && (
-                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
-                                                <ChevronLeftIcon size={20} className="text-brand-dark" />
-                                            </button>
-                                        )}
-                                    </div>
+                                <div className="flex-1 min-w-0 flex items-start gap-2 lg:gap-4">
+                                    {/* Gallery navigation + image (centered vertically) */}
+                                    <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
+                                        {/* Desktop Prev Button */}
+                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                            {galleryItems.length > 1 && (
+                                                <Button variant="filled" onClick={goToPrev} className="w-10 h-10 flex items-center justify-center">
+                                                    <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                </Button>
+                                            )}
+                                        </div>
 
-                                    <div className="relative flex-1 min-w-0">
-                                        {/* Desktop main image */}
-                                        <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
-                                            <div ref={galleryContainerRef}
-                                                className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
-                                                onMouseMove={(e) => {
-                                                    const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
-                                                    zoomOriginX.set(((e.clientX - left) / width) * 100)
-                                                    zoomOriginY.set(((e.clientY - top) / height) * 100)
-                                                    zoomScale.set(2.2)
-                                                }}
-                                                onMouseLeave={() => zoomScale.set(1)}
-                                                onClick={() => openLightbox(activeImgIndex)}>
-                                                <AnimatePresence mode="popLayout" custom={slideDirection}>
-                                                    <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
-                                                        className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${plan.name} à venda em ${partner.city} - ${partner.state}`}
-                                                        custom={slideDirection} variants={slideVariants}
-                                                        initial="enter" animate="center" exit="exit"
-                                                        transition={{ duration: 0.2 }}
-                                                        onClick={() => openLightbox(activeImgIndex)}
-                                                        style={{ transformOrigin, scale: smoothScale }} />
+                                        <div className="relative flex-1 min-w-0">
+                                            {/* Desktop main image */}
+                                            <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
+                                                <div ref={galleryContainerRef}
+                                                    className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
+                                                    onMouseMove={(e) => {
+                                                        const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
+                                                        zoomOriginX.set(((e.clientX - left) / width) * 100)
+                                                        zoomOriginY.set(((e.clientY - top) / height) * 100)
+                                                        zoomScale.set(2.2)
+                                                    }}
+                                                    onMouseLeave={() => zoomScale.set(1)}
+                                                    onClick={() => openLightbox(activeImgIndex)}>
+                                                    <AnimatePresence mode="popLayout" custom={slideDirection}>
+                                                        <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
+                                                            className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${plan.name} à venda em ${partner.city} - ${partner.state}`}
+                                                            custom={slideDirection} variants={slideVariants}
+                                                            initial="enter" animate="center" exit="exit"
+                                                            transition={{ duration: 0.2 }}
+                                                            onClick={() => openLightbox(activeImgIndex)}
+                                                            style={{ transformOrigin, scale: smoothScale }} />
+                                                    </AnimatePresence>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile main image */}
+                                            <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
+                                                <AnimatePresence mode="wait" custom={slideDirection}>
+                                                    {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${plan.name} à venda em ${partner.city} - ${partner.state}`)}
                                                 </AnimatePresence>
                                             </div>
                                         </div>
 
-                                        {/* Mobile main image */}
-                                        <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
-                                            <AnimatePresence mode="wait" custom={slideDirection}>
-                                                {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${plan.name} à venda em ${partner.city} - ${partner.state}`)}
-                                            </AnimatePresence>
+                                        {/* Desktop Actions Column (top) + Next Button */}
+                                        <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
+                                            {/* Action buttons at top */}
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                                                    <ShareIcon size={18} className="text-brand-green" />
+                                                </Button>
+                                            </div>
+
+                                            {/* Spacer to push Next button to middle */}
+                                            <div className="flex-1" />
+
+                                            {/* Next Button centered */}
+                                            {galleryItems.length > 1 && (
+                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                </Button>
+                                            )}
                                         </div>
-                                    </div>
-
-                                    {/* Desktop Next Button + Actions Column */}
-                                    <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
-                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center border-brand-border rounded-full" title="Compartilhar">
-                                            <ShareIcon className="w-5 h-5 text-brand-green" />
-                                        </Button>
-
-                                        {galleryItems.length > 1 && (
-                                            <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                            </Button>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -939,94 +1250,6 @@ export function PlanDetailsPageClient({
                                 </div>
                             </div>
 
-                            {/* Seller / Store Reputation & Levels Card */}
-                            <div className="border-t border-brand-border pt-8 mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-5">Quem oferece?</h3>
-                                {(() => {
-                                    const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null
-                                    const sellerBannerFallback = sellerAvatarImage
-                                        ? getDefaultBannerSeeded(partner.id || partner.store_name || "Vendedor")
-                                        : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"))
-                                    const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
-                                        ? getR2ImageUrl(partner.banner_url, "large")
-                                        : sellerBannerFallback
-
-                                    return (
-                                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
-                                            {/* Banner Link to Partner Profile */}
-                                            <Link href={getStoreUrl(partner)} className="block group">
-                                                <div className="aspect-[1400/300] w-full relative bg-gray-100 dark:bg-dark-border/50 overflow-hidden select-none">
-                                                    <img src={sellerBannerImage} alt={`Banner de ${partner.store_name}`} className="w-full h-full object-cover object-center" />
-                                                    <div className="absolute inset-0" />
-                                                </div>
-
-                                                <div className="px-5 pt-0 relative flex flex-col">
-                                                    {/* Avatar overlapping banner */}
-                                                    <div className="w-14 h-14 rounded-full border-2 border-white overflow-hidden bg-white -mt-7 z-10 self-start shadow-xs">
-                                                        <UserProfileImage
-                                                            fullName={partner.store_name || "Vendedor"}
-                                                            imageUrl={sellerAvatarImage}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-
-                                                    <div className="mt-3 min-w-0">
-                                                        <div className="flex items-center gap-1.5 justify-between">
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg truncate">
-                                                                {partner.store_name || partner.store_name}
-                                                            </span>
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                <StarIcon size={14} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
-                                                            </div>
-                                                        </div>
-                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
-                                                            {partner.city} - {partner.state}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </Link>
-
-                                            <div className="px-5 pb-5 mt-4">
-                                                {/* Reputation / Levels metrics */}
-                                                <div className="my-5 flex flex-col gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-lg leading-none">{reputationLevel.badge}</span>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
-                                                        {[1, 2, 3, 4, 5].map((lvl) => (
-                                                            <div
-                                                                key={lvl}
-                                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"}`}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center border-x border-brand-border">
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
-                                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-
                             {/* Accordion FAQs */}
                             <div className="border-t border-brand-border pt-8 mb-10">
                                 <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-5">Dúvidas Frequentes</h3>
@@ -1082,57 +1305,47 @@ export function PlanDetailsPageClient({
                             {BuyPanel}
                         </div>
                     </div>
-                </div>
 
-                {/* Mobile Bottom Bar */}
-                {!isPlanOwner && (
-                    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t dark:border-dark-border p-4 z-50 flex gap-3 lg:hidden shadow-lg items-center justify-between">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider">Assinatura</span>
-                            <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-none mt-0.5">
-                                {formatCurrency(planPrice)}
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal"> / {plan.frequency_type === "monthly" ? "mês" : "período"}</span>
-                            </span>
-                            {planShippingMode === "flat" && planShippingFlat > 0 && (
-                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                    + frete {formatCurrency(planShippingFlat)} por ciclo
+                    {/* Mobile bottom bar */}
+                    {!isPlanOwner && (
+                        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t dark:border-dark-border p-4 z-50 flex gap-3 lg:hidden shadow-lg">
+                            <div className="flex-1 flex flex-col justify-center min-w-0">
+                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider">Assinatura</span>
+                                <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-none mt-0.5 truncate">
+                                    {formatCurrency(planPrice)}
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">/{plan.frequency_type === "monthly" ? "mês" : plan.frequency_type === "weekly" ? "semana" : plan.frequency_type === "daily" ? "dia" : "período"}</span>
                                 </span>
-                            )}
+                                {acceptsDelivery && planShippingMode === "flat" && planShippingFlat > 0 && (
+                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
+                                        + frete {formatCurrency(planShippingFlat)} por ciclo
+                                    </span>
+                                )}
+                            </div>
+                            <Button
+                                className="flex-1 rounded-full min-w-[120px]"
+                                disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
+                                onClick={handleSubscribe}
+                            >
+                                {partner.isShowcaseActive === false ? (
+                                    "Vitrine Inativa"
+                                ) : isClosedAndBlocking ? (
+                                    "Loja Fechada"
+                                ) : submitting ? (
+                                    <span className="flex items-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Assinando...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        <CheckCircleIcon size={16} />
+                                        Assinar
+                                    </span>
+                                )}
+                            </Button>
                         </div>
-                        <button
-                            onClick={handleSubscribe}
-                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
-                            className="px-6 py-3.5 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm shrink-0"
-                        >
-                            {partner.isShowcaseActive === false ? (
-                                "Vitrine Inativa"
-                            ) : isClosedAndBlocking ? (
-                                "Loja Fechada"
-                            ) : submitting ? (
-                                <>
-                                    <Spinner size={14} className="text-white animate-spin" />
-                                    Assinando...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircleIcon size={16} />
-                                    Assinar
-                                </>
-                            )}
-                        </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </motion.div>
-
-            <ShareModal
-                isOpen={showShareModal}
-                onClose={() => setShowShareModal(false)}
-                url={isMounted ? `${window.location.origin}${getPlanUrl(plan, partner)}` : ""}
-                title={plan.name}
-                shareMessage={`Gostou? Espalhe a novidade!\n\n*${plan.name}*\nAssinatura recorrente na Dudit:`}
-                label="Link do plano"
-            />
-
-        </div>
+        </>
     )
 }

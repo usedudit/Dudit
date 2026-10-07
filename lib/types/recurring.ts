@@ -1,3 +1,8 @@
+import {
+  normalizeFulfillmentModes,
+  type FulfillmentMode,
+} from "@/lib/commerce/capabilities"
+
 export type RecurringPlanStatus = "active" | "inactive" | "archived"
 export type RecurringFrequencyType = "daily" | "weekly" | "monthly" | "yearly" | "custom"
 export type RecurringSubscriptionStatus =
@@ -87,6 +92,9 @@ export type RecurringPlan = {
   creditExpirationDays?: number | null
   shippingMode?: RecurringShippingMode
   shippingFlatAmount?: number
+  /** Modalidades aceitas pelo plano. Sem `delivery` nenhum frete e cobrado. */
+  fulfillmentModes?: FulfillmentMode[]
+  fulfillment_modes?: string[] | null
 }
 
 export type RecurringPlanItemRow = RecurringPlanItem & {
@@ -216,6 +224,11 @@ export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
     creditExpirationDays: row.credit_expiration_days != null ? Number(row.credit_expiration_days) : null,
     shippingMode: (row.shipping_mode as RecurringShippingMode | undefined) || "included",
     shippingFlatAmount: row.shipping_flat_amount != null ? Number(row.shipping_flat_amount) : 0,
+    fulfillment_modes: Array.isArray(row.fulfillment_modes) ? (row.fulfillment_modes as string[]) : null,
+    fulfillmentModes: normalizeFulfillmentModes(
+      row.fulfillment_modes as string[] | null | undefined,
+      ["delivery", "pickup"] as FulfillmentMode[],
+    ),
   }
 }
 

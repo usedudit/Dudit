@@ -293,7 +293,11 @@ export default function RecurringPlansPage({
         try {
             const res = await deleteRecurringPlanAction(partnerId, itemToDelete.id)
             if (res.success) {
-                notifySuccess("Plano recorrente excluído com sucesso!")
+                if (res.archived) {
+                    notifySuccess(res.message || "Plano com histórico vinculado foi arquivado em vez de excluído.")
+                } else {
+                    notifySuccess("Plano recorrente excluído com sucesso!")
+                }
                 setSelectedIds(prev => {
                     const next = new Set(prev)
                     next.delete(itemToDelete.id)
@@ -317,11 +321,19 @@ export default function RecurringPlansPage({
         setIsDeleting(true)
         try {
             let count = 0
+            let archived = 0
             for (const id of Array.from(selectedIds)) {
                 const res = await deleteRecurringPlanAction(partnerId, id)
-                if (res.success) count++
+                if (res.success) {
+                    count++
+                    if (res.archived) archived++
+                }
             }
-            notifySuccess(`${count} planos recorrentes excluídos com sucesso!`)
+            notifySuccess(
+                archived > 0
+                    ? `${count} planos processados (${archived} arquivados por terem assinaturas ou pedidos vinculados).`
+                    : `${count} planos recorrentes excluídos com sucesso!`
+            )
             setSelectedIds(new Set())
             afterMutation()
         } catch (e) {

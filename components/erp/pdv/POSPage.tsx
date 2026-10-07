@@ -1018,15 +1018,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }
 
     const ensurePreSaleToFinalize = async () => {
-        // A new cart is finalized directly. A persisted draft is updated only
-        // when it already exists and the operator changed it.
-        if (!activePreSaleId) return null
-        const savedId = await persistDraft()
-        if (!savedId) {
-            notifyError("Não foi possível atualizar a pré-venda antes de finalizar.")
-            return null
-        }
-        return savedId
+        // Return active draft ID directly without an extra network roundtrip,
+        // since finalizePreSaleAction already receives the live cart payload and updates status atomically.
+        return activePreSaleId || null
     }
 
     const loadPreSale = useCallback((preSale: PreSale) => {
@@ -1215,7 +1209,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 storeId: activeStoreId || null,
                 preSaleId: preSaleIdToFinalize || null,
                 checkoutId: preSaleIdToFinalize ? null : (directCheckoutIdRef.current ||= crypto.randomUUID()),
-                draft: preSaleIdToFinalize ? undefined : {
+                draft: {
                     customerId: selectedCustomerId || null,
                     items: cart.filter((item) => !item.isGift).map((item) => ({
                         productId: item.productId || null,

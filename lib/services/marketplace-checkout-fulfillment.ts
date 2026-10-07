@@ -23,6 +23,7 @@ import {
   toMpFrequency,
 } from "@/lib/services/recurring/frequency"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 
 const STOREFRONT_CHANNEL = "online_storefront"
@@ -628,8 +629,35 @@ async function createSubscriptionFromPlan(
     deliveryBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ subscriptionId: string; executionId: string }> {
+  // O plano e' a fonte da verdade: buscamos primeiro (sem filtrar pelo
+  // partner_id vindo do checkout) e usamos o partner proprio do plano.
+  const { data: plan, error: planError } = await supabase
+    .from("recurring_plans")
+    .select(
+      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, shipping_mode, shipping_flat_amount, fulfillment_modes, store_id, partner_id",
+    )
+    .eq("id", params.recurringPlanId)
+    .maybeSingle()
+
+  if (planError) throw planError
+  if (!plan?.id) throw new Error("Plano de assinatura não encontrado.")
+  if (plan.status !== "active") throw new Error("Este plano não está mais ativo para novas assinaturas.")
+  if (!plan.show_in_marketplace) throw new Error("Este plano não está disponível para novas assinaturas.")
+
+  // Modalidades do plano: so' entrega quando o plano aceita entrega etc.
+  const planModes = normalizeFulfillmentModes(plan.fulfillment_modes, ["delivery", "pickup"])
+  if (!planModes.includes(params.deliveryType)) {
+    throw new Error(
+      params.deliveryType === "delivery"
+        ? "Este plano é somente para retirada no local."
+        : "Este plano é somente para entrega e não aceita retirada.",
+    )
+  }
+
+  const partnerId = String(plan.partner_id || params.partnerId)
+
   const customerId = await ensureMarketplaceCustomer({
-    partnerId: params.partnerId,
+    partnerId,
     name: params.buyerName,
     email: params.buyerEmail,
     phone: params.buyerPhone || null,
@@ -641,19 +669,6 @@ async function createSubscriptionFromPlan(
     .update({ user_id: params.buyerId })
     .eq("id", customerId)
     .is("user_id", null)
-
-  const { data: plan } = await supabase
-    .from("recurring_plans")
-    .select(
-      "id, name, status, price, start_date, show_in_marketplace, billing_mode, frequency_type, frequency_interval, weekdays, day_of_month, use_last_day, year_month, year_day, shipping_mode, shipping_flat_amount, store_id",
-    )
-    .eq("id", params.recurringPlanId)
-    .eq("partner_id", params.partnerId)
-    .maybeSingle()
-
-  if (!plan?.id || plan.status !== "active" || !plan.show_in_marketplace) {
-    throw new Error("Plano de assinatura indisponível.")
-  }
 
   // Frete: resolvido UMA vez aqui e congelado na assinatura. A cobranca dos
   // ciclos seguintes nunca re-cota.
@@ -672,7 +687,7 @@ async function createSubscriptionFromPlan(
   const { data: existing } = await supabase
     .from("recurring_subscriptions")
     .select("id")
-    .eq("partner_id", params.partnerId)
+    .eq("partner_id", partnerId)
     .eq("customer_id", customerId)
     .eq("recurring_plan_id", params.recurringPlanId)
     .in("status", ["active", "paused"])
@@ -690,7 +705,7 @@ async function createSubscriptionFromPlan(
   const { data: subscription, error: subError } = await supabase
     .from("recurring_subscriptions")
     .insert({
-      partner_id: params.partnerId,
+      partner_id: partnerId,
       store_id: plan.store_id || null,
       customer_id: customerId,
       recurring_plan_id: params.recurringPlanId,
@@ -718,7 +733,7 @@ async function createSubscriptionFromPlan(
     .from("recurring_executions")
     .insert({
       subscription_id: subscription.id,
-      partner_id: params.partnerId,
+      partner_id: partnerId,
       scheduled_for: scheduledFor,
       status: "completed",
       order_id: params.orderId,
@@ -736,7 +751,7 @@ async function createSubscriptionFromPlan(
   // partir do proximo ciclo (nextExecutionAt).
   if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) + shipping.amount > 0) {
     await linkMpPreapproval(supabase, {
-      partnerId: params.partnerId,
+      partnerId,
       subscriptionId: subscription.id as string,
       payerEmail: params.buyerEmail,
       planName: plan.name || "Plano de assinatura",

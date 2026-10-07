@@ -6,6 +6,7 @@ import { getPlanUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getUserSessionData } from "@/lib/data/user"
+import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const dynamic = 'force-dynamic'
@@ -79,6 +80,10 @@ export default async function PlanDetailsPage({
     const userProfile = sessionData?.profile ? {
         full_name: sessionData.profile.full_name,
         address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null,
+        latitude: sessionData.profile.latitude,
+        longitude: sessionData.profile.longitude,
+        city: sessionData.profile.city,
+        state: sessionData.profile.state,
         avatar_url: sessionData.profile.avatar_url || null
     } : null
     const cartCount = sessionData?.cartCount || 0
@@ -95,6 +100,15 @@ export default async function PlanDetailsPage({
     }
 
     const partner = plan.partners || {}
+
+    const detailAds = await getSponsoredAdsForSlot("detail", {
+        lat: userProfile?.latitude ?? null,
+        lng: userProfile?.longitude ?? null,
+        citySlug: currentCidadeUf,
+        city: userProfile?.city ?? null,
+        state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
+    })
+    const detailAd = detailAds[0] ?? null
 
     // Schema.org JSON-LD for Product/Service/Plan
     const schemaJsonLd = {
@@ -125,6 +139,7 @@ export default async function PlanDetailsPage({
                 currentUserId={user?.id || null}
                 userProfile={userProfile}
                 cartCount={cartCount}
+                sponsoredAd={detailAd}
             />
 
             <MarketplaceFooter />

@@ -386,31 +386,46 @@ export async function addSubscriptionToCartAction(
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
-  const guard = await assertCanBuyFromStore(user.id, input.partnerId)
+  const admin = getAdminClient()
+
+  // O plano e' a fonte da verdade: busca por id (ou short_id) e usa o
+  // partner_id/ store_id do proprio plano. Assim um id de parceiro errado
+  // vindo do cliente nao derruba a compra com "plano indisponivel".
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.recurringPlanId)
+  const planFields = "id, short_id, status, show_in_marketplace, partner_id, store_id"
+  const { data: plan, error: planError } = isUuid
+    ? await admin.from("recurring_plans").select(planFields).eq("id", input.recurringPlanId).maybeSingle()
+    : await admin.from("recurring_plans").select(planFields).eq("short_id", input.recurringPlanId).maybeSingle()
+
+  if (planError) {
+    console.error("[addSubscriptionToCartAction] Falha ao buscar plano:", planError.message)
+  }
+  if (!plan) {
+    return { error: "Plano não encontrado. Atualize a página e tente novamente." }
+  }
+  if (plan.status !== "active") {
+    return { error: "Este plano não está mais ativo para novas assinaturas." }
+  }
+  if (!plan.show_in_marketplace) {
+    return { error: "Este plano não está disponível para novas assinaturas no momento." }
+  }
+
+  const partnerId = String(plan.partner_id)
+
+  const guard = await assertCanBuyFromStore(user.id, partnerId)
   if (guard.error) return { error: guard.error }
 
   const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
-  const admin = getAdminClient()
-  const acceptance = await canStoreAcceptOrders(admin, { partnerId: input.partnerId })
+  const acceptance = await canStoreAcceptOrders(admin, { partnerId })
   if (!acceptance.allowed) return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
-  const { data: plan } = await admin
-    .from("recurring_plans")
-    .select("id, status, show_in_marketplace, partner_id, store_id")
-    .eq("id", input.recurringPlanId)
-    .eq("partner_id", input.partnerId)
-    .maybeSingle()
-
-  if (!plan || plan.status !== "active" || !plan.show_in_marketplace) {
-    return { error: "Plano indisponível." }
-  }
 
   // Modulo recorrente exclusivo do Escalar: recusa amigavel ao comprador
   const { getRecurringModuleAccess, checkActiveSubscriptionCreateLimit } = await import("@/lib/services/recurring/limits")
-  const access = await getRecurringModuleAccess(input.partnerId)
+  const access = await getRecurringModuleAccess(partnerId)
   if (!access.allowed) {
     return { error: "Este lojista não possui assinaturas recorrentes disponíveis no momento." }
   }
-  const subLimit = await checkActiveSubscriptionCreateLimit(input.partnerId)
+  const subLimit = await checkActiveSubscriptionCreateLimit(partnerId)
   if (!subLimit.allowed) {
     return { error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
   }
@@ -420,7 +435,7 @@ export async function addSubscriptionToCartAction(
     .select("id")
     .eq("user_id", user.id)
     .eq("item_type", "subscription")
-    .eq("recurring_plan_id", input.recurringPlanId)
+    .eq("recurring_plan_id", plan.id)
     .maybeSingle()
 
   if (existing?.id) {
@@ -433,10 +448,10 @@ export async function addSubscriptionToCartAction(
     .from("cart_items")
     .insert({
       user_id: user.id,
-      partner_id: input.partnerId,
+      partner_id: partnerId,
       store_id: plan.store_id || null,
       item_type: "subscription",
-      recurring_plan_id: input.recurringPlanId,
+      recurring_plan_id: plan.id,
       product_id: null,
       quantity: 1,
       selected: true,
