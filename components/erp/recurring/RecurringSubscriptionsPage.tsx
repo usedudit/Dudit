@@ -12,7 +12,6 @@ import { useSidebar } from "@/lib/sidebar-context"
 // Reusable Components
 import {
   IconPlaceholder,
-  Input,
   Pagination,
   Tabs,
   TabsContent,
@@ -51,10 +50,22 @@ import {
   MoneyIcon,
   ListIcon,
   CreditCardIcon,
-  SearchIcon,
   ChevronLeftIcon,
 } from "@/lib/icons"
 import { Button, Badge, ListItem } from "@/components/reusable"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FilterChip from "@/components/reusable/FilterChip"
+import { SectionFilterBar } from "./SectionFilterBar"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import {
+  EMPTY_DATE_PERIOD,
+  addCalendarDaysYmd,
+  getBrazilTodayYmd,
+  isDatePeriodFilterActive,
+  resolveDatePeriodBounds,
+  summarizeDatePeriodFilter,
+  ymdInBounds,
+} from "@/lib/utils/filter-date-period"
 
 const COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
   { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
@@ -131,6 +142,208 @@ const SECTIONS: { key: Exclude<SectionKey, "home">; title: string; description: 
   },
 ]
 
+// ── Filtros por seção ─────────────────────────────────────────────────────────
+type ListFilters = { delivery: string[]; billing: string[]; horizon: string[] }
+type BillingFilters = { payment: string[]; datePeriod: DatePeriodFilterValue }
+type ForecastFilters = { horizon: string[] }
+type CreditsFilters = { balance: string[] }
+
+const EMPTY_LIST_FILTERS: ListFilters = { delivery: [], billing: [], horizon: [] }
+const EMPTY_BILLING_FILTERS: BillingFilters = { payment: [], datePeriod: { ...EMPTY_DATE_PERIOD } }
+const EMPTY_FORECAST_FILTERS: ForecastFilters = { horizon: [] }
+const EMPTY_CREDITS_FILTERS: CreditsFilters = { balance: [] }
+
+const DELIVERY_LABELS: Record<string, string> = { delivery: "Entrega", pickup: "Retirada no local" }
+const BILLING_LABELS: Record<string, string> = { auto_mercado_pago: "Mercado Pago", manual: "Manual" }
+const PAYMENT_LABELS: Record<string, string> = { paid: "Pago", pending: "Pendente", cancelled: "Cancelado" }
+const BALANCE_LABELS: Record<string, string> = { available: "Com saldo", empty: "Saldo zerado" }
+const HORIZON_LABELS: Record<string, string> = {
+  overdue: "Atrasadas",
+  today: "Hoje",
+  "7": "Próximos 7 dias",
+  "15": "Próximos 15 dias",
+  "30": "Próximos 30 dias",
+}
+
+const LIST_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "delivery",
+    title: "Tipo de Entrega",
+    type: "checkbox-list",
+    options: ["delivery", "pickup"],
+    optionLabels: DELIVERY_LABELS,
+  },
+  {
+    id: "billing",
+    title: "Modo de Cobrança",
+    type: "checkbox-list",
+    options: ["auto_mercado_pago", "manual"],
+    optionLabels: BILLING_LABELS,
+  },
+  {
+    id: "horizon",
+    title: "Próxima Execução",
+    type: "checkbox-list",
+    options: ["overdue", "7", "15", "30"],
+    optionLabels: HORIZON_LABELS,
+  },
+]
+
+const BILLING_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "payment",
+    title: "Situação do Pagamento",
+    type: "checkbox-list",
+    options: ["paid", "pending", "cancelled"],
+    optionLabels: PAYMENT_LABELS,
+  },
+  { id: "datePeriod", title: "Período", type: "date-period" },
+]
+
+const FORECAST_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "horizon",
+    title: "Previsão",
+    type: "checkbox-list",
+    options: ["today", "7", "15", "30"],
+    optionLabels: HORIZON_LABELS,
+  },
+]
+
+const CREDITS_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "balance",
+    title: "Saldo",
+    type: "checkbox-list",
+    options: ["available", "empty"],
+    optionLabels: BALANCE_LABELS,
+  },
+]
+
+const paymentBucket = (situation: string) =>
+  situation === "paid" ? "paid" : situation === "cancelled" ? "cancelled" : "pending"
+
+/** Janela de dias em relação a hoje: "overdue" = atrasadas, números = próximos N dias */
+const matchesHorizon = (raw: string | null | undefined, selected: string[]): boolean => {
+  if (selected.length === 0) return true
+  if (!raw) return false
+  const ymd = raw.slice(0, 10)
+  const today = getBrazilTodayYmd()
+  return selected.some((key) => {
+    if (key === "overdue") return ymd < today
+    const days = Number(key)
+    if (Number.isNaN(days)) return false
+    return ymd >= today && ymd <= addCalendarDaysYmd(today, days)
+  })
+}
+
+const ListFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: ListFilters
+  onClear: (key: keyof ListFilters) => void
+}) => (
+  <AnimatePresence>
+    {filters.delivery.length > 0 && (
+      <FilterChip
+        key="delivery"
+        label="Entrega"
+        value={filters.delivery.map((v) => DELIVERY_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("delivery")}
+      />
+    )}
+    {filters.billing.length > 0 && (
+      <FilterChip
+        key="billing"
+        label="Cobrança"
+        value={filters.billing.map((v) => BILLING_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("billing")}
+      />
+    )}
+    {filters.horizon.length > 0 && (
+      <FilterChip
+        key="horizon"
+        label="Próxima execução"
+        value={filters.horizon.map((v) => HORIZON_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("horizon")}
+      />
+    )}
+  </AnimatePresence>
+)
+
+const BillingFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: BillingFilters
+  onClear: (key: "payment" | "datePeriod") => void
+}) => (
+  <AnimatePresence>
+    {filters.payment.length > 0 && (
+      <FilterChip
+        key="payment"
+        label="Pagamento"
+        value={filters.payment.map((v) => PAYMENT_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("payment")}
+      />
+    )}
+    {isDatePeriodFilterActive(filters.datePeriod) && (
+      <FilterChip
+        key="datePeriod"
+        label="Período"
+        value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("datePeriod")}
+      />
+    )}
+  </AnimatePresence>
+)
+
+const ForecastFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: ForecastFilters
+  onClear: (key: keyof ForecastFilters) => void
+}) => (
+  <AnimatePresence>
+    {filters.horizon.length > 0 && (
+      <FilterChip
+        key="horizon"
+        label="Previsão"
+        value={filters.horizon.map((v) => HORIZON_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("horizon")}
+      />
+    )}
+  </AnimatePresence>
+)
+
+const CreditsFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: CreditsFilters
+  onClear: (key: keyof CreditsFilters) => void
+}) => (
+  <AnimatePresence>
+    {filters.balance.length > 0 && (
+      <FilterChip
+        key="balance"
+        label="Saldo"
+        value={filters.balance.map((v) => BALANCE_LABELS[v] || v).join(", ")}
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("balance")}
+      />
+    )}
+  </AnimatePresence>
+)
+
 export default function RecurringSubscriptionsPage({
   partnerId,
   initialSubscriptions = [],
@@ -158,6 +371,20 @@ export default function RecurringSubscriptionsPage({
   const effectiveViewMode = isTablet ? "grid" : viewMode
   const [page, setPage] = useState(1)
 
+  // Filtros por seção (botão "Filtros" + chips, padrão do ERP)
+  const [filterTarget, setFilterTarget] = useState<SectionKey | null>(null)
+  const [listFilters, setListFilters] = useState<ListFilters>(EMPTY_LIST_FILTERS)
+  const [billingFilters, setBillingFilters] = useState<BillingFilters>(EMPTY_BILLING_FILTERS)
+  const [forecastFilters, setForecastFilters] = useState<ForecastFilters>(EMPTY_FORECAST_FILTERS)
+  const [creditsFilters, setCreditsFilters] = useState<CreditsFilters>(EMPTY_CREDITS_FILTERS)
+
+  const hasListFilters =
+    listFilters.delivery.length > 0 || listFilters.billing.length > 0 || listFilters.horizon.length > 0
+  const hasBillingFilters =
+    billingFilters.payment.length > 0 || isDatePeriodFilterActive(billingFilters.datePeriod)
+  const hasForecastFilters = forecastFilters.horizon.length > 0
+  const hasCreditsFilters = creditsFilters.balance.length > 0
+
   const queryKey = useMemo(
     () => ["erp", "recurring_subscriptions", partnerId, selectedStore?.id] as const,
     [partnerId, selectedStore?.id],
@@ -179,9 +406,35 @@ export default function RecurringSubscriptionsPage({
     getDetailFn: async (subscriptionId: string) => {
       const res = await getRecurringSubscriptionDetailAction(partnerId, subscriptionId)
       if (!res.success || !res.data) return null
-      return { ...res.data.subscription, plan: res.data.plan, customer: res.data.customer } as any
+      // Forma achatada (atualiza a lista) + blocos anidados usados pelo detalhe
+      return {
+        ...res.data.subscription,
+        subscription: res.data.subscription,
+        plan: res.data.plan,
+        customer: res.data.customer,
+        items: res.data.items,
+        credits: res.data.credits,
+      } as any
     },
-    listToDetail: (item: any) => item,
+    // Cache parcial vindo da lista: mesmas chaves do detalhe completo
+    listToDetail: (item: any) => {
+      const rawPlan = item.plan
+      const plan = rawPlan
+        ? {
+            ...rawPlan,
+            frequencyType: rawPlan.frequencyType ?? rawPlan.frequency_type,
+            frequencyInterval: rawPlan.frequencyInterval ?? rawPlan.frequency_interval,
+          }
+        : null
+      return {
+        ...item,
+        subscription: item,
+        plan,
+        customer: item.customer,
+        items: [],
+        credits: [],
+      }
+    },
   })
 
   const {
@@ -193,6 +446,8 @@ export default function RecurringSubscriptionsPage({
     entityState,
     openEntity,
     closeEntity,
+    currentEntity,
+    isLoadingDetail,
     search,
     setSearch,
     debouncedSearch,
@@ -345,7 +600,7 @@ export default function RecurringSubscriptionsPage({
     return () => window.removeEventListener("resize", checkScroll)
   }, [checkScroll, viewMode, rawSubscriptions, currentTab])
 
-  // Filtro local (status + busca) sobre o cache — igual às outras páginas do ERP
+  // Filtro local (status + busca + filtros da seção) sobre o cache — igual às outras páginas do ERP
   const filteredSubscriptions = useMemo(() => {
     const term = debouncedSearch.toLowerCase()
     return (rawSubscriptions || []).filter((sub: any) => {
@@ -356,6 +611,20 @@ export default function RecurringSubscriptionsPage({
           return false
         }
       }
+      if (listFilters.delivery.length > 0) {
+        const deliveryType = sub.deliveryType || sub.delivery_type || "pickup"
+        if (!listFilters.delivery.includes(deliveryType)) return false
+      }
+      if (listFilters.billing.length > 0) {
+        const mode = sub.billingMode || sub.billing_mode || "manual"
+        if (!listFilters.billing.includes(mode)) return false
+      }
+      if (
+        listFilters.horizon.length > 0 &&
+        !matchesHorizon(sub.nextExecutionAt || sub.next_execution_at || null, listFilters.horizon)
+      ) {
+        return false
+      }
       if (!term) return true
       return (
         (sub.customer?.name || "").toLowerCase().includes(term) ||
@@ -364,7 +633,7 @@ export default function RecurringSubscriptionsPage({
         (sub.notes || "").toLowerCase().includes(term)
       )
     })
-  }, [rawSubscriptions, statusFilter, debouncedSearch])
+  }, [rawSubscriptions, statusFilter, debouncedSearch, listFilters])
 
   const tabCounts = useMemo(() => {
     const counts = {
@@ -390,7 +659,7 @@ export default function RecurringSubscriptionsPage({
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, debouncedSearch])
+  }, [statusFilter, debouncedSearch, listFilters])
 
   // Action execution: pause, resume, cancel, resolve_stock, sync
   const runAction = async (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", subscriptionId: string) => {
@@ -524,6 +793,36 @@ export default function RecurringSubscriptionsPage({
     [],
   )
 
+  const filteredBillingData = useMemo(() => {
+    const active = isDatePeriodFilterActive(billingFilters.datePeriod)
+    const { startYmd, endYmd } = resolveDatePeriodBounds(billingFilters.datePeriod)
+    return billingData.filter((row: any) => {
+      if (
+        billingFilters.payment.length > 0 &&
+        !billingFilters.payment.includes(paymentBucket(row.situation || ""))
+      ) {
+        return false
+      }
+      if (active && !ymdInBounds(row.created_at, startYmd, endYmd)) return false
+      return true
+    })
+  }, [billingData, billingFilters])
+
+  const filteredForecastData = useMemo(
+    () => forecastData.filter((row: any) => matchesHorizon(row.scheduledFor, forecastFilters.horizon)),
+    [forecastData, forecastFilters],
+  )
+
+  const filteredCreditsData = useMemo(
+    () =>
+      creditsData.filter((row: any) => {
+        if (creditsFilters.balance.length === 0) return true
+        const available = Number(row.remaining || 0) > 0
+        return creditsFilters.balance.includes(available ? "available" : "empty")
+      }),
+    [creditsData, creditsFilters],
+  )
+
   return (
     <FadeIn className="w-full">
       <style>{`
@@ -545,277 +844,437 @@ export default function RecurringSubscriptionsPage({
             onBack={closeEntity}
             canManage={canManage}
             initialTab={detailInitialTab}
+            initialDetail={currentEntity ?? null}
+            isLoadingInitial={isLoadingDetail}
             onChanged={() => {
               if (detailSubscriptionId) afterMutation(detailSubscriptionId)
             }}
           />
         ) : (
           <FadeIn key="list" className="block w-full">
-      <div className="w-full space-y-6 pt-4 px-4 md:px-8 pb-8">
-        {/* Header */}
-        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            {currentTab !== "home" && (
-              <div className="hidden md:flex shrink-0 mt-1">
-                <Button
-                  variant="filled"
-                  onClick={() => navigateToSection("home")}
-                  className="w-10 h-10 p-0 flex items-center justify-center"
-                  aria-label="Voltar"
-                >
-                  <ChevronLeftIcon size={18} />
-                </Button>
-              </div>
-            )}
-            <div>
-              <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                {SECTION_META[currentTab].title}
-              </h1>
-              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                {SECTION_META[currentTab].subtitle}
-              </p>
-            </div>
-          </div>
-          {currentTab === "list" && (
-            <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
-              {isExporting ? "Exportando..." : "Exportar"}
-            </Button>
-          )}
-        </header>
-
-        {/* Landing: secoes no estilo configuracoes */}
-        {currentTab === "home" && (
-          <FadeIn key="home-sections" className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {SECTIONS.map((section) => (
-                <ListItem
-                  key={section.key}
-                  icon={section.icon}
-                  title={section.title}
-                  description={section.description}
-                  onClick={() => navigateToSection(section.key)}
-                  showChevron
-                  className="px-4 py-3 gap-4"
-                />
-              ))}
-            </div>
-          </FadeIn>
-        )}
-
-        {/* Sections */}
-        <Tabs value={currentTab} onValueChange={(value) => navigateToSection(value as SectionKey)} className="w-full">
-
-          {/* Tab 1: Subscriptions list */}
-          <TabsContent value="list">
-            <SubscriptionPageControls
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              search={search}
-              onSearchChange={setSearch}
-              viewMode={effectiveViewMode}
-              onViewModeChange={setViewModeState}
-              tabCounts={tabCounts}
-            />
-
-            <AnimatePresence mode="wait">
-              {isListLoading ? (
-                <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
-                  <ThreeDotsLoader />
-                </FadeIn>
-              ) : rawSubscriptions.length === 0 ? (
-                <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
-                  <IconPlaceholder
-                    placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                    imageAlt="Nenhuma assinatura"
-                    title="Nenhuma assinatura"
-                    subtitle="Assinaturas criadas a partir dos seus planos recorrentes aparecerão aqui."
-                  />
-                </FadeIn>
-              ) : filteredSubscriptions.length === 0 ? (
-                <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
-                  <IconPlaceholder
-                    placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                    imageAlt="Nenhuma assinatura encontrada"
-                    title="Nenhuma assinatura encontrada"
-                    subtitle="Tente ajustar a busca ou os filtros de status."
-                    itemButton={search ? {
-                      text: "Limpar busca",
-                      action: () => setSearch(""),
-                      variant: "outline"
-                    } : undefined}
-                  />
-                </FadeIn>
-              ) : (
-                <FadeIn key={statusFilter + effectiveViewMode} className="w-full">
-                  {effectiveViewMode === "grid" ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                      {paginated.map((sub: any) => (
-                        <SubscriptionGridCard
-                          key={sub.id}
-                          sub={sub}
-                          canManage={canManage}
-                          onOpen={openDetail}
-                          onRunAction={runAction}
-                        />
-                      ))}
+            <div className="w-full space-y-6 pt-4 px-4 md:px-8 pb-8">
+              {/* Header */}
+              <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  {currentTab !== "home" && (
+                    <div className="hidden md:flex shrink-0 mt-1">
+                      <Button
+                        variant="filled"
+                        onClick={() => navigateToSection("home")}
+                        className="w-10 h-10 p-0 flex items-center justify-center"
+                        aria-label="Voltar"
+                      >
+                        <ChevronLeftIcon size={18} />
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="w-full overflow-hidden rounded-xl relative">
-                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                  )}
+                  <div>
+                    <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                      {SECTION_META[currentTab].title}
+                    </h1>
+                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                      {SECTION_META[currentTab].subtitle}
+                    </p>
+                  </div>
+                </div>
+                {currentTab === "list" && (
+                  <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                    {isExporting ? "Exportando..." : "Exportar"}
+                  </Button>
+                )}
+              </header>
 
-                      <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                          <thead>
-                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                              {COLUMNS.map((col, index) => (
-                                <th
-                                  key={col.id}
-                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
-                                  style={{ width: col.width }}
-                                >
-                                  <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
-                                    {col.label}
-                                  </div>
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
+              {/* Landing: secoes no estilo configuracoes */}
+              {currentTab === "home" && (
+                <FadeIn key="home-sections" className="w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {SECTIONS.map((section) => (
+                      <ListItem
+                        key={section.key}
+                        icon={section.icon}
+                        title={section.title}
+                        description={section.description}
+                        onClick={() => navigateToSection(section.key)}
+                        showChevron
+                        className="px-4 py-3 gap-4"
+                      />
+                    ))}
+                  </div>
+                </FadeIn>
+              )}
+
+              {/* Sections */}
+              <Tabs value={currentTab} onValueChange={(value) => navigateToSection(value as SectionKey)} className="w-full">
+
+                {/* Tab 1: Subscriptions list */}
+                <TabsContent value="list">
+                  <SubscriptionPageControls
+                    statusFilter={statusFilter}
+                    setStatusFilter={setStatusFilter}
+                    search={search}
+                    onSearchChange={setSearch}
+                    viewMode={effectiveViewMode}
+                    onViewModeChange={setViewModeState}
+                    onOpenFilter={() => setFilterTarget("list")}
+                    hasActiveFilters={hasListFilters}
+                    chips={
+                      <ListFilterChips
+                        filters={listFilters}
+                        onClear={(key) => setListFilters((prev) => ({ ...prev, [key]: [] }))}
+                      />
+                    }
+                    tabCounts={tabCounts}
+                  />
+
+                  <AnimatePresence mode="wait">
+                    {isListLoading ? (
+                      <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
+                        <ThreeDotsLoader />
+                      </FadeIn>
+                    ) : rawSubscriptions.length === 0 ? (
+                      <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                          imageAlt="Nenhuma assinatura"
+                          title="Nenhuma assinatura"
+                          subtitle="Assinaturas criadas a partir dos seus planos recorrentes aparecerão aqui."
+                        />
+                      </FadeIn>
+                    ) : filteredSubscriptions.length === 0 ? (
+                      <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                          imageAlt="Nenhuma assinatura encontrada"
+                          title="Nenhuma assinatura encontrada"
+                          subtitle="Tente ajustar a busca ou os filtros de status."
+                          itemButton={search || hasListFilters ? {
+                            text: "Limpar busca e filtros",
+                            action: () => {
+                              setSearch("")
+                              setListFilters({ ...EMPTY_LIST_FILTERS })
+                            },
+                            variant: "outline"
+                          } : undefined}
+                        />
+                      </FadeIn>
+                    ) : (
+                      <FadeIn key={statusFilter + effectiveViewMode} className="w-full">
+                        {effectiveViewMode === "grid" ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                             {paginated.map((sub: any) => (
-                              <SubscriptionListRow
+                              <SubscriptionGridCard
                                 key={sub.id}
                                 sub={sub}
-                                columns={COLUMNS}
                                 canManage={canManage}
                                 onOpen={openDetail}
                                 onRunAction={runAction}
                               />
                             ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          </div>
+                        ) : (
+                          <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                <thead>
+                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    {COLUMNS.map((col, index) => (
+                                      <th
+                                        key={col.id}
+                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
+                                        style={{ width: col.width }}
+                                      >
+                                        <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                          {col.label}
+                                        </div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {paginated.map((sub: any) => (
+                                    <SubscriptionListRow
+                                      key={sub.id}
+                                      sub={sub}
+                                      columns={COLUMNS}
+                                      canManage={canManage}
+                                      onOpen={openDetail}
+                                      onRunAction={runAction}
+                                    />
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </FadeIn>
+                    )}
+                  </AnimatePresence>
+                  {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+
+                  {filteredSubscriptions.length > 0 && paginated.length > 0 && (
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      onPageChange={(p) => {
+                        setPage(p)
+                        if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                          void fetchNextPage()
+                        }
+                      }}
+                    />
+                  )}
+                </TabsContent>
+
+                {/* Tab 2: Billing / Faturamento Panel */}
+                <TabsContent value="billing">
+                  <SectionFilterBar
+                    onOpenFilter={() => setFilterTarget("billing")}
+                    hasActiveFilters={hasBillingFilters}
+                    chips={
+                      <BillingFilterChips
+                        filters={billingFilters}
+                        onClear={(key) =>
+                          setBillingFilters((prev) => ({
+                            ...prev,
+                            [key]: key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
+                          }))
+                        }
+                      />
+                    }
+                  />
+                  {loadingBilling ? (
+                    <div className="flex items-center justify-center py-20">
+                      <ThreeDotsLoader />
+                    </div>
+                  ) : (
+                    <ReportTableCard
+                      columns={billingColumns}
+                      data={filteredBillingData}
+                      pageSize={8}
+                      emptyMessage={
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc={
+                            hasBillingFilters
+                              ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                              : "https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                          }
+                          imageAlt="Nenhum faturamento"
+                          title={
+                            hasBillingFilters
+                              ? "Nenhum faturamento encontrado"
+                              : "Nenhum faturamento gerado por assinaturas ainda."
+                          }
+                          subtitle={
+                            hasBillingFilters
+                              ? "Ajuste os filtros para encontrar as cobranças desejadas."
+                              : "Os pedidos criados por assinaturas aparecerão aqui."
+                          }
+                          itemButton={
+                            hasBillingFilters
+                              ? {
+                                  text: "Limpar filtros",
+                                  action: () => setBillingFilters({ ...EMPTY_BILLING_FILTERS }),
+                                  variant: "outline",
+                                }
+                              : undefined
+                          }
+                        />
+                      }
+                    />
+                  )}
+                </TabsContent>
+
+                {/* Tab 3: Forecast / Calendário & Demanda */}
+                <TabsContent value="forecast">
+                  <SectionFilterBar
+                    onOpenFilter={() => setFilterTarget("forecast")}
+                    hasActiveFilters={hasForecastFilters}
+                    chips={
+                      <ForecastFilterChips
+                        filters={forecastFilters}
+                        onClear={(key) => setForecastFilters((prev) => ({ ...prev, [key]: [] }))}
+                      />
+                    }
+                  />
+                  {loadingForecast ? (
+                    <div className="flex items-center justify-center py-20">
+                      <ThreeDotsLoader />
+                    </div>
+                  ) : (
+                    <div>
+                      {filteredForecastData.length === 0 ? (
+                        <div className="py-12 flex flex-col items-center justify-center text-center">
+                          <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc={
+                              hasForecastFilters
+                                ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                : "https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                            }
+                            imageAlt="Nenhuma previsão"
+                            title={
+                              hasForecastFilters
+                                ? "Nenhuma previsão encontrada"
+                                : "Nenhuma entrega ou cobrança prevista"
+                            }
+                            subtitle={
+                              hasForecastFilters
+                                ? "Ajuste os filtros para ver outras previsões."
+                                : "Não há execuções agendadas para os próximos 30 dias."
+                            }
+                            itemButton={
+                              hasForecastFilters
+                                ? {
+                                    text: "Limpar filtros",
+                                    action: () => setForecastFilters({ ...EMPTY_FORECAST_FILTERS }),
+                                    variant: "outline",
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
+                          {filteredForecastData.map((f, idx) => (
+                            <div key={idx} className="py-4 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="h-10 w-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold shrink-0">
+                                  {new Date(f.scheduledFor).getDate()}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{f.customerName}</p>
+                                  <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{f.planName}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
+                                Previsão: {new Date(f.scheduledFor).toLocaleDateString("pt-BR")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
-                </FadeIn>
-              )}
-            </AnimatePresence>
-            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                </TabsContent>
 
-            {filteredSubscriptions.length > 0 && paginated.length > 0 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={(p) => {
-                  setPage(p)
-                  if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                    void fetchNextPage()
-                  }
-                }}
-              />
-            )}
-          </TabsContent>
+                {/* Tab 4: Saldos de Créditos de Clientes */}
+                <TabsContent value="credits">
+                  <SectionFilterBar
+                    onOpenFilter={() => setFilterTarget("credits")}
+                    hasActiveFilters={hasCreditsFilters}
+                    chips={
+                      <CreditsFilterChips
+                        filters={creditsFilters}
+                        onClear={(key) => setCreditsFilters((prev) => ({ ...prev, [key]: [] }))}
+                      />
+                    }
+                    search={{
+                      value: creditsSearch,
+                      onChange: setCreditsSearch,
+                      placeholder: "Buscar por cliente...",
+                    }}
+                  />
 
-          {/* Tab 2: Billing / Faturamento Panel */}
-          <TabsContent value="billing">
-            {loadingBilling ? (
-              <div className="flex items-center justify-center py-20">
-                <ThreeDotsLoader />
-              </div>
-            ) : (
-              <ReportTableCard
-                columns={billingColumns}
-                data={billingData}
-                pageSize={8}
-                emptyMessage="Nenhum faturamento gerado por assinaturas ainda."
-              />
-            )}
-          </TabsContent>
-
-          {/* Tab 3: Forecast / Calendário & Demanda */}
-          <TabsContent value="forecast">
-            {loadingForecast ? (
-              <div className="flex items-center justify-center py-20">
-                <ThreeDotsLoader />
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                {forecastData.length === 0 ? (
-                  <div className="py-12 flex flex-col items-center justify-center text-center">
-                    <IconPlaceholder
-                      placeholderType="image"
-                      imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                      imageAlt="Nenhuma previsão"
-                      title="Nenhuma entrega ou cobrança prevista"
-                      subtitle="Não há execuções agendadas para os próximos 30 dias."
+                  {loadingCredits ? (
+                    <div className="flex items-center justify-center py-20">
+                      <ThreeDotsLoader />
+                    </div>
+                  ) : (
+                    <ReportTableCard
+                      columns={creditColumns}
+                      data={filteredCreditsData}
+                      pageSize={8}
+                      emptyMessage={
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc={
+                            hasCreditsFilters || debouncedCreditsSearch
+                              ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                              : "https://img.dudit.com.br/static/mascots/ValesCompra.png"
+                          }
+                          imageAlt="Nenhum crédito"
+                          title={
+                            hasCreditsFilters || debouncedCreditsSearch
+                              ? "Nenhum crédito encontrado"
+                              : "Nenhum saldo de crédito de serviço encontrado."
+                          }
+                          subtitle={
+                            hasCreditsFilters || debouncedCreditsSearch
+                              ? "Ajuste a busca ou os filtros para encontrar saldos."
+                              : "Créditos liberados para seus clientes aparecerão aqui."
+                          }
+                          itemButton={
+                            hasCreditsFilters || debouncedCreditsSearch
+                              ? {
+                                  text: "Limpar filtros",
+                                  action: () => {
+                                    setCreditsSearch("")
+                                    setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
+                                  },
+                                  variant: "outline",
+                                }
+                              : undefined
+                          }
+                        />
+                      }
                     />
-                  </div>
-                ) : (
-                  <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
-                    {forecastData.map((f, idx) => (
-                      <div key={idx} className="py-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="h-10 w-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold shrink-0">
-                            {new Date(f.scheduledFor).getDate()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{f.customerName}</p>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{f.planName}</p>
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
-                          Previsão: {new Date(f.scheduledFor).toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Tab 4: Saldos de Créditos de Clientes */}
-          <TabsContent value="credits">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-              <div className="w-full md:w-80">
-                <Input
-                  name="creditsSearch"
-                  placeholder="Buscar por cliente..."
-                  value={creditsSearch}
-                  onChange={(e) => setCreditsSearch(e.target.value)}
-                  className="h-[42px] w-full"
-                  variant="full-rounded"
-                  prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                />
-              </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
-
-            {loadingCredits ? (
-              <div className="flex items-center justify-center py-20">
-                <ThreeDotsLoader />
-              </div>
-            ) : (
-              <ReportTableCard
-                columns={creditColumns}
-                data={creditsData}
-                pageSize={8}
-                emptyMessage="Nenhum saldo de crédito de serviço encontrado."
-              />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
           </FadeIn>
         )}
       </AnimatePresence>
 
+      <FilterSheet
+        isOpen={filterTarget !== null}
+        onClose={() => setFilterTarget(null)}
+        sections={
+          filterTarget === "billing"
+            ? BILLING_FILTER_SECTIONS
+            : filterTarget === "forecast"
+              ? FORECAST_FILTER_SECTIONS
+              : filterTarget === "credits"
+                ? CREDITS_FILTER_SECTIONS
+                : LIST_FILTER_SECTIONS
+        }
+        filters={
+          filterTarget === "billing"
+            ? billingFilters
+            : filterTarget === "forecast"
+              ? forecastFilters
+              : filterTarget === "credits"
+                ? creditsFilters
+                : listFilters
+        }
+        setFilters={
+          filterTarget === "billing"
+            ? setBillingFilters
+            : filterTarget === "forecast"
+              ? setForecastFilters
+              : filterTarget === "credits"
+                ? setCreditsFilters
+                : setListFilters
+        }
+        onClear={() => {
+          if (filterTarget === "billing") setBillingFilters({ ...EMPTY_BILLING_FILTERS })
+          else if (filterTarget === "forecast") setForecastFilters({ ...EMPTY_FORECAST_FILTERS })
+          else if (filterTarget === "credits") setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
+          else setListFilters({ ...EMPTY_LIST_FILTERS })
+        }}
+      />
+
       <ExportColumnSelectionModal
-          isOpen={columnSelectionModal.isOpen}
-          canExportAllColumns={columnSelectionModal.canExportAllColumns}
-          onConfirm={handleColumnConfirm}
-          onClose={closeColumnSelectionModal}
+        isOpen={columnSelectionModal.isOpen}
+        canExportAllColumns={columnSelectionModal.canExportAllColumns}
+        onConfirm={handleColumnConfirm}
+        onClose={closeColumnSelectionModal}
       />
     </FadeIn>
   )

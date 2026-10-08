@@ -326,9 +326,10 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
     await requirePermission(partnerId, "recurring_subscriptions", "view")
     const supabase = await getSupabaseServerClient()
 
-    const { data, error } = await supabase
-      .from("recurring_subscriptions")
-      .select(`
+    const [mainResult, creditsResult] = await Promise.all([
+      supabase
+        .from("recurring_subscriptions")
+        .select(`
         *,
         recurring_plans(
           id, short_id, partner_id, name, description, price, images, status, frequency_type,
@@ -350,9 +351,18 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
           services:service_id(id, name, images)
         )
       `)
-      .eq("id", subscriptionId)
-      .eq("partner_id", partnerId)
-      .maybeSingle()
+        .eq("id", subscriptionId)
+        .eq("partner_id", partnerId)
+        .maybeSingle(),
+      supabase
+        .from("subscription_item_credits")
+        .select("id, quantity, consumed, expires_at, services(name)")
+        .eq("partner_id", partnerId)
+        .eq("subscription_id", subscriptionId)
+        .order("expires_at", { ascending: true, nullsFirst: false }),
+    ])
+
+    const { data, error } = mainResult
 
     if (error) throw error
     if (!data) throw new Error("Assinatura não encontrada")
@@ -360,12 +370,7 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
     const row = data as Record<string, any>
     const planRow = row.recurring_plans as Record<string, any> | null
 
-    const { data: creditRows, error: creditsError } = await supabase
-      .from("subscription_item_credits")
-      .select("id, quantity, consumed, expires_at, services(name)")
-      .eq("partner_id", partnerId)
-      .eq("subscription_id", subscriptionId)
-      .order("expires_at", { ascending: true, nullsFirst: false })
+    const { data: creditRows, error: creditsError } = creditsResult
 
     if (creditsError) throw creditsError
 

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
@@ -9,9 +10,12 @@ import {
   ActionsDropdown,
   Badge,
   Button,
+  DefaultModal,
   DropdownItem,
   FormSection,
   IconPlaceholder,
+  InfoCard,
+  Input,
   Pagination,
   SidebarCard,
   Tabs,
@@ -48,12 +52,13 @@ import {
   ChevronLeftIcon,
   PlayIcon,
   RepeatIcon,
+  SearchIcon,
   ThreeDotsIcon,
 } from "@/lib/icons"
 
 const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
-type DetailTab = "general" | "items" | "history"
+type DetailTab = "general" | "items" | "credits" | "notes" | "history"
 type SubscriptionAction = "pause" | "resume" | "cancel" | "resolve_stock" | "sync"
 
 interface SubscriptionDetailPageProps {
@@ -63,6 +68,10 @@ interface SubscriptionDetailPageProps {
   canManage: boolean
   onChanged?: () => void
   initialTab?: DetailTab
+  /** Detalhe já resolvido pelo cache da página de lista (evita um segundo fetch) */
+  initialDetail?: RecurringSubscriptionDetail | null
+  /** Enquanto a página pai ainda busca o detalhe */
+  isLoadingInitial?: boolean
 }
 
 const SidebarRow = ({
@@ -83,20 +92,18 @@ const SidebarRow = ({
 )
 
 const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex justify-between items-start text-[14px] gap-4">
-    <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
-    <span className="text-right text-sm font-semibold text-brand-dark dark:text-dark-heading break-words min-w-0">
-      {value}
-    </span>
+  <div className="flex flex-col gap-1 min-w-0">
+    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{label}</span>
+    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading break-words min-w-0">{value}</span>
   </div>
 )
 
 const EXECUTION_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
-  { id: "scheduled_for", label: "Agendada", align: "left", width: "180px" },
-  { id: "status", label: "Situação", align: "center", width: "180px" },
+  { id: "scheduled_for", label: "Agendada", align: "left", width: "170px" },
   { id: "orders", label: "Pedido", align: "left", width: "140px" },
   { id: "completed_at", label: "Concluída em", align: "left", width: "200px" },
-  { id: "error_message", label: "Erro", align: "left" },
+  { id: "actions", label: "Ações", align: "center", width: "110px" },
+  { id: "status", label: "Situação", align: "center", width: "180px" },
 ]
 
 const HISTORY_ITEMS_PER_PAGE = 8
@@ -108,22 +115,28 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   canManage,
   onChanged,
   initialTab = "general",
+  initialDetail,
+  isLoadingInitial = false,
 }) => {
   const { toast } = useToast()
   const { setHeaderOverride } = useSidebar()
+  const router = useRouter()
   const isTablet = useMediaQuery("(max-width: 1024px)")
 
-  const [detail, setDetail] = useState<RecurringSubscriptionDetail | null>(null)
+  const [detail, setDetail] = useState<RecurringSubscriptionDetail | null>(initialDetail ?? null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [executions, setExecutions] = useState<any[]>([])
   const [loadingExecutions, setLoadingExecutions] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
+  const [historySearch, setHistorySearch] = useState("")
+  const [executionError, setExecutionError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab)
   const [isScrolled, setIsScrolled] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
+  const executionsRequestedRef = useRef(false)
   const [scrollState, setScrollState] = useState({ left: false, right: false })
 
   const handleScroll = useCallback(() => {
@@ -161,10 +174,23 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     }
   }, [partnerId, subscriptionId])
 
+  // Reaproveita o detalhe buscado pela página de lista; só busca por conta própria
+  // quando a página pai não fornece (ou não tem) dados.
   useEffect(() => {
-    void loadDetail()
+    if (initialDetail) {
+      setLoadError(null)
+      setDetail(initialDetail)
+      return
+    }
+    if (!isLoadingInitial) void loadDetail()
+  }, [initialDetail, isLoadingInitial, loadDetail])
+
+  // Histórico de execuções só é carregado quando a aba é aberta
+  useEffect(() => {
+    if (activeTab !== "history" || executionsRequestedRef.current) return
+    executionsRequestedRef.current = true
     void loadExecutions()
-  }, [loadDetail, loadExecutions])
+  }, [activeTab, loadExecutions])
 
   useEffect(() => {
     checkTableScroll()
@@ -172,7 +198,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     return () => window.removeEventListener("resize", checkTableScroll)
   }, [checkTableScroll, executions, activeTab])
 
-const pageTitle = detail?.plan?.name || "Assinatura"
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [historySearch])
+
+  const pageTitle = detail?.plan?.name || "Assinatura"
 
   useEffect(() => {
     setHeaderOverride({ title: pageTitle, onBack, isSubPage: true })
@@ -226,13 +256,22 @@ const pageTitle = detail?.plan?.name || "Assinatura"
             res.message ||
             (action === "sync" ? "Assinatura sincronizada com sucesso!" : "Assinatura atualizada com sucesso!"),
         })
-        await Promise.all([loadDetail(), loadExecutions()])
+        // Com o cache da lista, a página pai já refaz o detalhe; sem cache, busca aqui.
+        if (!initialDetail) await loadDetail()
+        if (executionsRequestedRef.current) await loadExecutions()
         onChanged?.()
       } finally {
         setBusy(false)
       }
     },
-    [busy, loadDetail, loadExecutions, onChanged, partnerId, subscriptionId, toast],
+    [busy, initialDetail, loadDetail, loadExecutions, onChanged, partnerId, subscriptionId, toast],
+  )
+
+  const openOrder = useCallback(
+    (orderId: string) => {
+      router.push(`/erp/pedidos?view=${orderId}`)
+    },
+    [router],
   )
 
   if (!detail) {
@@ -291,6 +330,15 @@ const pageTitle = detail?.plan?.name || "Assinatura"
     </>
   )
 
+  const cancelledCard =
+    status === "cancelled" ? (
+      <InfoCard
+        color="red"
+        title="Assinatura cancelada"
+        message={`Esta assinatura foi cancelada${subscription.cancelledAt ? ` em ${formatFullDate(subscription.cancelledAt)}` : ""} e não gera novas execuções.`}
+      />
+    ) : null
+
   // Itens contratados (fallback para os itens do plano quando a assinatura ainda nao tem vinculo)
   const usingPlanItems = !detail.items.length && !!plan?.items?.length
   const tabItems = usingPlanItems
@@ -318,8 +366,21 @@ const pageTitle = detail?.plan?.name || "Assinatura"
         images: item.product ? item.product.images : item.service?.images,
       }))
 
-  const historyTotalPages = Math.max(Math.ceil(executions.length / HISTORY_ITEMS_PER_PAGE), 1)
-  const paginatedExecutions = executions.slice(
+  const filteredExecutions = useMemo(() => {
+    const term = historySearch.trim().toLowerCase()
+    if (!term) return executions
+    return executions.filter((execution: any) => {
+      const orderNumber = execution.orders?.order_number ? String(execution.orders.order_number) : ""
+      return (
+        orderNumber.includes(term) ||
+        (execution.scheduled_for || "").toLowerCase().includes(term) ||
+        (execution.status || "").toLowerCase().includes(term)
+      )
+    })
+  }, [executions, historySearch])
+
+  const historyTotalPages = Math.max(Math.ceil(filteredExecutions.length / HISTORY_ITEMS_PER_PAGE), 1)
+  const paginatedExecutions = filteredExecutions.slice(
     (historyPage - 1) * HISTORY_ITEMS_PER_PAGE,
     historyPage * HISTORY_ITEMS_PER_PAGE,
   )
@@ -403,6 +464,8 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                   <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                     <TabsTrigger value="general">Dados gerais</TabsTrigger>
                     <TabsTrigger value="items">Itens Contratados</TabsTrigger>
+                    <TabsTrigger value="credits">Créditos de Serviço</TabsTrigger>
+                    {subscription.notes && <TabsTrigger value="notes">Observações</TabsTrigger>}
                     <TabsTrigger value="history">Histórico de Execuções</TabsTrigger>
                   </TabsList>
                 </div>
@@ -414,10 +477,13 @@ const pageTitle = detail?.plan?.name || "Assinatura"
               <AnimatePresence mode="wait">
                 {activeTab === "general" && (
                   <FadeIn key="general" className="block">
+                    {/* Cancelada: card vermelho no topo no tablet/mobile */}
+                    {cancelledCard && <div className="lg:hidden mb-6">{cancelledCard}</div>}
+
                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                       <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                        <FormSection title="Dados da Assinatura" className="space-y-6">
-                          <div className="grid grid-cols-12 gap-x-5 gap-y-4">
+                        <FormSection title="Dados do Cliente" className="mb-8">
+                          <div className="grid grid-cols-12 gap-x-5 gap-y-5">
                             <div className="col-span-12 md:col-span-6">
                               <InfoRow label="Cliente" value={customer?.name || subscription.customerId} />
                             </div>
@@ -427,6 +493,11 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                             <div className="col-span-12 md:col-span-6">
                               <InfoRow label="Telefone" value={customer?.phone || "—"} />
                             </div>
+                          </div>
+                        </FormSection>
+
+                        <FormSection hasSeparator title="Ciclo e Execução">
+                          <div className="grid grid-cols-12 gap-x-5 gap-y-5">
                             <div className="col-span-12 md:col-span-6">
                               <InfoRow
                                 label="Frequência"
@@ -453,29 +524,6 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                                 }
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-6">
-                              <InfoRow
-                                label="Tipo de Entrega"
-                                value={subscription.deliveryType === "delivery" ? "Entrega" : "Retirada"}
-                              />
-                            </div>
-                            {subscription.deliveryType === "delivery" && subscription.deliveryAddress && (
-                              <div className="col-span-12">
-                                <InfoRow label="Endereço de Entrega" value={subscription.deliveryAddress} />
-                              </div>
-                            )}
-                            <div className="col-span-12 md:col-span-6">
-                              <InfoRow
-                                label="Frete"
-                                value={formatCurrency(Number(subscription.shippingAmount || 0))}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-6">
-                              <InfoRow
-                                label="Origem do Frete"
-                                value={getRecurringShippingSourceLabel(subscription.shippingSource || "pickup")}
-                              />
-                            </div>
                             {subscription.pausedAt && (
                               <div className="col-span-12 md:col-span-6">
                                 <InfoRow label="Pausada em" value={formatFullDate(subscription.pausedAt)} />
@@ -489,17 +537,40 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                           </div>
                         </FormSection>
 
-                        {subscription.notes && (
-                          <FormSection title="Observações" className="mt-8">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">
-                              {subscription.notes}
-                            </p>
-                          </FormSection>
-                        )}
+                        <FormSection hasSeparator title="Entrega e Frete">
+                          <div className="grid grid-cols-12 gap-x-5 gap-y-5">
+                            <div className="col-span-12 md:col-span-6">
+                              <InfoRow
+                                label="Tipo de Entrega"
+                                value={subscription.deliveryType === "delivery" ? "Entrega" : "Retirada"}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-6">
+                              <InfoRow
+                                label="Frete"
+                                value={formatCurrency(Number(subscription.shippingAmount || 0))}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-6">
+                              <InfoRow
+                                label="Origem do Frete"
+                                value={getRecurringShippingSourceLabel(subscription.shippingSource || "pickup")}
+                              />
+                            </div>
+                            {subscription.deliveryType === "delivery" && subscription.deliveryAddress && (
+                              <div className="col-span-12">
+                                <InfoRow label="Endereço de Entrega" value={subscription.deliveryAddress} />
+                              </div>
+                            )}
+                          </div>
+                        </FormSection>
                       </div>
 
                       {/* Sidebar */}
                       <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                        {/* Cancelada: card vermelho acima do resumo financeiro no desktop */}
+                        {cancelledCard && <div className="hidden lg:block mb-6">{cancelledCard}</div>}
+
                         <SidebarCard hasSeparator hasTopStrip title="Resumo Financeiro">
                           <div className="flex flex-col gap-3">
                             <SidebarRow
@@ -566,37 +637,6 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                               </div>
                             )}
                           </div>
-                        </SidebarCard>
-
-                        <SidebarCard hasSeparator hasTopStrip title="Créditos de Serviço">
-                          {!detail.credits.length ? (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                              Nenhum crédito de serviço lançado para esta assinatura.
-                            </p>
-                          ) : (
-                            <div className="flex flex-col gap-3">
-                              {detail.credits.map((credit) => (
-                                <div
-                                  key={credit.id}
-                                  className="flex items-start justify-between gap-3 border-b border-brand-border/50 dark:border-dark-border/50 pb-2 last:border-0 last:pb-0"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">
-                                      {credit.serviceName}
-                                    </p>
-                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                      {credit.expiresAt
-                                        ? `Válido até ${formatFullDate(credit.expiresAt)}`
-                                        : "Sem validade"}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs font-bold whitespace-nowrap text-brand-primary">
-                                    {credit.remaining}/{credit.quantity}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </SidebarCard>
                       </div>
                     </div>
@@ -678,73 +718,178 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                   </FadeIn>
                 )}
 
-                {activeTab === "history" && (
-                  <FadeIn key="history" className="block">
-                    {loadingExecutions ? (
-                      <div className="flex items-center justify-center py-24">
-                        <ThreeDotsLoader />
-                      </div>
-                    ) : executions.length === 0 ? (
+                {activeTab === "credits" && (
+                  <FadeIn key="credits" className="block">
+                    {detail.credits.length ? (
+                      <FormSection
+                        title="Créditos de Serviço"
+                        description="Saldo de serviços liberado por esta assinatura."
+                      >
+                        <div className="space-y-4">
+                          {detail.credits.map((credit) => (
+                            <div
+                              key={credit.id}
+                              className="flex items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                  {credit.serviceName}
+                                </p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                  {credit.expiresAt
+                                    ? `Válido até ${formatFullDate(credit.expiresAt)}`
+                                    : "Sem validade"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                  {credit.consumed} consumidos
+                                </span>
+                                <span
+                                  className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${credit.remaining > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
+                                >
+                                  {credit.remaining}/{credit.quantity}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </FormSection>
+                    ) : (
                       <div className="w-full flex items-center justify-center min-h-[400px]">
                         <IconPlaceholder
                           placeholderType="image"
-                          imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                          imageAlt="Nenhuma execução"
-                          title="Nenhuma execução registrada"
-                          subtitle="As execuções desta assinatura aparecerão aqui conforme forem acontecendo."
+                          imageSrc="https://img.dudit.com.br/static/mascots/ValesCompra.png"
+                          imageAlt="Nenhum crédito"
+                          title="Nenhum crédito de serviço"
+                          subtitle="Créditos liberados por esta assinatura aparecerão aqui."
                         />
                       </div>
-                    ) : (
-                      <>
-                        {isTablet ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
-                            {paginatedExecutions.map((execution) => (
-                              <ExecutionGridCard key={execution.id} execution={execution} />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="w-full overflow-hidden rounded-xl relative">
-                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkTableScroll}>
-                              <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                                <thead>
-                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                    {EXECUTION_COLUMNS.map((col, index) => (
-                                      <th
-                                        key={col.id}
-                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "error_message" ? "rounded-r-lg pr-6" : ""}`}
-                                        style={{ width: col.width }}
-                                      >
-                                        <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
-                                          {col.label}
-                                        </div>
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {paginatedExecutions.map((execution) => (
-                                    <ExecutionListRow key={execution.id} execution={execution} columns={EXECUTION_COLUMNS} />
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-
-                        {historyTotalPages > 1 && (
-                          <div className="mt-2">
-                            <Pagination
-                              currentPage={historyPage}
-                              totalPages={historyTotalPages}
-                              onPageChange={setHistoryPage}
-                            />
-                          </div>
-                        )}
-                      </>
                     )}
+                  </FadeIn>
+                )}
+
+                {activeTab === "notes" && subscription.notes && (
+                  <FadeIn key="notes" className="block">
+                    <FormSection title="Observações">
+                      <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">
+                        {subscription.notes}
+                      </p>
+                    </FormSection>
+                  </FadeIn>
+                )}
+
+                {activeTab === "history" && (
+                  <FadeIn key="history" className="block">
+                    <FormSection
+                      title="Histórico de Execuções"
+                      description="Ciclos já processados desta assinatura."
+                    >
+                      <div className="max-w-sm">
+                        <Input
+                          name="historySearch"
+                          placeholder="Buscar por pedido, data ou situação..."
+                          value={historySearch}
+                          onChange={(e) => setHistorySearch(e.target.value)}
+                          variant="full-rounded"
+                          label=""
+                          prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                        />
+                      </div>
+
+                      {loadingExecutions ? (
+                        <div className="flex items-center justify-center py-24">
+                          <ThreeDotsLoader />
+                        </div>
+                      ) : filteredExecutions.length === 0 ? (
+                        <div className="w-full flex items-center justify-center min-h-[400px]">
+                          <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                            imageAlt="Nenhuma execução"
+                            title={
+                              executions.length === 0
+                                ? "Nenhuma execução registrada"
+                                : "Nenhuma execução encontrada"
+                            }
+                            subtitle={
+                              executions.length === 0
+                                ? "As execuções desta assinatura aparecerão aqui conforme forem acontecendo."
+                                : "Ajuste a busca para encontrar o ciclo desejado."
+                            }
+                            itemButton={
+                              executions.length > 0
+                                ? {
+                                    text: "Limpar busca",
+                                    action: () => setHistorySearch(""),
+                                    variant: "outline",
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {isTablet ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
+                              {paginatedExecutions.map((execution) => (
+                                <ExecutionGridCard
+                                  key={execution.id}
+                                  execution={execution}
+                                  onOpenOrder={openOrder}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="w-full overflow-hidden rounded-xl relative">
+                              <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                              <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                              <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkTableScroll}>
+                                <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                  <thead>
+                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                      {EXECUTION_COLUMNS.map((col, index) => (
+                                        <th
+                                          key={col.id}
+                                          className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${index === EXECUTION_COLUMNS.length - 1 ? "rounded-r-lg pr-6" : ""}`}
+                                          style={{ width: col.width }}
+                                        >
+                                          <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                            {col.label}
+                                          </div>
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {paginatedExecutions.map((execution) => (
+                                      <ExecutionListRow
+                                        key={execution.id}
+                                        execution={execution}
+                                        columns={EXECUTION_COLUMNS}
+                                        onOpenOrder={openOrder}
+                                        onViewError={setExecutionError}
+                                      />
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          {historyTotalPages > 1 && (
+                            <div className="mt-2">
+                              <Pagination
+                                currentPage={historyPage}
+                                totalPages={historyTotalPages}
+                                onPageChange={setHistoryPage}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </FormSection>
                   </FadeIn>
                 )}
               </AnimatePresence>
@@ -785,6 +930,15 @@ const pageTitle = detail?.plan?.name || "Assinatura"
             </div>
           )}
         </Tabs>
+
+        <DefaultModal
+          isOpen={!!executionError}
+          onClose={() => setExecutionError(null)}
+          title="Erro da execução"
+          maxWidth="md"
+        >
+          <p className="text-sm text-brand-red whitespace-pre-wrap">{executionError}</p>
+        </DefaultModal>
       </div>
     </FadeIn>
   )

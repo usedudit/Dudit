@@ -1,10 +1,9 @@
 "use client"
 
 import React from "react"
-import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
-  SearchIcon,
   GridIcon,
   ListIcon,
   PlusIcon,
@@ -14,6 +13,7 @@ import {
   BlockedIcon,
   ArchiveIcon
 } from "@/lib/icons"
+import { SectionFilterBar } from "./SectionFilterBar"
 
 interface PlanPageControlsProps {
   activeTab: "Todos" | "Ativo" | "Inativo" | "Arquivado"
@@ -24,6 +24,9 @@ interface PlanPageControlsProps {
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
   canManage: boolean
+  onOpenFilter: () => void
+  hasActiveFilters: boolean
+  chips?: React.ReactNode
   tabCounts?: { Todos: number; Ativo: number; Inativo: number; Arquivado: number }
 }
 
@@ -36,6 +39,9 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
   viewMode,
   onViewModeChange,
   canManage,
+  onOpenFilter,
+  hasActiveFilters,
+  chips,
   tabCounts
 }) => {
   return (
@@ -61,61 +67,42 @@ export const PlanPageControls: React.FC<PlanPageControlsProps> = ({
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-        {/* Mobile Controls */}
-        <div className="md:hidden flex items-center gap-2 w-full">
-          <div className="flex-1 min-w-0">
-            <Input
-              name="search"
-              placeholder="Buscar..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="h-[42px] w-full"
-              variant="full-rounded"
-              prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-            />
-          </div>
-          {canManage && (
-            <Button
-              onClick={onAddPlan}
-              className="w-[42px] h-[42px] p-0 flex items-center justify-center"
-              leftIcon={<PlusIcon size={18} />}
-            />
-          )}
-        </div>
-
-        {/* Desktop Controls */}
-        <div className="hidden md:flex items-center w-full gap-4">
-          <div className="w-80">
-            <Input
-              name="search"
-              placeholder="Buscar planos..."
-              prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="h-[42px]"
-              variant="full-rounded"
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* View Toggles */}
-          <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-            <button
-              onClick={() => onViewModeChange("list")}
-              className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-            >
-              <ListIcon className="w-[18px] h-[18px]" />
-            </button>
-            <button
-              onClick={() => onViewModeChange("grid")}
-              className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-            >
-              <GridIcon className="w-[18px] h-[18px]" />
-            </button>
-          </div>
-        </div>
+      <div className="px-4 md:px-8">
+        <SectionFilterBar
+          onOpenFilter={onOpenFilter}
+          hasActiveFilters={hasActiveFilters}
+          chips={chips}
+          search={{
+            value: search,
+            onChange: onSearchChange,
+            placeholder: "Buscar planos...",
+          }}
+          mobileExtra={
+            canManage ? (
+              <Button
+                onClick={onAddPlan}
+                className="w-[42px] h-[42px] p-0 flex items-center justify-center shrink-0"
+                leftIcon={<PlusIcon size={18} />}
+              />
+            ) : undefined
+          }
+          extraRight={
+            <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+              <button
+                onClick={() => onViewModeChange("list")}
+                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+              >
+                <ListIcon className="w-[18px] h-[18px]" />
+              </button>
+              <button
+                onClick={() => onViewModeChange("grid")}
+                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+              >
+                <GridIcon className="w-[18px] h-[18px]" />
+              </button>
+            </div>
+          }
+        />
       </div>
     </>
   )

@@ -80,7 +80,10 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
             </span>
             {sub.plan && (
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {getRecurringFrequencyLabel(sub.plan.frequency_type, sub.plan.frequency_interval)}
+                {getRecurringFrequencyLabel(
+                  sub.plan.frequencyType ?? sub.plan.frequency_type,
+                  sub.plan.frequencyInterval ?? sub.plan.frequency_interval,
+                )}
               </span>
             )}
           </div>

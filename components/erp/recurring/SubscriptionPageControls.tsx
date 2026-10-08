@@ -1,10 +1,9 @@
 "use client"
 
 import React from "react"
-import { Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
-  SearchIcon,
   GridIcon,
   ListIcon,
   Users,
@@ -14,6 +13,7 @@ import {
   ClockIcon,
   AlertTriangleIcon
 } from "@/lib/icons"
+import { SectionFilterBar } from "./SectionFilterBar"
 import type { RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
 
 interface SubscriptionPageControlsProps {
@@ -23,6 +23,9 @@ interface SubscriptionPageControlsProps {
   onSearchChange: (value: string) => void
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
+  onOpenFilter: () => void
+  hasActiveFilters: boolean
+  chips?: React.ReactNode
   tabCounts?: {
     all: number
     active: number
@@ -41,6 +44,9 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
   onSearchChange,
   viewMode,
   onViewModeChange,
+  onOpenFilter,
+  hasActiveFilters,
+  chips,
   tabCounts
 }) => {
   return (
@@ -75,39 +81,16 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none">
-        {/* Mobile Controls */}
-        <div className="md:hidden flex items-center gap-2 w-full">
-          <div className="flex-1 min-w-0">
-            <Input
-              name="search"
-              placeholder="Buscar por notas..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="h-[42px] w-full"
-              variant="full-rounded"
-              prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-            />
-          </div>
-        </div>
-
-        {/* Desktop Controls */}
-        <div className="hidden md:flex items-center w-full gap-4">
-          <div className="w-80">
-            <Input
-              name="search"
-              placeholder="Buscar assinaturas..."
-              prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="h-[42px]"
-              variant="full-rounded"
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* View Toggles */}
+      <SectionFilterBar
+        onOpenFilter={onOpenFilter}
+        hasActiveFilters={hasActiveFilters}
+        chips={chips}
+        search={{
+          value: search,
+          onChange: onSearchChange,
+          placeholder: "Buscar assinaturas...",
+        }}
+        extraRight={
           <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
             <button
               onClick={() => onViewModeChange("list")}
@@ -122,8 +105,8 @@ export const SubscriptionPageControls: React.FC<SubscriptionPageControlsProps> =
               <GridIcon className="w-[18px] h-[18px]" />
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
     </>
   )
 }

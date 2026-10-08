@@ -23,7 +23,7 @@ interface ReportTableCardProps {
   title?: string
   columns: TableColumn[]
   data: TableRow[]
-  emptyMessage?: string
+  emptyMessage?: React.ReactNode
   pageSize?: number
   detailHref?: string
   detailLabel?: string
@@ -178,8 +178,12 @@ export function ReportTableCard({
           </div>
         </>
       ) : (
-        <div className="py-12 flex flex-col items-center justify-center text-center">
-          <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{emptyMessage}</span>
+        <div className="py-6 flex flex-col items-center justify-center text-center">
+          {typeof emptyMessage === "string" ? (
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{emptyMessage}</span>
+          ) : (
+            emptyMessage
+          )}
         </div>
       )}
     </div>

@@ -78,7 +78,10 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
           {/* Linha 3: Recorrência */}
           {sub.plan && (
             <div className="text-xs text-brand-primary font-medium mt-0.5 truncate">
-              Recorrência: {getRecurringFrequencyLabel(sub.plan.frequency_type, sub.plan.frequency_interval)}
+              Recorrência: {getRecurringFrequencyLabel(
+                sub.plan.frequencyType ?? sub.plan.frequency_type,
+                sub.plan.frequencyInterval ?? sub.plan.frequency_interval,
+              )}
             </div>
           )}
         </div>

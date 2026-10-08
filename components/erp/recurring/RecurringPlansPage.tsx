@@ -41,6 +41,100 @@ import { listRecurringPlansAction, deleteRecurringPlanAction } from "@/app/actio
 import { useStore } from "@/lib/store-context"
 import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel, getRecurringBillingModeLabel } from "@/lib/types/recurring"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FilterChip from "@/components/reusable/FilterChip"
+
+type PlanFilters = { frequency: string[]; billing: string[]; price: { min: string; max: string } }
+
+const EMPTY_PLAN_FILTERS: PlanFilters = { frequency: [], billing: [], price: { min: "", max: "" } }
+
+const PLAN_FREQUENCY_LABELS: Record<string, string> = {
+  daily: "Diária",
+  weekly: "Semanal",
+  monthly: "Mensal",
+  yearly: "Anual",
+  custom: "Personalizada",
+}
+
+const PLAN_BILLING_LABELS: Record<string, string> = {
+  auto_mercado_pago: "Mercado Pago",
+  manual: "Manual",
+}
+
+const PLAN_FILTER_SECTIONS: FilterSectionConfig[] = [
+  {
+    id: "frequency",
+    title: "Frequência",
+    type: "checkbox-list",
+    options: ["daily", "weekly", "monthly", "yearly", "custom"],
+    optionLabels: PLAN_FREQUENCY_LABELS,
+  },
+  {
+    id: "billing",
+    title: "Cobrança",
+    type: "checkbox-list",
+    options: ["auto_mercado_pago", "manual"],
+    optionLabels: PLAN_BILLING_LABELS,
+  },
+  {
+    id: "price",
+    title: "Preço",
+    type: "range",
+    rangeConfig: {
+      minKey: "min",
+      maxKey: "max",
+      minPlaceholder: "Preço mínimo",
+      maxPlaceholder: "Preço máximo",
+    },
+  },
+]
+
+const PlanFilterChips = ({
+  filters,
+  onClear,
+}: {
+  filters: PlanFilters
+  onClear: (key: keyof PlanFilters) => void
+}) => {
+  const priceValue =
+    filters.price.min || filters.price.max
+      ? [
+          filters.price.min ? `a partir de R$ ${filters.price.min}` : null,
+          filters.price.max ? `até R$ ${filters.price.max}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : ""
+
+  return (
+    <AnimatePresence>
+      {filters.frequency.length > 0 && (
+        <FilterChip
+          key="frequency"
+          label="Frequência"
+          value={filters.frequency.map((v) => PLAN_FREQUENCY_LABELS[v] || v).join(", ")}
+          onRemove={() => onClear("frequency")}
+        />
+      )}
+      {filters.billing.length > 0 && (
+        <FilterChip
+          key="billing"
+          label="Cobrança"
+          value={filters.billing.map((v) => PLAN_BILLING_LABELS[v] || v).join(", ")}
+          onRemove={() => onClear("billing")}
+        />
+      )}
+      {priceValue && (
+        <FilterChip
+          key="price"
+          label="Preço"
+          value={priceValue}
+          onRemove={() => onClear("price")}
+        />
+      )}
+    </AnimatePresence>
+  )
+}
 
 type SortKey = "name" | "frequency" | "billing" | "startDate" | "endDate" | "status"
 type SortDirection = "asc" | "desc"
@@ -137,6 +231,14 @@ export default function RecurringPlansPage({
     const [page, setPage] = useState(1)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
+    // Filtros (botão "Filtros" + chips, padrão do ERP)
+    const [planFilters, setPlanFilters] = useState<PlanFilters>(EMPTY_PLAN_FILTERS)
+    const [isFilterOpen, setIsFilterOpen] = useState(false)
+    const hasActiveFilters =
+        planFilters.frequency.length > 0 ||
+        planFilters.billing.length > 0 ||
+        Boolean(planFilters.price.min || planFilters.price.max)
+
     // Selection states
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [itemToDelete, setItemToDelete] = useState<any | null>(null)
@@ -194,6 +296,23 @@ export default function RecurringPlansPage({
                 else if (activeTab === "Arquivado") tabMatch = p.status === "archived"
                 return tabMatch
             })
+            .filter((p: any) => {
+                if (planFilters.frequency.length > 0 && !planFilters.frequency.includes(p.frequencyType)) {
+                    return false
+                }
+                if (planFilters.billing.length > 0) {
+                    const mode = p.billingMode || p.billing_mode || "manual"
+                    if (!planFilters.billing.includes(mode)) return false
+                }
+                const min = parseFloat(planFilters.price.min)
+                const max = parseFloat(planFilters.price.max)
+                if (!Number.isNaN(min) || !Number.isNaN(max)) {
+                    const price = Number(p.price ?? 0)
+                    if (!Number.isNaN(min) && price < min) return false
+                    if (!Number.isNaN(max) && price > max) return false
+                }
+                return true
+            })
 
         const result = [...filtered]
 
@@ -230,7 +349,11 @@ export default function RecurringPlansPage({
         }
 
         return result
-    }, [rawPlans, debouncedSearch, activeTab, sortConfig])
+    }, [rawPlans, debouncedSearch, activeTab, sortConfig, planFilters])
+
+    useEffect(() => {
+        setPage(1)
+    }, [debouncedSearch, activeTab, planFilters])
 
     const totalPages = Math.ceil(filteredPlans.length / itemsPerPage)
     const paginated = filteredPlans.slice((page - 1) * itemsPerPage, page * itemsPerPage)
@@ -419,6 +542,22 @@ export default function RecurringPlansPage({
                                     viewMode={effectiveViewMode}
                                     onViewModeChange={setViewModeState}
                                     canManage={canManage}
+                                    onOpenFilter={() => setIsFilterOpen(true)}
+                                    hasActiveFilters={hasActiveFilters}
+                                    chips={
+                                        <PlanFilterChips
+                                            filters={planFilters}
+                                            onClear={(key) =>
+                                                setPlanFilters((prev) =>
+                                                    key === "price"
+                                                        ? { ...prev, price: { min: "", max: "" } }
+                                                        : key === "frequency"
+                                                            ? { ...prev, frequency: [] }
+                                                            : { ...prev, billing: [] },
+                                                )
+                                            }
+                                        />
+                                    }
                                 />
                             )}
 
@@ -462,10 +601,13 @@ export default function RecurringPlansPage({
                                                 imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                                 imageAlt="Nenhum plano encontrado"
                                                 title="Nenhum plano encontrado"
-                                                subtitle="Ajuste os filtros de busca para encontrar o que procura."
+                                                subtitle="Ajuste a busca ou os filtros para encontrar o que procura."
                                                 itemButton={{
-                                                    text: "Limpar busca",
-                                                    action: () => setSearch(""),
+                                                    text: "Limpar busca e filtros",
+                                                    action: () => {
+                                                        setSearch("")
+                                                        setPlanFilters({ ...EMPTY_PLAN_FILTERS })
+                                                    },
                                                     variant: "outline"
                                                 }}
                                             />
@@ -623,6 +765,14 @@ export default function RecurringPlansPage({
                     label="Link do plano"
                 />
             )}
+            <FilterSheet
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                sections={PLAN_FILTER_SECTIONS}
+                filters={planFilters}
+                setFilters={setPlanFilters}
+                onClear={() => setPlanFilters({ ...EMPTY_PLAN_FILTERS })}
+            />
         </>
     )
 }
