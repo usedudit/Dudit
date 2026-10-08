@@ -15,6 +15,8 @@ import {
   buildFulfillmentPayload,
   type ResolvedCartLine,
 } from "@/lib/services/marketplace-cart-resolver"
+import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import type { RecurringShippingMode } from "@/lib/types/recurring"
 import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 import type { CheckoutFulfillmentPayload } from "@/lib/types/marketplace-cart"
 
@@ -100,7 +102,45 @@ export async function priceMarketplaceCartCheckout(
   // serviços não têm envio físico e a cotação gerava "raio" indevido.
   const hasOnlyServiceLines = resolvedLines.every((l) => l.itemType === "service_booking")
 
-  const shouldQuoteDelivery = !hasOnlyServiceLines && (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) && Boolean(params.deliveryAddress) && params.deliveryType === "delivery"
+  // Assinaturas seguem a política de frete do PRÓPRIO PLANO (pickup/included =
+  // 0, flat = valor fixo, quote = cotação única no cadastro). Cotar o frete
+  // próprio do vendedor para um carrinho só de assinatura inflava o total do
+  // checkout (ex.: plano com frete incluso virando preço + frete).
+  const hasOnlySubscriptionLines =
+    resolvedLines.length > 0 && resolvedLines.every((l) => l.itemType === "subscription")
+  let subscriptionShippingFee = 0
+  let subscriptionShippingNeedsQuote = false
+
+  if (hasOnlySubscriptionLines && params.deliveryType === "delivery") {
+    const planIds = Array.from(
+      new Set(resolvedLines.map((l) => l.recurringPlanId).filter((id): id is string => Boolean(id))),
+    )
+    if (planIds.length > 0) {
+      const { data: planRows } = await adminClient
+        .from("recurring_plans")
+        .select("id, shipping_mode, shipping_flat_amount")
+        .in("id", planIds)
+
+      for (const row of planRows || []) {
+        const shipping = resolveSubscriptionShipping({
+          deliveryType: params.deliveryType,
+          shippingMode: ((row as any).shipping_mode as RecurringShippingMode) || "included",
+          shippingFlatAmount: Number((row as any).shipping_flat_amount || 0),
+        })
+        if (!shipping.resolved) subscriptionShippingNeedsQuote = true
+        else subscriptionShippingFee += shipping.amount
+      }
+    }
+  }
+
+  const shouldQuoteDelivery = hasOnlySubscriptionLines
+    ? subscriptionShippingNeedsQuote &&
+      Boolean(params.deliveryAddress) &&
+      params.deliveryType === "delivery"
+    : !hasOnlyServiceLines &&
+      (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) &&
+      Boolean(params.deliveryAddress) &&
+      params.deliveryType === "delivery"
 
   if (shouldQuoteDelivery) {
     // Transportadora selecionada (SuperFrete) é a fonte autoritativa do frete —
@@ -157,6 +197,10 @@ export async function priceMarketplaceCartCheckout(
     }
   }
 
+  // Frete fixo do plano (shipping_mode = flat) entra no total junto da
+  // cotação quando houver. Modos pickup/included zeram aqui mesmo.
+  deliveryFee += subscriptionShippingFee
+
   let couponId: string | null = null
   let couponDiscountAmount = 0
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
@@ -202,8 +246,20 @@ export async function priceMarketplaceCartCheckout(
   const isFreeShippingCoupon = Boolean(
     couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping",
   )
-  if (((!hasOnlyServiceLines && hasDeliveryLines) || carrierApplied) && isFreeShippingCoupon) {
-    if (carrierApplied) {
+  // Assinatura com frete fixo (flat) ou cotação pendente também entra no
+  // frete grátis; modo included já nasce zerado.
+  const freeShippingApplies = hasOnlySubscriptionLines
+    ? subscriptionShippingNeedsQuote || subscriptionShippingFee > 0 || carrierApplied
+    : ((!hasOnlyServiceLines && hasDeliveryLines) || carrierApplied)
+
+  if (freeShippingApplies && isFreeShippingCoupon) {
+    if (hasOnlySubscriptionLines && !subscriptionShippingNeedsQuote) {
+      // Frete fixo do plano — não precisa (nem pode) re-cotar o frete próprio.
+      deliveryFee = 0
+      if (deliveryBreakdown) {
+        deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+      }
+    } else if (carrierApplied) {
       // Frete do carrier já resolvido — não re-cotar o frete próprio só pra zerar.
       deliveryFee = 0
       if (deliveryBreakdown) {

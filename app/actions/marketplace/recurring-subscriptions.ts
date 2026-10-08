@@ -393,7 +393,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
-        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais, is_showcase_active),
+        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais, is_showcase_active, addresses!store_id!left(id, street, number, neighborhood, city, state, zip_code, latitude, longitude)),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, short_id, name, price, images),
@@ -460,6 +460,13 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
       rating: rawStore?.rating ?? rawPartner?.rating ?? 0,
       vendas_totais: rawStore?.vendas_totais ?? rawPartner?.vendas_totais ?? 0,
+      // Cidade/estado da LOJA (paridade com produtos/servicos): alimenta a URL
+      // canonica e o breadcrumb da pagina do plano.
+      city: rawStore?.addresses?.[0]?.city || rawPartner?.addresses?.[0]?.city || null,
+      state: rawStore?.addresses?.[0]?.state || rawPartner?.addresses?.[0]?.state || null,
+      neighborhood: rawStore?.addresses?.[0]?.neighborhood || rawPartner?.addresses?.[0]?.neighborhood || null,
+      latitude: rawStore?.addresses?.[0]?.latitude ?? rawPartner?.addresses?.[0]?.latitude ?? null,
+      longitude: rawStore?.addresses?.[0]?.longitude ?? rawPartner?.addresses?.[0]?.longitude ?? null,
     } : {}
     const planImages = Array.isArray(data.images) && data.images.length > 0
       ? data.images

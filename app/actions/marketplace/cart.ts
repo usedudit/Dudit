@@ -35,6 +35,8 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
+import type { RecurringShippingMode } from "@/lib/types/recurring"
 
 export type MarketplaceCartPageData = {
   itemsByPartner: Record<string, any>
@@ -1003,7 +1005,40 @@ export async function checkoutCartAction(
   // Carrinho só com serviços não cota frete (nem próprio nem transportadora):
   // serviços não têm envio físico e a cotação gerava "raio" indevido.
   const hasOnlyServiceLines = resolvedLines.every((l) => l.itemType === "service_booking")
-  const shouldQuoteDelivery = !hasOnlyServiceLines && (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
+
+  // Assinaturas seguem a política de frete do PRÓPRIO PLANO (pickup/included =
+  // 0, flat = valor fixo, quote = cotação). Cotação do frete próprio do vendedor
+  // inflava o total do primeiro ciclo do pedido.
+  const hasOnlySubscriptionLines =
+    resolvedLines.length > 0 && resolvedLines.every((l) => l.itemType === "subscription")
+  let subscriptionShippingFee = 0
+  let subscriptionShippingNeedsQuote = false
+
+  if (hasOnlySubscriptionLines && orderDelivery === "delivery") {
+    const planIds = Array.from(
+      new Set(resolvedLines.map((l) => l.recurringPlanId).filter((id): id is string => Boolean(id))),
+    )
+    if (planIds.length > 0) {
+      const { data: planRows } = await adminClient
+        .from("recurring_plans")
+        .select("id, shipping_mode, shipping_flat_amount")
+        .in("id", planIds)
+
+      for (const row of planRows || []) {
+        const shipping = resolveSubscriptionShipping({
+          deliveryType: orderDelivery,
+          shippingMode: ((row as any).shipping_mode as RecurringShippingMode) || "included",
+          shippingFlatAmount: Number((row as any).shipping_flat_amount || 0),
+        })
+        if (!shipping.resolved) subscriptionShippingNeedsQuote = true
+        else subscriptionShippingFee += shipping.amount
+      }
+    }
+  }
+
+  const shouldQuoteDelivery = hasOnlySubscriptionLines
+    ? subscriptionShippingNeedsQuote && Boolean(deliveryAddress) && orderDelivery === "delivery"
+    : !hasOnlyServiceLines && (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
 
   // 1. Parallel independent reads block
   const [
@@ -1103,6 +1138,9 @@ export async function checkoutCartAction(
       deliveryBreakdown = deliveryQuote.breakdown
     }
   }
+
+  // Frete fixo do plano (shipping_mode = flat) entra no total do pedido.
+  deliveryFee += subscriptionShippingFee
 
   let couponIdToSave: string | null = null
   let couponDiscountAmount = 0

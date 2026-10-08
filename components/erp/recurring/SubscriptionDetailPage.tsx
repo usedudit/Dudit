@@ -5,20 +5,20 @@ import { AnimatePresence } from "framer-motion"
 
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
-import { ReportTableCard } from "@/components/erp/reports/widgets"
 import {
   ActionsDropdown,
   Badge,
   Button,
   DropdownItem,
   FormSection,
-  FormTextarea,
-  Input,
+  IconPlaceholder,
+  Pagination,
   SidebarCard,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
+  ThreeDotsLoader,
 } from "@/components/reusable"
 import {
   cancelRecurringSubscriptionAction,
@@ -30,7 +30,6 @@ import {
   updateSubscriptionStockShortageResolvedAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import {
-  getRecurringExecutionStatusLabel,
   getRecurringFrequencyLabel,
   getRecurringShippingSourceLabel,
   getRecurringStatusLabel,
@@ -38,18 +37,23 @@ import {
 } from "@/lib/types/recurring"
 import type { RecurringSubscriptionDetail } from "@/lib/types/recurring"
 import { formatCurrency, formatFullDate } from "@/lib/utils"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { useMediaQuery } from "../hooks"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useToast } from "@/hooks/use-toast"
+import { ExecutionGridCard } from "./ExecutionGridCard"
+import { ExecutionListRow } from "./ExecutionListRow"
 import {
   BlockedIcon,
   ChevronLeftIcon,
-  ClockIcon,
   PlayIcon,
   RepeatIcon,
   ThreeDotsIcon,
 } from "@/lib/icons"
 
-type DetailTab = "general" | "history"
+const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
+
+type DetailTab = "general" | "items" | "history"
 type SubscriptionAction = "pause" | "resume" | "cancel" | "resolve_stock" | "sync"
 
 interface SubscriptionDetailPageProps {
@@ -78,6 +82,25 @@ const SidebarRow = ({
   </div>
 )
 
+const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="flex justify-between items-start text-[14px] gap-4">
+    <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+    <span className="text-right text-sm font-semibold text-brand-dark dark:text-dark-heading break-words min-w-0">
+      {value}
+    </span>
+  </div>
+)
+
+const EXECUTION_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
+  { id: "scheduled_for", label: "Agendada", align: "left", width: "180px" },
+  { id: "status", label: "Situação", align: "center", width: "180px" },
+  { id: "orders", label: "Pedido", align: "left", width: "140px" },
+  { id: "completed_at", label: "Concluída em", align: "left", width: "200px" },
+  { id: "error_message", label: "Erro", align: "left" },
+]
+
+const HISTORY_ITEMS_PER_PAGE = 8
+
 export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   partnerId,
   subscriptionId,
@@ -88,21 +111,34 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 }) => {
   const { toast } = useToast()
   const { setHeaderOverride } = useSidebar()
+  const isTablet = useMediaQuery("(max-width: 1024px)")
 
   const [detail, setDetail] = useState<RecurringSubscriptionDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [executions, setExecutions] = useState<any[]>([])
   const [loadingExecutions, setLoadingExecutions] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab)
   const [isScrolled, setIsScrolled] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
 
   const handleScroll = useCallback(() => {
     if (scrollContainerRef.current) {
       setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }
+  }, [])
+
+  const checkTableScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState({
+      left: scrollLeft > 0,
+      right: scrollLeft < scrollWidth - clientWidth - 2,
+    })
   }, [])
 
   const loadDetail = useCallback(async () => {
@@ -129,6 +165,12 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     void loadDetail()
     void loadExecutions()
   }, [loadDetail, loadExecutions])
+
+  useEffect(() => {
+    checkTableScroll()
+    window.addEventListener("resize", checkTableScroll)
+    return () => window.removeEventListener("resize", checkTableScroll)
+  }, [checkTableScroll, executions, activeTab])
 
 const pageTitle = detail?.plan?.name || "Assinatura"
 
@@ -193,72 +235,17 @@ const pageTitle = detail?.plan?.name || "Assinatura"
     [busy, loadDetail, loadExecutions, onChanged, partnerId, subscriptionId, toast],
   )
 
-  const executionColumns = useMemo(
-    () => [
-      {
-        key: "scheduled_for",
-        header: "Agendada",
-        render: (value: any) => <span className="font-semibold">{formatFullDate(value)}</span>,
-      },
-      {
-        key: "status",
-        header: "Status",
-        align: "center" as const,
-        render: (value: any) => (
-          <Badge
-            variant={
-              value === "completed"
-                ? "green"
-                : value === "failed"
-                  ? "red"
-                  : value === "awaiting_payment"
-                    ? "orange"
-                    : "gray"
-            }
-          >
-            {getRecurringExecutionStatusLabel(value)}
-          </Badge>
-        ),
-      },
-      {
-        key: "orders",
-        header: "Pedido",
-        render: (value: any, row: any) =>
-          row.orders?.order_number ? (
-            <span className="font-bold">#{row.orders.order_number}</span>
-          ) : (
-            <span className="text-brand-inactive-text dark:text-dark-body">—</span>
-          ),
-      },
-      {
-        key: "completed_at",
-        header: "Concluída em",
-        render: (value: any) =>
-          value ? (
-            <span className="font-medium">{formatFullDate(value)}</span>
-          ) : (
-            <span className="text-brand-inactive-text dark:text-dark-body">—</span>
-          ),
-      },
-      {
-        key: "error_message",
-        header: "Erro",
-        render: (value: any) =>
-          value ? (
-            <span className="text-xs font-medium text-brand-red">{value}</span>
-          ) : (
-            <span className="text-brand-inactive-text dark:text-dark-body">—</span>
-          ),
-      },
-    ],
-    [],
-  )
-
   if (!detail) {
     if (loadError) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-65px)] bg-white dark:bg-dark-background">
-          <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{loadError}</p>
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+            imageAlt="Assinatura não encontrada"
+            title="Erro ao carregar assinatura"
+            subtitle={loadError}
+          />
           <Button variant="outline" onClick={onBack}>
             Voltar para a lista
           </Button>
@@ -302,6 +289,39 @@ const pageTitle = detail?.plan?.name || "Assinatura"
         </DropdownItem>
       )}
     </>
+  )
+
+  // Itens contratados (fallback para os itens do plano quando a assinatura ainda nao tem vinculo)
+  const usingPlanItems = !detail.items.length && !!plan?.items?.length
+  const tabItems = usingPlanItems
+    ? (plan?.items || []).map((item) => ({
+        key: item.id,
+        name: item.product?.name || item.service?.name || "Item",
+        itemType: item.itemType,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice ?? 0,
+        preferredTime: item.preferredTime,
+        durationMinutes: item.durationMinutes,
+        images: item.product ? (item.product as any).images : (item.service as any)?.images,
+      }))
+    : detail.items.map((item) => ({
+        key: item.id,
+        name:
+          item.product?.name ||
+          item.service?.name ||
+          (item.itemType === "product" ? "Produto" : "Serviço"),
+        itemType: item.itemType,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        preferredTime: item.preferredTime,
+        durationMinutes: item.durationMinutes,
+        images: item.product ? item.product.images : item.service?.images,
+      }))
+
+  const historyTotalPages = Math.max(Math.ceil(executions.length / HISTORY_ITEMS_PER_PAGE), 1)
+  const paginatedExecutions = executions.slice(
+    (historyPage - 1) * HISTORY_ITEMS_PER_PAGE,
+    historyPage * HISTORY_ITEMS_PER_PAGE,
   )
 
   return (
@@ -382,6 +402,7 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                   <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                     <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                    <TabsTrigger value="items">Itens Contratados</TabsTrigger>
                     <TabsTrigger value="history">Histórico de Execuções</TabsTrigger>
                   </TabsList>
                 </div>
@@ -396,125 +417,83 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                       <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                         <FormSection title="Dados da Assinatura" className="space-y-6">
-                          <div className="grid grid-cols-12 gap-5">
+                          <div className="grid grid-cols-12 gap-x-5 gap-y-4">
                             <div className="col-span-12 md:col-span-6">
-                              <Input label="Cliente" value={customer?.name || detail.subscription.customerId} readOnly />
+                              <InfoRow label="Cliente" value={customer?.name || subscription.customerId} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input label="E-mail" value={customer?.email || "—"} readOnly />
+                              <InfoRow label="E-mail" value={customer?.email || "—"} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input label="Telefone" value={customer?.phone || "—"} readOnly />
+                              <InfoRow label="Telefone" value={customer?.phone || "—"} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input
+                              <InfoRow
                                 label="Frequência"
                                 value={
                                   plan
                                     ? getRecurringFrequencyLabel(plan.frequencyType, plan.frequencyInterval)
                                     : "—"
                                 }
-                                readOnly
                               />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input label="Data de Início" value={formatFullDate(subscription.startedAt)} readOnly />
+                              <InfoRow label="Data de Início" value={formatFullDate(subscription.startedAt)} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input
-                                label="Próxima Execução"
-                                value={formatFullDate(subscription.nextExecutionAt)}
-                                readOnly
-                              />
+                              <InfoRow label="Próxima Execução" value={formatFullDate(subscription.nextExecutionAt)} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input
+                              <InfoRow
                                 label="Última Execução"
                                 value={
                                   subscription.lastExecutionAt
                                     ? formatFullDate(subscription.lastExecutionAt)
                                     : "Nenhuma execução"
                                 }
-                                readOnly
                               />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input
+                              <InfoRow
                                 label="Tipo de Entrega"
                                 value={subscription.deliveryType === "delivery" ? "Entrega" : "Retirada"}
-                                readOnly
                               />
                             </div>
                             {subscription.deliveryType === "delivery" && subscription.deliveryAddress && (
                               <div className="col-span-12">
-                                <Input
-                                  label="Endereço de Entrega"
-                                  value={subscription.deliveryAddress}
-                                  readOnly
-                                />
+                                <InfoRow label="Endereço de Entrega" value={subscription.deliveryAddress} />
                               </div>
                             )}
                             <div className="col-span-12 md:col-span-6">
-                              <Input
+                              <InfoRow
                                 label="Frete"
                                 value={formatCurrency(Number(subscription.shippingAmount || 0))}
-                                readOnly
                               />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <Input
+                              <InfoRow
                                 label="Origem do Frete"
                                 value={getRecurringShippingSourceLabel(subscription.shippingSource || "pickup")}
-                                readOnly
                               />
                             </div>
                             {subscription.pausedAt && (
                               <div className="col-span-12 md:col-span-6">
-                                <Input label="Pausada em" value={formatFullDate(subscription.pausedAt)} readOnly />
+                                <InfoRow label="Pausada em" value={formatFullDate(subscription.pausedAt)} />
                               </div>
                             )}
                             {subscription.cancelledAt && (
                               <div className="col-span-12 md:col-span-6">
-                                <Input label="Cancelada em" value={formatFullDate(subscription.cancelledAt)} readOnly />
+                                <InfoRow label="Cancelada em" value={formatFullDate(subscription.cancelledAt)} />
                               </div>
                             )}
                           </div>
                         </FormSection>
 
-                        <FormSection title="Itens Contratados" className="mt-8 space-y-4">
-                          {!detail.items.length ? (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                              Nenhum item registrado nesta assinatura. Os itens do plano estão no resumo ao lado.
-                            </p>
-                          ) : (
-                            <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
-                              {detail.items.map((item) => (
-                                <div key={item.id} className="py-3 flex items-center justify-between gap-4">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                      {item.product?.name ||
-                                        item.service?.name ||
-                                        (item.itemType === "product" ? "Produto" : "Serviço")}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                      {item.itemType === "product" ? "Produto" : "Serviço"} · Quantidade{" "}
-                                      {item.quantity}
-                                      {item.preferredTime ? ` · Horário ${String(item.preferredTime).slice(0, 5)}` : ""}
-                                      {item.durationMinutes ? ` · ${item.durationMinutes} min` : ""}
-                                    </p>
-                                  </div>
-                                  <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading whitespace-nowrap">
-                                    {formatCurrency(item.unitPrice)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </FormSection>
-
                         {subscription.notes && (
                           <FormSection title="Observações" className="mt-8">
-                            <FormTextarea label="Notas da assinatura" value={subscription.notes} disabled rows={3} />
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">
+                              {subscription.notes}
+                            </p>
                           </FormSection>
                         )}
                       </div>
@@ -619,34 +598,83 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                             </div>
                           )}
                         </SidebarCard>
-
-                        <SidebarCard hasSeparator hasTopStrip title="Itens do Plano">
-                          {!plan?.items?.length ? (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                              Plano sem itens cadastrados.
-                            </p>
-                          ) : (
-                            <div className="flex flex-col gap-3">
-                              {plan.items.map((item) => (
-                                <div key={item.id} className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">
-                                      {item.product?.name || item.service?.name || "Item"}
-                                    </p>
-                                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                      {item.itemType === "product" ? "Produto" : "Serviço"} · Qtd {item.quantity}
-                                    </p>
-                                  </div>
-                                  <span className="text-xs font-semibold whitespace-nowrap text-brand-dark dark:text-dark-heading">
-                                    {item.unitPrice != null ? formatCurrency(Number(item.unitPrice)) : "—"}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </SidebarCard>
                       </div>
                     </div>
+                  </FadeIn>
+                )}
+
+                {activeTab === "items" && (
+                  <FadeIn key="items" className="block">
+                    {tabItems.length ? (
+                      <FormSection title={usingPlanItems ? "Itens do Plano" : "Itens Contratados"}>
+                        <div className="space-y-4">
+                          {tabItems.map((item) => {
+                            const imageSrc = Array.isArray(item.images) && item.images.length
+                              ? getR2ImageUrl(item.images[0], "thumbnail")
+                              : PLACEHOLDER_IMAGE
+                            return (
+                              <div key={item.key} className="flex items-start gap-4">
+                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border">
+                                  <img
+                                    src={imageSrc}
+                                    alt={item.name}
+                                    loading="lazy"
+                                    className="w-full h-full object-cover rounded-full"
+                                    onError={(e: any) => {
+                                      e.target.src = PLACEHOLDER_IMAGE
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-start mb-1 gap-3">
+                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                      {item.name}
+                                    </h4>
+                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                                      {formatCurrency(item.unitPrice)}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
+                                    {item.itemType === "product" ? "Produto" : "Serviço"}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-brand-inactive-text dark:text-dark-body">
+                                      Quantidade {item.quantity}
+                                    </span>
+                                    {item.preferredTime && (
+                                      <>
+                                        <span className="text-brand-border dark:text-dark-border">|</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body">
+                                          Horário {String(item.preferredTime).slice(0, 5)}
+                                        </span>
+                                      </>
+                                    )}
+                                    {item.durationMinutes ? (
+                                      <>
+                                        <span className="text-brand-border dark:text-dark-border">|</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body">
+                                          {item.durationMinutes} min
+                                        </span>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </FormSection>
+                    ) : (
+                      <div className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                          imageAlt="Nenhum item"
+                          title="Nenhum item contratado"
+                          subtitle="Esta assinatura ainda não tem itens vinculados."
+                        />
+                      </div>
+                    )}
                   </FadeIn>
                 )}
 
@@ -654,19 +682,68 @@ const pageTitle = detail?.plan?.name || "Assinatura"
                   <FadeIn key="history" className="block">
                     {loadingExecutions ? (
                       <div className="flex items-center justify-center py-24">
-                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                          Carregando histórico...
-                        </span>
+                        <ThreeDotsLoader />
+                      </div>
+                    ) : executions.length === 0 ? (
+                      <div className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                          imageAlt="Nenhuma execução"
+                          title="Nenhuma execução registrada"
+                          subtitle="As execuções desta assinatura aparecerão aqui conforme forem acontecendo."
+                        />
                       </div>
                     ) : (
-                      <ReportTableCard
-                        title="Histórico de Execuções"
-                        icon={ClockIcon}
-                        columns={executionColumns}
-                        data={executions}
-                        pageSize={10}
-                        emptyMessage="Nenhuma execução registrada para esta assinatura."
-                      />
+                      <>
+                        {isTablet ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
+                            {paginatedExecutions.map((execution) => (
+                              <ExecutionGridCard key={execution.id} execution={execution} />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkTableScroll}>
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                <thead>
+                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    {EXECUTION_COLUMNS.map((col, index) => (
+                                      <th
+                                        key={col.id}
+                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "error_message" ? "rounded-r-lg pr-6" : ""}`}
+                                        style={{ width: col.width }}
+                                      >
+                                        <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                          {col.label}
+                                        </div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {paginatedExecutions.map((execution) => (
+                                    <ExecutionListRow key={execution.id} execution={execution} columns={EXECUTION_COLUMNS} />
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {historyTotalPages > 1 && (
+                          <div className="mt-2">
+                            <Pagination
+                              currentPage={historyPage}
+                              totalPages={historyTotalPages}
+                              onPageChange={setHistoryPage}
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </FadeIn>
                 )}

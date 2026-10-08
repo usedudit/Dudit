@@ -377,7 +377,13 @@ export async function prepareServiceBookingCheckoutAction(
 }
 
 export async function addSubscriptionToCartAction(
-  input: { recurringPlanId: string; partnerId: string; csrf_token?: string },
+  input: {
+    recurringPlanId: string
+    partnerId: string
+    csrf_token?: string
+    /** Escolha de recebimento feita na página do plano (delivery/pickup). */
+    fulfillmentMode?: "delivery" | "pickup"
+  },
 ) {
   await requireRateLimit(RateLimitCategory.CART)
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -392,7 +398,7 @@ export async function addSubscriptionToCartAction(
   // partner_id/ store_id do proprio plano. Assim um id de parceiro errado
   // vindo do cliente nao derruba a compra com "plano indisponivel".
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.recurringPlanId)
-  const planFields = "id, short_id, status, show_in_marketplace, partner_id, store_id"
+  const planFields = "id, short_id, status, show_in_marketplace, partner_id, store_id, fulfillment_modes"
   const { data: plan, error: planError } = isUuid
     ? await admin.from("recurring_plans").select(planFields).eq("id", input.recurringPlanId).maybeSingle()
     : await admin.from("recurring_plans").select(planFields).eq("short_id", input.recurringPlanId).maybeSingle()
@@ -438,8 +444,24 @@ export async function addSubscriptionToCartAction(
     .eq("recurring_plan_id", plan.id)
     .maybeSingle()
 
+  // Modo de recebimento escolhido na página do plano — só persiste se o plano aceitar.
+  const planAllowedModes: string[] = Array.isArray(plan.fulfillment_modes)
+    ? plan.fulfillment_modes as string[]
+    : ["delivery", "pickup"]
+  const requestedMode = input.fulfillmentMode === "pickup" || input.fulfillmentMode === "delivery"
+    ? input.fulfillmentMode
+    : null
+  const fulfillmentMode = requestedMode && planAllowedModes.includes(requestedMode) ? requestedMode : null
+
   if (existing?.id) {
-    await supabase.from("cart_items").update({ selected: true }).eq("id", existing.id)
+    await supabase
+      .from("cart_items")
+      .update({
+        selected: true,
+        ...(fulfillmentMode ? { fulfillment_mode: fulfillmentMode } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
     await revalidateCart(user.id)
     return { success: true, cartItemId: existing.id }
   }
@@ -455,6 +477,7 @@ export async function addSubscriptionToCartAction(
       product_id: null,
       quantity: 1,
       selected: true,
+      fulfillment_mode: fulfillmentMode,
     })
     .select("id")
     .single()

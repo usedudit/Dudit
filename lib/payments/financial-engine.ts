@@ -1,99 +1,104 @@
-import type { PaymentMethodFeeConfig } from "./calculation"
-export type { PaymentMethodFeeConfig }
+import type { PaymentMethodFeeConfig } from "./calculation";
+export type { PaymentMethodFeeConfig };
 
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
+const round2 = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
 
 const toSafeMoney = (value: number) => {
-  const n = Number(value || 0)
-  if (!Number.isFinite(n)) return 0
-  return Math.max(0, round2(n))
-}
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, round2(n));
+};
 
-export type AdjustmentType = "none" | "discount" | "fee" | "interest"
+export type AdjustmentType = "none" | "discount" | "fee" | "interest";
 
 export type PaymentLineInput = {
-  amountReceived: number
-  paymentMethod: PaymentMethodFeeConfig
-  installmentNumber?: number
-}
+  amountReceived: number;
+  paymentMethod: PaymentMethodFeeConfig;
+  installmentNumber?: number;
+};
 
 export type PaymentLineDetails = {
-  amountReceived: number
-  adjustmentType: AdjustmentType
-  adjustmentPercent: number
-  adjustmentAmount: number
-  feeBearer: "merchant" | "customer" | null
-  effectiveAmount: number
-  netAmount: number
-  paymentMethodDiscountAmount: number
-  interestAmount: number
-  feeAmount: number
-  fixedFeeAmount: number
+  amountReceived: number;
+  adjustmentType: AdjustmentType;
+  adjustmentPercent: number;
+  adjustmentAmount: number;
+  feeBearer: "merchant" | "customer" | null;
+  effectiveAmount: number;
+  netAmount: number;
+  paymentMethodDiscountAmount: number;
+  interestAmount: number;
+  feeAmount: number;
+  fixedFeeAmount: number;
   /** Custo de parcelamento (juros das parcelas), segue installmentFeeBearer */
-  installmentCostAmount: number
+  installmentCostAmount: number;
   /** @deprecated Use installmentCostAmount + installmentFeeBearer for precise breakdown */
-  installmentFeeBearer: "merchant" | "customer" | null
-}
+  installmentFeeBearer: "merchant" | "customer" | null;
+};
 
 export type PaymentBreakdownLine = {
-  method: string
+  method: string;
   /** @deprecated Use effectiveAmount instead */
-  amount: number
-  amountReceived: number
-  adjustmentType: AdjustmentType
-  adjustmentPercent: number
-  adjustmentAmount: number
-  feeBearer: "merchant" | "customer" | null
-  effectiveAmount: number
-  netAmount: number
-  paymentMethodId: string | null
-  installmentNumber: number
-  paymentMethodDiscountAmount?: number
-  interestAmount?: number
-  feeAmount?: number
-  fixedFeeAmount?: number
-  installmentCostAmount?: number
-  installmentFeeBearer?: "merchant" | "customer" | null
-}
+  amount: number;
+  amountReceived: number;
+  adjustmentType: AdjustmentType;
+  adjustmentPercent: number;
+  adjustmentAmount: number;
+  feeBearer: "merchant" | "customer" | null;
+  effectiveAmount: number;
+  netAmount: number;
+  paymentMethodId: string | null;
+  installmentNumber: number;
+  paymentMethodDiscountAmount?: number;
+  interestAmount?: number;
+  feeAmount?: number;
+  fixedFeeAmount?: number;
+  installmentCostAmount?: number;
+  installmentFeeBearer?: "merchant" | "customer" | null;
+};
 
 export type PaymentBreakdownEntry = {
-  method: string
+  method: string;
   /** @deprecated Use effectiveAmount */
-  amount: number
-  amountReceived?: number
-  adjustmentType?: string
-  adjustmentPercent?: number
-  adjustmentAmount?: number
-  effectiveAmount?: number
-  netAmount?: number
-  feeBearer?: string | null
-  paymentMethodId?: string | null
-  installmentNumber?: number
-  paymentMethodDiscountAmount?: number
-  interestAmount?: number
-  feeAmount?: number
-  fixedFeeAmount?: number
-  installmentCostAmount?: number
-  installmentFeeBearer?: "merchant" | "customer" | null
+  amount: number;
+  amountReceived?: number;
+  adjustmentType?: string;
+  adjustmentPercent?: number;
+  adjustmentAmount?: number;
+  effectiveAmount?: number;
+  netAmount?: number;
+  feeBearer?: string | null;
+  paymentMethodId?: string | null;
+  installmentNumber?: number;
+  paymentMethodDiscountAmount?: number;
+  interestAmount?: number;
+  feeAmount?: number;
+  fixedFeeAmount?: number;
+  installmentCostAmount?: number;
+  installmentFeeBearer?: "merchant" | "customer" | null;
+  /** Cash-specific: whether the customer requested change ("troco para") */
+  wantsChange?: boolean;
+  /** Cash-specific: the amount the customer wants change for (dinheiro recebido para troco) */
+  payWithAmount?: number;
   /** Mercado Pago specific fields */
-  provider?: string
-  paymentTypeId?: string | null
-  paymentStatus?: string | null
-  paymentStatusDetail?: string | null
-  feeDetails?: Array<{ type: string; amount: number; feePayer: string }>
-  installmentAmount?: number
-  cardLastDigits?: string | null
-  cardFirstDigits?: string | null
-  cardholderName?: string | null
-}
+  provider?: string;
+  paymentTypeId?: string | null;
+  paymentStatus?: string | null;
+  paymentStatusDetail?: string | null;
+  feeDetails?: Array<{ type: string; amount: number; feePayer: string }>;
+  installmentAmount?: number;
+  cardLastDigits?: string | null;
+  cardFirstDigits?: string | null;
+  cardholderName?: string | null;
+};
 
 export type PaymentBreakdownResult = {
-  lines: PaymentBreakdownLine[]
-  totalEffectiveAmount: number
-  totalNetAmount: number
-  totalReceived: number
-  remainingBalance: number
-}
+  lines: PaymentBreakdownLine[];
+  totalEffectiveAmount: number;
+  totalNetAmount: number;
+  totalReceived: number;
+  remainingBalance: number;
+};
 
 /**
  * Determines the adjustment type from a payment method config.
@@ -101,13 +106,15 @@ export type PaymentBreakdownResult = {
  * - feePercent > 0 || feeFixed > 0 → fee
  * - otherwise → none
  */
-export function deriveAdjustmentType(pm: PaymentMethodFeeConfig): AdjustmentType {
-  const dp = Math.max(0, Number(pm.discountPercent || 0))
-  const fp = Math.max(0, Number(pm.feePercent || 0))
-  const fx = Math.max(0, Number(pm.feeFixed || 0))
-  if (dp > 0) return "discount"
-  if (fp > 0 || fx > 0) return "fee"
-  return "none"
+export function deriveAdjustmentType(
+  pm: PaymentMethodFeeConfig,
+): AdjustmentType {
+  const dp = Math.max(0, Number(pm.discountPercent || 0));
+  const fp = Math.max(0, Number(pm.feePercent || 0));
+  const fx = Math.max(0, Number(pm.feeFixed || 0));
+  if (dp > 0) return "discount";
+  if (fp > 0 || fx > 0) return "fee";
+  return "none";
 }
 
 /**
@@ -120,77 +127,96 @@ export function deriveAdjustmentType(pm: PaymentMethodFeeConfig): AdjustmentType
  * - Interest: adds to base when feeBearer=customer
  * - Fee: adds to base when feeBearer=customer
  */
-export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails {
-  const baseAmount = toSafeMoney(input.amountReceived)
-  const pm = input.paymentMethod
+export function computePaymentLine(
+  input: PaymentLineInput,
+): PaymentLineDetails {
+  const baseAmount = toSafeMoney(input.amountReceived);
+  const pm = input.paymentMethod;
 
-  const discountPercent = Math.max(0, Number(pm.discountPercent || 0))
-  const feePercent = Math.max(0, Number(pm.feePercent || 0))
-  const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
-  const feeBearer = (pm.feeBearer || "merchant") as "merchant" | "customer"
-  const installmentFeeBearer = (pm.installmentFeeBearer || "merchant") as "merchant" | "customer"
+  const discountPercent = Math.max(0, Number(pm.discountPercent || 0));
+  const feePercent = Math.max(0, Number(pm.feePercent || 0));
+  const feeFixed = Math.max(0, Number(pm.feeFixed || 0));
+  const feeBearer = (pm.feeBearer || "merchant") as "merchant" | "customer";
+  const installmentFeeBearer = (pm.installmentFeeBearer || "merchant") as
+    "merchant" | "customer";
 
-  const clampedInstallments = Math.min(Math.max(1, input.installmentNumber || 1), Math.max(1, pm.maxInstallments || 24))
-  const installmentFeePercent = (pm.installmentFees || []).find(
-    (entry) => Number(entry.installmentNumber) === clampedInstallments,
-  )?.feePercent || 0
-  const fixedInterestPercent = Math.max(0, Number(pm.fixedInterestPercent || 0))
-  const interestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
+  const clampedInstallments = Math.min(
+    Math.max(1, input.installmentNumber || 1),
+    Math.max(1, pm.maxInstallments || 24),
+  );
+  const installmentFeePercent =
+    (pm.installmentFees || []).find(
+      (entry) => Number(entry.installmentNumber) === clampedInstallments,
+    )?.feePercent || 0;
+  const fixedInterestPercent = Math.max(
+    0,
+    Number(pm.fixedInterestPercent || 0),
+  );
+  const interestPercent = Math.max(
+    0,
+    fixedInterestPercent + Number(installmentFeePercent || 0),
+  );
 
-  const hasDiscount = discountPercent > 0
-  const hasFee = feePercent > 0 || feeFixed > 0
-  const hasInterest = interestPercent > 0
+  const hasDiscount = discountPercent > 0;
+  const hasFee = feePercent > 0 || feeFixed > 0;
+  const hasInterest = interestPercent > 0;
 
   // Step 1: Discount (always reduces base)
-  const paymentMethodDiscountAmount = round2(baseAmount * (discountPercent / 100))
-  let current = round2(baseAmount - paymentMethodDiscountAmount)
+  const paymentMethodDiscountAmount = round2(
+    baseAmount * (discountPercent / 100),
+  );
+  let current = round2(baseAmount - paymentMethodDiscountAmount);
 
   // Step 2: Interest on discounted amount.
   // Juros fixos (fixedInterestPercent) seguem feeBearer; o custo de parcelamento
   // (installmentFeePercent) segue installmentFeeBearer (config independente).
-  const fixedInterestAmount = round2(current * (fixedInterestPercent / 100))
-  const installmentCostAmount = round2(current * (installmentFeePercent / 100))
-  const interestAmount = round2(fixedInterestAmount + installmentCostAmount)
+  const fixedInterestAmount = round2(current * (fixedInterestPercent / 100));
+  const installmentCostAmount = round2(current * (installmentFeePercent / 100));
+  const interestAmount = round2(fixedInterestAmount + installmentCostAmount);
   if (hasInterest && feeBearer === "customer") {
-    current = round2(current + fixedInterestAmount)
+    current = round2(current + fixedInterestAmount);
   }
   if (hasInterest && installmentFeeBearer === "customer") {
-    current = round2(current + installmentCostAmount)
+    current = round2(current + installmentCostAmount);
   }
 
   // Step 3: Fee on amount after interest
-  const feeAmount = round2(current * (feePercent / 100))
-  const fixedFeeAmount = feeFixed
+  const feeAmount = round2(current * (feePercent / 100));
+  const fixedFeeAmount = feeFixed;
   if (hasFee && feeBearer === "customer") {
-    current = round2(current + feeAmount + fixedFeeAmount)
+    current = round2(current + feeAmount + fixedFeeAmount);
   }
 
-  const effectiveAmount = round2(current)
+  const effectiveAmount = round2(current);
   // Lucro líquido = valor cobrado (effectiveAmount) menos custos absorvidos:
   // - taxas/juros fixos seguem feeBearer; o custo de parcelamento segue
   //   installmentFeeBearer (independente).
   const netAmount = round2(
-    effectiveAmount
-      - (feeBearer === "merchant" ? fixedInterestAmount + feeAmount + fixedFeeAmount : 0)
-      - (installmentFeeBearer === "merchant" ? installmentCostAmount : 0)
-  )
+    effectiveAmount -
+      (feeBearer === "merchant"
+        ? fixedInterestAmount + feeAmount + fixedFeeAmount
+        : 0) -
+      (installmentFeeBearer === "merchant" ? installmentCostAmount : 0),
+  );
 
   // Primary adjustment type for backward compatibility
-  let adjustmentType: AdjustmentType = "none"
-  let adjustmentPercent = 0
+  let adjustmentType: AdjustmentType = "none";
+  let adjustmentPercent = 0;
   if (hasDiscount) {
-    adjustmentType = "discount"
-    adjustmentPercent = discountPercent
+    adjustmentType = "discount";
+    adjustmentPercent = discountPercent;
   } else if (hasInterest) {
-    adjustmentType = "interest"
-    adjustmentPercent = interestPercent
+    adjustmentType = "interest";
+    adjustmentPercent = interestPercent;
   } else if (hasFee) {
-    adjustmentType = "fee"
-    adjustmentPercent = feePercent
+    adjustmentType = "fee";
+    adjustmentPercent = feePercent;
   }
 
-  const adjustmentAmount = round2(paymentMethodDiscountAmount + interestAmount + feeAmount + fixedFeeAmount)
-  const onlyDiscount = hasDiscount && !hasFee && !hasInterest
+  const adjustmentAmount = round2(
+    paymentMethodDiscountAmount + interestAmount + feeAmount + fixedFeeAmount,
+  );
+  const onlyDiscount = hasDiscount && !hasFee && !hasInterest;
 
   return {
     amountReceived: baseAmount,
@@ -206,7 +232,7 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
     fixedFeeAmount,
     installmentCostAmount,
     installmentFeeBearer: onlyDiscount ? null : installmentFeeBearer,
-  }
+  };
 }
 
 /**
@@ -214,12 +240,12 @@ export function computePaymentLine(input: PaymentLineInput): PaymentLineDetails 
  * Returns per-line details, totals, and remaining balance.
  */
 export function computePaymentBreakdown(input: {
-  orderTotal: number
-  lines: PaymentLineInput[]
+  orderTotal: number;
+  lines: PaymentLineInput[];
 }): PaymentBreakdownResult {
-  const orderTotal = toSafeMoney(input.orderTotal)
+  const orderTotal = toSafeMoney(input.orderTotal);
   const lines = input.lines.map((line, i) => {
-    const details = computePaymentLine(line)
+    const details = computePaymentLine(line);
     return {
       method: `method_${i}`,
       amount: details.effectiveAmount,
@@ -238,13 +264,17 @@ export function computePaymentBreakdown(input: {
       fixedFeeAmount: details.fixedFeeAmount,
       installmentCostAmount: details.installmentCostAmount,
       installmentFeeBearer: details.installmentFeeBearer,
-    }
-  })
+    };
+  });
 
-  const totalEffectiveAmount = round2(lines.reduce((s, l) => s + l.effectiveAmount, 0))
-  const totalNetAmount = round2(lines.reduce((s, l) => s + l.netAmount, 0))
-  const totalReceived = round2(lines.reduce((s, l) => s + l.amountReceived, 0))
-  const remainingBalance = round2(Math.max(0, orderTotal - totalEffectiveAmount))
+  const totalEffectiveAmount = round2(
+    lines.reduce((s, l) => s + l.effectiveAmount, 0),
+  );
+  const totalNetAmount = round2(lines.reduce((s, l) => s + l.netAmount, 0));
+  const totalReceived = round2(lines.reduce((s, l) => s + l.amountReceived, 0));
+  const remainingBalance = round2(
+    Math.max(0, orderTotal - totalEffectiveAmount),
+  );
 
   return {
     lines,
@@ -252,7 +282,7 @@ export function computePaymentBreakdown(input: {
     totalNetAmount,
     totalReceived,
     remainingBalance,
-  }
+  };
 }
 
 /**
@@ -260,10 +290,16 @@ export function computePaymentBreakdown(input: {
  * Used by existing code that still expects the old return type.
  */
 export function computePaymentAmountsLegacy(input: PaymentLineInput) {
-  const line = computePaymentLine(input)
-  const { amountReceived, adjustmentPercent, adjustmentAmount, effectiveAmount, adjustmentType } = line
-  const isDiscount = adjustmentType === "discount"
-  const isFee = adjustmentType === "fee" || adjustmentType === "interest"
+  const line = computePaymentLine(input);
+  const {
+    amountReceived,
+    adjustmentPercent,
+    adjustmentAmount,
+    effectiveAmount,
+    adjustmentType,
+  } = line;
+  const isDiscount = adjustmentType === "discount";
+  const isFee = adjustmentType === "fee" || adjustmentType === "interest";
   return {
     finalAmount: effectiveAmount,
     paymentMethodDiscountAmount: isDiscount ? adjustmentAmount : 0,
@@ -276,5 +312,5 @@ export function computePaymentAmountsLegacy(input: PaymentLineInput) {
     appliedDiscountPercent: isDiscount ? adjustmentPercent : 0,
     appliedFeePercent: isFee ? adjustmentPercent : 0,
     appliedInterestPercent: 0,
-  }
+  };
 }

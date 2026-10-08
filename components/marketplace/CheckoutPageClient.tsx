@@ -754,11 +754,22 @@ export function CheckoutPageClient() {
         }
         // Saiu do modo carrier (ex.: endereço trocou e o frete próprio cobre):
         // no fluxo WhatsApp sem transportadora selecionada, volta ao modo manual.
-        if (isWhatsappFlow && selectedCarrierServiceId == null && paymentOption === "mercadopago") {
+        // Carrinho com assinatura fica no Mercado Pago (cobrança recorrente).
+        if (isWhatsappFlow && selectedCarrierServiceId == null && paymentOption === "mercadopago" && !requirements?.hasSubscriptionLines) {
             setPaymentOption("traditional")
             setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
         }
-    }, [carrierCheckoutEngaged, paymentOption, isWhatsappFlow, selectedCarrierServiceId])
+    }, [carrierCheckoutEngaged, paymentOption, isWhatsappFlow, selectedCarrierServiceId, requirements?.hasSubscriptionLines])
+
+    // Assinatura: o pagamento é recorrente pelo Mercado Pago — deixa o MP já
+    // selecionado para o comprador não precisar escolher a forma de pagamento.
+    const mpOptionAvailable = Boolean(partnerInfo.mpConnected) && (!isWhatsappFlow || carrierCheckoutEngaged)
+    useEffect(() => {
+        if (!requirements?.hasSubscriptionLines || !mpOptionAvailable) return
+        if (paymentOption !== null || contextLoading) return
+        setPaymentOption("mercadopago")
+        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+    }, [requirements?.hasSubscriptionLines, mpOptionAvailable, paymentOption, contextLoading])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -791,6 +802,18 @@ export function CheckoutPageClient() {
             setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
         } else if (canDel && !canPick) {
             setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
+        }
+
+        // Carrinho só de assinatura: o comprador escolheu o modo de recebimento
+        // na página do plano (gravado em cart_items.fulfillment_mode). Respeita
+        // a escolha em vez de cair no padrão do delivery config da loja.
+        const ctxLines = Array.isArray(checkoutContext.lines) ? checkoutContext.lines : []
+        const subLines = ctxLines.filter((l: any) => l.lineKind === "subscription")
+        if (subLines.length > 0 && subLines.length === ctxLines.length) {
+            const chosenMode = subLines.find((l: any) => l.fulfillmentMode === "pickup" || l.fulfillmentMode === "delivery")?.fulfillmentMode
+            if (chosenMode === "pickup" || chosenMode === "delivery") {
+                setFormData((prev) => ({ ...prev, deliveryType: chosenMode }))
+            }
         }
 
         if (checkoutContext.storefrontPaymentMethods.length > 0) {
@@ -973,7 +996,9 @@ export function CheckoutPageClient() {
         deliveryPlanEnabled &&
         deliveryEnabled,
     )
-    const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
+    // Assinaturas também exibem a linha de frete (o total do servidor já
+    // inclui o frete resolvido pela política do plano).
+    const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions) || Boolean(requirements?.hasSubscriptionLines)
     const hasConfiguredDeliveryRates = useMemo(() => {
         if (deliveryBreakdown?.hasRatesConfigured !== undefined) {
             return Boolean(deliveryBreakdown.hasRatesConfigured)
@@ -1012,6 +1037,22 @@ export function CheckoutPageClient() {
         return usesDeposit ? checkoutAmounts.depositChargeTotal : checkoutAmounts.fullOrderTotal
     }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal, showDeliveryFeeRow, isPickup, deliveryFee, hasFreeDeliveryCoupon])
     const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0)
+    // Frete exibido no resumo: para carrinho só de assinatura a cotação
+    // client-side não existe (a política vem do plano) — usa o total do servidor.
+    const subscriptionOnlyCart = Boolean(requirements?.hasSubscriptionLines) && !requirements?.hasProductLines && !requirements?.hasServiceLines
+    const summaryDeliveryFee = subscriptionOnlyCart ? (checkoutAmounts?.deliveryFee ?? deliveryFee) : deliveryFee
+    // Carrinho com assinatura: assinaturas recorrentes só aceitam cartão de
+    // crédito no Mercado Pago (Pix volta apenas no fallback payment_failed).
+    const mpPaymentMethodsForCart: MpAcceptedPaymentMethods | undefined = useMemo(() => {
+        if (!mpAcceptedPaymentMethods || !requirements?.hasSubscriptionLines) return mpAcceptedPaymentMethods
+        return {
+            credit_card: true,
+            debit_card: false,
+            pix: false,
+            boleto: false,
+            mercado_pago_wallet: false,
+        }
+    }, [mpAcceptedPaymentMethods, requirements?.hasSubscriptionLines])
     const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
@@ -1613,7 +1654,8 @@ export function CheckoutPageClient() {
         || (productDeliveryQuoteActive && (deliveryQuoteLoading || !!deliveryError))
 
     const renderOrderBumpSection = () => {
-        if (!bumpCandidates.length) return null
+        // Assinatura é um fluxo próprio: sem order bump ("aproveite e leve").
+        if (requirements?.hasSubscriptionLines || !bumpCandidates.length) return null
         const bump = bumpCandidates[0]
         const imgUrl = bump.images?.[0] ? getR2ImageUrl(bump.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
         const isAdding = addingBumpId === bump.id
@@ -1888,12 +1930,12 @@ export function CheckoutPageClient() {
                 {showDeliveryFeeRow && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span>Entrega</span>
-                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                        <span className={(isPickup || (summaryDeliveryFee === 0 && (hasFreeDeliveryCoupon || (subscriptionOnlyCart && !deliveryQuoteLoading) || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
                                 ? "Grátis"
                                 : deliveryQuoteLoading && selectedCarrierServiceId == null
                                     ? "Calculando..."
-                                    : (deliveryFee === 0 && (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold))
+                                    : (summaryDeliveryFee === 0 && (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold))
                                         ? (
                                             <span className="flex items-center gap-1.5 justify-end">
                                                 {(deliveryBreakdown as any)?.originalFee != null && Number((deliveryBreakdown as any).originalFee) > 0 && (
@@ -1902,16 +1944,18 @@ export function CheckoutPageClient() {
                                                 <span className="text-brand-green font-semibold">Grátis</span>
                                             </span>
                                         )
-                                        : deliveryFee > 0
-                                            ? formatCurrency(deliveryFee)
-                                            : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress || !hasConfiguredDeliveryRates
-                                                ? "A combinar"
-                                                : "Grátis"
+                                        : summaryDeliveryFee > 0
+                                            ? formatCurrency(summaryDeliveryFee)
+                                            : subscriptionOnlyCart
+                                                ? "Grátis"
+                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress || !hasConfiguredDeliveryRates
+                                                    ? "A combinar"
+                                                    : "Grátis"
                             }
                         </span>
                     </div>
                 )}
-                {showDeliveryFeeRow && !isPickup && deliveryFee > 0 && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
+                {showDeliveryFeeRow && !isPickup && summaryDeliveryFee > 0 && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
                     <div className="space-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
                         {Number(deliveryBreakdown.baseFee) > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(deliveryBreakdown.baseFee))}</span></div>}
                         {Number(deliveryBreakdown.distanceFee) > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(Number(deliveryBreakdown.distanceFee))}</span></div>}
@@ -2623,7 +2667,7 @@ export function CheckoutPageClient() {
                         notes: formData.notes,
                         couponCode: couponCode || null,
                         couponDiscount: couponDiscount,
-                        deliveryFee: isPickup ? 0 : deliveryFee,
+                        deliveryFee: isPickup ? 0 : checkoutDeliveryFee,
                         checkoutPricing: checkoutPricingSnapshot,
                         cartItemIds: cartItemIds,
                         storeId: storeId || checkoutContext?.store?.id || sessionData?.storeId || undefined,
@@ -2712,7 +2756,7 @@ export function CheckoutPageClient() {
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
-                            deliveryFee: showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0,
+                            deliveryFee: showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? checkoutDeliveryFee : 0,
                             checkoutPricing: checkoutPricingSnapshot,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
@@ -2775,7 +2819,7 @@ export function CheckoutPageClient() {
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
-                            deliveryFee: isPickup ? 0 : deliveryFee,
+                            deliveryFee: isPickup ? 0 : checkoutDeliveryFee,
                             checkoutPricing: checkoutPricingSnapshot,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
@@ -3044,7 +3088,7 @@ export function CheckoutPageClient() {
                                                     icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
                                                     title="Mercado Pago"
                                                     description={(() => {
-                                                        const mp = mpAcceptedPaymentMethods
+                                                        const mp = mpPaymentMethodsForCart
                                                         const enabled = []
                                                         if (mp?.pix === true) enabled.push("Pix")
                                                         if (mp?.credit_card === true) enabled.push("Cartão")
@@ -3518,8 +3562,8 @@ export function CheckoutPageClient() {
                                         )}
                                     </div>
                                 )}
-                                {/* Order Bump */}
-                                {bumpCandidates.length > 0 && (() => {
+                                {/* Order Bump (não aparece em carrinho de assinatura) */}
+                                {!requirements?.hasSubscriptionLines && bumpCandidates.length > 0 && (() => {
                                     const bump = bumpCandidates[0]
                                     const imgUrl = bump.images?.[0] ? getR2ImageUrl(bump.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
                                     const isAdding = addingBumpId === bump.id
@@ -3567,7 +3611,7 @@ export function CheckoutPageClient() {
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
                                                 title="Mercado Pago"
                                                 description={(() => {
-                                                    const mp = mpAcceptedPaymentMethods
+                                                    const mp = mpPaymentMethodsForCart
                                                     const enabled = []
                                                     if (mp?.pix === true) enabled.push("Pix")
                                                     if (mp?.credit_card === true) enabled.push("Cartão")
@@ -4077,7 +4121,7 @@ export function CheckoutPageClient() {
                             title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                             description={
                                 paymentOption === "mercadopago" ? (() => {
-                                    const mp = mpAcceptedPaymentMethods
+                                    const mp = mpPaymentMethodsForCart
                                     const enabled = []
                                     if (mp?.pix === true) enabled.push("Pix")
                                     if (mp?.credit_card === true) enabled.push("Cartão")
@@ -4294,7 +4338,7 @@ export function CheckoutPageClient() {
                     userName={pixPaymentData.userName}
                     userAddress={pixPaymentData.userAddress}
                     buyerId={userId!}
-                    mpAcceptedPaymentMethods={mpAcceptedPaymentMethods}
+                    mpAcceptedPaymentMethods={mpPaymentMethodsForCart}
                     partnerPhone={pixPaymentData.partnerPhone}
                     pixKey={pixPaymentData.pixKey}
                     pixKeyType={pixPaymentData.pixKeyType}
@@ -4501,7 +4545,7 @@ export function CheckoutPageClient() {
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Mercado Pago</h3>
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{(() => {
-                                                    const mp = mpAcceptedPaymentMethods
+                                                    const mp = mpPaymentMethodsForCart
                                                     const enabled = []
                                                     if (mp?.pix === true) enabled.push("Pix")
                                                     if (mp?.credit_card === true) enabled.push("Cartão")

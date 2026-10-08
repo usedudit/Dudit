@@ -4,12 +4,12 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { ShareIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon, FlagIcon } from "@/lib/icons"
+import { ShareIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon, FlagIcon, PlusIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, CepInput, Spinner, InfoCard, DefaultModal } from "@/components/reusable"
+import { Button, Input, CepInput, Spinner, InfoCard, DefaultModal, FormSection, FormDropdown, Separator, RadioButton } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
@@ -22,6 +22,7 @@ import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
 import { useModalLayer } from "@/lib/modal-stack"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getStoreUrl, getPlanUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
@@ -65,6 +66,7 @@ export function PlanDetailsPageClient({
     const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
+    const [showAddressModal, setShowAddressModal] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
@@ -108,6 +110,7 @@ export function PlanDetailsPageClient({
     const [showAddressForm, setShowAddressForm] = useState(false)
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
+    const [planDeliveryFee, setPlanDeliveryFee] = useState<number | null>(null)
     const [newAddressData, setNewAddressData] = useState({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
         latitude: null as number | null, longitude: null as number | null
@@ -288,6 +291,8 @@ export function PlanDetailsPageClient({
                 setShowAddressForm(false)
                 setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
                 await loadUserAddresses()
+                const createdId = (result as any)?.address?.id
+                if (createdId) setSelectedAddressId(createdId)
             }
         } catch (err) {
             notifyError("Erro ao cadastrar endereço.")
@@ -324,6 +329,7 @@ export function PlanDetailsPageClient({
                 recurringPlanId: plan.id,
                 partnerId: partner.partner_id || partner.id,
                 csrf_token: token,
+                fulfillmentMode: deliveryType === "pickup" ? "pickup" : "delivery",
             })
 
             if (result.success) {
@@ -363,8 +369,8 @@ export function PlanDetailsPageClient({
     }
 
     const frequencyLabel = useMemo(() => {
-        const interval = plan.frequency_interval || 1
-        const type = plan.frequency_type || "monthly"
+        const interval = Number(plan.frequencyInterval || plan.frequency_interval || 1)
+        const type = plan.frequencyType || plan.frequency_type || "monthly"
 
         if (type === "daily") return interval === 1 ? "diário" : `a cada ${interval} dias`
         if (type === "weekly") return interval === 1 ? "semanal" : `a cada ${interval} semanas`
@@ -376,6 +382,49 @@ export function PlanDetailsPageClient({
     const planPrice = Number(plan.price || 0)
     const planShippingMode = plan.shippingMode || plan.shipping_mode || "included"
     const planShippingFlat = Number(plan.shippingFlatAmount ?? plan.shipping_flat_amount ?? 0)
+
+    const priceSuffix = useMemo(() => {
+        const type = plan.frequencyType || plan.frequency_type
+        const interval = Number(plan.frequencyInterval || plan.frequency_interval || 1)
+        if (type === "daily") return interval === 1 ? "/dia" : `/a cada ${interval} dias`
+        if (type === "weekly") return interval === 1 ? "/semana" : `/a cada ${interval} semanas`
+        if (type === "monthly") return interval === 1 ? "/mês" : `/a cada ${interval} meses`
+        if (type === "yearly") return interval === 1 ? "/ano" : `/a cada ${interval} anos`
+        return ""
+    }, [plan.frequencyType, plan.frequency_type, plan.frequencyInterval, plan.frequency_interval])
+
+    const deliveryTypeOptions = useMemo(() => {
+        const options: { value: string; label: string }[] = []
+        if (acceptsPickup) options.push({ value: "pickup", label: "Retirar no local" })
+        if (acceptsDelivery) options.push({ value: "delivery", label: "Entrega pelo vendedor" })
+        return options
+    }, [acceptsPickup, acceptsDelivery])
+
+    // Plano com frete cotado: cota uma unica vez no cadastro, igual ao produto.
+    useEffect(() => {
+        if (deliveryType !== "delivery" || !acceptsDelivery || planShippingMode !== "quote" || !selectedAddress) {
+            setPlanDeliveryFee(null)
+            return
+        }
+        let active = true
+        const address = selectedAddress
+        quoteDeliveryFeeAction({
+            partnerId: partner.partner_id || partner.id,
+            storeId: partner.store_id || null,
+            destinationAddress: buildAddressString(address),
+            destinationCoords: address.latitude && address.longitude
+                ? { lat: Number(address.latitude), lng: Number(address.longitude) }
+                : null,
+            freeDeliveryCoupon: false,
+            orderSubtotal: planPrice,
+        }).then((quote) => {
+            if (!active) return
+            setPlanDeliveryFee(quote.success ? Number((quote as any).fee || 0) : null)
+        }).catch(() => {
+            if (active) setPlanDeliveryFee(null)
+        })
+        return () => { active = false }
+    }, [deliveryType, acceptsDelivery, planShippingMode, selectedAddress, partner.partner_id, partner.id, partner.store_id, planPrice])
 
     const handleWhatsApp = useCallback(() => {
         const cleaned = partner.phone?.replace(/\D/g, "") ?? ""
@@ -463,16 +512,11 @@ export function PlanDetailsPageClient({
             <div className="mb-6">
                 <div className="space-y-1">
                     <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
-                        {formatCurrency(planPrice)}{plan.frequency_type === "monthly" ? "/mês" : plan.frequency_type === "weekly" ? "/semana" : plan.frequency_type === "daily" ? "/dia" : plan.frequency_type === "yearly" ? "/ano" : "/período"}
+                        {formatCurrency(planPrice)}{priceSuffix}
                     </p>
                     <p className="text-xs md:text-[0.875rem] text-brand-inactive-text dark:text-dark-body mt-1">
                         Cobrança recorrente {frequencyLabel}
                     </p>
-                    {plan.billingMode === "auto_mercado_pago" && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">
-                            ✓ Faturamento automático no cartão (Mercado Pago)
-                        </p>
-                    )}
                 </div>
             </div>
 
@@ -521,165 +565,108 @@ export function PlanDetailsPageClient({
                 <>
                     {/* Delivery Options */}
                     <div className="mb-6">
-                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Como deseja receber?</h3>
-                        <div className="flex gap-3">
-                            {acceptsPickup && (
-                                <button
-                                    onClick={() => setDeliveryType("pickup")}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "pickup"
-                                        ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                        : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
-                                        }`}
-                                >
-                                    Retirar no Local
-                                </button>
-                            )}
-                            {acceptsDelivery && (
-                                <button
-                                    onClick={() => setDeliveryType("delivery")}
-                                    className={`flex-1 py-3 px-4 rounded-xl border text-center transition-all ${deliveryType === "delivery"
-                                        ? "border-brand-green bg-[#ecfdf5] text-brand-green font-bold"
-                                        : "border-brand-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border"
-                                        }`}
-                                >
-                                    Entrega
-                                </button>
-                            )}
-                        </div>
+                        <FormDropdown
+                            label="Como deseja receber?"
+                            options={deliveryTypeOptions}
+                            value={deliveryType}
+                            setValue={(v) => setDeliveryType(v === "delivery" ? "delivery" : "pickup")}
+                            placeholder="Selecione"
+                            width="w-full"
+                        />
                     </div>
 
-                    {/* Address select when delivery */}
-                    {deliveryType === "delivery" && (
-                        <div className="mb-6 animate-fade-in">
-                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Endereço de entrega</h3>
-
+                    {/* Shipping: address + delivery/pickup rows (parity with product) */}
+                    <FormSection className="mb-8">
+                        <div className="flex flex-col">
                             {loadingAddresses ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <Spinner size={20} />
+                                <div className="py-4 text-center text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">
+                                    Carregando endereços...
                                 </div>
-                            ) : userAddresses.length > 0 ? (
-                                <div className="space-y-3 mb-3">
-                                    {userAddresses.map((a: any) => (
-                                        <div
-                                            key={a.id}
-                                            onClick={() => setSelectedAddressId(a.id)}
-                                            className={`p-3 rounded-xl border cursor-pointer flex items-start gap-2.5 transition-all ${selectedAddressId === a.id
-                                                ? "border-brand-green bg-[#ecfdf5] text-brand-green"
-                                                : "border-brand-border hover:border-gray-300 dark:hover:border-dark-border text-brand-dark dark:text-dark-heading"
-                                                }`}
-                                        >
-                                            <MapPinIcon size={16} className="mt-0.5 shrink-0 text-brand-inactive-text dark:text-dark-body" />
-                                            <div className="text-xs font-medium leading-relaxed flex-1">
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading block mb-0.5 uppercase tracking-wide">
-                                                    {a.address_type || "Casa"}
-                                                </span>
-                                                {buildAddressString(a)}
-                                            </div>
-                                            {selectedAddressId === a.id && (
-                                                <CheckIcon size={16} className="shrink-0 text-brand-green" />
+                            ) : deliveryType === "delivery" && userId && selectedAddress ? (
+                                <div className="flex items-center justify-between w-full py-4">
+                                    <div className="flex items-stretch gap-3">
+                                        <img
+                                            src="https://img.dudit.com.br/static/Map.png"
+                                            alt="Endereço de entrega"
+                                            className="w-10 h-10 object-cover rounded-full shrink-0"
+                                        />
+                                        <div className="flex flex-col justify-center">
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body max-w-[200px] sm:max-w-xs truncate">
+                                                {selectedAddress.street}, {selectedAddress.number}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
+                                        Trocar
+                                    </Button>
+                                </div>
+                            ) : deliveryType === "delivery" ? (
+                                <div className="py-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddressForm(true)}
+                                        className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
+                                    >
+                                        <PlusIcon size={14} /> {userAddresses.length > 0 ? "Cadastrar novo endereço" : "Cadastrar endereço de entrega"}
+                                    </button>
+                                </div>
+                            ) : null}
+
+                            {!loadingAddresses && <Separator className="opacity-60" />}
+
+                            {acceptsDelivery && (
+                                <>
+                                    <div className="flex justify-between items-start py-4">
+                                        <div>
+                                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega pelo vendedor</p>
+                                            {deliveryType !== "delivery" ? (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Selecione a entrega acima para informar o endereço</p>
+                                            ) : planShippingMode === "quote" ? (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Frete cotado neste endereço e mantido em todos os ciclos</p>
+                                            ) : planShippingMode === "flat" ? (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Cobrado em cada ciclo da assinatura, sem re-cotação</p>
+                                            ) : (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Frete incluso no valor da assinatura</p>
                                             )}
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">Nenhum endereço cadastrado.</p>
+                                        <div className="text-right">
+                                            {deliveryType !== "delivery" ? (
+                                                <p className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">—</p>
+                                            ) : planShippingMode === "flat" ? (
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(planShippingFlat)}</p>
+                                            ) : planShippingMode === "quote" ? (
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                    {planDeliveryFee === null ? "A combinar" : planDeliveryFee > 0 ? formatCurrency(planDeliveryFee) : "Grátis"}
+                                                </p>
+                                            ) : (
+                                                <p className="text-sm font-bold text-brand-green">Grátis</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Separator className="opacity-60" />
+                                </>
                             )}
 
-                            {!showAddressForm ? (
-                                <button
-                                    onClick={() => setShowAddressForm(true)}
-                                    className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
-                                >
-                                    + Cadastrar novo endereço
-                                </button>
-                            ) : (
-                                <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-dark-border space-y-4">
-                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Novo Endereço</h4>
-                                    <CepInput
-                                        id="new-addr-cep"
-                                        name="zipCode"
-                                        value={newAddressData.zipCode}
-                                        onChange={val => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
-                                        onAddressFetched={handleCepBlur}
-                                    />
-                                    <Input
-                                        label="Rua"
-                                        id="new-addr-street"
-                                        name="street"
-                                        value={newAddressData.street}
-                                        onChange={e => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
-                                        disabled={loadingCep}
-                                    />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input
-                                            label="Número"
-                                            id="new-addr-number"
-                                            name="number"
-                                            value={newAddressData.number}
-                                            onChange={e => setNewAddressData(prev => ({ ...prev, number: e.target.value }))}
-                                            disabled={newAddressData.noNumber}
-                                        />
-                                        <Input
-                                            label="Complemento"
-                                            id="new-addr-comp"
-                                            name="complement"
-                                            value={newAddressData.complement}
-                                            onChange={e => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
-                                        />
+                            {acceptsPickup && (
+                                <div className="flex justify-between items-start py-4">
+                                    <div>
+                                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Retirar no local</p>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Compareça à loja no dia combinado com o vendedor</p>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="new-addr-noNumber"
-                                            checked={newAddressData.noNumber}
-                                            onChange={e => setNewAddressData(prev => ({ ...prev, noNumber: e.target.checked, number: e.target.checked ? "S/N" : "" }))}
-                                        />
-                                        <label htmlFor="new-addr-noNumber" className="text-xs text-brand-dark dark:text-dark-heading font-medium">Sem número (S/N)</label>
-                                    </div>
-                                    <Input
-                                        label="Bairro"
-                                        id="new-addr-neighborhood"
-                                        name="neighborhood"
-                                        value={newAddressData.neighborhood}
-                                        onChange={e => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
-                                        disabled={loadingCep}
-                                    />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input
-                                            label="Cidade"
-                                            id="new-addr-city"
-                                            name="city"
-                                            value={newAddressData.city}
-                                            onChange={e => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
-                                            disabled={loadingCep}
-                                        />
-                                        <Input
-                                            label="Estado"
-                                            id="new-addr-state"
-                                            name="state"
-                                            value={newAddressData.state}
-                                            onChange={e => setNewAddressData(prev => ({ ...prev, state: e.target.value }))}
-                                            disabled={loadingCep}
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 pt-2">
-                                        <Button size="sm" onClick={handleSaveAddress} className="bg-brand-green text-white hover:bg-[#047857]">
-                                            Salvar
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => setShowAddressForm(false)}>
-                                            Cancelar
-                                        </Button>
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-brand-green">Grátis</p>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    )}
+                    </FormSection>
 
                     {/* Subscribe button */}
                     <div className="hidden lg:block mb-4">
                         <Button
                             onClick={handleSubscribe}
-                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
+                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId) || partner.isShowcaseActive === false || isClosedAndBlocking}
                             className="w-full h-[46px]"
                         >
                             {partner.isShowcaseActive === false ? (
@@ -903,6 +890,153 @@ export function PlanDetailsPageClient({
                 targetId={partner.partner_id || partner.id}
                 targetName={partner.store_name}
             />
+
+            <DefaultModal
+                isOpen={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+                title="Seus Endereços"
+                maxWidth="md"
+            >
+                <div className="space-y-3 pb-4">
+                    {userAddresses.length === 0 && (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum endereço cadastrado.</p>
+                    )}
+                    {userAddresses.map((address: any) => (
+                        <div
+                            key={address.id}
+                            onClick={() => {
+                                setSelectedAddressId(address.id)
+                                setShowAddressModal(false)
+                            }}
+                            className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
+                                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                                }`}
+                        >
+                            <div className="mt-2.5 shrink-0 px-4">
+                                <RadioButton
+                                    name="planAddressSelect"
+                                    value={address.id}
+                                    checked={selectedAddressId === address.id}
+                                    onChange={() => {
+                                        setSelectedAddressId(address.id)
+                                        setShowAddressModal(false)
+                                    }}
+                                />
+                            </div>
+                            <div className="flex-1 pr-4">
+                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
+                            </div>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowAddressModal(false)
+                            setShowAddressForm(true)
+                        }}
+                        className="w-full py-3 border border-dashed border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-dark dark:text-dark-heading transition-colors flex items-center justify-center gap-2 mt-4"
+                    >
+                        <PlusIcon size={16} /> Adicionar outro endereço
+                    </button>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showAddressForm}
+                onClose={() => setShowAddressForm(false)}
+                title="Adicionar novo endereço"
+            >
+                <div className="flex flex-col gap-4 pb-4">
+                    <CepInput
+                        id="new-addr-cep"
+                        name="zipCode"
+                        label="CEP"
+                        value={newAddressData.zipCode}
+                        onChange={val => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
+                        onAddressFetched={handleCepBlur}
+                    />
+                    <Input
+                        label="Rua/Avenida"
+                        id="new-addr-street"
+                        name="street"
+                        value={newAddressData.street}
+                        onChange={e => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
+                        disabled={loadingCep}
+                        placeholder="Rua, Avenida, etc."
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                            <Input
+                                label="Número"
+                                id="new-addr-number"
+                                name="number"
+                                value={newAddressData.number}
+                                onChange={e => setNewAddressData(prev => ({ ...prev, number: e.target.value }))}
+                                disabled={newAddressData.noNumber}
+                                placeholder="123"
+                            />
+                            <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading font-medium">
+                                <input
+                                    type="checkbox"
+                                    id="new-addr-noNumber"
+                                    checked={newAddressData.noNumber}
+                                    onChange={e => setNewAddressData(prev => ({ ...prev, noNumber: e.target.checked, number: e.target.checked ? "S/N" : "" }))}
+                                />
+                                Sem número (S/N)
+                            </label>
+                        </div>
+                        <Input
+                            label="Complemento"
+                            id="new-addr-comp"
+                            name="complement"
+                            value={newAddressData.complement}
+                            onChange={e => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
+                            placeholder="Apto, Bloco, etc."
+                        />
+                    </div>
+                    <Input
+                        label="Bairro"
+                        id="new-addr-neighborhood"
+                        name="neighborhood"
+                        value={newAddressData.neighborhood}
+                        onChange={e => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                        disabled={loadingCep}
+                        placeholder="Nome do bairro"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Cidade"
+                            id="new-addr-city"
+                            name="city"
+                            value={newAddressData.city}
+                            onChange={e => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
+                            disabled={loadingCep}
+                            placeholder="Nome da cidade"
+                        />
+                        <Input
+                            label="Estado"
+                            id="new-addr-state"
+                            name="state"
+                            value={newAddressData.state}
+                            onChange={e => setNewAddressData(prev => ({ ...prev, state: e.target.value.toUpperCase().slice(0, 2) }))}
+                            disabled={loadingCep}
+                            placeholder="UF"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSaveAddress} disabled={loadingCep} className="flex-1">
+                            {loadingCep ? <Spinner size={16} className="mr-2" /> : null}
+                            Salvar Endereço
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowAddressForm(false)}>
+                            Cancelar
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
 
             <DefaultModal
                 isOpen={showPaymentModal}
@@ -1313,7 +1447,7 @@ export function PlanDetailsPageClient({
                                 <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider">Assinatura</span>
                                 <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-none mt-0.5 truncate">
                                     {formatCurrency(planPrice)}
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">/{plan.frequency_type === "monthly" ? "mês" : plan.frequency_type === "weekly" ? "semana" : plan.frequency_type === "daily" ? "dia" : "período"}</span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{priceSuffix}</span>
                                 </span>
                                 {acceptsDelivery && planShippingMode === "flat" && planShippingFlat > 0 && (
                                     <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
@@ -1323,7 +1457,7 @@ export function PlanDetailsPageClient({
                             </div>
                             <Button
                                 className="flex-1 rounded-full min-w-[120px]"
-                                disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
+                                disabled={submitting || (deliveryType === "delivery" && !selectedAddressId) || partner.isShowcaseActive === false || isClosedAndBlocking}
                                 onClick={handleSubscribe}
                             >
                                 {partner.isShowcaseActive === false ? (

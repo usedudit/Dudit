@@ -164,6 +164,7 @@ export type RecurringSubscriptionDetailCustomer = {
   email?: string | null
   phone?: string | null
   address?: string | null
+  image_url?: string | null
 }
 
 export type RecurringSubscriptionDetailItem = {

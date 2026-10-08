@@ -90,6 +90,7 @@ function normalizePlan(item: any) {
 
     return {
         id: item.id,
+        short_id: item.short_id || null,
         name: item.name,
         description: item.description,
         price: computedPrice,
@@ -748,6 +749,7 @@ async function _searchMarketplaceInternal(
                     supabase.from("recurring_plans").select(`
                         id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                         partners(id, is_showcase_active),
+                        stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                         recurring_plan_items(
                             id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                             products:product_id(id, short_id, name, price, images),

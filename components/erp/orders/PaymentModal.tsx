@@ -539,7 +539,7 @@ const PaymentModal = ({
             .then((data) => {
                 if (data && data.pixData && depositChargeAmount > 0.009) {
                     setDepositMpPixData({ qrCode: data.pixData.qrCode, qrCodeBase64: data.pixData.qrCodeBase64 });
-                setDepositPixGeneratedAt(Date.now());
+                    setDepositPixGeneratedAt(Date.now());
                     setDepositMpPaymentId(data.paymentId || data.mpPaymentId || null);
                     setExistingSinalLoaded(true);
                 }
@@ -3297,12 +3297,11 @@ const PaymentModal = ({
                                                             label="Pagará com quanto?"
                                                             value={payWithAmount}
                                                             onChange={(val: any) => setPayWithAmount(Number(val || 0))}
-                                                            className="font-bold"
                                                         />
                                                         {payWithAmount > paymentBaseAmount ? (
                                                             <InfoCard color="blue" title="Troco" message={formatCurrency(payWithAmount - paymentBaseAmount)} />
                                                         ) : (
-                                                            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                                            <p className="text-xs font-semibold text-brand-orange">
                                                                 O valor pago deve ser maior que {formatCurrency(paymentBaseAmount)} para haver troco.
                                                             </p>
                                                         )}
@@ -3868,7 +3867,7 @@ const PaymentModal = ({
                                                 </div>
                                             )}
 
-                                             {mpStep === 'boleto' && mpBoletoData && (
+                                            {mpStep === 'boleto' && mpBoletoData && (
                                                 <div className="flex flex-col items-center px-2 pt-4">
                                                     <div className="text-center mb-6">
                                                         <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">

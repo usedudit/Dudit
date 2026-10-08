@@ -2,16 +2,16 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Button, Tooltip, ActionsDropdown, DropdownItem } from "@/components/reusable"
-import { ClockIcon, BlockedIcon, PlayIcon, RepeatIcon, AlertTriangleIcon } from "@/lib/icons"
+import { Badge, Tooltip, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { BlockedIcon, PlayIcon, RepeatIcon, AlertTriangleIcon, ClockIcon } from "@/lib/icons"
 import type { RecurringSubscription } from "@/lib/types/recurring"
 import {
   getRecurringStatusLabel,
   getRecurringFrequencyLabel,
-  getRecurringShippingSourceLabel,
   getRecurringStatusVariant,
 } from "@/lib/types/recurring"
-import { formatFullDate, formatCurrency } from "@/lib/utils"
+import { formatDate, formatCurrency } from "@/lib/utils"
 import type { SubscriptionRowTab } from "./SubscriptionListRow"
 
 interface SubscriptionGridCardProps {
@@ -29,7 +29,7 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
 }) => {
   const priceChangePending = !!sub.priceChangeRequestedAt && !sub.priceChangeDecision
   const canCancel = canManage && sub.status !== "cancelled" && sub.status !== "expired"
-  const customerLabel = sub.customer?.name || sub.customerId || ""
+  const customerLabel = sub.customer?.name || sub.customerId || "Cliente"
 
   return (
     <motion.div
@@ -42,11 +42,11 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
     >
       <div className="flex gap-4 mb-2">
         {/* Avatar do cliente */}
-        <div className="w-18 h-18 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border">
-          <span className="text-lg font-bold text-brand-inactive-text dark:text-dark-body uppercase">
-            {customerLabel.trim().slice(0, 2) || "?"}
-          </span>
-        </div>
+        <UserProfileImage
+          fullName={customerLabel}
+          imageUrl={sub.customer?.image_url || sub.customer?.avatar_url}
+          className="w-12 h-12 text-lg"
+        />
 
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           {/* Linha 1: Plano + badges */}
@@ -75,66 +75,78 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
             {customerLabel}
           </div>
 
-          {/* Linha 3: Próxima execução e recorrência */}
-          <div className="text-xs text-brand-inactive-text dark:text-dark-body space-y-1 mt-1.5">
-            <div>Próxima execução: {formatFullDate(sub.nextExecutionAt).slice(0, 10)}</div>
-            {sub.plan && (
-              <div className="font-medium text-brand-primary">
-                Recorrência: {getRecurringFrequencyLabel(sub.plan.frequency_type, sub.plan.frequency_interval)}
-              </div>
-            )}
-          </div>
+          {/* Linha 3: Recorrência */}
+          {sub.plan && (
+            <div className="text-xs text-brand-primary font-medium mt-0.5 truncate">
+              Recorrência: {getRecurringFrequencyLabel(sub.plan.frequency_type, sub.plan.frequency_interval)}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Rodapé */}
-      <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-end justify-between gap-3">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Frete</span>
-          <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-            {formatCurrency(Number(sub.shippingAmount || 0))}
-            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body ml-1">
-              · {getRecurringShippingSourceLabel(sub.shippingSource || "pickup")}
+      {/* Área do Rodapé */}
+      <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+        {/* Linha A: Próxima Execução e Frete */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Próxima Execução</span>
+            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
+              {formatDate(sub.nextExecutionAt) || "-"}
             </span>
-          </span>
+          </div>
+
+          <div className="flex flex-col gap-0.5 items-end min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Frete</span>
+            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
+              {formatCurrency(Number(sub.shippingAmount || 0))}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9"
-            onClick={() => onOpen(sub.id, "history")}
-          >
-            <ClockIcon size={14} className="mr-1" /> Histórico
-          </Button>
+        {/* Linha B: Modalidade e Ações */}
+        <div className="flex items-end justify-between mt-1">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Modalidade</span>
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+              {sub.deliveryType === "delivery" ? "Entrega" : "Retirada no local"}
+            </span>
+          </div>
 
-          <ActionsDropdown
-            onView={() => onOpen(sub.id)}
-            onCancel={canCancel ? () => onRunAction("cancel", sub.id) : undefined}
-            cancelLabel="Cancelar assinatura"
+          {/* Botão de Ações */}
+          <div
+            className="shrink-0"
+            onClick={(e) => e.stopPropagation()}
           >
-            {canManage && sub.mpPreapprovalId && (
-              <DropdownItem onClick={() => onRunAction("sync", sub.id)}>
-                <RepeatIcon size={18} /> Sincronizar com MP
+            <ActionsDropdown
+              onView={() => onOpen(sub.id)}
+              onCancel={canCancel ? () => onRunAction("cancel", sub.id) : undefined}
+              cancelLabel="Cancelar assinatura"
+            >
+              <DropdownItem onClick={() => onOpen(sub.id, "history")}>
+                <ClockIcon size={18} /> Histórico
               </DropdownItem>
-            )}
-            {canManage && sub.status === "active" && (
-              <DropdownItem onClick={() => onRunAction("pause", sub.id)}>
-                <BlockedIcon size={18} /> Pausar
-              </DropdownItem>
-            )}
-            {canManage && sub.status === "paused" && (
-              <DropdownItem onClick={() => onRunAction("resume", sub.id)}>
-                <PlayIcon size={18} /> Reativar
-              </DropdownItem>
-            )}
-            {canManage && sub.status === "awaiting_restock" && (
-              <DropdownItem onClick={() => onRunAction("resolve_stock", sub.id)}>
-                <AlertTriangleIcon size={18} /> Resolver estoque
-              </DropdownItem>
-            )}
-          </ActionsDropdown>
+              {canManage && sub.mpPreapprovalId && (
+                <DropdownItem onClick={() => onRunAction("sync", sub.id)}>
+                  <RepeatIcon size={18} /> Sincronizar com MP
+                </DropdownItem>
+              )}
+              {canManage && sub.status === "active" && (
+                <DropdownItem onClick={() => onRunAction("pause", sub.id)}>
+                  <BlockedIcon size={18} /> Pausar
+                </DropdownItem>
+              )}
+              {canManage && sub.status === "paused" && (
+                <DropdownItem onClick={() => onRunAction("resume", sub.id)}>
+                  <PlayIcon size={18} /> Reativar
+                </DropdownItem>
+              )}
+              {canManage && sub.status === "awaiting_restock" && (
+                <DropdownItem onClick={() => onRunAction("resolve_stock", sub.id)}>
+                  <AlertTriangleIcon size={18} /> Resolver estoque
+                </DropdownItem>
+              )}
+            </ActionsDropdown>
+          </div>
         </div>
       </div>
     </motion.div>

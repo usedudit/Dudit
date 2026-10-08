@@ -563,8 +563,9 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
             : getProductUrl(product, product.partners))
 
     let frequencyText = ""
-    if (itemType === "plano" && (product as any).frequency_type) {
-        const freq = (product as any).frequency_type
+    const planFrequencyType = (product as any).frequency_type || (product as any).frequencyType
+    if (itemType === "plano" && planFrequencyType) {
+        const freq = planFrequencyType
         if (freq === "monthly") frequencyText = "/mês"
         else if (freq === "weekly") frequencyText = "/sem"
         else if (freq === "yearly") frequencyText = "/ano"

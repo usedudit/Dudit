@@ -21,8 +21,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     }
 
     const p = plan.partners || {}
-    const address = p?.addresses?.[0] || {}
-    const city = address?.city || "Brasil"
+    const storeAddress = (plan as any)?.stores?.addresses?.[0] || p?.addresses?.[0] || {}
+    const city = (p as any)?.city || storeAddress?.city || "Brasil"
 
     const planUrl = `https://dudit.com.br${getPlanUrl(plan)}`
 

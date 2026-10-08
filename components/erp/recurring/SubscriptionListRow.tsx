@@ -8,10 +8,10 @@ import type { RecurringSubscription } from "@/lib/types/recurring"
 import {
   getRecurringStatusLabel,
   getRecurringFrequencyLabel,
-  getRecurringShippingSourceLabel,
   getRecurringStatusVariant,
 } from "@/lib/types/recurring"
-import { formatFullDate, formatCurrency } from "@/lib/utils"
+import { formatDate, formatCurrency } from "@/lib/utils"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 export type SubscriptionRowTab = "general" | "history"
 
@@ -57,17 +57,17 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
       case "customer":
         return (
           <div className="flex items-center gap-3 text-left min-w-0">
-            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-              <span className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase">
-                {(sub.customer?.name || sub.customerId || "?").trim().slice(0, 2)}
-              </span>
-            </div>
+            <UserProfileImage
+              fullName={sub.customer?.name || sub.customerId || "Cliente"}
+              imageUrl={sub.customer?.image_url || sub.customer?.avatar_url}
+              className="w-10 h-10 text-[14px]"
+            />
             <div className="flex flex-col text-left min-w-0">
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px]">
                 {sub.customer?.name || sub.customerId}
               </span>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {sub.deliveryType === "delivery" ? "Entrega" : "Retirada no local"}
+                {sub.customer?.email || "—"}
               </span>
             </div>
           </div>
@@ -99,7 +99,7 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
       case "nextExecution":
         return (
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-            {formatFullDate(sub.nextExecutionAt).slice(0, 10)}
+            {formatDate(sub.nextExecutionAt)}
           </span>
         )
       case "shipping":
@@ -109,7 +109,7 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
               {formatCurrency(Number(sub.shippingAmount || 0))}
             </span>
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-              {getRecurringShippingSourceLabel(sub.shippingSource || "pickup")}
+              {sub.deliveryType === "delivery" ? "Entrega" : "Retirada no local"}
             </span>
           </div>
         )

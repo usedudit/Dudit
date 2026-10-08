@@ -6,7 +6,8 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { useEntityState } from "@/hooks/use-entity-state"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { useSidebar } from "@/lib/sidebar-context"
 
 // Reusable Components
 import {
@@ -15,8 +16,8 @@ import {
   Pagination,
   Tabs,
   TabsContent,
+  ThreeDotsLoader,
 } from "@/components/reusable"
-import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { ReportTableCard } from "@/components/erp/reports/widgets"
 
 // Specific components
@@ -37,7 +38,7 @@ import {
   getSubscriptionForecastAction,
   getSubscriptionCreditsAction,
   syncSubscriptionWithMpErpAction,
-  getRecurringSubscriptionStatsAction,
+  getRecurringSubscriptionDetailAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import type { RecurringSubscription, RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
 import { formatCurrency } from "@/lib/utils"
@@ -48,13 +49,8 @@ import {
   ExportFileIcon,
   CalendarIcon,
   MoneyIcon,
-  Users,
   ListIcon,
   CreditCardIcon,
-  CheckCircleIcon,
-  CancelCircleIcon,
-  AlertTriangleIcon,
-  RepeatIcon,
   SearchIcon,
   ChevronLeftIcon,
 } from "@/lib/icons"
@@ -68,10 +64,6 @@ const COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "r
   { id: "shipping", label: "Frete", align: "left" as const, width: "150px" },
   { id: "actions", label: "Ações", align: "center" as const, width: "250px" },
 ]
-
-const PulseBlock = ({ className = "" }: { className?: string }) => (
-  <div className={`animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20 ${className}`} />
-)
 
 type SectionKey = "home" | "list" | "billing" | "forecast" | "credits"
 
@@ -97,6 +89,20 @@ const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
     subtitle: "Saldo de serviços disponíveis em cada cliente.",
   },
 }
+
+const SECTION_SLUGS: Record<Exclude<SectionKey, "home">, string> = {
+  list: "assinaturas",
+  billing: "faturamento",
+  forecast: "calendario",
+  credits: "creditos",
+}
+
+const SLUG_TO_SECTION: Record<string, SectionKey> = Object.entries(SECTION_SLUGS).reduce(
+  (acc, [key, slug]) => ({ ...acc, [slug]: key as SectionKey }),
+  {} as Record<string, SectionKey>,
+)
+
+const DELINQUENT_STATUSES = ["past_due", "payment_failed"]
 
 const SECTIONS: { key: Exclude<SectionKey, "home">; title: string; description: string; icon: typeof ListIcon }[] = [
   {
@@ -144,153 +150,56 @@ export default function RecurringSubscriptionsPage({
   const { canEdit } = usePermissions()
   const canManage = canEdit("recurring_subscriptions")
   const { selectedStore } = useStore()
+  const { setHeaderOverride } = useSidebar()
 
-  const [currentTab, setCurrentTab] = useState<"home" | "list" | "billing" | "forecast" | "credits">("home")
-
-  const [subscriptions, setSubscriptions] = useState<RecurringSubscription[]>(initialSubscriptions)
-  const [hasMore, setHasMore] = useState(initialHasMore)
-  const [nextCursor, setNextCursor] = useState(initialNextCursor)
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-
+  const [currentTab, setCurrentTab] = useState<SectionKey>("home")
   const [statusFilter, setStatusFilter] = useState<RecurringSubscriptionStatusFilter>("all")
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
-
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
   const effectiveViewMode = isTablet ? "grid" : viewMode
   const [page, setPage] = useState(1)
 
-  // Billing Panel States
-  const [billingData, setBillingData] = useState<any[]>([])
-  const [loadingBilling, setLoadingBilling] = useState(true)
+  const queryKey = useMemo(
+    () => ["erp", "recurring_subscriptions", partnerId, selectedStore?.id] as const,
+    [partnerId, selectedStore?.id],
+  )
 
-  // Forecast States
-  const [forecastData, setForecastData] = useState<any[]>([])
-  const [loadingForecast, setLoadingForecast] = useState(true)
+  const entityPage = useEntityPage<any, any, string>({
+    entityType: "recurring_subscriptions",
+    partnerId,
+    queryKey,
+    initialItems: initialSubscriptions,
+    initialNextCursor,
+    initialHasMore,
+    fetchPageFn: async ({ cursor }) => {
+      const res = await listRecurringSubscriptionsAction(partnerId, { cursor, storeId: selectedStore?.id || undefined })
+      if (!res.success || !res.data) throw new Error(res.error || "Erro ao carregar assinaturas.")
+      return { items: res.data.items as any[], nextCursor: res.data.nextCursor, hasMore: res.data.hasMore }
+    },
+    dedupeKey: useCallback((s: any) => String(s?.id || ""), []),
+    getDetailFn: async (subscriptionId: string) => {
+      const res = await getRecurringSubscriptionDetailAction(partnerId, subscriptionId)
+      if (!res.success || !res.data) return null
+      return { ...res.data.subscription, plan: res.data.plan, customer: res.data.customer } as any
+    },
+    listToDetail: (item: any) => item,
+  })
 
-  // Credits States
-  const [creditsData, setCreditsData] = useState<any[]>([])
-  const [loadingCredits, setLoadingCredits] = useState(true)
-  const [creditsSearch, setCreditsSearch] = useState("")
-
-  const [tabCounts, setTabCounts] = useState<{
-    all: number
-    active: number
-    paused: number
-    pending: number
-    delinquent: number
-    awaiting_restock: number
-    cancelled: number
-  } | null>(null)
-
-  const observerTarget = useRef<HTMLDivElement>(null)
-  const itemsPerPage = 8
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search)
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [search])
-
-  const loadStats = useCallback(async () => {
-    const res = await getRecurringSubscriptionStatsAction(partnerId, { storeId: selectedStore?.id || null })
-    if (res.success && res.data) {
-      setTabCounts({
-        all: res.data.total,
-        active: res.data.active,
-        paused: res.data.paused,
-        pending: res.data.pending,
-        delinquent: res.data.delinquent,
-        awaiting_restock: res.data.awaiting_restock,
-        cancelled: res.data.cancelled,
-      })
-    }
-  }, [partnerId, selectedStore?.id])
-
-  useEffect(() => {
-    void loadStats()
-  }, [loadStats])
-
-  // Fetch / reload subscriptions when filters change
-  const reload = useCallback(async (statusVal: typeof statusFilter, searchVal: string) => {
-    setLoading(true)
-    const res = await listRecurringSubscriptionsAction(partnerId, {
-      status: statusVal,
-      search: searchVal,
-      storeId: selectedStore?.id || undefined,
-    })
-    setLoading(false)
-    void loadStats()
-    if (res.success && res.data) {
-      setSubscriptions(res.data.items as RecurringSubscription[])
-      setHasMore(res.data.hasMore)
-      setNextCursor(res.data.nextCursor)
-      setPage(1)
-    }
-  }, [partnerId, loadStats, selectedStore?.id])
-
-  useEffect(() => {
-    if (currentTab === "list") {
-      reload(statusFilter, debouncedSearch)
-    }
-  }, [statusFilter, debouncedSearch, reload, currentTab])
-
-  // Load other tab details
-  const loadTabDetails = useCallback(async () => {
-    if (currentTab === "home" || currentTab === "list") {
-      return
-    }
-    if (currentTab === "billing") {
-      setLoadingBilling(true)
-      const res = await getSubscriptionBillingPanelAction(partnerId)
-      setLoadingBilling(false)
-      if (res.success && res.data) {
-        setBillingData(res.data)
-      }
-    } else if (currentTab === "forecast") {
-      setLoadingForecast(true)
-      const res = await getSubscriptionForecastAction(partnerId)
-      setLoadingForecast(false)
-      if (res.success && res.data) {
-        setForecastData(res.data)
-      }
-    } else if (currentTab === "credits") {
-      setLoadingCredits(true)
-      const res = await getSubscriptionCreditsAction(partnerId, creditsSearch)
-      setLoadingCredits(false)
-      if (res.success && res.data) {
-        setCreditsData(res.data)
-      }
-    }
-  }, [currentTab, partnerId, creditsSearch])
-
-  useEffect(() => {
-    loadTabDetails()
-  }, [currentTab, loadTabDetails])
-
-  // Load more / infinite scroll logic
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
-    const res = await listRecurringSubscriptionsAction(partnerId, {
-      cursor: nextCursor,
-      status: statusFilter,
-      search: debouncedSearch,
-      storeId: selectedStore?.id || undefined,
-    })
-    setLoadingMore(false)
-    if (res.success && res.data) {
-      setSubscriptions((prev) => [...prev, ...(res.data!.items as RecurringSubscription[])])
-      setHasMore(res.data.hasMore)
-      setNextCursor(res.data.nextCursor)
-    }
-  }, [partnerId, nextCursor, statusFilter, debouncedSearch, loadingMore, selectedStore?.id])
+  const {
+    items: rawSubscriptions,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isListLoading,
+    entityState,
+    openEntity,
+    closeEntity,
+    search,
+    setSearch,
+    debouncedSearch,
+    afterMutation,
+  } = entityPage
 
   // Full-screen detail (?view=<id>, ?view=<id>&type=history)
-  const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
   const isDetailOpen = entityState.isOpen && entityState.action === "view" && !!entityState.entityId
   const detailSubscriptionId = isDetailOpen ? entityState.entityId : null
   const detailInitialTab = entityState.entityType === "history" ? "history" : "general"
@@ -302,11 +211,117 @@ export default function RecurringSubscriptionsPage({
     [openEntity],
   )
 
+  // Navegação entre seções com ?tab=<slug> no URL
+  const navigateToSection = useCallback((tab: SectionKey) => {
+    setCurrentTab(tab)
+    if (typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    const slug = tab === "home" ? null : SECTION_SLUGS[tab as Exclude<SectionKey, "home">]
+    if (slug) url.searchParams.set("tab", slug)
+    else url.searchParams.delete("tab")
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }, [])
+
+  // Lê ?tab= na montagem e sincroniza com voltar/avançar do navegador
+  useEffect(() => {
+    const sectionFromUrl = () => {
+      const value = new URLSearchParams(window.location.search).get("tab")
+      return value && SLUG_TO_SECTION[value] ? SLUG_TO_SECTION[value] : "home"
+    }
+    setCurrentTab(sectionFromUrl())
+    const handlePopState = () => setCurrentTab(sectionFromUrl())
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
+
+  // Cabeçalho sticky padrão: título da seção + botão voltar padrão
+  useEffect(() => {
+    if (detailSubscriptionId) return
+    if (currentTab !== "home") {
+      setHeaderOverride({
+        title: SECTION_META[currentTab].title,
+        onBack: () => navigateToSection("home"),
+        isSubPage: true,
+      })
+    } else {
+      setHeaderOverride({ title: SECTION_META.home.title })
+    }
+  }, [currentTab, detailSubscriptionId, navigateToSection, setHeaderOverride])
+
+  // Reset detail view when sidebar resets
+  useEffect(() => {
+    const handleReset = () => closeEntity()
+    window.addEventListener("erp-sidebar-reset", handleReset)
+    return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+  }, [closeEntity])
+
+  // Billing Panel States
+  const [billingData, setBillingData] = useState<any[]>([])
+  const [loadingBilling, setLoadingBilling] = useState(false)
+
+  // Forecast States
+  const [forecastData, setForecastData] = useState<any[]>([])
+  const [loadingForecast, setLoadingForecast] = useState(false)
+
+  // Credits States
+  const [creditsData, setCreditsData] = useState<any[]>([])
+  const [loadingCredits, setLoadingCredits] = useState(false)
+  const [creditsSearch, setCreditsSearch] = useState("")
+  const [debouncedCreditsSearch, setDebouncedCreditsSearch] = useState("")
+
+  const billingLoadedRef = useRef(false)
+  const forecastLoadedRef = useRef(false)
+  const creditsTermRef = useRef<string | null>(null)
+
+  const observerTarget = useRef<HTMLDivElement>(null)
+  const itemsPerPage = 8
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCreditsSearch(creditsSearch), 300)
+    return () => clearTimeout(timer)
+  }, [creditsSearch])
+
+  // Carrega os dados das seções uma única vez (sem refetch ao voltar para a seção)
+  const loadTabDetails = useCallback(async () => {
+    if (currentTab === "billing") {
+      if (billingLoadedRef.current) return
+      setLoadingBilling(true)
+      const res = await getSubscriptionBillingPanelAction(partnerId)
+      setLoadingBilling(false)
+      if (res.success && res.data) {
+        setBillingData(res.data)
+        billingLoadedRef.current = true
+      }
+    } else if (currentTab === "forecast") {
+      if (forecastLoadedRef.current) return
+      setLoadingForecast(true)
+      const res = await getSubscriptionForecastAction(partnerId)
+      setLoadingForecast(false)
+      if (res.success && res.data) {
+        setForecastData(res.data)
+        forecastLoadedRef.current = true
+      }
+    } else if (currentTab === "credits") {
+      if (creditsTermRef.current === debouncedCreditsSearch) return
+      setLoadingCredits(true)
+      const res = await getSubscriptionCreditsAction(partnerId, debouncedCreditsSearch)
+      setLoadingCredits(false)
+      if (res.success && res.data) {
+        setCreditsData(res.data)
+        creditsTermRef.current = debouncedCreditsSearch
+      }
+    }
+  }, [currentTab, partnerId, debouncedCreditsSearch])
+
+  useEffect(() => {
+    void loadTabDetails()
+  }, [loadTabDetails])
+
   useInfiniteScrollObserver(observerTarget, {
     enabled: currentTab === "list" && !isDetailOpen,
-    hasNextPage: !!hasMore,
-    isFetchingNextPage: loadingMore,
-    fetchNextPage: loadMore,
+    hasNextPage: !!hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage: () => fetchNextPage(),
     rootMargin: "320px",
     threshold: 0,
   })
@@ -328,33 +343,76 @@ export default function RecurringSubscriptionsPage({
     checkScroll()
     window.addEventListener("resize", checkScroll)
     return () => window.removeEventListener("resize", checkScroll)
-  }, [checkScroll, viewMode, subscriptions, currentTab])
+  }, [checkScroll, viewMode, rawSubscriptions, currentTab])
+
+  // Filtro local (status + busca) sobre o cache — igual às outras páginas do ERP
+  const filteredSubscriptions = useMemo(() => {
+    const term = debouncedSearch.toLowerCase()
+    return (rawSubscriptions || []).filter((sub: any) => {
+      if (statusFilter !== "all") {
+        if (statusFilter === "delinquent") {
+          if (!DELINQUENT_STATUSES.includes(sub.status)) return false
+        } else if (sub.status !== statusFilter) {
+          return false
+        }
+      }
+      if (!term) return true
+      return (
+        (sub.customer?.name || "").toLowerCase().includes(term) ||
+        (sub.customer?.email || "").toLowerCase().includes(term) ||
+        (sub.plan?.name || "").toLowerCase().includes(term) ||
+        (sub.notes || "").toLowerCase().includes(term)
+      )
+    })
+  }, [rawSubscriptions, statusFilter, debouncedSearch])
+
+  const tabCounts = useMemo(() => {
+    const counts = {
+      all: 0,
+      active: 0,
+      paused: 0,
+      pending: 0,
+      delinquent: 0,
+      awaiting_restock: 0,
+      cancelled: 0,
+    }
+    for (const sub of rawSubscriptions || []) {
+      counts.all++
+      if (sub.status === "active") counts.active++
+      else if (sub.status === "paused") counts.paused++
+      else if (sub.status === "pending") counts.pending++
+      else if (sub.status === "awaiting_restock") counts.awaiting_restock++
+      else if (sub.status === "cancelled") counts.cancelled++
+      if (DELINQUENT_STATUSES.includes(sub.status)) counts.delinquent++
+    }
+    return counts
+  }, [rawSubscriptions])
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, debouncedSearch])
 
   // Action execution: pause, resume, cancel, resolve_stock, sync
   const runAction = async (action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync", subscriptionId: string) => {
     if (action === "sync") {
-      setLoading(true)
       const res = await syncSubscriptionWithMpErpAction(partnerId, subscriptionId)
-      setLoading(false)
       if (!res.success) {
         toast({ title: "Erro", description: res.error, variant: "destructive" })
         return
       }
       toast({ title: `Assinatura sincronizada com sucesso!` })
-      reload(statusFilter, debouncedSearch)
+      afterMutation(subscriptionId)
       return
     }
 
     if (action === "resolve_stock") {
-      setLoading(true)
       const res = await updateSubscriptionStockShortageResolvedAction(partnerId, subscriptionId)
-      setLoading(false)
       if (!res.success) {
         toast({ title: "Erro", description: res.error, variant: "destructive" })
         return
       }
       toast({ title: res.message || "Sucesso" })
-      reload(statusFilter, debouncedSearch)
+      afterMutation(subscriptionId)
       return
     }
 
@@ -371,17 +429,21 @@ export default function RecurringSubscriptionsPage({
       return
     }
     toast({ title: "Assinatura atualizada com sucesso!" })
-    reload(statusFilter, debouncedSearch)
+    afterMutation(subscriptionId)
   }
 
-  const totalPages = Math.ceil(subscriptions.length / itemsPerPage)
-  const paginated = subscriptions.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+  const totalPages = Math.ceil(filteredSubscriptions.length / itemsPerPage)
+  const paginated = filteredSubscriptions.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
+  const prevFilteredLengthRef = useRef(0)
   useEffect(() => {
-    if (page === totalPages && hasMore && !loadingMore) {
-      void loadMore()
+    const lengthChanged = filteredSubscriptions.length !== prevFilteredLengthRef.current
+    prevFilteredLengthRef.current = filteredSubscriptions.length
+    if (lengthChanged) return
+    if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage()
     }
-  }, [page, totalPages, hasMore, loadingMore, loadMore])
+  }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage, filteredSubscriptions.length])
 
   const handleExport = useCallback(() => {
     void exportData({
@@ -395,16 +457,6 @@ export default function RecurringSubscriptionsPage({
       },
     })
   }, [exportData, partnerId, selectedStore?.id, statusFilter, debouncedSearch])
-
-  const kpis = useMemo(() => {
-    if (!tabCounts) return []
-    return [
-      { title: "Assinaturas Ativas", value: String(tabCounts.active), trend: "", icon: CheckCircleIcon },
-      { title: "Pausadas", value: String(tabCounts.paused), trend: "", icon: CancelCircleIcon },
-      { title: "Com Pendência", value: String(tabCounts.delinquent), trend: "", icon: AlertTriangleIcon },
-      { title: "Total", value: String(tabCounts.all), trend: "", icon: RepeatIcon },
-    ]
-  }, [tabCounts])
 
   const billingColumns = useMemo(
     () => [
@@ -482,7 +534,6 @@ export default function RecurringSubscriptionsPage({
         .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .sub-table tbody tr:last-child > td { border-bottom: none; }
       `}</style>
 
       <AnimatePresence mode="wait">
@@ -494,7 +545,9 @@ export default function RecurringSubscriptionsPage({
             onBack={closeEntity}
             canManage={canManage}
             initialTab={detailInitialTab}
-            onChanged={() => reload(statusFilter, debouncedSearch)}
+            onChanged={() => {
+              if (detailSubscriptionId) afterMutation(detailSubscriptionId)
+            }}
           />
         ) : (
           <FadeIn key="list" className="block w-full">
@@ -503,14 +556,16 @@ export default function RecurringSubscriptionsPage({
         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             {currentTab !== "home" && (
-              <Button
-                variant="outline"
-                onClick={() => setCurrentTab("home")}
-                leftIcon={<ChevronLeftIcon size={18} />}
-                className="mt-1 shrink-0"
-              >
-                Voltar
-              </Button>
+              <div className="hidden md:flex shrink-0 mt-1">
+                <Button
+                  variant="filled"
+                  onClick={() => navigateToSection("home")}
+                  className="w-10 h-10 p-0 flex items-center justify-center"
+                  aria-label="Voltar"
+                >
+                  <ChevronLeftIcon size={18} />
+                </Button>
+              </div>
             )}
             <div>
               <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
@@ -528,19 +583,6 @@ export default function RecurringSubscriptionsPage({
           )}
         </header>
 
-        {/* KPI row */}
-        {(currentTab === "home" || currentTab === "list") && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-            <div className="lg:col-span-12">
-              {kpis.length > 0 ? (
-                <SummaryCards metrics={kpis} variant="horizontal" />
-              ) : (
-                <PulseBlock className="h-[120px] w-full" />
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Landing: secoes no estilo configuracoes */}
         {currentTab === "home" && (
           <FadeIn key="home-sections" className="w-full">
@@ -551,7 +593,7 @@ export default function RecurringSubscriptionsPage({
                   icon={section.icon}
                   title={section.title}
                   description={section.description}
-                  onClick={() => setCurrentTab(section.key)}
+                  onClick={() => navigateToSection(section.key)}
                   showChevron
                   className="px-4 py-3 gap-4"
                 />
@@ -561,7 +603,7 @@ export default function RecurringSubscriptionsPage({
         )}
 
         {/* Sections */}
-        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as SectionKey)} className="w-full">
+        <Tabs value={currentTab} onValueChange={(value) => navigateToSection(value as SectionKey)} className="w-full">
 
           {/* Tab 1: Subscriptions list */}
           <TabsContent value="list">
@@ -572,20 +614,30 @@ export default function RecurringSubscriptionsPage({
               onSearchChange={setSearch}
               viewMode={effectiveViewMode}
               onViewModeChange={setViewModeState}
-              tabCounts={tabCounts || undefined}
+              tabCounts={tabCounts}
             />
 
             <AnimatePresence mode="wait">
-              {loading ? (
-                <FadeIn key="loading" className="w-full">
-                  <PulseBlock className="h-[480px] w-full" />
+              {isListLoading ? (
+                <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
+                  <ThreeDotsLoader />
                 </FadeIn>
-              ) : subscriptions.length === 0 ? (
+              ) : rawSubscriptions.length === 0 ? (
                 <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
                   <IconPlaceholder
                     placeholderType="image"
                     imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
                     imageAlt="Nenhuma assinatura"
+                    title="Nenhuma assinatura"
+                    subtitle="Assinaturas criadas a partir dos seus planos recorrentes aparecerão aqui."
+                  />
+                </FadeIn>
+              ) : filteredSubscriptions.length === 0 ? (
+                <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
+                  <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                    imageAlt="Nenhuma assinatura encontrada"
                     title="Nenhuma assinatura encontrada"
                     subtitle="Tente ajustar a busca ou os filtros de status."
                     itemButton={search ? {
@@ -610,12 +662,12 @@ export default function RecurringSubscriptionsPage({
                       ))}
                     </div>
                   ) : (
-                    <div className="w-full bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border relative">
-                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                    <div className="w-full overflow-hidden rounded-xl relative">
+                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                      <div className="overflow-x-auto custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                        <table className="sub-table w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                      <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                           <thead>
                             <tr className="bg-brand-gray dark:bg-dark-border/50">
                               {COLUMNS.map((col, index) => (
@@ -650,16 +702,16 @@ export default function RecurringSubscriptionsPage({
                 </FadeIn>
               )}
             </AnimatePresence>
-            {hasMore ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
 
-            {subscriptions.length > 0 && paginated.length > 0 && (
+            {filteredSubscriptions.length > 0 && paginated.length > 0 && (
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
                 onPageChange={(p) => {
                   setPage(p)
-                  if (p === totalPages && hasMore && !loadingMore) {
-                    void loadMore()
+                  if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                    void fetchNextPage()
                   }
                 }}
               />
@@ -669,11 +721,11 @@ export default function RecurringSubscriptionsPage({
           {/* Tab 2: Billing / Faturamento Panel */}
           <TabsContent value="billing">
             {loadingBilling ? (
-              <PulseBlock className="h-[360px] w-full" />
+              <div className="flex items-center justify-center py-20">
+                <ThreeDotsLoader />
+              </div>
             ) : (
               <ReportTableCard
-                title="Painel de Cobranças e Notas"
-                icon={MoneyIcon}
                 columns={billingColumns}
                 data={billingData}
                 pageSize={8}
@@ -685,30 +737,20 @@ export default function RecurringSubscriptionsPage({
           {/* Tab 3: Forecast / Calendário & Demanda */}
           <TabsContent value="forecast">
             {loadingForecast ? (
-              <PulseBlock className="h-[360px] w-full" />
+              <div className="flex items-center justify-center py-20">
+                <ThreeDotsLoader />
+              </div>
             ) : (
               <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                      <CalendarIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                        Calendário de Entregas & Execuções Futuras
-                      </h3>
-                      <p className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        Execuções e entregas agendadas nos próximos 30 dias de assinaturas ativas.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 {forecastData.length === 0 ? (
                   <div className="py-12 flex flex-col items-center justify-center text-center">
-                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                      Nenhuma entrega ou cobrança prevista nos próximos 30 dias.
-                    </span>
+                    <IconPlaceholder
+                      placeholderType="image"
+                      imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                      imageAlt="Nenhuma previsão"
+                      title="Nenhuma entrega ou cobrança prevista"
+                      subtitle="Não há execuções agendadas para os próximos 30 dias."
+                    />
                   </div>
                 ) : (
                   <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
@@ -751,11 +793,11 @@ export default function RecurringSubscriptionsPage({
             </div>
 
             {loadingCredits ? (
-              <PulseBlock className="h-[360px] w-full" />
+              <div className="flex items-center justify-center py-20">
+                <ThreeDotsLoader />
+              </div>
             ) : (
               <ReportTableCard
-                title="Saldo de Créditos dos Clientes"
-                icon={Users}
                 columns={creditColumns}
                 data={creditsData}
                 pageSize={8}
