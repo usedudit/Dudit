@@ -110,7 +110,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false)
 
     const defaultMargin = useMemo(() => {
-        const margin = (businessInfo as any)?.salesSettings?.defaultProfitMarginPercent
+        const margin = (businessInfo as any)?.salesSettings?.defaultMarginPercent
         return typeof margin === "number" && margin > 0 ? margin : null
     }, [businessInfo])
 

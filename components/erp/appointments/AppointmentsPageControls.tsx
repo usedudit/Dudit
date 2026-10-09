@@ -15,6 +15,7 @@ import {
     Settings2Icon,
     ExportFileIcon,
     UploadIcon,
+    StarIcon,
 } from "@/lib/icons";
 import { CalendarOff, RefreshCw } from "lucide-react";
 
@@ -49,6 +50,8 @@ interface AppointmentsPageControlsProps {
     onExport: () => void;
     isExporting: boolean;
     onImport?: () => void;
+    onOpenSuggestions?: () => void;
+    hasEscalarPlan?: boolean;
 }
 
 const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
@@ -73,6 +76,8 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     onExport,
     isExporting,
     onImport,
+    onOpenSuggestions,
+    hasEscalarPlan,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null);
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false });
@@ -300,6 +305,18 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                                 <div className="text-[10px] font-bold text-brand-inactive-text px-3 py-1 uppercase tracking-wider">
                                     Ações
                                 </div>
+                                {onOpenSuggestions && (
+                                    <button
+                                        onClick={onOpenSuggestions}
+                                        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-semibold text-gray-750 hover:bg-gray-50 dark:text-dark-body dark:hover:bg-zinc-800 rounded-md"
+                                    >
+                                        <StarIcon size={16} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
+                                        Sugestões
+                                        {!hasEscalarPlan && (
+                                            <span className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded ml-auto">Premium</span>
+                                        )}
+                                    </button>
+                                )}
                                 <button
                                     onClick={onOpenUnavailable}
                                     className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-semibold text-gray-750 hover:bg-gray-50 dark:text-dark-body dark:hover:bg-zinc-800 rounded-md"

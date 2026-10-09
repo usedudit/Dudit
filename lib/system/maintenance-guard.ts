@@ -13,8 +13,13 @@ const EXEMPT_PREFIXES = [
   "/ddt-admin",
   "/api/health",
   "/api/monitoring",
+  "/api/internal",
+  "/api/cron",
   "/api/webhooks",
-  "/api/mercadopago/webhook",
+  "/api/whatsapp",
+  "/api/mercadopago",
+  "/api/r2",
+  "/api/assets",
   "/api/system",
   "/_next",
   "/favicon.ico",
@@ -46,7 +51,7 @@ function isExemptPath(pathname: string): boolean {
 }
 
 let memoryCache: { data: CachedMaintenance | null; expiresAt: number } | null = null
-const MAINTENANCE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes local in-memory cache (invalidated on-demand via admin toggle)
+const MAINTENANCE_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes local in-memory cache (invalidated on-demand via admin toggle)
 
 export function clearMaintenanceMemoryCache(): void {
   memoryCache = null
@@ -55,7 +60,7 @@ export function clearMaintenanceMemoryCache(): void {
 /**
  * Fetch maintenance status from Upstash Redis REST API (Edge compatible).
  * Fails OPEN (returns disabled) if Redis is down, unreachable, or times out.
- * Uses a 30s local memory cache to avoid exhausting Redis request limits on page loads.
+ * Uses Next.js Data Cache ('system-maintenance') + local memory cache to avoid unnecessary Redis calls.
  */
 async function fetchMaintenanceStatus(): Promise<CachedMaintenance | null> {
   const now = Date.now()
@@ -79,7 +84,7 @@ async function fetchMaintenanceStatus(): Promise<CachedMaintenance | null> {
         Authorization: `Bearer ${kvToken}`,
       },
       signal: controller.signal,
-      cache: "no-store",
+      next: { revalidate: 3600, tags: ['system-maintenance'] },
     })
 
     clearTimeout(timeoutId)

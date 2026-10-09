@@ -3,6 +3,7 @@ export type ExploreItemType = "produto" | "servico" | "loja"
 const PUBLIC_PRODUCT_FIELDS = [
   "id", "name", "description", "price", "promotional_price", "images", "video_thumbnail",
   "rating", "marketplace_score", "sales_last_30_days", "favorites_count", "views_last_30_days",
+  "stock_quantity", "stock_available",
   "category_id", "marketplace_category_id", "category", "subcategoryName", "created_at", "updated_at",
   "partners", "stores", "show_price_in_store", "fallback_variant_image", "fallback_variant_price", "itemType",
 ] as const

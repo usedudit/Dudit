@@ -3,8 +3,17 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import {
+  evaluateNoShowAlerts,
+  evaluateStagnantServices,
+  toDateStr,
+  subtractDays,
+  type NoShowAlertsResult,
+  type StagnantServicesResult,
+} from "@/lib/erp/appointment-insights"
+import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
@@ -478,6 +487,113 @@ export async function getAppointmentsByDateRangeAction(
     return { success: true, items: data || [] }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao buscar agendamentos", items: [] }
+  }
+}
+
+/**
+ * Sugestões & Oportunidades — clientes com faltas recorrentes ("Ausência") no período.
+ */
+export async function getNoShowAlertsAction(
+  partnerId: string,
+  periodDays: number = 90,
+  storeId?: string
+): Promise<{ error: string } | NoShowAlertsResult> {
+  try {
+    await requireUser()
+    await requirePermission(partnerId, "appointments", "view")
+    if (storeId) {
+      await requireStorePermission(storeId, partnerId, "appointments", "view")
+    }
+    const admin = createAdminClient()
+
+    const days = Math.max(1, Math.min(365, Number(periodDays) || 90))
+    const today = toDateStr(new Date())
+    const cutoff = subtractDays(today, days)
+
+    const columns = "id, customer_id, customer_name, start_date, status, price, source, store_id"
+
+    let pastQuery = admin
+      .from("appointments")
+      .select(columns)
+      .eq("partner_id", partnerId)
+      .gte("start_date", cutoff)
+      .lte("start_date", today)
+    let futureQuery = admin
+      .from("appointments")
+      .select(columns)
+      .eq("partner_id", partnerId)
+      .gt("start_date", today)
+
+    if (storeId) {
+      pastQuery = pastQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+      futureQuery = futureQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+    }
+
+    const [{ data: past, error }, { data: future, error: futureError }] = await Promise.all([
+      pastQuery.order("start_date", { ascending: false }).limit(2000),
+      futureQuery.order("start_date", { ascending: true }).limit(2000),
+    ])
+
+    if (error) return { error: error.message }
+    if (futureError) return { error: futureError.message }
+
+    return evaluateNoShowAlerts(past || [], future || [], { periodDays: days, today })
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
+/**
+ * Sugestões & Oportunidades — serviços ativos sem nenhum agendamento no período.
+ */
+export async function getStagnantServicesAction(
+  partnerId: string,
+  periodDays: number = 90,
+  storeId?: string
+): Promise<{ error: string } | StagnantServicesResult> {
+  try {
+    await requireUser()
+    await requirePermission(partnerId, "appointments", "view")
+    await requirePermission(partnerId, "services", "view")
+    if (storeId) {
+      await requireStorePermission(storeId, partnerId, "services", "view")
+    }
+    const admin = createAdminClient()
+
+    const days = Math.max(1, Math.min(365, Number(periodDays) || 90))
+    const today = toDateStr(new Date())
+    const cutoff = subtractDays(today, days)
+
+    let servicesQuery = admin
+      .from("services")
+      .select(
+        "id, name, price, promotional_price, duration_minutes, category, images, created_at, is_unavailable_type, store_id"
+      )
+      .eq("partner_id", partnerId)
+    servicesQuery = scopeActiveOnly(servicesQuery)
+
+    let usageQuery = admin
+      .from("appointments")
+      .select("service_id, service_name, start_date, source, status, store_id")
+      .eq("partner_id", partnerId)
+      .gte("start_date", cutoff)
+
+    if (storeId) {
+      servicesQuery = servicesQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+      usageQuery = usageQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+    }
+
+    const [{ data: services, error }, { data: usage, error: usageError }] = await Promise.all([
+      servicesQuery.order("created_at", { ascending: true }).limit(200),
+      usageQuery.order("start_date", { ascending: true }).limit(3000),
+    ])
+
+    if (error) return { error: error.message }
+    if (usageError) return { error: usageError.message }
+
+    return evaluateStagnantServices(services || [], usage || [], { periodDays: days, today })
+  } catch (error: any) {
+    return { error: error.message }
   }
 }
 

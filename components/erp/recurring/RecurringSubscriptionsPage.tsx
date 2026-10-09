@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
@@ -11,6 +12,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 
 // Reusable Components
 import {
+  AlertModal,
   IconPlaceholder,
   Pagination,
   Tabs,
@@ -24,6 +26,12 @@ import SubscriptionPageControls from "./SubscriptionPageControls"
 import SubscriptionGridCard from "./SubscriptionGridCard"
 import SubscriptionListRow from "./SubscriptionListRow"
 import SubscriptionDetailPage from "./SubscriptionDetailPage"
+import ForecastPageControls from "./ForecastPageControls"
+import ForecastGridCard from "./ForecastGridCard"
+import ForecastListRow from "./ForecastListRow"
+import BillingPageControls from "./BillingPageControls"
+import BillingGridCard from "./BillingGridCard"
+import BillingListRow from "./BillingListRow"
 
 // Utils
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -40,7 +48,6 @@ import {
   getRecurringSubscriptionDetailAction,
 } from "@/app/actions/erp/recurring-subscriptions"
 import type { RecurringSubscription, RecurringSubscriptionStatusFilter } from "@/lib/types/recurring"
-import { formatCurrency } from "@/lib/utils"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { useStore } from "@/lib/store-context"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
@@ -52,7 +59,7 @@ import {
   CreditCardIcon,
   ChevronLeftIcon,
 } from "@/lib/icons"
-import { Button, Badge, ListItem } from "@/components/reusable"
+import { Button, ListItem } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FilterChip from "@/components/reusable/FilterChip"
 import { SectionFilterBar } from "./SectionFilterBar"
@@ -75,6 +82,34 @@ const COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "r
   { id: "shipping", label: "Frete", align: "left" as const, width: "150px" },
   { id: "actions", label: "Ações", align: "center" as const, width: "250px" },
 ]
+
+const FORECAST_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
+  { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
+  { id: "plan", label: "Plano / Frequência", align: "left" as const, width: "230px" },
+  { id: "scheduledFor", label: "Previsão", align: "left" as const, width: "170px" },
+  { id: "value", label: "Próxima Cobrança", align: "right" as const, width: "170px" },
+  { id: "modality", label: "Entrega", align: "left" as const, width: "190px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "120px" },
+]
+
+const BILLING_COLUMNS: Array<{ id: string; label: string; align?: "left" | "center" | "right"; width?: string }> = [
+  { id: "order", label: "Pedido", align: "left" as const, width: "200px" },
+  { id: "customer", label: "Cliente", align: "left" as const, width: "260px" },
+  { id: "date", label: "Data", align: "left" as const, width: "150px" },
+  { id: "value", label: "Valor", align: "right" as const, width: "150px" },
+  { id: "status", label: "Status Pagamento", align: "center" as const, width: "170px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "120px" },
+]
+
+type ConfirmDialog = {
+  title: string
+  message: string
+  confirmText: string
+  cancelText?: string
+  variant?: "danger" | "success" | "warning" | "info"
+  isDestructive?: boolean
+  onConfirm: () => void | Promise<void>
+}
 
 type SectionKey = "home" | "list" | "billing" | "forecast" | "credits"
 
@@ -364,6 +399,7 @@ export default function RecurringSubscriptionsPage({
   const canManage = canEdit("recurring_subscriptions")
   const { selectedStore } = useStore()
   const { setHeaderOverride } = useSidebar()
+  const router = useRouter()
 
   const [currentTab, setCurrentTab] = useState<SectionKey>("home")
   const [statusFilter, setStatusFilter] = useState<RecurringSubscriptionStatusFilter>("all")
@@ -513,10 +549,18 @@ export default function RecurringSubscriptionsPage({
   // Billing Panel States
   const [billingData, setBillingData] = useState<any[]>([])
   const [loadingBilling, setLoadingBilling] = useState(false)
+  const [billingSearch, setBillingSearch] = useState("")
+  const [billingPage, setBillingPage] = useState(1)
+
+  // Confirmação de ações destrutivas (pausar/cancelar)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   // Forecast States
   const [forecastData, setForecastData] = useState<any[]>([])
   const [loadingForecast, setLoadingForecast] = useState(false)
+  const [forecastSearch, setForecastSearch] = useState("")
+  const [forecastPage, setForecastPage] = useState(1)
 
   // Credits States
   const [creditsData, setCreditsData] = useState<any[]>([])
@@ -701,6 +745,69 @@ export default function RecurringSubscriptionsPage({
     afterMutation(subscriptionId)
   }
 
+  // Ações disparadas pela seção Calendário & Demanda: além da mutação,
+  // recarregam a previsão (uma assinatura pausada/cancelada sai da lista).
+  const runForecastAction = async (
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    subscriptionId: string,
+  ) => {
+    await runAction(action, subscriptionId)
+    forecastLoadedRef.current = false
+    void loadTabDetails()
+  }
+
+  const confirmFirst = (
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    then: () => Promise<void>,
+  ) => {
+    setConfirmDialog(
+      action === "pause"
+        ? {
+            title: "Pausar assinatura?",
+            message:
+              "As próximas execuções ficam suspensas até você reativar. Nenhuma nova cobrança será feita nesse período.",
+            confirmText: "Pausar assinatura",
+            cancelText: "Voltar",
+            variant: "warning",
+            onConfirm: then,
+          }
+        : {
+            title: "Cancelar assinatura?",
+            message:
+              "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
+            confirmText: "Cancelar assinatura",
+            cancelText: "Manter assinatura",
+            isDestructive: true,
+            onConfirm: then,
+          },
+    )
+  }
+
+  const handleAction = (
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    subscriptionId: string,
+  ) => {
+    if (action === "pause" || action === "cancel") {
+      confirmFirst(action, () => runAction(action, subscriptionId))
+      return
+    }
+    void runAction(action, subscriptionId)
+  }
+
+  const handleForecastAction = (
+    action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
+    subscriptionId: string,
+  ) => {
+    if (action === "pause" || action === "cancel") {
+      confirmFirst(action, () => runForecastAction(action, subscriptionId))
+      return
+    }
+    void runForecastAction(action, subscriptionId)
+  }
+
+  const openOrder = (orderId: string) => router.push(`/erp/pedidos?view=${orderId}`)
+  const openSubscriptionFromBilling = (subscriptionId: string) => openDetail(subscriptionId)
+
   const totalPages = Math.ceil(filteredSubscriptions.length / itemsPerPage)
   const paginated = filteredSubscriptions.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
@@ -726,35 +833,6 @@ export default function RecurringSubscriptionsPage({
       },
     })
   }, [exportData, partnerId, selectedStore?.id, statusFilter, debouncedSearch])
-
-  const billingColumns = useMemo(
-    () => [
-      {
-        key: "order_number",
-        header: "Pedido",
-        render: (value: any, row: any) => <span className="font-bold">#{value || row.id.slice(0, 8)}</span>,
-      },
-      { key: "customer_name", header: "Cliente" },
-      { key: "created_at", header: "Data", render: (value: any) => new Date(value).toLocaleDateString("pt-BR") },
-      {
-        key: "total_amount",
-        header: "Valor",
-        align: "right" as const,
-        render: (value: any) => <span className="font-semibold">{formatCurrency(value)}</span>,
-      },
-      {
-        key: "situation",
-        header: "Status Pagamento",
-        align: "center" as const,
-        render: (value: any) => (
-          <Badge variant={value === "paid" ? "green" : value === "cancelled" ? "red" : "orange"}>
-            {value === "paid" ? "Pago" : value === "cancelled" ? "Cancelado" : "Pendente"}
-          </Badge>
-        ),
-      },
-    ],
-    [],
-  )
 
   const creditColumns = useMemo(
     () => [
@@ -796,6 +874,7 @@ export default function RecurringSubscriptionsPage({
   const filteredBillingData = useMemo(() => {
     const active = isDatePeriodFilterActive(billingFilters.datePeriod)
     const { startYmd, endYmd } = resolveDatePeriodBounds(billingFilters.datePeriod)
+    const term = billingSearch.trim().toLowerCase()
     return billingData.filter((row: any) => {
       if (
         billingFilters.payment.length > 0 &&
@@ -804,14 +883,48 @@ export default function RecurringSubscriptionsPage({
         return false
       }
       if (active && !ymdInBounds(row.created_at, startYmd, endYmd)) return false
+      if (term) {
+        const haystack = `${row.order_number || ""} ${row.customer_name || ""}`.toLowerCase()
+        if (!haystack.includes(term)) return false
+      }
       return true
     })
-  }, [billingData, billingFilters])
+  }, [billingData, billingFilters, billingSearch])
 
-  const filteredForecastData = useMemo(
-    () => forecastData.filter((row: any) => matchesHorizon(row.scheduledFor, forecastFilters.horizon)),
-    [forecastData, forecastFilters],
+  const billingTotalPages = Math.max(1, Math.ceil(filteredBillingData.length / itemsPerPage))
+  const safeBillingPage = Math.min(billingPage, billingTotalPages)
+  const billingPaginated = filteredBillingData.slice(
+    (safeBillingPage - 1) * itemsPerPage,
+    safeBillingPage * itemsPerPage,
   )
+
+  useEffect(() => {
+    setBillingPage(1)
+  }, [billingSearch, billingFilters, currentTab])
+
+  const filteredForecastData = useMemo(() => {
+    const term = forecastSearch.trim().toLowerCase()
+    return forecastData.filter((row: any) => {
+      if (!matchesHorizon(row.scheduledFor, forecastFilters.horizon)) return false
+      if (!term) return true
+      return (
+        (row.customerName || "").toLowerCase().includes(term) ||
+        (row.customerEmail || "").toLowerCase().includes(term) ||
+        (row.planName || "").toLowerCase().includes(term)
+      )
+    })
+  }, [forecastData, forecastFilters, forecastSearch])
+
+  const forecastTotalPages = Math.max(1, Math.ceil(filteredForecastData.length / itemsPerPage))
+  const safeForecastPage = Math.min(forecastPage, forecastTotalPages)
+  const forecastPaginated = filteredForecastData.slice(
+    (safeForecastPage - 1) * itemsPerPage,
+    safeForecastPage * itemsPerPage,
+  )
+
+  useEffect(() => {
+    setForecastPage(1)
+  }, [forecastSearch, forecastFilters, currentTab])
 
   const filteredCreditsData = useMemo(
     () =>
@@ -969,7 +1082,7 @@ export default function RecurringSubscriptionsPage({
                                 sub={sub}
                                 canManage={canManage}
                                 onOpen={openDetail}
-                                onRunAction={runAction}
+                                onRunAction={handleAction}
                               />
                             ))}
                           </div>
@@ -1003,7 +1116,7 @@ export default function RecurringSubscriptionsPage({
                                       columns={COLUMNS}
                                       canManage={canManage}
                                       onOpen={openDetail}
-                                      onRunAction={runAction}
+                                      onRunAction={handleAction}
                                     />
                                   ))}
                                 </tbody>
@@ -1032,7 +1145,11 @@ export default function RecurringSubscriptionsPage({
 
                 {/* Tab 2: Billing / Faturamento Panel */}
                 <TabsContent value="billing">
-                  <SectionFilterBar
+                  <BillingPageControls
+                    search={billingSearch}
+                    onSearchChange={setBillingSearch}
+                    viewMode={effectiveViewMode}
+                    onViewModeChange={setViewModeState}
                     onOpenFilter={() => setFilterTarget("billing")}
                     hasActiveFilters={hasBillingFilters}
                     chips={
@@ -1047,52 +1164,113 @@ export default function RecurringSubscriptionsPage({
                       />
                     }
                   />
-                  {loadingBilling ? (
-                    <div className="flex items-center justify-center py-20">
-                      <ThreeDotsLoader />
-                    </div>
-                  ) : (
-                    <ReportTableCard
-                      columns={billingColumns}
-                      data={filteredBillingData}
-                      pageSize={8}
-                      emptyMessage={
+
+                  <AnimatePresence mode="wait">
+                    {loadingBilling ? (
+                      <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
+                        <ThreeDotsLoader />
+                      </FadeIn>
+                    ) : billingData.length === 0 ? (
+                      <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
                         <IconPlaceholder
                           placeholderType="image"
-                          imageSrc={
-                            hasBillingFilters
-                              ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                              : "https://img.dudit.com.br/static/mascots/SemPedidos.png"
-                          }
+                          imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                           imageAlt="Nenhum faturamento"
-                          title={
-                            hasBillingFilters
-                              ? "Nenhum faturamento encontrado"
-                              : "Nenhum faturamento gerado por assinaturas ainda."
-                          }
-                          subtitle={
-                            hasBillingFilters
-                              ? "Ajuste os filtros para encontrar as cobranças desejadas."
-                              : "Os pedidos criados por assinaturas aparecerão aqui."
-                          }
-                          itemButton={
-                            hasBillingFilters
-                              ? {
-                                  text: "Limpar filtros",
-                                  action: () => setBillingFilters({ ...EMPTY_BILLING_FILTERS }),
-                                  variant: "outline",
-                                }
-                              : undefined
-                          }
+                          title="Nenhum faturamento gerado por assinaturas ainda."
+                          subtitle="Os pedidos criados por assinaturas aparecerão aqui."
                         />
-                      }
+                      </FadeIn>
+                    ) : filteredBillingData.length === 0 ? (
+                      <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                          imageAlt="Nenhum faturamento encontrado"
+                          title="Nenhum faturamento encontrado"
+                          subtitle="Tente ajustar a busca ou os filtros."
+                          itemButton={{
+                            text: "Limpar busca e filtros",
+                            action: () => {
+                              setBillingSearch("")
+                              setBillingFilters({ ...EMPTY_BILLING_FILTERS })
+                            },
+                            variant: "outline",
+                          }}
+                        />
+                      </FadeIn>
+                    ) : (
+                      <FadeIn key={effectiveViewMode} className="w-full">
+                        {effectiveViewMode === "grid" ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                            {billingPaginated.map((row: any) => (
+                              <BillingGridCard
+                                key={row.id}
+                                row={row}
+                                onOpen={openOrder}
+                                onOpenSubscription={openSubscriptionFromBilling}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                <thead>
+                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    {BILLING_COLUMNS.map((col, index) => (
+                                      <th
+                                        key={col.id}
+                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
+                                        style={{ width: col.width }}
+                                      >
+                                        <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                          {col.label}
+                                        </div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {billingPaginated.map((row: any) => (
+                                    <BillingListRow
+                                      key={row.id}
+                                      row={row}
+                                      columns={BILLING_COLUMNS}
+                                      onOpen={openOrder}
+                                      onOpenSubscription={openSubscriptionFromBilling}
+                                    />
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </FadeIn>
+                    )}
+                  </AnimatePresence>
+
+                  {filteredBillingData.length > 0 && (
+                    <Pagination
+                      currentPage={safeBillingPage}
+                      totalPages={billingTotalPages}
+                      onPageChange={(p) => {
+                        setBillingPage(p)
+                        window.scrollTo({ top: 0, behavior: "smooth" })
+                      }}
                     />
                   )}
                 </TabsContent>
 
                 {/* Tab 3: Forecast / Calendário & Demanda */}
                 <TabsContent value="forecast">
-                  <SectionFilterBar
+                  <ForecastPageControls
+                    search={forecastSearch}
+                    onSearchChange={setForecastSearch}
+                    viewMode={effectiveViewMode}
+                    onViewModeChange={setViewModeState}
                     onOpenFilter={() => setFilterTarget("forecast")}
                     hasActiveFilters={hasForecastFilters}
                     chips={
@@ -1102,64 +1280,105 @@ export default function RecurringSubscriptionsPage({
                       />
                     }
                   />
-                  {loadingForecast ? (
-                    <div className="flex items-center justify-center py-20">
-                      <ThreeDotsLoader />
-                    </div>
-                  ) : (
-                    <div>
-                      {filteredForecastData.length === 0 ? (
-                        <div className="py-12 flex flex-col items-center justify-center text-center">
-                          <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc={
-                              hasForecastFilters
-                                ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                : "https://img.dudit.com.br/static/mascots/Assinaturas.png"
-                            }
-                            imageAlt="Nenhuma previsão"
-                            title={
-                              hasForecastFilters
-                                ? "Nenhuma previsão encontrada"
-                                : "Nenhuma entrega ou cobrança prevista"
-                            }
-                            subtitle={
-                              hasForecastFilters
-                                ? "Ajuste os filtros para ver outras previsões."
-                                : "Não há execuções agendadas para os próximos 30 dias."
-                            }
-                            itemButton={
-                              hasForecastFilters
-                                ? {
-                                    text: "Limpar filtros",
-                                    action: () => setForecastFilters({ ...EMPTY_FORECAST_FILTERS }),
-                                    variant: "outline",
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex flex-col divide-y divide-brand-border/50 dark:divide-dark-border/50">
-                          {filteredForecastData.map((f, idx) => (
-                            <div key={idx} className="py-4 flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-4 min-w-0">
-                                <div className="h-10 w-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading font-bold shrink-0">
-                                  {new Date(f.scheduledFor).getDate()}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{f.customerName}</p>
-                                  <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{f.planName}</p>
-                                </div>
-                              </div>
-                              <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
-                                Previsão: {new Date(f.scheduledFor).toLocaleDateString("pt-BR")}
-                              </span>
+
+                  <AnimatePresence mode="wait">
+                    {loadingForecast ? (
+                      <FadeIn key="loading" className="w-full flex items-center justify-center py-20">
+                        <ThreeDotsLoader />
+                      </FadeIn>
+                    ) : forecastData.length === 0 ? (
+                      <FadeIn key="empty" className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
+                          imageAlt="Nenhuma previsão"
+                          title="Nenhuma execução prevista"
+                          subtitle="As próximas execuções e entregas das suas assinaturas ativas aparecerão aqui."
+                        />
+                      </FadeIn>
+                    ) : filteredForecastData.length === 0 ? (
+                      <FadeIn key="empty-results" className="w-full flex items-center justify-center min-h-[400px]">
+                        <IconPlaceholder
+                          placeholderType="image"
+                          imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                          imageAlt="Nenhuma previsão encontrada"
+                          title="Nenhuma previsão encontrada"
+                          subtitle="Tente ajustar a busca ou o período da previsão."
+                          itemButton={{
+                            text: "Limpar busca e filtros",
+                            action: () => {
+                              setForecastSearch("")
+                              setForecastFilters({ ...EMPTY_FORECAST_FILTERS })
+                            },
+                            variant: "outline",
+                          }}
+                        />
+                      </FadeIn>
+                    ) : (
+                      <FadeIn key={effectiveViewMode} className="w-full">
+                        {effectiveViewMode === "grid" ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                            {forecastPaginated.map((f: any) => (
+                              <ForecastGridCard
+                                key={f.id}
+                                row={f}
+                                canManage={canManage}
+                                onOpen={openDetail}
+                                onRunAction={handleForecastAction}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                              <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                <thead>
+                                  <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                    {FORECAST_COLUMNS.map((col, index) => (
+                                      <th
+                                        key={col.id}
+                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${index === 0 ? "rounded-l-lg pl-6" : ""} ${col.id === "actions" ? "rounded-r-lg pr-6" : ""}`}
+                                        style={{ width: col.width }}
+                                      >
+                                        <div className={`flex items-center ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                          {col.label}
+                                        </div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {forecastPaginated.map((f: any) => (
+                                    <ForecastListRow
+                                      key={f.id}
+                                      row={f}
+                                      columns={FORECAST_COLUMNS}
+                                      canManage={canManage}
+                                      onOpen={openDetail}
+                                      onRunAction={handleForecastAction}
+                                    />
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </FadeIn>
+                    )}
+                  </AnimatePresence>
+
+                  {filteredForecastData.length > 0 && (
+                    <Pagination
+                      currentPage={safeForecastPage}
+                      totalPages={forecastTotalPages}
+                      onPageChange={(p) => {
+                        setForecastPage(p)
+                        window.scrollTo({ top: 0, behavior: "smooth" })
+                      }}
+                    />
                   )}
                 </TabsContent>
 
@@ -1275,6 +1494,28 @@ export default function RecurringSubscriptionsPage({
         canExportAllColumns={columnSelectionModal.canExportAllColumns}
         onConfirm={handleColumnConfirm}
         onClose={closeColumnSelectionModal}
+      />
+
+      <AlertModal
+        isOpen={!!confirmDialog}
+        title={confirmDialog?.title || ""}
+        message={confirmDialog?.message}
+        confirmText={confirmDialog?.confirmText}
+        cancelText={confirmDialog?.cancelText || "Voltar"}
+        variant={confirmDialog?.variant}
+        isDestructive={confirmDialog?.isDestructive}
+        isLoading={confirmBusy}
+        onClose={() => setConfirmDialog(null)}
+        onConfirm={async () => {
+          const fn = confirmDialog?.onConfirm
+          setConfirmBusy(true)
+          try {
+            await fn?.()
+          } finally {
+            setConfirmBusy(false)
+            setConfirmDialog(null)
+          }
+        }}
       />
     </FadeIn>
   )

@@ -92,6 +92,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined) {
             .from("products")
             .select(`
             id, name, description, price, promotional_price, images, rating, status, is_active, moderation_status, deleted_at, show_in_marketplace,
+            sales_last_30_days, stock_quantity, stock_available,
             category_id, category:product_categories!category_id(name), created_at, updated_at,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, is_showcase_active),

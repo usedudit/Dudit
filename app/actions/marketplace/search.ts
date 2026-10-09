@@ -30,6 +30,71 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
     return { fallback_variant_image: image, fallback_variant_price: lowestPrice }
 }
 
+// ─── Badges de vitrine (Últimos N / Destaque / promoções) ──────────────────
+// Mesma lógica da homepage (discover.ts applyUrgencyBadges) para que o
+// ItemCard renderize os badges no /explorar exatamente como no home.
+
+async function decorateExploreItems(items: any[], options: { includePromotions?: boolean } = {}): Promise<any[]> {
+    if (!Array.isArray(items) || items.length === 0) return items
+
+    // Clona produtos: os arrays podem ser compartilhados com o searchMemoryCache
+    // e não podem ser mutados com badges de um usuário específico.
+    const decorated = items.map((item) => (item && item.itemType === "produto" ? { ...item } : item))
+
+    let userId: string | null = null
+    try {
+        const user = await getCurrentUser()
+        userId = user?.id ?? null
+    } catch { }
+
+    const seed = `dudit-${userId ?? "anon"}-${new Date().toDateString()}`
+    for (const item of decorated) {
+        if (!item || item.itemType !== "produto") continue
+        if (item._sales === undefined) item._sales = Number(item.sales_last_30_days ?? 0) || 0
+        if (item._stock === undefined) item._stock = Number(item.stock_quantity ?? item.stock_available ?? 0) || 0
+        if (item._badgeLabel) continue
+
+        let h = 0
+        const s = `${seed}-${item.id}-launch-badge`
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i)
+        const bucket = Math.abs(h) % 100
+        const stock = item._stock
+
+        if (stock > 0 && stock <= 5 && bucket < 45) {
+            item._badgeLabel = `Últimos ${stock}`
+            item._badgeVariant = "red"
+        } else if (bucket >= 75 && bucket < 90) {
+            item._badgeLabel = "Destaque"
+            item._badgeVariant = "purple"
+        }
+    }
+
+    if (options.includePromotions) {
+        try {
+            const partnerIds = new Set<string>()
+            for (const item of decorated) {
+                if (!item || item.itemType !== "produto") continue
+                const raw = Array.isArray(item.partners) ? item.partners[0] : item.partners
+                if (raw?.id) partnerIds.add(String(raw.id))
+            }
+            if (partnerIds.size > 0) {
+                const { listActivePromotionsForPartnersAction } = await import("@/app/actions/shared/promotions")
+                const promoMap = await listActivePromotionsForPartnersAction([...partnerIds])
+                if (promoMap.size > 0) {
+                    for (const item of decorated) {
+                        if (!item || item.itemType !== "produto") continue
+                        const raw = Array.isArray(item.partners) ? item.partners[0] : item.partners
+                        const promos = raw?.id ? promoMap.get(String(raw.id)) : undefined
+                        if (promos && promos.length > 0) item._promotions = promos
+                    }
+                }
+            }
+        } catch { /* promoções de campanha são best-effort */ }
+    }
+
+    return decorated
+}
+
 function applyShowcasePenalty(items: any[]): any[] {
     const active: any[] = []
     const inactive: any[] = []
@@ -368,10 +433,15 @@ export const searchMarketplaceDirectFull = cache(async (
         }).catch(() => { })
     }
 
+    const [decoratedResults, decoratedDistantItems] = await Promise.all([
+        decorateExploreItems(finalResults, { includePromotions: !limits.cursor && !limits.lastId }),
+        decorateExploreItems(moreDistantItems),
+    ])
+
     return {
-        results: finalResults,
+        results: decoratedResults,
         moreDistantSellers,
-        moreDistantItems
+        moreDistantItems: decoratedDistantItems
     }
 })
 
@@ -706,7 +776,7 @@ async function _searchMarketplaceInternal(
                 _prodIdx = promises.length
                 promises.push(
                     supabase.from("products").select(`
-                        id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
+                        id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating, sales_last_30_days,
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, is_showcase_active),
@@ -1310,7 +1380,7 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                    id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, sales_last_30_days,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),

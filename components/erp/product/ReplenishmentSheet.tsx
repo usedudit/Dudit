@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon, SearchIcon } from "@/lib/icons"
+import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon, SearchIcon, CheckCircleIcon, TrendingUpIcon } from "@/lib/icons"
 import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, Input, FormDropdown } from "@/components/reusable"
+import AlertModal from "@/components/reusable/AlertModal"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -11,6 +12,9 @@ import {
     getReplenishmentSuggestionsAction,
     getStagnantProductsAction,
     updateProductPromotionalPriceAction,
+    getPricingAlertsAction,
+    updateProductSalePriceAction,
+    type PricingAlert,
 } from "@/app/actions/erp/products"
 import { notifyReplenishmentSuggestedAction } from "@/app/actions/erp/notifications"
 import { formatCurrency, formatQuantityWithUnit, formatUnit } from "@/lib/utils"
@@ -64,7 +68,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
 
-    const [activeTab, setActiveTab] = useState<"reposicao" | "parados">("reposicao")
+    const [activeTab, setActiveTab] = useState<"reposicao" | "parados" | "precificacao">("reposicao")
 
     const [selectedPeriod, setSelectedPeriod] = useState<number>(90)
     const [searchQuery, setSearchQuery] = useState("")
@@ -83,6 +87,17 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
     // Stagnant products (>selectedPeriod d)
     const [stagnantProducts, setStagnantProducts] = useState<StagnantProduct[]>([])
     const [loadingStagnant, setLoadingStagnant] = useState(false)
+
+    // Pricing alerts (cost vs sale price / thin margins)
+    const [pricingAlerts, setPricingAlerts] = useState<PricingAlert[]>([])
+    const [pricingMeta, setPricingMeta] = useState<{
+        counts: { loss: number; thin: number }
+        thresholdPercent: number
+        defaultMarginPercent: number
+    } | null>(null)
+    const [loadingPricing, setLoadingPricing] = useState(false)
+    const [applyTarget, setApplyTarget] = useState<PricingAlert | null>(null)
+    const [isApplying, setIsApplying] = useState(false)
 
     // Second Sheet (Promotional Price for Stagnant Product)
     const [selectedStagnant, setSelectedStagnant] = useState<StagnantProduct | null>(null)
@@ -117,6 +132,23 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
         })
     }, [partnerId, selectedPeriod, storeId])
 
+    const fetchPricing = useCallback(() => {
+        setLoadingPricing(true)
+        getPricingAlertsAction(partnerId, storeId).then((res) => {
+            if ("alerts" in res && res.alerts) {
+                setPricingAlerts(res.alerts)
+                setPricingMeta({
+                    counts: res.counts,
+                    thresholdPercent: res.thresholdPercent,
+                    defaultMarginPercent: res.defaultMarginPercent,
+                })
+            } else if ("error" in res && res.error) {
+                notifyError(res.error)
+            }
+            setLoadingPricing(false)
+        })
+    }, [partnerId, storeId])
+
     const refetchStagnant = useCallback(() => {
         fetchStagnant()
     }, [fetchStagnant])
@@ -125,14 +157,18 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
         if (!isOpen) {
             setSuggestions([])
             setStagnantProducts([])
+            setPricingAlerts([])
+            setPricingMeta(null)
             setSearchQuery("")
             setIsDiscountSheetOpen(false)
             setSelectedStagnant(null)
+            setApplyTarget(null)
             return
         }
         fetchSuggestions()
         fetchStagnant()
-    }, [isOpen, fetchSuggestions, fetchStagnant])
+        fetchPricing()
+    }, [isOpen, fetchSuggestions, fetchStagnant, fetchPricing])
 
     useEffect(() => {
         if (isOpen) {
@@ -183,6 +219,152 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
         }
     }
 
+    const handleApplyPricing = async () => {
+        if (!applyTarget) return
+        const target = applyTarget
+        const removePromo = target.cause === "promo"
+        setIsApplying(true)
+
+        const res = removePromo
+            ? await updateProductSalePriceAction({ productId: target.id, partnerId, clearPromotion: true })
+            : await updateProductSalePriceAction({ productId: target.id, partnerId, price: target.suggested_price })
+
+        setIsApplying(false)
+        setApplyTarget(null)
+
+        if (res.error) {
+            notifyError(res.error)
+            return
+        }
+
+        notifySuccess(removePromo ? "Promoção removida!" : "Preço atualizado com sucesso!")
+        fetchPricing()
+        router.refresh()
+    }
+
+    // --- CONTEÚDO DA ABA PRECIFICAÇÃO ---
+    const pricingContent = loadingPricing ? (
+        <div className="flex items-center justify-center py-16">
+            <ThreeDotsLoader />
+        </div>
+    ) : pricingAlerts.length === 0 ? (
+        <div className="py-12">
+            <IconPlaceholder
+                icon={CheckCircleIcon}
+                title="Preços em dia!"
+                subtitle="Nenhum produto está sendo vendido abaixo do custo ou com margem apertada."
+            />
+        </div>
+    ) : (
+        <div className="space-y-3">
+            {pricingMeta && (
+                <InfoCard
+                    title="Saúde dos Preços"
+                    color={pricingMeta.counts.loss > 0 ? "red" : "orange"}
+                    message={`${pricingMeta.counts.loss} produto(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% — metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
+                />
+            )}
+            {pricingAlerts.map((a) => {
+                const isLoss = a.status === "loss"
+                const canApplyDirectly = !a.has_variants && a.suggested_price > 0
+                const isPromoFix = a.cause === "promo"
+                return (
+                    <div
+                        key={a.id}
+                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-green transition-all cursor-pointer"
+                        onClick={() => {
+                            onClose()
+                            router.push(`/erp/produtos?view=${a.id}`)
+                        }}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                <img src={getPrimaryProductDisplayImage(a)} alt={a.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {a.name}
+                                </p>
+                                <p className="text-xs text-brand-inactive-text mt-0.5">
+                                    {a.sku || a.gtin || "Sem SKU"}
+                                </p>
+                            </div>
+                            <Badge variant={isLoss ? "red" : "orange"}>
+                                {isLoss ? "Abaixo do custo" : "Margem apertada"}
+                            </Badge>
+                        </div>
+
+                        {isPromoFix && (
+                            <p className="mt-2 text-xs font-semibold text-brand-orange">
+                                O preço promocional está abaixo do custo
+                            </p>
+                        )}
+
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
+                            <div>
+                                <span className="text-brand-inactive-text block">Custo</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(a.cost_price)}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-brand-inactive-text block">Preço atual</span>
+                                <span className={`font-bold ${isLoss ? "text-brand-red line-through" : "text-brand-dark dark:text-dark-heading"}`}>
+                                    {formatCurrency(a.effective_price)}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-brand-inactive-text block">Margem</span>
+                                <span className={`font-bold ${isLoss ? "text-brand-red" : "text-brand-orange"}`}>
+                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "—"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between gap-2">
+                            <div className="text-xs text-brand-inactive-text min-w-0">
+                                {isLoss ? (
+                                    <>
+                                        Perde <span className="font-bold text-brand-red">{formatCurrency(a.loss_per_unit)}</span>/un
+                                        {a.stock_quantity > 0 && (
+                                            <> · <span className="font-bold text-brand-red">{formatCurrency(a.impact)}</span> em estoque</>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        Potencial:{" "}
+                                        <span className="font-bold text-brand-green">
+                                            {a.stock_quantity > 0
+                                                ? `+${formatCurrency(a.impact)}`
+                                                : `+${formatCurrency(a.potential_gain_per_unit)}/un`}
+                                        </span>
+                                        {a.stock_quantity > 0 && " em estoque"}
+                                    </>
+                                )}
+                            </div>
+                            {canApplyDirectly ? (
+                                <Button
+                                    size="sm"
+                                    variant={isPromoFix ? "outlineorange" : "outline"}
+                                    className="h-8 text-xs gap-1.5 shrink-0"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setApplyTarget(a)
+                                    }}
+                                >
+                                    <TrendingUpIcon size={14} className="text-brand-primary" />
+                                    {isPromoFix ? "Remover promoção" : `Aplicar ${formatCurrency(a.suggested_price)}`}
+                                </Button>
+                            ) : (
+                                <span className="text-xs text-brand-inactive-text shrink-0">Revisar variantes</span>
+                            )}
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+
     // --- CONTEÚDO DA SHEET PRINCIPAL ---
     const mainContent = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -203,6 +385,9 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                         </TabsTrigger>
                         <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
                             Parados ({stagnantProducts.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="precificacao" className="px-0 pb-3 text-sm">
+                            Precificação ({pricingAlerts.length})
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
@@ -272,7 +457,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                             ))}
                         </div>
                     )
-                ) : (
+                ) : activeTab === "parados" ? (
                     loadingStagnant ? (
                         <div className="flex items-center justify-center py-16">
                             <ThreeDotsLoader />
@@ -396,6 +581,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                             )}
                         </div>
                     )
+                ) : (
+                    pricingContent
                 )}
             </div>
 
@@ -556,6 +743,50 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
         )
     })() : null
 
+    // --- MODAL DE CONFIRMAÇÃO (APLICAR PREÇO / REMOVER PROMOÇÃO) ---
+    const applyConfirmModal = applyTarget ? (
+        <AlertModal
+            isOpen
+            onClose={() => {
+                if (!isApplying) setApplyTarget(null)
+            }}
+            onConfirm={handleApplyPricing}
+            variant={applyTarget.cause === "promo" ? "warning" : "info"}
+            title={applyTarget.cause === "promo" ? "Remover promoção?" : "Aplicar preço sugerido?"}
+            confirmText={applyTarget.cause === "promo" ? "Remover" : "Aplicar"}
+            isLoading={isApplying}
+            disabled={isApplying}
+            message={
+                <div className="space-y-1.5 text-left">
+                    <p className="font-bold text-brand-dark dark:text-dark-heading">{applyTarget.name}</p>
+                    {applyTarget.cause === "promo" ? (
+                        <>
+                            <p>
+                                Promoção atual: <strong>{formatCurrency(applyTarget.effective_price)}</strong> · Custo:{" "}
+                                <strong>{formatCurrency(applyTarget.cost_price)}</strong>
+                            </p>
+                            <p>
+                                Remover a promoção volta o preço para{" "}
+                                <strong>{formatCurrency(applyTarget.base_price)}</strong>.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p>
+                                Preço atual: <strong>{formatCurrency(applyTarget.effective_price)}</strong> · Custo:{" "}
+                                <strong>{formatCurrency(applyTarget.cost_price)}</strong>
+                            </p>
+                            <p>
+                                Novo preço: <strong>{formatCurrency(applyTarget.suggested_price)}</strong>
+                                {pricingMeta && ` (margem padrão de ${pricingMeta.defaultMarginPercent}%)`}
+                            </p>
+                        </>
+                    )}
+                </div>
+            }
+        />
+    ) : null
+
     // --- RENDERIZADOR RESPONSIVO (DESKTOP SHEET VS BOTTOM SHEET) ---
     if (isMobile) {
         return (
@@ -566,6 +797,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 <BottomSheet isOpen={isDiscountSheetOpen} onClose={() => setIsDiscountSheetOpen(false)}>
                     {discountContent}
                 </BottomSheet>
+                {applyConfirmModal}
             </>
         )
     }
@@ -609,6 +841,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                     </div>
                 </div>
             </Portal>
+
+            {applyConfirmModal}
         </>
     )
 }

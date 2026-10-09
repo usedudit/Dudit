@@ -8,6 +8,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ERPDetailLoading } from "@/components/erp/shared/ERPDetailLoading"
 import {
   ActionsDropdown,
+  AlertModal,
   Badge,
   Button,
   DefaultModal,
@@ -61,6 +62,16 @@ const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 type DetailTab = "general" | "items" | "credits" | "notes" | "history"
 type SubscriptionAction = "pause" | "resume" | "cancel" | "resolve_stock" | "sync"
 
+type ConfirmDialog = {
+  title: string
+  message: string
+  confirmText: string
+  cancelText?: string
+  variant?: "danger" | "success" | "warning" | "info"
+  isDestructive?: boolean
+  onConfirm: () => void | Promise<void>
+}
+
 interface SubscriptionDetailPageProps {
   partnerId: string
   subscriptionId: string
@@ -84,7 +95,7 @@ const SidebarRow = ({
   valueClassName?: string
 }) => (
   <div className="flex items-start justify-between gap-3">
-    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{label}</span>
+    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{label}</span>
     <span className={`text-sm font-semibold text-right text-brand-dark dark:text-dark-heading ${valueClassName}`}>
       {value}
     </span>
@@ -133,6 +144,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab)
   const [isScrolled, setIsScrolled] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -218,9 +230,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 
   const primaryAction = useMemo(() => {
     if (!canManage || !status) return null
-    if (status === "active") {
-      return { label: "Pausar assinatura", icon: <BlockedIcon size={18} />, action: "pause" as SubscriptionAction }
-    }
+    // Assinatura ativa não tem botão principal: pausar/cancelar ficam no menu de ações.
+    if (status === "active") return null
     if (status === "paused") {
       return { label: "Reativar assinatura", icon: <PlayIcon size={18} />, action: "resume" as SubscriptionAction }
     }
@@ -233,7 +244,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     return null
   }, [canManage, canSync, status])
 
-  const runAction = useCallback(
+  const executeAction = useCallback(
     async (action: SubscriptionAction) => {
       if (busy) return
       setBusy(true)
@@ -265,6 +276,38 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
       }
     },
     [busy, initialDetail, loadDetail, loadExecutions, onChanged, partnerId, subscriptionId, toast],
+  )
+
+  // Pausar e cancelar pedem confirmação (AlertModal); as demais ações rodam direto.
+  const runAction = useCallback(
+    (action: SubscriptionAction) => {
+      if (action === "pause" || action === "cancel") {
+        setConfirmDialog(
+          action === "pause"
+            ? {
+              title: "Pausar assinatura?",
+              message:
+                "As próximas execuções ficam suspensas até você reativar. Nenhuma nova cobrança será feita nesse período.",
+              confirmText: "Pausar assinatura",
+              cancelText: "Voltar",
+              variant: "warning",
+              onConfirm: () => executeAction(action),
+            }
+            : {
+              title: "Cancelar assinatura?",
+              message:
+                "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
+              confirmText: "Cancelar assinatura",
+              cancelText: "Manter assinatura",
+              isDestructive: true,
+              onConfirm: () => executeAction(action),
+            },
+        )
+        return
+      }
+      void executeAction(action)
+    },
+    [executeAction],
   )
 
   const openOrder = useCallback(
@@ -309,7 +352,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
     <>
       {showPauseMenu && (
         <DropdownItem onClick={() => void runAction("pause")}>
-          <BlockedIcon size={18} /> Pausar
+          <BlockedIcon size={18} /> Pausar assinatura
         </DropdownItem>
       )}
       {showResumeMenu && (
@@ -343,28 +386,28 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   const usingPlanItems = !detail.items.length && !!plan?.items?.length
   const tabItems = usingPlanItems
     ? (plan?.items || []).map((item) => ({
-        key: item.id,
-        name: item.product?.name || item.service?.name || "Item",
-        itemType: item.itemType,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice ?? 0,
-        preferredTime: item.preferredTime,
-        durationMinutes: item.durationMinutes,
-        images: item.product ? (item.product as any).images : (item.service as any)?.images,
-      }))
+      key: item.id,
+      name: item.product?.name || item.service?.name || "Item",
+      itemType: item.itemType,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice ?? 0,
+      preferredTime: item.preferredTime,
+      durationMinutes: item.durationMinutes,
+      images: item.product ? (item.product as any).images : (item.service as any)?.images,
+    }))
     : detail.items.map((item) => ({
-        key: item.id,
-        name:
-          item.product?.name ||
-          item.service?.name ||
-          (item.itemType === "product" ? "Produto" : "Serviço"),
-        itemType: item.itemType,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        preferredTime: item.preferredTime,
-        durationMinutes: item.durationMinutes,
-        images: item.product ? item.product.images : item.service?.images,
-      }))
+      key: item.id,
+      name:
+        item.product?.name ||
+        item.service?.name ||
+        (item.itemType === "product" ? "Produto" : "Serviço"),
+      itemType: item.itemType,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      preferredTime: item.preferredTime,
+      durationMinutes: item.durationMinutes,
+      images: item.product ? item.product.images : item.service?.images,
+    }))
 
   const filteredExecutions = useMemo(() => {
     const term = historySearch.trim().toLowerCase()
@@ -587,7 +630,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                               label="Total do próximo ciclo"
                               value={formatCurrency(
                                 Number(plan?.price ?? subscription.contractedAmount ?? 0) +
-                                  Number(subscription.shippingAmount || 0),
+                                Number(subscription.shippingAmount || 0),
                               )}
                               valueClassName="text-brand-primary"
                             />
@@ -615,26 +658,13 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                             <SidebarRow
                               label="Mercado Pago"
                               value={subscription.mpPreapprovalId || "Não vinculada"}
-                              valueClassName="text-xs break-all"
+                              valueClassName="text-sm break-all"
                             />
                             {priceChangePending && (
-                              <div className="rounded-xl bg-brand-blue-secondary/60 dark:bg-blue-900/20 px-3 py-2">
-                                <p className="text-xs font-semibold text-brand-blue dark:text-blue-400">
-                                  Mudança de preço aguardando decisão
-                                </p>
-                                {subscription.priceChangeExpiresAt && (
-                                  <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                    Janela até {formatFullDate(subscription.priceChangeExpiresAt)}
-                                  </p>
-                                )}
-                              </div>
+                              <InfoCard title="Mudança de preço aguardando decisão" message={subscription.priceChangeExpiresAt ? `Janela até ${formatFullDate(subscription.priceChangeExpiresAt)}` : ""} color="blue" />
                             )}
                             {subscription.pendingCancellationReason && (
-                              <div className="rounded-xl bg-brand-red-secondary/60 dark:bg-red-900/20 px-3 py-2">
-                                <p className="text-xs font-semibold text-brand-red dark:text-red-400">
-                                  {subscription.pendingCancellationReason}
-                                </p>
-                              </div>
+                              <InfoCard title="Cancelamento pendente" message={subscription.pendingCancellationReason} color="red" />
                             )}
                           </div>
                         </SidebarCard>
@@ -742,7 +772,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                   {credit.consumed} consumidos
                                 </span>
                                 <span
@@ -820,10 +850,10 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                             itemButton={
                               executions.length > 0
                                 ? {
-                                    text: "Limpar busca",
-                                    action: () => setHistorySearch(""),
-                                    variant: "outline",
-                                  }
+                                  text: "Limpar busca",
+                                  action: () => setHistorySearch(""),
+                                  variant: "outline",
+                                }
                                 : undefined
                             }
                           />
@@ -939,6 +969,26 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         >
           <p className="text-sm text-brand-red whitespace-pre-wrap">{executionError}</p>
         </DefaultModal>
+
+        <AlertModal
+          isOpen={!!confirmDialog}
+          title={confirmDialog?.title || ""}
+          message={confirmDialog?.message}
+          confirmText={confirmDialog?.confirmText}
+          cancelText={confirmDialog?.cancelText || "Voltar"}
+          variant={confirmDialog?.variant}
+          isDestructive={confirmDialog?.isDestructive}
+          isLoading={busy}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={async () => {
+            const fn = confirmDialog?.onConfirm
+            try {
+              await fn?.()
+            } finally {
+              setConfirmDialog(null)
+            }
+          }}
+        />
       </div>
     </FadeIn>
   )

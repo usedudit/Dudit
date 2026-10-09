@@ -24,6 +24,13 @@ import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIX
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import {
+    evaluatePricing,
+    getDefaultMarginPercent,
+    getMarginThresholdPercent,
+    sortPricingAlerts,
+    roundMoney,
+} from "@/lib/erp/pricing-alerts"
 
 import { headers } from "next/headers"
 
@@ -218,7 +225,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         if ((finalServicePrice === undefined || finalServicePrice === null || Number(finalServicePrice) === 0) && numServiceCost > 0) {
             try {
                 const { data: partnerRec } = await admin.from("partners").select("business_info").eq("id", finalPartnerId).single()
-                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultProfitMarginPercent
+                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultMarginPercent
                 if (typeof defaultMargin === "number" && defaultMargin > 0) {
                     finalServicePrice = Math.round(numServiceCost * (1 + defaultMargin / 100) * 100) / 100
                 }
@@ -811,5 +818,163 @@ export async function duplicateServiceAction(serviceId: string) {
         return successResponse({ newServiceId: inserted.id, product: inserted })
     } catch (error: any) {
         return errorResponse(error.message)
+    }
+}
+
+// ============================================================================
+// SUGESTÕES & OPORTUNIDADES — PRECIFICAÇÃO DE SERVIÇOS
+// ============================================================================
+
+export interface ServicePricingAlert {
+    id: string
+    name: string
+    category: string | null
+    duration_minutes: number | null
+    images: string[] | null
+    price: number
+    cost_price: number
+    promotional_price: number | null
+    status: "loss" | "thin"
+    cause: "price" | "promo"
+    base_price: number
+    effective_price: number
+    margin_percent: number | null
+    suggested_price: number
+    loss_per_unit: number
+    potential_gain_per_unit: number
+    impact: number
+}
+
+export interface ServicePricingAlertsResult {
+    alerts: ServicePricingAlert[]
+    total: number
+    counts: { loss: number; thin: number }
+    thresholdPercent: number
+    defaultMarginPercent: number
+}
+
+export async function getServicesPricingAlertsAction(
+    partnerId: string,
+    storeId?: string
+): Promise<{ error: string } | ServicePricingAlertsResult> {
+    try {
+        await requireUser()
+        await requirePermission(partnerId, "services", "view")
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "services", "view")
+        }
+        const admin = getAdminClient()
+
+        let query = admin
+            .from("services")
+            .select(
+                "id, name, category, duration_minutes, images, price, cost_price, promotional_price, is_unavailable_type, store_id"
+            )
+            .eq("partner_id", partnerId)
+            .gt("cost_price", 0)
+            .order("name")
+            .limit(200)
+        query = scopeActiveOnly(query)
+        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+
+        const [{ data, error }, { data: partnerData }] = await Promise.all([
+            query,
+            admin.from("partners").select("business_info").eq("id", partnerId).single(),
+        ])
+
+        if (error) return { error: error.message }
+
+        const defaultMarginPercent = getDefaultMarginPercent(partnerData?.business_info)
+        const thresholdPercent = getMarginThresholdPercent(defaultMarginPercent)
+
+        const alerts: ServicePricingAlert[] = []
+
+        for (const s of data || []) {
+            if (s.is_unavailable_type === true) continue
+
+            const evaluation = evaluatePricing(
+                {
+                    price: Number(s.price) || 0,
+                    costPrice: Number(s.cost_price) || 0,
+                    promotionalPrice: s.promotional_price != null ? Number(s.promotional_price) : null,
+                    hasVariants: false,
+                },
+                defaultMarginPercent,
+                thresholdPercent
+            )
+
+            if (evaluation.status === "ok") continue
+
+            const perUnit =
+                evaluation.status === "loss" ? evaluation.lossPerUnit : evaluation.potentialGainPerUnit
+
+            alerts.push({
+                id: s.id,
+                name: s.name,
+                category: s.category || null,
+                duration_minutes: s.duration_minutes ?? null,
+                images: Array.isArray(s.images) ? s.images : null,
+                price: Number(s.price) || 0,
+                cost_price: Number(s.cost_price) || 0,
+                promotional_price: s.promotional_price != null ? Number(s.promotional_price) : null,
+                status: evaluation.status,
+                cause: evaluation.cause,
+                base_price: evaluation.basePrice,
+                effective_price: evaluation.effectivePrice,
+                margin_percent: evaluation.marginPercent,
+                suggested_price: evaluation.suggestedPrice,
+                loss_per_unit: evaluation.lossPerUnit,
+                potential_gain_per_unit: evaluation.potentialGainPerUnit,
+                impact: roundMoney(perUnit),
+            })
+        }
+
+        const sorted = sortPricingAlerts(alerts)
+
+        return {
+            alerts: sorted,
+            total: sorted.length,
+            counts: {
+                loss: sorted.filter((a) => a.status === "loss").length,
+                thin: sorted.filter((a) => a.status === "thin").length,
+            },
+            thresholdPercent,
+            defaultMarginPercent,
+        }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function updateServiceSalePriceAction(params: {
+    serviceId: string
+    partnerId: string
+    price?: number
+    clearPromotion?: boolean
+}) {
+    try {
+        await requireUser()
+        await requirePermission(params.partnerId, "services", "edit")
+        const admin = getAdminClient()
+
+        const updates: Record<string, unknown> = { updated_at: getBrasiliaTime() }
+        if (params.price !== undefined) updates.price = params.price
+        if (params.clearPromotion) updates.promotional_price = null
+
+        const { error } = await admin
+            .from("services")
+            .update(updates)
+            .eq("id", params.serviceId)
+            .eq("partner_id", params.partnerId)
+
+        if (error) return { error: error.message }
+
+        await invalidateServiceCache(params.serviceId, params.partnerId, "update")
+        await revalidateServices(params.partnerId, params.serviceId)
+        revalidatePath("/erp/servicos")
+
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
     }
 }

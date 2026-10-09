@@ -15,12 +15,15 @@ import { useStore } from "@/lib/store-context"
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
-import { PlusIcon, TrashIcon } from "@/lib/icons"
+import { PlusIcon, TrashIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import VideoPageControls from "./VideoPageControls"
 import VideoListItem from "./VideoListRow"
 import VideoGridCard from "./VideoGridCard"
 import VideoFormPage from "./VideoFormPage"
+
+type SortKey = "video" | "status" | "views" | "clicks" | "date"
+type SortDirection = "asc" | "desc"
 
 type ActiveTab = "Todos" | "Pendentes" | "Aprovados" | "Rejeitados"
 type ViewMode = "list" | "grid"
@@ -54,6 +57,7 @@ export default function VideosManagement() {
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [activeTab, setActiveTab] = useState<"Todos" | "Pendentes" | "Aprovados" | "Rejeitados">("Todos")
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [videoToDelete, setVideoToDelete] = useState<CommunityVideoItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
@@ -90,7 +94,7 @@ export default function VideosManagement() {
 
     const filteredVideos = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase()
-        return videos.filter((v) => {
+        const filtered = videos.filter((v) => {
             const searchMatch = !term || v.title?.toLowerCase().includes(term) || v.description?.toLowerCase().includes(term)
             const tabMatch =
                 activeTab === "Todos" ||
@@ -99,7 +103,29 @@ export default function VideosManagement() {
                 (activeTab === "Rejeitados" && (v.moderation_status === "rejected" || v.moderation_status === "flagged"))
             return searchMatch && tabMatch
         })
-    }, [videos, debouncedSearch, activeTab])
+
+        if (sortConfig) {
+            const { key, direction } = sortConfig
+            const result = [...filtered]
+            result.sort((a, b) => {
+                let aVal: any, bVal: any
+                switch (key) {
+                    case "video": aVal = a.title || ""; bVal = b.title || ""; break
+                    case "status": aVal = a.moderation_status || ""; bVal = b.moderation_status || ""; break
+                    case "views": aVal = a.views_count ?? 0; bVal = b.views_count ?? 0; break
+                    case "clicks": aVal = a.clicks_count ?? 0; bVal = b.clicks_count ?? 0; break
+                    case "date": aVal = a.published_at || a.created_at || ""; bVal = b.published_at || b.created_at || ""; break
+                    default: aVal = (a as any)[key]; bVal = (b as any)[key]
+                }
+                if (aVal === bVal) return 0
+                const comparison = aVal < bVal ? -1 : 1
+                return direction === "asc" ? comparison : -comparison
+            })
+            return result
+        }
+
+        return filtered
+    }, [videos, debouncedSearch, activeTab, sortConfig])
 
     const totalPages = Math.max(1, Math.ceil(filteredVideos.length / ITEMS_PER_PAGE))
     const paginatedVideos = filteredVideos.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -364,17 +390,36 @@ export default function VideosManagement() {
                                                                             />
                                                                         </div>
                                                                     </th>
-                                                                    {COLUMNS.map((col, idx) => (
-                                                                        <th
-                                                                            key={col.id}
-                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
-                                                                            style={{ width: col.width }}
-                                                                        >
-                                                                            <div className={`flex items-center ${col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                                <span>{col.label}</span>
-                                                                            </div>
-                                                                        </th>
-                                                                    ))}
+                                                                    {COLUMNS.map((col, idx) => {
+                                                                        const isSortable = col.id !== "actions"
+                                                                        const isSorted = sortConfig?.key === col.id
+                                                                        return (
+                                                                            <th
+                                                                                key={col.id}
+                                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                                                                                style={{ width: col.width }}
+                                                                                onClick={() => {
+                                                                                    if (!isSortable) return
+                                                                                    setSortConfig(prev => ({
+                                                                                        key: col.id as SortKey,
+                                                                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                    }))
+                                                                                }}
+                                                                            >
+                                                                                <div className={`relative flex items-center ${(col.align as string) === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                    <span>{col.label}</span>
+                                                                                    {isSortable && (
+                                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                            <ArrowUpDownIcon
+                                                                                                size={14}
+                                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </th>
+                                                                        )
+                                                                    })}
                                                                 </tr>
                                                             </thead>
                                                             <tbody>

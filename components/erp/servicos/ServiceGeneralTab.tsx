@@ -61,7 +61,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
     const { businessInfo } = usePermissions()
 
     const defaultMargin = useMemo(() => {
-        const margin = (businessInfo as any)?.salesSettings?.defaultProfitMarginPercent
+        const margin = (businessInfo as any)?.salesSettings?.defaultMarginPercent
         return typeof margin === "number" && margin > 0 ? margin : null
     }, [businessInfo])
 

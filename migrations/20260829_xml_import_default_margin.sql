@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Migration: 20260829_xml_import_default_margin.sql
--- Description: Apply defaultProfitMarginPercent in execute_xml_import RPC
+-- Description: Apply defaultMarginPercent in execute_xml_import RPC
 -- when creating new products from XML items.
 -- ============================================================================
 
@@ -99,7 +99,7 @@ BEGIN
 
   -- Busca margem padrão configurada no parceiro
   SELECT COALESCE(
-    NULLIF(business_info->'salesSettings'->>'defaultProfitMarginPercent', '')::NUMERIC,
+    NULLIF(business_info->'salesSettings'->>'defaultMarginPercent', '')::NUMERIC,
     NULL
   ) INTO v_default_margin
   FROM public.partners
@@ -108,7 +108,7 @@ BEGIN
   -- Se tiver loja específica e a loja tiver margem própria, sobrescreve
   IF p_store_id IS NOT NULL THEN
     SELECT COALESCE(
-      NULLIF(business_info->'salesSettings'->>'defaultProfitMarginPercent', '')::NUMERIC,
+      NULLIF(business_info->'salesSettings'->>'defaultMarginPercent', '')::NUMERIC,
       v_default_margin
     ) INTO v_default_margin
     FROM public.stores

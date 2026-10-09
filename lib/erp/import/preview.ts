@@ -45,7 +45,7 @@ export async function generatePreview(
         .select("business_info")
         .eq("id", partnerId)
         .single()
-      const margin = partnerData?.business_info?.salesSettings?.defaultProfitMarginPercent
+      const margin = partnerData?.business_info?.salesSettings?.defaultMarginPercent
       if (typeof margin === "number" && margin > 0) {
         defaultMarginPercent = margin
       }

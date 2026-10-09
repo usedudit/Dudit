@@ -400,6 +400,39 @@ async function createRecurringOrder(params: {
   }
 }
 
+/**
+ * Concede os créditos de serviço do ciclo recem-concluído.
+ * Best-effort: o ciclo já foi concluído, então uma falha aqui não pode
+ * reverter a execução — apenas loga.
+ */
+async function grantCreditsForCycle(
+  supabase: SupabaseClient,
+  input: { partnerId: string; customerId: string; subscriptionId: string; executionId: string },
+): Promise<void> {
+  try {
+    const { grantSubscriptionCredits } = await import("@/lib/services/credit.service")
+    const res = await grantSubscriptionCredits(supabase, input)
+    if (!res.success) {
+      console.error("[recurring] grant_subscription_credits falhou:", res.error)
+      return
+    }
+    if (res.grantedCount > 0) {
+      await logAuditEvent({
+        partnerId: input.partnerId,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: input.subscriptionId,
+        actionType: "updated",
+        changeLines: [`${res.grantedCount} crédito(s) de serviço liberado(s) para o ciclo.`],
+        source: "system",
+        metadata: { execution_id: input.executionId, granted: res.grantedCount },
+      })
+    }
+  } catch (err) {
+    console.error("[recurring] grant_subscription_credits erro:", err)
+  }
+}
+
 export async function executeRecurringClaim(claim: ClaimedRecurringExecution): Promise<void> {
   const supabase = getAdminClient()
 
@@ -622,6 +655,14 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
   })
 
   if (completeError) throw completeError
+
+  // Créditos de serviço do ciclo (o next_execution_at já foi avançado acima)
+  await grantCreditsForCycle(supabase, {
+    partnerId: claim.partnerId,
+    customerId: claim.customerId,
+    subscriptionId: claim.subscriptionId,
+    executionId: claim.executionId,
+  })
 
   await logAuditEvent({
     partnerId: claim.partnerId,
@@ -855,6 +896,14 @@ export async function processPreapprovalPaymentWebhook(params: {
       p_appointment_ids: null,
     })
     if (completeError) throw completeError
+
+    // 8.2 Créditos de serviço do ciclo cobrado (o next_execution_at já avançou)
+    await grantCreditsForCycle(supabase, {
+      partnerId: sub.partner_id,
+      customerId: sub.customer_id,
+      subscriptionId: sub.id,
+      executionId: exec.id,
+    })
 
     // 8.5 Receita + saldo da conta financeira do ciclo cobrado automaticamente.
     try {

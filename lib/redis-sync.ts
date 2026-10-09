@@ -130,6 +130,7 @@ export async function syncToExploreRedis({
           .select(`
             id, name, description, price, promotional_price, images, video_thumbnail, rating,
             marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
+            stock_quantity, stock_available,
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id),

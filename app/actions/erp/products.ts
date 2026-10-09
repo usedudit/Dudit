@@ -30,6 +30,13 @@ import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIX
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import {
+    evaluatePricing,
+    getDefaultMarginPercent,
+    getMarginThresholdPercent,
+    roundMoney,
+    sortPricingAlerts,
+} from "@/lib/erp/pricing-alerts"
 import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
@@ -589,7 +596,7 @@ export async function createProductComprehensiveAction(data: {
         if ((finalPrice === undefined || finalPrice === null || Number(finalPrice) === 0) && numCost > 0) {
             try {
                 const { data: partnerRec } = await admin.from("partners").select("business_info").eq("id", finalPartnerId).single()
-                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultProfitMarginPercent
+                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultMarginPercent
                 if (typeof defaultMargin === "number" && defaultMargin > 0) {
                     finalPrice = Math.round(numCost * (1 + defaultMargin / 100) * 100) / 100
                 }
@@ -2188,6 +2195,176 @@ export async function updateProductPromotionalPriceAction(params: {
                 promotional_price: params.promotionalPrice,
                 updated_at: new Date().toISOString(),
             })
+            .eq("id", params.productId)
+            .eq("partner_id", params.partnerId)
+
+        if (error) return { error: error.message }
+
+        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => {})
+
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export interface PricingAlert {
+    id: string
+    name: string
+    sku: string | null
+    gtin: string | null
+    stock_quantity: number
+    price: number
+    cost_price: number
+    promotional_price: number | null
+    unit: string
+    images: string[] | null
+    has_variants: boolean
+    status: "loss" | "thin"
+    cause: "price" | "promo"
+    base_price: number
+    effective_price: number
+    margin_percent: number | null
+    suggested_price: number
+    loss_per_unit: number
+    potential_gain_per_unit: number
+    impact: number
+}
+
+export interface PricingAlertsResult {
+    alerts: PricingAlert[]
+    total: number
+    counts: { loss: number; thin: number }
+    thresholdPercent: number
+    defaultMarginPercent: number
+}
+
+export async function getPricingAlertsAction(
+    partnerId: string,
+    storeId?: string
+): Promise<{ error: string } | PricingAlertsResult> {
+    try {
+        await requireUser()
+        await requirePermission(partnerId, "products", "view")
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "products", "view")
+        }
+        const admin = getAdminClient()
+
+        let query = admin
+            .from("products")
+            .select(
+                "id, name, sku, gtin, stock_quantity, price, cost_price, promotional_price, unit, images, variants:product_variants(count)"
+            )
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+            .gt("cost_price", 0)
+            .order("name")
+            .limit(200)
+
+        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+
+        const [{ data, error }, { data: partnerData }] = await Promise.all([
+            query,
+            admin.from("partners").select("business_info").eq("id", partnerId).single(),
+        ])
+
+        if (error) return { error: error.message }
+
+        const defaultMarginPercent = getDefaultMarginPercent(partnerData?.business_info)
+        const thresholdPercent = getMarginThresholdPercent(defaultMarginPercent)
+
+        const hasVariantsCount = (p: any) =>
+            Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+
+        const variantProductIds = (data || []).filter((p: any) => hasVariantsCount(p) > 0).map((p: any) => p.id)
+        const variantAggregates = await fetchVariantAggregates(variantProductIds)
+
+        const alerts: PricingAlert[] = []
+
+        for (const p of data || []) {
+            const hasVariants = hasVariantsCount(p) > 0
+            const agg = hasVariants ? variantAggregates[p.id] : undefined
+            const evaluation = evaluatePricing(
+                {
+                    price: Number(p.price) || 0,
+                    costPrice: Number(p.cost_price) || 0,
+                    promotionalPrice: p.promotional_price != null ? Number(p.promotional_price) : null,
+                    variantMinPrice: agg?.variant_min_price ?? null,
+                    hasVariants,
+                },
+                defaultMarginPercent,
+                thresholdPercent
+            )
+
+            if (evaluation.status === "ok") continue
+
+            const stock = Number(p.stock_quantity) || 0
+            const perUnit =
+                evaluation.status === "loss" ? evaluation.lossPerUnit : evaluation.potentialGainPerUnit
+
+            alerts.push({
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                gtin: p.gtin,
+                stock_quantity: stock,
+                price: Number(p.price) || 0,
+                cost_price: Number(p.cost_price) || 0,
+                promotional_price: p.promotional_price != null ? Number(p.promotional_price) : null,
+                unit: p.unit || "un",
+                images: Array.isArray(p.images) ? p.images : null,
+                has_variants: hasVariants,
+                status: evaluation.status,
+                cause: evaluation.cause,
+                base_price: evaluation.basePrice,
+                effective_price: evaluation.effectivePrice,
+                margin_percent: evaluation.marginPercent,
+                suggested_price: evaluation.suggestedPrice,
+                loss_per_unit: evaluation.lossPerUnit,
+                potential_gain_per_unit: evaluation.potentialGainPerUnit,
+                impact: roundMoney(perUnit * Math.max(stock, 0)),
+            })
+        }
+
+        const sorted = sortPricingAlerts(alerts)
+
+        return {
+            alerts: sorted,
+            total: sorted.length,
+            counts: {
+                loss: sorted.filter((a) => a.status === "loss").length,
+                thin: sorted.filter((a) => a.status === "thin").length,
+            },
+            thresholdPercent,
+            defaultMarginPercent,
+        }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function updateProductSalePriceAction(params: {
+    productId: string
+    partnerId: string
+    price?: number
+    clearPromotion?: boolean
+}) {
+    try {
+        await requireUser()
+        await requirePermission(params.partnerId, "products", "edit")
+        const admin = getAdminClient()
+
+        const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+        if (params.price !== undefined) updates.price = params.price
+        if (params.clearPromotion) {
+            updates.promotional_price = null
+            updates.is_on_promotion = false
+        }
+
+        const { error } = await admin
+            .from("products")
+            .update(updates)
             .eq("id", params.productId)
             .eq("partner_id", params.partnerId)
 

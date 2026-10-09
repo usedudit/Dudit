@@ -6,6 +6,7 @@ import {
     ExportFileIcon,
     Settings2Icon,
     UploadIcon,
+    StarIcon,
 } from '@/lib/icons';
 import { useErpExport } from '@/hooks/use-erp-export';
 import { usePermissions } from '@/lib/permission-context';
@@ -50,6 +51,9 @@ import { getUnavailableTypesAction } from '@/app/actions/erp/unavailable-types';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet from '@/components/reusable/FilterSheet';
 import AppointmentsPageControls from './AppointmentsPageControls';
+import { AppointmentsSuggestionsSheet } from './AppointmentsSuggestionsSheet';
+import { usePlanUpgrade } from '@/components/erp/subscription/PlanUpgradeModal';
+import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { AppointmentListRow } from './AppointmentListRow';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { text } from 'node:stream/consumers';
@@ -151,11 +155,19 @@ const AppointmentsPage = ({
     const [isUnavailableSheetOpen, setIsUnavailableSheetOpen] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [moreSheetDate, setMoreSheetDate] = useState<string>('');
     const [moreSheetAppointments, setMoreSheetAppointments] = useState<Appointment[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const { planSlug } = usePermissions();
+    const { openPlanUpgrade } = usePlanUpgrade();
+    const hasEscalarPlan = hasMinimumPlan(planSlug, 'escalar');
     const { error: notifyError } = useNotification();
+
+    const handleOpenSuggestions = useCallback(() => {
+        if (hasEscalarPlan) setShowSuggestions(true);
+        else openPlanUpgrade('escalar');
+    }, [hasEscalarPlan, openPlanUpgrade]);
 
     // Selection Mode
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -803,6 +815,13 @@ const AppointmentsPage = ({
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="outlineorange"
+                                        className="w-[42px] h-[42px]"
+                                        onClick={handleOpenSuggestions}
+                                        leftIcon={<StarIcon size={18} />}
+                                    >
+                                    </Button>
                                     <Dropdown
                                         trigger={
                                             <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
@@ -863,6 +882,8 @@ const AppointmentsPage = ({
                                 onExport={handleExport}
                                 isExporting={isExporting}
                                 onImport={() => router.push('/erp/agendamentos/importar')}
+                                onOpenSuggestions={handleOpenSuggestions}
+                                hasEscalarPlan={hasEscalarPlan}
                             />
 
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full md:px-8">
@@ -1259,6 +1280,12 @@ const AppointmentsPage = ({
                         )}
                     </AnimatePresence>
                     <SavingStatusModal isOpen={isSaving} text="Salvando agendamento..." />
+                    <AppointmentsSuggestionsSheet
+                        isOpen={showSuggestions}
+                        onClose={() => setShowSuggestions(false)}
+                        partnerId={partnerId}
+                        storeId={storeId || undefined}
+                    />
                 </FadeIn>
             </AnimatePresence >
         </>

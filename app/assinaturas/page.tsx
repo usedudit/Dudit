@@ -1,5 +1,4 @@
 import { requireUser } from "@/lib/auth/authorization"
-import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { MySubscriptionsClient } from "@/components/marketplace/MySubscriptionsClient"
 import { getMyRecurringSubscriptionsAction } from "@/app/actions/marketplace/recurring-subscriptions"
@@ -14,7 +13,12 @@ export const metadata = {
   description: "Acompanhe suas assinaturas recorrentes, entregas e créditos na Dudit",
 }
 
-export default async function MySubscriptionsPage() {
+export default async function MySubscriptionsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ view?: string; subscription?: string }>
+}) {
+  const resolvedParams = await searchParams
   const user = await requireUser()
   if (!user) redirect("/auth/login")
 
@@ -32,15 +36,20 @@ export default async function MySubscriptionsPage() {
     }
     : null
 
+  const initialSubscriptionId = resolvedParams?.view || resolvedParams?.subscription || null
+
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-      <MarketplaceHeader simpleTitle="Minhas Assinaturas" userProfile={userProfile} cartCount={sessionData?.cartCount || 0} />
-
       <main className="flex-1 container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px]">
         {!result.success ? (
           <InfoCard color="red" message={result.error || "Erro ao carregar suas assinaturas."} />
         ) : (
-          <MySubscriptionsClient subscriptions={result.data || []} />
+          <MySubscriptionsClient
+            subscriptions={result.data || []}
+            initialSubscriptionId={initialSubscriptionId}
+            userProfile={userProfile}
+            cartCount={sessionData?.cartCount || 0}
+          />
         )}
       </main>
 

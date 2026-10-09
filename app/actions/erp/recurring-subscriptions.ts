@@ -503,7 +503,7 @@ export async function getSubscriptionBillingPanelAction(partnerId: string) {
 
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, total_amount, situation, created_at, recurring_subscription_id, recurring_execution_id")
+      .select("id, order_number, customer_name, total_amount, situation, created_at, payment_method, recurring_subscription_id, recurring_execution_id")
       .eq("partner_id", partnerId)
       .not("recurring_subscription_id", "is", null)
       .order("created_at", { ascending: false })
@@ -526,9 +526,10 @@ export async function getSubscriptionForecastAction(partnerId: string) {
     const { data: subs, error } = await supabase
       .from("recurring_subscriptions")
       .select(`
-        id, customer_id, next_execution_at,
-        customers(name),
-        recurring_plans(name, frequency_type, frequency_interval)
+        id, customer_id, next_execution_at, status, delivery_type, delivery_address,
+        shipping_amount, contracted_amount, billing_mode, mp_preapproval_id,
+        customers:customer_id(id, name, email, image_url),
+        recurring_plans(id, name, price, frequency_type, frequency_interval)
       `)
       .eq("partner_id", partnerId)
       .eq("status", "active")
@@ -545,9 +546,25 @@ export async function getSubscriptionForecastAction(partnerId: string) {
       })
       .map(sub => ({
         id: sub.id,
+        customerId: sub.customer_id,
         customerName: sub.customers?.name || "Cliente",
+        customerEmail: sub.customers?.email || null,
+        customerImage: sub.customers?.image_url || null,
+        planId: sub.recurring_plans?.id || null,
         planName: sub.recurring_plans?.name || "Plano",
-        scheduledFor: sub.next_execution_at
+        frequencyType: sub.recurring_plans?.frequency_type || null,
+        frequencyInterval: sub.recurring_plans?.frequency_interval ?? null,
+        status: sub.status,
+        deliveryType: sub.delivery_type || "pickup",
+        deliveryAddress: sub.delivery_address || null,
+        shippingAmount: Number(sub.shipping_amount || 0),
+        billingMode: sub.billing_mode || "manual",
+        mpPreapprovalId: sub.mp_preapproval_id || null,
+        amount:
+          sub.contracted_amount != null
+            ? Number(sub.contracted_amount)
+            : Number(sub.recurring_plans?.price || 0) + Number(sub.shipping_amount || 0),
+        scheduledFor: sub.next_execution_at,
       }))
       .sort((a: any, b: any) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
 

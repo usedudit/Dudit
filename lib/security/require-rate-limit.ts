@@ -104,6 +104,8 @@ async function buildIdentifier(
 // MAIN HELPER
 // ============================================================================
 
+const localShortCircuitCache = new Map<string, { count: number; resetAt: number }>()
+
 /**
  * Rate-limit the current request based on the given category.
  *
@@ -134,6 +136,20 @@ export async function requireRateLimit(
             config.identifierType,
             endpointName
         )
+
+        // Memory pre-check for non-critical routes to save Redis commands during fast UI interaction
+        if (!config.failClosed) {
+            const now = Date.now()
+            const cached = localShortCircuitCache.get(identifier)
+            if (cached && cached.resetAt > now) {
+                cached.count++
+                if (cached.count <= Math.max(3, Math.floor(config.maxRequests * 0.3))) {
+                    return { success: true }
+                }
+            } else {
+                localShortCircuitCache.set(identifier, { count: 1, resetAt: now + 5000 })
+            }
+        }
 
         const { success, reset } = await limiter.limit(identifier)
 

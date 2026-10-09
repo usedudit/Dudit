@@ -217,14 +217,14 @@ export async function getMyRecurringSubscriptionsAction() {
           id, short_id, name, description, price, frequency_type, frequency_interval, status,
           recurring_plan_items(
             id, item_type, product_id, service_id, quantity, unit_price, sort_order,
-            products:product_id(id, name, images),
-            services:service_id(id, name, images)
+            products:product_id(id, short_id, name, images),
+            services:service_id(id, short_id, name, images)
           )
         ),
         recurring_subscription_items(
           id, item_type, product_id, service_id, quantity, unit_price, sort_order,
-          products:product_id(id, name, images),
-          services:service_id(id, name, images)
+          products:product_id(id, short_id, name, images),
+          services:service_id(id, short_id, name, images)
         ),
         partners:partner_id(id),
         stores(id, short_id, name, slug, logo_url, addresses!store_id!left(city, state))
@@ -585,7 +585,8 @@ export async function postponeMySubscriptionCycleAction(subscriptionId: string, 
       .from("recurring_subscriptions")
       .select(`
         id, partner_id, next_execution_at, mp_preapproval_id,
-        customers!inner(user_id)
+        customers!inner(user_id),
+        recurring_plans(frequency_type)
       `)
       .eq("id", subscriptionId)
       .single()
@@ -593,6 +594,15 @@ export async function postponeMySubscriptionCycleAction(subscriptionId: string, 
     const customerUserId = (sub as any)?.customers?.user_id
     if (!sub?.id || customerUserId !== user.id) {
       return { success: false, error: "Assinatura não encontrada." }
+    }
+
+    // Ciclos longos não permitem adiar por dias (só pular ou antecipar).
+    const frequencyType = (sub as any)?.recurring_plans?.frequency_type
+    if (frequencyType === "monthly" || frequencyType === "yearly") {
+      return {
+        success: false,
+        error: "Planos mensais e anuais não permitem adiar o ciclo. Use pular ou antecipar.",
+      }
     }
 
     const currentNext = new Date(sub.next_execution_at)

@@ -61,13 +61,14 @@ import { POST } from "./route"
 
 describe("POST /api/orders/retry-payment", () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
   })
 
   it("preserves Boleto payment data and does NOT convert to Pix", async () => {
     const mockMpBoletoResponse = {
       id: "mp-pay-999",
       status: "pending",
+      transaction_amount: 150.00,
       payment_method_id: "bolbradesco",
       payment_type_id: "ticket",
       barcode: {
@@ -109,6 +110,7 @@ describe("POST /api/orders/retry-payment", () => {
     const mockMpPixResponse = {
       id: "mp-pay-888",
       status: "pending",
+      transaction_amount: 150.00,
       payment_method_id: "pix",
       payment_type_id: "bank_transfer",
       point_of_interaction: {

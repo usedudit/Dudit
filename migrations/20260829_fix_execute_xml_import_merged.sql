@@ -10,7 +10,7 @@
 --   5. FOR UPDATE locks on xml_import_items
 --
 -- This migration re-creates execute_xml_import with ALL improvements including
--- the defaultProfitMarginPercent feature from the margin migration.
+-- the defaultMarginPercent feature from the margin migration.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.execute_xml_import(
@@ -108,7 +108,7 @@ BEGIN
 
   -- Busca margem padrão configurada no parceiro
   SELECT COALESCE(
-    NULLIF(business_info->'salesSettings'->>'defaultProfitMarginPercent', '')::NUMERIC,
+    NULLIF(business_info->'salesSettings'->>'defaultMarginPercent', '')::NUMERIC,
     NULL
   ) INTO v_default_margin
   FROM public.partners
@@ -117,7 +117,7 @@ BEGIN
   -- Se tiver loja específica e a loja tiver margem própria, sobrescreve
   IF p_store_id IS NOT NULL THEN
     SELECT COALESCE(
-      NULLIF(business_info->'salesSettings'->>'defaultProfitMarginPercent', '')::NUMERIC,
+      NULLIF(business_info->'salesSettings'->>'defaultMarginPercent', '')::NUMERIC,
       v_default_margin
     ) INTO v_default_margin
     FROM public.stores

@@ -50,10 +50,7 @@ export function ReportTableCard({
   const rows = data.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
-    <div className={cn(
-      "bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border",
-      className
-    )}>
+    <div>
       {(title || data.length > 0) && (
         <div className={cn("flex items-center", title ? "justify-between mb-6" : "justify-end mb-4")}>
           {title &&

@@ -161,6 +161,8 @@ export async function updateMaintenanceConfig(
       await redis.set(REDIS_KEY_MAINTENANCE, JSON.stringify(merged))
       const { clearMaintenanceMemoryCache } = await import("@/lib/system/maintenance-guard")
       clearMaintenanceMemoryCache()
+      const { safeRevalidateTag } = await import("@/lib/utils/revalidation")
+      await safeRevalidateTag("system-maintenance")
     } catch (redisErr) {
       console.warn("[system-settings] Redis sync failed for maintenance:", redisErr)
     }

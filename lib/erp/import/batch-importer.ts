@@ -318,16 +318,16 @@ export async function executeImport(
   }
 
   // Fetch default profit margin if importing products or services
-  let defaultProfitMarginPercent: number | null = null
+  let defaultMarginPercent: number | null = null
   if (entityType === "products" || entityType === "services") {
     const { data: partnerData } = await supabase
       .from("partners")
       .select("business_info")
       .eq("id", partnerId)
       .single()
-    const margin = partnerData?.business_info?.salesSettings?.defaultProfitMarginPercent
+    const margin = partnerData?.business_info?.salesSettings?.defaultMarginPercent
     if (typeof margin === "number" && margin > 0) {
-      defaultProfitMarginPercent = margin
+      defaultMarginPercent = margin
     }
   }
 
@@ -349,7 +349,7 @@ export async function executeImport(
         categoryCache,
         brandCache,
         duplicateStrategy,
-        defaultProfitMarginPercent,
+        defaultMarginPercent,
         remainingItemsSlots,
       )
       successRows += result.success
@@ -389,7 +389,7 @@ export async function executeImport(
         startIndex,
         categoryCache,
         duplicateStrategy,
-        defaultProfitMarginPercent,
+        defaultMarginPercent,
         remainingItemsSlots,
       )
       successRows += result.success
@@ -693,7 +693,7 @@ async function importProductBatch(
   categoryCache: Map<string, string>,
   brandCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
-  defaultProfitMarginPercent: number | null = null,
+  defaultMarginPercent: number | null = null,
   remainingSlots: number | null = null,
 ): Promise<{
   success: number
@@ -758,8 +758,8 @@ async function importProductBatch(
     const costPrice = parseNumber(row["cost_price"])
 
     // Apply default profit margin if price is missing or zero and cost price is given
-    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultProfitMarginPercent && defaultProfitMarginPercent > 0) {
-      price = Math.round(costPrice * (1 + defaultProfitMarginPercent / 100) * 100) / 100
+    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultMarginPercent && defaultMarginPercent > 0) {
+      price = Math.round(costPrice * (1 + defaultMarginPercent / 100) * 100) / 100
     }
 
     if (price === null) {
@@ -1291,7 +1291,7 @@ async function importServiceBatch(
   startIndex: number,
   categoryCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
-  defaultProfitMarginPercent: number | null = null,
+  defaultMarginPercent: number | null = null,
   remainingSlots: number | null = null,
 ): Promise<{
   success: number
@@ -1355,8 +1355,8 @@ async function importServiceBatch(
     const costPrice = parseNumber(row["cost_price"])
 
     // Apply default profit margin if price is missing or zero and cost price is given
-    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultProfitMarginPercent && defaultProfitMarginPercent > 0) {
-      price = Math.round(costPrice * (1 + defaultProfitMarginPercent / 100) * 100) / 100
+    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultMarginPercent && defaultMarginPercent > 0) {
+      price = Math.round(costPrice * (1 + defaultMarginPercent / 100) * 100) / 100
     }
 
     if (price === null) {
