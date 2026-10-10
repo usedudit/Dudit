@@ -510,7 +510,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                         return (
                                             <div
                                                 key={p.id}
-                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-primary/40 hover:shadow-sm transition-all cursor-pointer"
+                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-green transition-all cursor-pointer"
                                                 onClick={() => openDiscountSheet(p)}
                                             >
                                                 <div className="flex items-start gap-3">
@@ -619,7 +619,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 {/* Scroll Body */}
                 <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-6">
                     {/* Resumo do Produto */}
-                    <div className="bg-brand-gray/40 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <div className="w-14 h-14 rounded-full bg-white dark:bg-dark-surface shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
                             <img src={getPrimaryProductDisplayImage(selectedStagnant)} alt={selectedStagnant.name} className="w-full h-full object-cover" />
                         </div>
@@ -669,8 +669,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                         type="button"
                                         onClick={() => setPromoPriceInput(calculatedPrice)}
                                         className={`py-2 px-2 rounded-full text-xs font-bold border transition-all ${isSelected
-                                            ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-                                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-primary/50"
+                                            ? "border-brand-green text-brand-green"
+                                            : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading"
                                             }`}
                                     >
                                         -{pct}%
@@ -683,8 +683,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                                     type="button"
                                     onClick={() => setPromoPriceInput(selectedStagnant.cost_price!)}
                                     className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all col-span-3 sm:col-span-1 ${Math.abs(promoPriceInput - selectedStagnant.cost_price) < 0.05
-                                        ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
-                                        : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading hover:border-brand-orange/50"
+                                        ? "border-brand-orange text-brand-orange"
+                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading"
                                         }`}
                                 >
                                     No Custo
@@ -695,10 +695,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
 
                     {/* Input de Preço Promocional */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">
-                            Preço Promocional (R$)
-                        </label>
                         <MoneyInput
+                            label="Preço Promocional (R$)"
                             name="promo_price"
                             value={promoPriceInput}
                             onChange={(val) => setPromoPriceInput(typeof val === "number" ? val : parseFloat(val) || 0)}

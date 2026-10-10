@@ -25,7 +25,7 @@ import {
     AlertCircleIcon, HistoryIcon, ShoppingCartIcon,
     CheckCircleIcon, StarIcon, RepeatIcon,
 } from "@/lib/icons"
-import { ReportTableCard, ReportListCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
+import { ReportListCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
 import type {
     SalesReportData, CustomerReportData, ReturnsReportData,
@@ -369,7 +369,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                             title="Pedidos por Hora"
                             legendItems={[{ label: "Volume de Pedidos", color: "#059669" }]}
                         />
-                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={["#059669"]} />
+                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={["#059669"]} legendLabels={{ value: "Volume de Pedidos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -406,6 +406,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                             colors={CHART_COLORS_VIVID}
                             format="currency"
                             height="h-[200px]"
+                            legendLabels={{ value: "Receita" }}
                         />
                     </div>
                 </div>
@@ -510,7 +511,7 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                             title="Evolução de Vendas e Devoluções"
                             legendItems={[{ label: "Produtos Vendidos", color: "#059669" }, { label: "Produtos Devolvidos", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} format="currency" />
+                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} format="currency" legendLabels={{ vendidos: "Produtos Vendidos", devolvidos: "Produtos Devolvidos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -657,7 +658,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                             title="Faturamento por Serviço"
                             legendItems={[{ label: "Receita", color: "#059669" }]}
                         />
-                        <DashboardLineChart data={serviceChartData} />
+                        <DashboardLineChart data={serviceChartData} legendLabels={{ value: "Receita" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -797,7 +798,6 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
     const statusData = (appointmentsData.statusBreakdown || []).map(s => ({ label: s.label, value: s.value }))
     const hourlyData = (appointmentsData.hourlyDistribution || []).map(h => ({ label: h.label, value: h.value }))
     const serviceData = (appointmentsData.servicePopularity || []).map(s => ({ label: s.label, value: s.value }))
-    const sourceData = (appointmentsData.sourceBreakdown || []).map(s => ({ label: s.label, value: s.value }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -842,7 +842,7 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                             title="Agendamentos por Hora"
                             legendItems={[{ label: "Volume", color: "#059669" }]}
                         />
-                        <DashboardBarChart data={hourlyData} colors={["#059669"]} />
+                        <DashboardBarChart data={hourlyData} colors={["#059669"]} legendLabels={{ value: "Volume" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -853,16 +853,19 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                 </div>
             </div>
 
-            {/* Row 4: Origem (4) + Equipe (4) + Recentes (4) */}
+            {/* Row 4: Comparecimento (4) + Equipe (4) + Recentes (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Origem dos Agendamentos" />
+                        <CardHeader icon={TargetIcon} title="Taxa de Comparecimento" />
                         <DashboardDonutChart
-                            data={sourceData}
-                            totalValue={String(totalCount)}
-                            totalLabel="Agendamentos"
-                            colors={CHART_COLORS_CATEGORY}
+                            data={[
+                                { label: "Presentes", value: appointmentsData.attendanceRate, fill: "#059669" },
+                                { label: "Ausentes", value: Math.max(100 - appointmentsData.attendanceRate, 0), fill: "#ef4444" },
+                            ]}
+                            totalValue={`${appointmentsData.attendanceRate}%`}
+                            totalLabel="Taxa"
+                            colors={["#059669", "#ef4444"]}
                         />
                     </div>
                 </div>
@@ -979,7 +982,6 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                             { id: "deliveryPerson", label: "Entregador", width: "180px" },
                             { id: "duration", label: "Duração", width: "110px" },
                             { id: "status", label: "Status", align: "center", width: "160px" },
-                            { id: "actions", label: "Ações", align: "center", width: "80px" },
                         ]}
                         data={deliveryData.recentDeliveries}
                         onRowClick={(row) => router.push(`/erp/entregas?view=${row.id}`)}
@@ -1425,12 +1427,9 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                                             descriptionClassName="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium truncate"
                                             className="!border-0 !bg-transparent px-2 py-2"
                                             right={
-                                                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${isOverdue
-                                                    ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200"
-                                                    : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200"
-                                                    }`}>
+                                                <Badge variant={isOverdue ? "red" : "orange"} icon={null}>
                                                     {item.statusLabel || (isOverdue ? "Vencido" : "Próximo")}
-                                                </span>
+                                                </Badge>
                                             }
                                         />
                                     )
@@ -1705,7 +1704,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                             title="Evolução de Faturamento por Canal"
                             legendItems={[{ label: "Online", color: "#059669" }, { label: "Presencial", color: "#2563eb" }, { label: "Outros", color: "#f59e0b" }]}
                         />
-                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} format="currency" />
+                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} format="currency" legendLabels={{ online: "Online", presencial: "Presencial", outros: "Outros" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1870,7 +1869,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
                             title="Atendimentos por Dia"
                             legendItems={[{ label: "Atendimentos", color: "#059669" }]}
                         />
-                        <DashboardLineChart data={evoData} colors={["#059669"]} />
+                        <DashboardLineChart data={evoData} colors={["#059669"]} legendLabels={{ value: "Atendimentos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1954,15 +1953,12 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TargetIcon} title="Taxa de Comparecimento" />
+                        <CardHeader icon={ShoppingBagIcon} title="Serviços Mais Realizados" />
                         <DashboardDonutChart
-                            data={[
-                                { label: "Presentes", value: productivityData.metrics.attendanceRate, fill: "#059669" },
-                                { label: "Ausentes", value: Math.max(100 - productivityData.metrics.attendanceRate, 0), fill: "#ef4444" },
-                            ]}
-                            totalValue={`${productivityData.metrics.attendanceRate}%`}
-                            totalLabel="Taxa"
-                            colors={["#059669", "#ef4444"]}
+                            data={productivityData.serviceRanking.slice(0, 6).map(s => ({ label: s.label, value: s.count }))}
+                            totalValue={String(productivityData.metrics.totalAppointments)}
+                            totalLabel="Atendimentos"
+                            colors={CHART_COLORS_CATEGORY}
                         />
                     </div>
                 </div>
@@ -1974,6 +1970,15 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
 // ─────────────────────────────────────────────────────────────
 // 10. ABA DE TROCAS E DEVOLUÇÕES
 // ─────────────────────────────────────────────────────────────
+function getReturnStatusMeta(status: string): { variant: "green" | "red" | "orange" | "blue" | "gray" } {
+    const s = (status || "").toLowerCase()
+    if (s.includes("recus") || s.includes("cancel")) return { variant: "red" }
+    if (s.includes("concl") || s.includes("aprov") || s.includes("reembols") || s.includes("fechado")) return { variant: "green" }
+    if (s.includes("pend") || s.includes("aguard") || s.includes("análise") || s.includes("analise") || s.includes("aberto") || s.includes("process")) return { variant: "orange" }
+    if (s.includes("trânsito") || s.includes("transito")) return { variant: "blue" }
+    return { variant: "gray" }
+}
+
 function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
@@ -2033,7 +2038,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                             title="Evolução das Devoluções"
                             legendItems={[{ label: "Devoluções", color: "#ef4444" }]}
                         />
-                        <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} colors={["#ef4444"]} />
+                        <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} colors={["#ef4444"]} legendLabels={{ value: "Devoluções" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -2052,27 +2057,66 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
             {/* Row 3: Últimas Devoluções (8) + Produtos Mais Devolvidos (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <ReportTableCard
+                    <ReportListCard
                         title="Últimas Devoluções"
-                        columns={[
-                            {
-                                key: "id", header: "#", render: (v: string) => (
-                                    <div className="flex items-center gap-2">
-                                        <ReturnIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                        <span className="font-bold">{v.slice(0, 8)}</span>
-                                    </div>
-                                )
-                            },
-                            { key: "customer", header: "Cliente" },
-                            { key: "reason", header: "Motivo" },
-                            { key: "amount", header: "Valor" },
-                            { key: "status", header: "Status" },
-                            { key: "date", header: "Data" },
-                        ]}
-                        data={returnsData.recentReturns.slice(0, 4)}
-                        onRowClick={() => router.push("/erp/devolucoes")}
                         icon={ReturnIcon}
-                        pageSize={4}
+                        columns={[
+                            { id: "return", label: "Devolução", width: "200px" },
+                            { id: "customer", label: "Cliente", width: "170px" },
+                            { id: "reason", label: "Motivo", width: "180px" },
+                            { id: "amount", label: "Valor", width: "110px" },
+                            { id: "status", label: "Status", align: "center", width: "150px" },
+                        ]}
+                        data={returnsData.recentReturns.slice(0, 5)}
+                        onRowClick={() => router.push("/erp/devolucoes")}
+                        renderCell={(colId, row) => {
+                            switch (colId) {
+                                case "return":
+                                    return (
+                                        <div className="flex items-center gap-3 text-left">
+                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                <ReturnIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </div>
+                                            <div className="flex flex-col text-left min-w-0">
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                                    {String(row.id).slice(0, 8)}
+                                                </span>
+                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                    {row.date}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )
+                                case "customer":
+                                    return (
+                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[170px] block">
+                                            {row.customer || "-"}
+                                        </span>
+                                    )
+                                case "reason":
+                                    return (
+                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px] block" title={row.reason}>
+                                            {row.reason || "-"}
+                                        </span>
+                                    )
+                                case "amount":
+                                    return (
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                            {row.amount}
+                                        </span>
+                                    )
+                                case "status": {
+                                    const meta = getReturnStatusMeta(row.status)
+                                    return (
+                                        <Badge variant={meta.variant}>
+                                            {row.status || "Pendente"}
+                                        </Badge>
+                                    )
+                                }
+                                default:
+                                    return row[colId] ?? "-"
+                            }
+                        }}
                         className="h-full"
                     />
                 </div>

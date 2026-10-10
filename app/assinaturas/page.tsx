@@ -40,15 +40,18 @@ export default async function MySubscriptionsPage({
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-      <main className="flex-1 container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px]">
+      <main className="flex-1 w-full">
         {!result.success ? (
-          <InfoCard color="red" message={result.error || "Erro ao carregar suas assinaturas."} />
+          <div className="container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px]">
+            <InfoCard color="red" message={result.error || "Erro ao carregar suas assinaturas."} />
+          </div>
         ) : (
           <MySubscriptionsClient
             subscriptions={result.data || []}
             initialSubscriptionId={initialSubscriptionId}
             userProfile={userProfile}
             cartCount={sessionData?.cartCount || 0}
+            userId={user.id}
           />
         )}
       </main>

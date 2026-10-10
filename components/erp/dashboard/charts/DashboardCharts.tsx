@@ -35,10 +35,11 @@ export function getFormatter(format?: "currency" | "compact" | "number" | "quant
 /**
  * Universal custom tooltip with solid branding, bold typography and dark mode support
  */
-export function CustomChartTooltip({ active, payload, label, formatter, valuePrefix = "", valueSuffix = "" }: any) {
+export function CustomChartTooltip({ active, payload, label, formatter, valuePrefix = "", valueSuffix = "", labels }: any) {
   if (!active || !payload || !payload.length) return null
 
-  const title = label || payload[0]?.name || payload[0]?.payload?.label
+  const title = label || payload[0]?.payload?.label
+  const showNames = payload.length > 1 || !title
 
   return (
     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-3.5 shadow-xl flex flex-col gap-2 font-sans min-w-[160px] z-50 pointer-events-none">
@@ -50,7 +51,10 @@ export function CustomChartTooltip({ active, payload, label, formatter, valuePre
       <div className="flex flex-col gap-1.5">
         {payload.map((entry: any, index: number) => {
           const color = entry.color || entry.stroke || entry.fill || entry.payload?.fill || "var(--color-brand-green, #059669)"
-          const name = entry.name === "value" ? "Este Período" : entry.name === "secondary" ? "Período Anterior" : (entry.name || entry.dataKey || "Valor")
+          const name = labels?.[entry.dataKey]
+            ?? (entry.name === "value" ? "Este Período"
+              : entry.name === "secondary" ? "Período Anterior"
+                : (entry.name || entry.dataKey || "Valor"))
           const rawVal = entry.value
           let displayVal = rawVal
           if (formatter) {
@@ -60,13 +64,15 @@ export function CustomChartTooltip({ active, payload, label, formatter, valuePre
           }
           return (
             <div key={index} className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body truncate max-w-[130px]">
-                  {name}
-                </span>
-              </div>
-              <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading shrink-0 tabular-nums">
+              {showNames && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body truncate max-w-[130px]">
+                    {name}
+                  </span>
+                </div>
+              )}
+              <span className={`text-[12px] font-bold text-brand-dark dark:text-dark-heading shrink-0 tabular-nums ${showNames ? "" : "w-full text-center"}`}>
                 {valuePrefix}{displayVal}{valueSuffix}
               </span>
             </div>
@@ -145,7 +151,7 @@ export function DashboardLineChart({
             width={65}
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
-          <Tooltip content={<CustomChartTooltip formatter={valueFormatter} />} />
+          <Tooltip content={<CustomChartTooltip formatter={valueFormatter} labels={legendLabels} />} />
           {keys.map((key, i) => (
             <Line
               key={key}
@@ -217,8 +223,8 @@ export function DashboardBarChart({
             width={65}
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
-          <Tooltip content={<CustomChartTooltip formatter={valueFormatter} />} />
-          <Bar dataKey="value" name="Valor" radius={[6, 6, 0, 0]}>
+          <Tooltip content={<CustomChartTooltip formatter={valueFormatter} labels={legendLabels} />} />
+          <Bar dataKey="value" name={legendLabels?.value || "Valor"} radius={[6, 6, 0, 0]}>
             {data.map((entry, index) => <Cell key={index} fill={(entry as any).fill || barColors[index % barColors.length]} />)}
           </Bar>
         </BarChart>

@@ -26,6 +26,7 @@ interface MySubscriptionsClientProps {
   initialSubscriptionId?: string | null
   userProfile?: any
   cartCount?: number
+  userId?: string | null
 }
 
 export function MySubscriptionsClient({
@@ -33,6 +34,7 @@ export function MySubscriptionsClient({
   initialSubscriptionId,
   userProfile,
   cartCount,
+  userId,
 }: MySubscriptionsClientProps) {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"subscriptions" | "credits">("subscriptions")
@@ -179,23 +181,25 @@ export function MySubscriptionsClient({
     <>
       <MarketplaceHeader simpleTitle={headerTitle} userProfile={userProfile} cartCount={cartCount} />
 
-      <AnimatePresence mode="wait">
-        {activeSubscription ? (
-          <MySubscriptionDetailPage
-            key={activeSubscription.id}
-            subscription={activeSubscription}
-            onBack={handleCloseDetails}
-            onUpdate={refreshItem}
-          />
-        ) : (
-          <motion.div
-            key="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col flex-1 w-full"
-          >
+      <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          {activeSubscription ? (
+            <MySubscriptionDetailPage
+              key={activeSubscription.id}
+              subscription={activeSubscription}
+              onBack={handleCloseDetails}
+              onUpdate={refreshItem}
+              userId={userId}
+            />
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col flex-1 w-full"
+            >
             {/* Header (desktop) */}
             <div className="hidden lg:block items-center mb-8">
               <div>
@@ -267,7 +271,7 @@ export function MySubscriptionsClient({
                               className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-all duration-200 hover:shadow-md hover:border-brand-green dark:hover:border-brand-green w-full cursor-pointer"
                             >
                               {/* Card Header */}
-                              <div className="px-6 py-4 flex flex-row items-start justify-between gap-4">
+                              <div className="px-6 py-4 flex flex-row items-center justify-between gap-4">
                                 <div className="flex items-center gap-4 min-w-0">
                                   <img
                                     src={storeImage}
@@ -311,20 +315,26 @@ export function MySubscriptionsClient({
                                 </div>
                               </div>
 
-                              {/* Card Content: só o essencial, o resto fica no detalhe */}
+                              {/* Card Content */}
                               <div className="px-6 pb-6 pt-0">
                                 <div className="h-px bg-brand-border dark:bg-dark-border w-full mb-6" />
 
-                                <div className="flex items-end justify-between gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div className="flex flex-col min-w-0">
-                                    <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body font-medium mb-1">
-                                      <CalendarIcon size={14} />
-                                      <span>{isClosed ? "Encerrada em" : "Próxima cobrança"}</span>
-                                    </div>
-                                    <span className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                      {formatCurrency(cycleAmount)}
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mb-1">
+                                      Último pagamento
                                     </span>
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 truncate">
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                      {sub.lastExecutionAt ? formatDate(sub.lastExecutionAt) : "—"}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mb-1">
+                                      {isClosed ? "Encerrada em" : "Próxima cobrança"}
+                                    </span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                      <CalendarIcon size={14} className="text-brand-inactive-text" />
                                       {isClosed
                                         ? statusConfig.label
                                         : sub.nextExecutionAt
@@ -332,16 +342,34 @@ export function MySubscriptionsClient({
                                           : "—"}
                                     </span>
                                   </div>
-
-                                  <Button
-                                    variant="outline"
-                                    className="w-auto shrink-0"
-                                    onClick={() => handleOpenDetails(sub.id)}
-                                    rightIcon={<ChevronRightIcon size={16} />}
-                                  >
-                                    Ver detalhes
-                                  </Button>
                                 </div>
+                              </div>
+
+                              {/* Card Footer (mesmo layout do card de pedido: valor à esquerda, ação à direita) */}
+                              <div className="flex flex-row justify-between items-center gap-4 px-6 py-4 border-t border-brand-border dark:border-dark-border w-full flex-wrap">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Valor atual {sub.frequencyLabel ? `• ${sub.frequencyLabel}` : ""}
+                                  </span>
+                                  <span className="text-base font-bold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(cycleAmount)}
+                                  </span>
+                                  {sub.contractedAmount != null &&
+                                    Math.abs(Number(sub.contractedAmount) - cycleAmount) > 0.009 && (
+                                      <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        Contratado: {formatCurrency(sub.contractedAmount)}
+                                      </span>
+                                    )}
+                                </div>
+
+                                <Button
+                                  variant="outline"
+                                  className="w-auto shrink-0"
+                                  onClick={() => handleOpenDetails(sub.id)}
+                                  rightIcon={<ChevronRightIcon size={16} />}
+                                >
+                                  Ver detalhes
+                                </Button>
                               </div>
                             </div>
                           )
@@ -468,7 +496,8 @@ export function MySubscriptionsClient({
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </>
   )
 }

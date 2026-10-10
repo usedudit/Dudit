@@ -868,7 +868,7 @@ export async function getServicesPricingAlertsAction(
         let query = admin
             .from("services")
             .select(
-                "id, name, category, duration_minutes, images, price, cost_price, promotional_price, is_unavailable_type, store_id"
+                "id, name, category:service_categories!category_id(name), duration_minutes, images, price, cost_price, promotional_price, is_unavailable_type, store_id"
             )
             .eq("partner_id", partnerId)
             .gt("cost_price", 0)
@@ -892,6 +892,11 @@ export async function getServicesPricingAlertsAction(
         for (const s of data || []) {
             if (s.is_unavailable_type === true) continue
 
+            const categoryName =
+                s.category && typeof s.category === "object"
+                    ? (s.category as any).name || null
+                    : s.category ?? null
+
             const evaluation = evaluatePricing(
                 {
                     price: Number(s.price) || 0,
@@ -911,7 +916,7 @@ export async function getServicesPricingAlertsAction(
             alerts.push({
                 id: s.id,
                 name: s.name,
-                category: s.category || null,
+                category: categoryName,
                 duration_minutes: s.duration_minutes ?? null,
                 images: Array.isArray(s.images) ? s.images : null,
                 price: Number(s.price) || 0,

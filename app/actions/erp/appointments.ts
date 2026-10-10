@@ -567,7 +567,7 @@ export async function getStagnantServicesAction(
     let servicesQuery = admin
       .from("services")
       .select(
-        "id, name, price, promotional_price, duration_minutes, category, images, created_at, is_unavailable_type, store_id"
+        "id, name, price, promotional_price, duration_minutes, category:service_categories!category_id(name), images, created_at, is_unavailable_type, store_id"
       )
       .eq("partner_id", partnerId)
     servicesQuery = scopeActiveOnly(servicesQuery)
@@ -591,7 +591,15 @@ export async function getStagnantServicesAction(
     if (error) return { error: error.message }
     if (usageError) return { error: usageError.message }
 
-    return evaluateStagnantServices(services || [], usage || [], { periodDays: days, today })
+    const normalizedServices = (services || []).map((s: any) => ({
+      ...s,
+      category:
+        s.category && typeof s.category === "object"
+          ? s.category.name || null
+          : s.category ?? null,
+    }))
+
+    return evaluateStagnantServices(normalizedServices, usage || [], { periodDays: days, today })
   } catch (error: any) {
     return { error: error.message }
   }

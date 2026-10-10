@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard } from "@/components/reusable"
-import { ChevronLeftIcon, LinkIcon, EditIcon, SaveIcon, ThreeDotsIcon } from "@/lib/icons"
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard, ActionsDropdown } from "@/components/reusable"
+import { ChevronLeftIcon, ChevronDownIcon, LinkIcon, EditIcon, SaveIcon, ThreeDotsIcon } from "@/lib/icons"
 import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
 import CommunityVideoUploadSection from "./CommunityVideoUploadSection"
@@ -38,11 +39,38 @@ const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cya
     flagged: "red",
 }
 
-const STATUS_LABELS: Record<string, string> = {
-    pending_moderation: "Pendente",
-    approved: "Aprovado",
-    rejected: "Rejeitado",
-    flagged: "Sinalizado",
+function formatMetric(value: number | string | null | undefined): string {
+    const n = Number(value ?? 0)
+    return new Intl.NumberFormat("pt-BR").format(n)
+}
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
+                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{label}</p>
+                <div className="flex flex-col gap-1.5">
+                    {payload.map((entry: any, index: number) => {
+                        const color = entry.fill || "var(--color-brand-green)"
+                        return (
+                            <div key={index} className="flex items-center justify-between gap-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded bg-current shrink-0" style={{ color }} />
+                                    <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                                        {entry.name}
+                                    </span>
+                                </div>
+                                <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+                                    {formatMetric(entry.value)}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
+    return null
 }
 
 export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete, isLoading, partnerId, readOnly }: VideoFormPageProps) {
@@ -53,6 +81,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
     const [description, setDescription] = useState("")
     const [videoMeta, setVideoMeta] = useState<VideoMetadata>(EMPTY_VIDEO)
     const [tags, setTags] = useState<string[]>([])
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
     const [linkedItem, setLinkedItem] = useState<{ id: string; name: string; type: "product" | "service" } | null>(null)
     const [linkedCollectionUrl, setLinkedCollectionUrl] = useState("")
@@ -92,13 +121,6 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
             }
             setLinkedCollectionUrl(video.linked_collection_url || (video.linked_item_type === "collection" && video.linked_collection_short_id ? `/colecoes/${video.linked_collection_short_id}` : ""))
             setTags(video.tags || [])
-        } else {
-            setTitle("")
-            setDescription("")
-            setVideoMeta(EMPTY_VIDEO)
-            setTags([])
-            setLinkedItem(null)
-            setLinkedCollectionUrl("")
         }
     }, [video])
 
@@ -158,11 +180,18 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
         return Object.keys(errors).filter((f) => errorFields[f] === tab).length
     }
 
-    const duration = videoMeta.video_duration
-    const minutes = duration ? Math.floor(duration / 60) : 0
-    const seconds = duration ? (duration % 60).toString().padStart(2, "0") : "00"
-
-    const hasVideo = !!videoMeta.video_url
+    const comparisonData = [
+        {
+            name: "Visualizações",
+            total: Number(video?.views_count ?? 0),
+            recente: Number(video?.views_last_30_days ?? 0),
+        },
+        {
+            name: "Cliques",
+            total: Number(video?.clicks_count ?? 0),
+            recente: Number(video?.clicks_last_30_days ?? 0),
+        },
+    ]
 
     return (
         <FadeIn>
@@ -186,10 +215,8 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="hidden md:inline truncate">{readOnly ? (video?.title || "Vídeo") : isEditing ? "Editar Vídeo" : "Novo Vídeo"}</span>
-                                            {readOnly && (
-                                                <Badge variant={STATUS_VARIANTS[video?.moderation_status] || "orange"} className="whitespace-nowrap scale-90 shrink-0">
-                                                    {STATUS_LABELS[video?.moderation_status] || video?.moderation_status}
-                                                </Badge>
+                                            {readOnly && video?.moderation_status && (
+                                                <Badge variant={STATUS_VARIANTS[video.moderation_status] || "gray"} className="whitespace-nowrap scale-90 shrink-0" />
                                             )}
                                         </h1>
 
@@ -202,14 +229,14 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {readOnly ? (
                                             <>
+                                                {onDelete && (
+                                                    <ActionsDropdown
+                                                        onDelete={onDelete}
+                                                    />
+                                                )}
                                                 {onEdit && (
                                                     <Button onClick={onEdit} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                                         Editar vídeo
-                                                    </Button>
-                                                )}
-                                                {onDelete && (
-                                                    <Button variant="outline" onClick={onDelete} className="text-brand-red">
-                                                        Excluir
                                                     </Button>
                                                 )}
                                             </>
@@ -233,15 +260,9 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="vinc">
-                                            Vinculações
-                                            {getTabErrorCount("vinc") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                        </TabsTrigger>
                                         {readOnly && (
                                             <TabsTrigger value="metrics">
-                                                <span className="inline-flex items-center gap-2">
-                                                    Métricas
-                                                </span>
+                                                Métricas
                                             </TabsTrigger>
                                         )}
                                     </TabsList>
@@ -255,153 +276,233 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                 {activeTab === "general" && (
                                     <FadeIn key="general" className="block">
                                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            {/* Left Column */}
+                                            {/* ESQUERDA (Principal) */}
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                                <FormSection title="Informações do Vídeo">
-                                                    <div className="space-y-5">
-                                                        <Input
-                                                            label="Título"
-                                                            name="title"
-                                                            value={title}
-                                                            onChange={(e) => setTitle(e.target.value)}
-                                                            placeholder="Título do vídeo"
-                                                            error={!!errors.title}
-                                                            errorMessage={errors.title}
-                                                            disabled={readOnly}
-                                                            maxLength={150}
-                                                        />
-                                                        <FormTextarea
-                                                            label="Descrição"
-                                                            name="description"
-                                                            value={description}
-                                                            onChange={(e) => setDescription(e.target.value)}
-                                                            placeholder="Descrição do vídeo..."
-                                                            rows={4}
-                                                            disabled={readOnly}
-                                                        />
-                                                        {readOnly ? (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading">Vídeo</label>
-                                                                {videoMeta.video_url && (
-                                                                    <div className="w-full aspect-video overflow-hidden rounded-lg border border-brand-border dark:border-dark-border bg-black">
-                                                                        {videoMeta.video_type === "youtube" || videoMeta.video_type === "vimeo" ? (
-                                                                            <iframe
-                                                                                src={
-                                                                                    videoMeta.video_type === "youtube"
-                                                                                        ? `https://www.youtube.com/embed/${videoMeta.video_provider_id}`
-                                                                                        : `https://player.vimeo.com/video/${videoMeta.video_provider_id}`
-                                                                                }
-                                                                                title="Preview do vídeo"
-                                                                                loading="lazy"
-                                                                                allow="accelerometer; encrypted-media; picture-in-picture"
-                                                                                allowFullScreen
-                                                                                className="w-full h-full"
-                                                                            />
-                                                                        ) : (
-                                                                            <video
-                                                                                src={videoMeta.video_url}
-                                                                                poster={videoMeta.video_thumbnail || undefined}
-                                                                                controls
-                                                                                preload="metadata"
-                                                                                playsInline
-                                                                                className="w-full h-full object-contain bg-black"
-                                                                            />
-                                                                        )}
-                                                                    </div>
+                                                {readOnly ? (
+                                                    <>
+                                                        {/* Informações Básicas */}
+                                                        <FormSection title="Informações Básicas" className="mb-8">
+                                                            <div className="space-y-6">
+                                                                <div>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Título</span>
+                                                                    <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {title || "-"}
+                                                                    </h1>
+                                                                </div>
+                                                            </div>
+                                                        </FormSection>
+
+                                                        {/* Descrição */}
+                                                        <FormSection title="Descrição" className="mb-8">
+                                                            <div className={`relative ${!isDescriptionExpanded ? "max-h-[160px] overflow-hidden" : ""}`}>
+                                                                {description ? (
+                                                                    <p className="text-sm md:text-base text-brand-dark dark:text-dark-heading leading-relaxed">
+                                                                        {description}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Sem descrição cadastrada.</p>
+                                                                )}
+                                                                {!isDescriptionExpanded && description.length > 250 && (
+                                                                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-dark-surface to-transparent pointer-events-none" />
                                                                 )}
                                                             </div>
-                                                        ) : (
+                                                            {description.length > 250 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                                                    className="flex items-center gap-1 text-brand-primary dark:text-brand-primary font-bold text-sm mt-3 hover:underline cursor-pointer"
+                                                                >
+                                                                    {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                                                    <ChevronDownIcon size={16} className={`transition-transform duration-200 ${isDescriptionExpanded ? "rotate-180" : ""}`} />
+                                                                </button>
+                                                            )}
+                                                        </FormSection>
+
+                                                        {/* Vídeo */}
+                                                        {videoMeta.video_url && (
+                                                            <FormSection title="Vídeo">
+                                                                <div className="w-full aspect-video overflow-hidden rounded-lg border border-brand-border dark:border-dark-border bg-black">
+                                                                    {videoMeta.video_type === "youtube" || videoMeta.video_type === "vimeo" ? (
+                                                                        <iframe
+                                                                            src={
+                                                                                videoMeta.video_type === "youtube"
+                                                                                    ? `https://www.youtube.com/embed/${videoMeta.video_provider_id}`
+                                                                                    : `https://player.vimeo.com/video/${videoMeta.video_provider_id}`
+                                                                            }
+                                                                            title="Preview do vídeo"
+                                                                            loading="lazy"
+                                                                            allow="accelerometer; encrypted-media; picture-in-picture"
+                                                                            allowFullScreen
+                                                                            className="w-full h-full"
+                                                                        />
+                                                                    ) : (
+                                                                        <video
+                                                                            src={videoMeta.video_url}
+                                                                            poster={videoMeta.video_thumbnail || undefined}
+                                                                            controls
+                                                                            preload="metadata"
+                                                                            playsInline
+                                                                            className="w-full h-full object-contain bg-black"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            </FormSection>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {/* Informações Básicas */}
+                                                        <FormSection title="Informações Básicas" className="mb-8">
+                                                            <div className="space-y-6">
+                                                                <Input
+                                                                    label="Título"
+                                                                    name="title"
+                                                                    value={title}
+                                                                    onChange={(e) => setTitle(e.target.value)}
+                                                                    placeholder="Título do vídeo"
+                                                                    error={!!errors.title}
+                                                                    errorMessage={errors.title}
+                                                                    disabled={readOnly}
+                                                                    maxLength={150}
+                                                                />
+                                                            </div>
+                                                        </FormSection>
+
+                                                        {/* Descrição */}
+                                                        <FormSection title="Descrição" className="mb-8">
+                                                            <FormTextarea
+                                                                label="Descrição"
+                                                                name="description"
+                                                                value={description}
+                                                                onChange={(e) => setDescription(e.target.value)}
+                                                                placeholder="Descrição do vídeo..."
+                                                                rows={4}
+                                                                disabled={readOnly}
+                                                            />
+                                                        </FormSection>
+
+                                                        {/* Vídeo */}
+                                                        <FormSection title="Vídeo">
                                                             <CommunityVideoUploadSection
                                                                 video={videoMeta}
                                                                 onChange={setVideoMeta}
                                                             />
-                                                        )}
-                                                    </div>
-                                                </FormSection>
+                                                        </FormSection>
+                                                    </>
+                                                )}
                                             </div>
-                                        </div>
-                                    </FadeIn>
-                                )}
-                                {activeTab === "vinc" && (
-                                    <FadeIn key="vinc" className="block">
-                                        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                                <SidebarCard hasTopStrip hasSeparator title="Vinculações">
-                                                    <div className="space-y-5">
-                                                        <div>
-                                                            <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                Produto Vinculado
-                                                            </label>
-                                                            {linkedItem?.type === "product" ? (
-                                                                <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <Badge variant="green" className="whitespace-nowrap">Vinculado</Badge>
-                                                                    <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                                        {linkedItem.name || linkedItem.id}
-                                                                    </span>
-                                                                    {!readOnly && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setLinkedItem(null)}
-                                                                            className="text-sm text-red-500 hover:text-red-600"
-                                                                        >
-                                                                            Remover
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <Button variant="outline" type="button" onClick={() => setShowProductSheet(true)} className="w-full" disabled={readOnly}>
-                                                                    Selecionar Produto
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                Serviço Vinculado
-                                                            </label>
-                                                            {linkedItem?.type === "service" ? (
-                                                                <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <Badge variant="cyan" className="whitespace-nowrap">Vinculado</Badge>
-                                                                    <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
-                                                                        {linkedItem.name || linkedItem.id}
-                                                                    </span>
-                                                                    {!readOnly && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setLinkedItem(null)}
-                                                                            className="text-sm text-red-500 hover:text-red-600"
-                                                                        >
-                                                                            Remover
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <Button variant="outline" type="button" onClick={() => setShowServiceSheet(true)} className="w-full" disabled={readOnly}>
-                                                                    Selecionar Serviço
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                        <Input
-                                                            label="Link da Coleção"
-                                                            name="linkedCollectionUrl"
-                                                            value={linkedCollectionUrl}
-                                                            onChange={(e) => setLinkedCollectionUrl(e.target.value)}
-                                                            placeholder="https://dudit.com.br/colecoes/nome-da-colecao"
-                                                            prefix={<LinkIcon size={18} />}
-                                                            disabled={readOnly}
-                                                        />
-                                                    </div>
-                                                </SidebarCard>
 
-                                                <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
-                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                                        Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca.
-                                                    </p>
-                                                    <TagsInput
-                                                        tags={tags}
-                                                        onChange={setTags}
-                                                        disabled={readOnly}
-                                                        placeholder="Adicionar tag..."
-                                                    />
+                                            {/* DIREITA (SidebarCard) */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                                <SidebarCard hasSeparator hasTopStrip title="Organização">
+                                                    {readOnly ? (
+                                                        <div className="space-y-4">
+                                                            <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Produto Vinculado</span>
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {linkedItem?.type === "product" ? (linkedItem.name || linkedItem.id) : "-"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Serviço Vinculado</span>
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {linkedItem?.type === "service" ? (linkedItem.name || linkedItem.id) : "-"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Link da Coleção</span>
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate max-w-[150px]">
+                                                                    {linkedCollectionUrl || "-"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Palavras-chave</span>
+                                                                <div className="flex flex-wrap gap-1 justify-end">
+                                                                    {tags.length > 0 ? tags.map((tag, i) => (
+                                                                        <Badge key={i} variant="gray" className="whitespace-nowrap scale-90">
+                                                                            {tag}
+                                                                        </Badge>
+                                                                    )) : (
+                                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">-</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-5">
+                                                            <div>
+                                                                <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                    Produto Vinculado
+                                                                </label>
+                                                                {linkedItem?.type === "product" ? (
+                                                                    <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
+                                                                        <Badge variant="green" className="whitespace-nowrap">Vinculado</Badge>
+                                                                        <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
+                                                                            {linkedItem.name || linkedItem.id}
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setLinkedItem(null)}
+                                                                            className="text-sm text-red-500 hover:text-red-600"
+                                                                        >
+                                                                            Remover
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Button variant="outline" type="button" onClick={() => setShowProductSheet(true)} className="w-full" disabled={readOnly}>
+                                                                        Selecionar Produto
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                    Serviço Vinculado
+                                                                </label>
+                                                                {linkedItem?.type === "service" ? (
+                                                                    <div className="flex items-center gap-3 rounded-lg border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-border/20">
+                                                                        <Badge variant="cyan" className="whitespace-nowrap">Vinculado</Badge>
+                                                                        <span className="text-sm text-brand-dark dark:text-dark-heading truncate flex-1">
+                                                                            {linkedItem.name || linkedItem.id}
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setLinkedItem(null)}
+                                                                            className="text-sm text-red-500 hover:text-red-600"
+                                                                        >
+                                                                            Remover
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <Button variant="outline" type="button" onClick={() => setShowServiceSheet(true)} className="w-full" disabled={readOnly}>
+                                                                        Selecionar Serviço
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                            <Input
+                                                                label="Link da Coleção"
+                                                                name="linkedCollectionUrl"
+                                                                value={linkedCollectionUrl}
+                                                                onChange={(e) => setLinkedCollectionUrl(e.target.value)}
+                                                                placeholder="https://dudit.com.br/colecoes/nome-da-colecao"
+                                                                prefix={<LinkIcon size={18} />}
+                                                                disabled={readOnly}
+                                                            />
+                                                            <div>
+                                                                <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                    Palavras-chave de busca
+                                                                </label>
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                                                    Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca.
+                                                                </p>
+                                                                <TagsInput
+                                                                    tags={tags}
+                                                                    onChange={setTags}
+                                                                    disabled={readOnly}
+                                                                    placeholder="Adicionar tag..."
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </SidebarCard>
                                             </div>
                                         </div>
@@ -410,55 +511,64 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                 {activeTab === "metrics" && readOnly && (
                                     <FadeIn key="metrics" className="block">
                                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                            <div className="col-span-12 lg:col-span-6 pr-0 lg:pr-12">
-                                                <FormSection title="Estatísticas">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Visualizações</span>
-                                                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{video?.views_count ?? 0}</span>
-                                                        </div>
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Cliques</span>
-                                                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{video?.clicks_count ?? 0}</span>
-                                                        </div>
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Duração</span>
-                                                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                                {duration ? `${minutes}:${seconds}` : "-"}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Status de moderação</span>
-                                                            <Badge variant={STATUS_VARIANTS[video?.moderation_status] || "gray"} className="whitespace-nowrap scale-90 w-fit">
-                                                                {STATUS_LABELS[video?.moderation_status] || video?.moderation_status}
-                                                            </Badge>
-                                                        </div>
+                                            {/* ESQUERDA (Principal) */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                                {/* Comparison Chart */}
+                                                <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col">
+                                                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-6">
+                                                        Comparativo: Histórico vs Últimos 30 dias
+                                                    </h3>
+                                                    <div className="h-64 w-full">
+                                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                                                            <BarChart data={comparisonData} barGap={6} barCategoryGap="25%">
+                                                                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-brand-border)" />
+                                                                <XAxis
+                                                                    dataKey="name"
+                                                                    tickLine={false}
+                                                                    axisLine={false}
+                                                                    tick={{ fill: "currentColor", className: "text-brand-inactive-text dark:text-dark-body", fontSize: 12, fontWeight: 500 }}
+                                                                />
+                                                                <YAxis
+                                                                    tickLine={false}
+                                                                    axisLine={false}
+                                                                    tick={{ fill: "currentColor", className: "text-brand-inactive-text dark:text-dark-body", fontSize: 12, fontWeight: 500 }}
+                                                                />
+                                                                <Tooltip
+                                                                    content={<CustomTooltip />}
+                                                                    cursor={{ fill: "var(--color-brand-green-light)", opacity: 0.1 }}
+                                                                />
+                                                                <Bar dataKey="total" name="Total Histórico" radius={[6, 6, 0, 0]} fill="var(--color-brand-green)" />
+                                                                <Bar dataKey="recente" name="Últimos 30 Dias" radius={[6, 6, 0, 0]} fill="var(--color-brand-dark)" />
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
                                                     </div>
-                                                </FormSection>
+                                                </div>
                                             </div>
-                                            <div className="col-span-12 lg:col-span-6 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                                <SidebarCard hasTopStrip title="Informações">
+
+                                            {/* DIREITA (SidebarCard) */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                                <SidebarCard hasSeparator hasTopStrip title="Informações">
                                                     <div className="space-y-4">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Criado em</span>
-                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                        <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Criado em</span>
+                                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                                 {formatDate(video?.created_at)}
                                                             </span>
                                                         </div>
                                                         {video?.published_at && (
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">Publicado em</span>
-                                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Publicado em</span>
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                                     {formatDate(video.published_at)}
                                                                 </span>
                                                             </div>
                                                         )}
                                                         {video?.updated_at && (
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">Atualizado em</span>
-                                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Atualizado em</span>
+                                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                                                     {formatDate(video.updated_at)}
-                                                            </span>
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -475,12 +585,21 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         {readOnly ? (
                             <>
-                                <Button variant="outline" className="flex-1 h-12" leftIcon={<ThreeDotsIcon size={18} />} onClick={onEdit}>
-                                    Editar
-                                </Button>
-                                {onDelete && (
-                                    <Button variant="outline" onClick={onDelete} className="text-brand-red">
-                                        Excluir
+                                <ActionsDropdown
+                                    onDelete={onDelete}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 h-12"
+                                            leftIcon={<ThreeDotsIcon size={18} />}
+                                        >
+                                            Opções
+                                        </Button>
+                                    }
+                                />
+                                {onEdit && (
+                                    <Button onClick={onEdit} className="flex-1 h-12" leftIcon={<EditIcon size={18} />}>
+                                        Editar vídeo
                                     </Button>
                                 )}
                             </>

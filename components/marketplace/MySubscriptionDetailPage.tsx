@@ -15,6 +15,9 @@ import {
   DropdownItem,
   SkeletonLoader,
   AlertModal,
+  IconPlaceholder,
+  DefaultModal,
+  RadioButton,
 } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { useToast } from "@/hooks/use-toast"
@@ -30,12 +33,14 @@ import {
   confirmMySubscriptionAddressChangeAction,
   respondToMySubscriptionPriceChangeAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
 import { formatCurrency, formatDate, formatFullDate } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
-import { getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ClockIcon,
   BlockedIcon,
@@ -51,6 +56,8 @@ import {
   RepeatIcon,
   MoneyIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
+  MapPinIcon,
 } from "@/lib/icons"
 import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
 
@@ -115,17 +122,22 @@ interface MySubscriptionDetailPageProps {
   subscription: any
   onBack: () => void
   onUpdate: (updated: any) => void
+  userId?: string | null
 }
 
-export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }: MySubscriptionDetailPageProps) {
+export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, userId }: MySubscriptionDetailPageProps) {
+  const router = useRouter()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"details" | "history">("details")
+  const [activeTab, setActiveTab] = useState<"details" | "notes" | "history">("details")
   const [actionLoading, setActionLoading] = useState(false)
 
-  const [editing, setEditing] = useState(false)
-  const [editAddress, setEditAddress] = useState("")
   const [editNotes, setEditNotes] = useState("")
+  const [editingNotes, setEditingNotes] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
+
+  const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const [userAddresses, setUserAddresses] = useState<any[]>([])
+  const [loadingAddresses, setLoadingAddresses] = useState(false)
 
   const [executions, setExecutions] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -240,13 +252,44 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
     if (res.data) onUpdate(res.data)
   }
 
-  const handleSaveDetails = async () => {
+  const handleSaveNotes = async () => {
     setSavingDetails(true)
-    const res = await updateMySubscriptionDetailsAction(sub.id, {
-      deliveryAddress: editAddress,
-      notes: editNotes,
-    })
+    const res = await updateMySubscriptionDetailsAction(sub.id, { notes: editNotes })
     setSavingDetails(false)
+    if (!res.success) {
+      toast({ title: "Erro", description: res.error, variant: "destructive" })
+      return
+    }
+    toast({ title: "Observações atualizadas com sucesso!" })
+    if (res.data) onUpdate(res.data)
+    setEditingNotes(false)
+  }
+
+  const openAddressModal = async () => {
+    if (!userId) {
+      toast({ title: "Erro", description: "Não foi possível carregar seus endereços.", variant: "destructive" })
+      return
+    }
+    setAddressModalOpen(true)
+    setLoadingAddresses(true)
+    try {
+      const res = await getAddressesAction(userId, "user")
+      setUserAddresses((res.addresses as any[]) || [])
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível carregar seus endereços.", variant: "destructive" })
+      setAddressModalOpen(false)
+    } finally {
+      setLoadingAddresses(false)
+    }
+  }
+
+  const handlePickAddress = async (addr: any) => {
+    const formatted = `${addr.street}, ${addr.number}${addr.complement ? `, ${addr.complement}` : ""} - ${addr.neighborhood}, ${addr.city} - ${addr.state}, ${addr.zip_code}`
+    setAddressModalOpen(false)
+    if (formatted === (sub.deliveryAddress || "")) return
+    setActionLoading(true)
+    const res = await updateMySubscriptionDetailsAction(sub.id, { deliveryAddress: formatted })
+    setActionLoading(false)
     if (!res.success) {
       toast({ title: "Erro", description: res.error, variant: "destructive" })
       return
@@ -254,13 +297,12 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
     if (res.requiresConfirmation) {
       toast({
         title: "Confirme a mudança de endereço",
-        description: "O novo endereço tem frete mais caro. Aceite ou recuse abaixo para continuar.",
+        description: "O novo endereço tem frete mais caro. Aceite ou recuse no aviso acima para continuar.",
       })
     } else {
-      toast({ title: "Detalhes de entrega atualizados com sucesso!" })
+      toast({ title: "Endereço de entrega atualizado com sucesso!" })
     }
     if (res.data) onUpdate(res.data)
-    setEditing(false)
   }
 
   const handleConfirmAddressChange = async (decision: "accept" | "discard") => {
@@ -308,6 +350,36 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
   }
 
   // Confirmações usando o AlertModal do projeto (nada de confirm() do navegador)
+  const askPause = () =>
+    setConfirmDialog({
+      title: "Pausar assinatura?",
+      message: "As próximas cobranças e entregas ficam suspensas até você reativar. Você pode reativar quando quiser.",
+      confirmText: "Pausar assinatura",
+      cancelText: "Manter ativa",
+      variant: "warning",
+      onConfirm: () => runAction("pause"),
+    })
+
+  const askResume = () =>
+    setConfirmDialog({
+      title: "Reativar assinatura?",
+      message: "As próximas cobranças e entregas deste plano voltam a acontecer conforme o ciclo contratado.",
+      confirmText: "Reativar assinatura",
+      cancelText: "Voltar",
+      variant: "success",
+      onConfirm: () => runAction("resume"),
+    })
+
+  const askRefund = () =>
+    setConfirmDialog({
+      title: "Solicitar reembolso?",
+      message: "Vamos abrir a solicitação de reembolso da última fatura paga desta assinatura para você revisar e enviar.",
+      confirmText: "Continuar",
+      cancelText: "Voltar",
+      variant: "warning",
+      onConfirm: handleRefund,
+    })
+
   const askCancel = () =>
     setConfirmDialog({
       title: "Cancelar assinatura?",
@@ -350,12 +422,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
       onConfirm: () => handlePriceChangeResponse("reject"),
     })
 
-  const openEdit = () => {
-    setEditAddress(sub.deliveryAddress || "")
-    setEditNotes(sub.notes || "")
-    setEditing((prev) => !prev)
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -365,7 +431,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
       className="flex flex-col h-full w-full"
     >
       {/* Header */}
-      <div className="mb-8 flex flex-row items-center gap-4 w-full justify-start">
+      <div className="mb-8 hidden lg:flex flex-row items-center gap-4 w-full justify-start">
         <Button
           variant="filled"
           onClick={onBack}
@@ -374,11 +440,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
         >
           <XIcon className="w-5 h-5" />
         </Button>
-        <img
-          src={storeImage}
-          alt={storeName}
-          className="w-11 h-11 rounded-full object-cover border border-brand-border dark:border-dark-border bg-white shrink-0"
-        />
         <div className="text-left flex-1 min-w-0">
           <h1 className="text-xl lg:text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
             <span className="truncate">{sub.plan?.name || "Assinatura"}</span>
@@ -389,7 +450,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
             )}
           </h1>
           <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-            {storeName} • Iniciada em {formatFullDate(sub.createdAt)}
+            Iniciada em {formatFullDate(sub.createdAt)}
           </p>
         </div>
         <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
@@ -398,10 +459,11 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
         </div>
       </div>
 
-      <div className="max-w-3xl lg:max-w-[1400px] mx-auto w-full pb-16">
+      <div className="max-w-3xl lg:max-w-[1400px] mx-auto w-full pb-32">
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger value="details">Detalhes da Assinatura</TabsTrigger>
+            <TabsTrigger value="notes">Observações</TabsTrigger>
             <TabsTrigger value="history">Histórico de Cobranças</TabsTrigger>
           </TabsList>
 
@@ -566,22 +628,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                 {/* Section: plano */}
                 <FormSection title="Plano" hasSeparator>
                   <div>
-                    <DetailRow
-                      label="Nome do plano"
-                      value={
-                        sub.plan ? (
-                          <Link
-                            href={getPlanUrl(sub.plan, sub.partner)}
-                            prefetch={false}
-                            className="hover:text-brand-green transition-colors"
-                          >
-                            {sub.plan.name}
-                          </Link>
-                        ) : (
-                          "—"
-                        )
-                      }
-                    />
                     <DetailRow label="Recorrência" value={sub.frequencyLabel || "—"} />
                     <DetailRow
                       label="Início da assinatura"
@@ -611,9 +657,9 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                   title={sub.deliveryType === "delivery" ? "Endereço de Entrega" : "Retirada no estabelecimento"}
                   hasSeparator
                   headerRight={
-                    !isClosed ? (
-                      <Button variant="outline" size="sm" leftIcon={<EditIcon size={16} />} onClick={openEdit}>
-                        {editing ? "Fechar edição" : "Editar entrega"}
+                    !isClosed && sub.deliveryType === "delivery" ? (
+                      <Button variant="outline" size="sm" leftIcon={<EditIcon size={16} />} onClick={openAddressModal} disabled={actionLoading}>
+                        Trocar endereço
                       </Button>
                     ) : null
                   }
@@ -635,65 +681,32 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                       }
                     />
                   </div>
-
-                  {editing && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden space-y-4 pt-2"
-                    >
-                      <div className="space-y-3">
-                        {sub.deliveryType === "delivery" && (
-                          <div>
-                            <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body mb-1">
-                              Endereço de entrega
-                            </label>
-                            <input
-                              type="text"
-                              value={editAddress}
-                              onChange={(e) => setEditAddress(e.target.value)}
-                              className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm py-2 px-3 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-brand-green"
-                              placeholder="Rua, número, complemento, bairro"
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body mb-1">
-                            Observações para entrega / execução
-                          </label>
-                          <textarea
-                            value={editNotes}
-                            onChange={(e) => setEditNotes(e.target.value)}
-                            rows={2}
-                            className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm py-2 px-3 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-brand-green"
-                            placeholder="Instruções especiais ou observações..."
-                          />
-                        </div>
-
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
-                            Cancelar
-                          </Button>
-                          <Button size="sm" onClick={handleSaveDetails} disabled={savingDetails}>
-                            {savingDetails ? "Salvando..." : "Salvar Alterações"}
-                          </Button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
                 </FormSection>
 
-                {/* Section: observações */}
-                {sub.notes && (
-                  <FormSection title="Observações" hasSeparator>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">
-                      {sub.notes}
-                    </p>
-                  </FormSection>
-                )}
+                {/* Section: vendedor */}
+                <FormSection title="Vendedor" hasSeparator>
+                  <Link
+                    href={getStoreUrl({
+                      ...sub.partner,
+                      id: sub.partner?.storeId || sub.partner?.id || sub.partnerId,
+                      short_id: sub.partner?.short_id,
+                      name: storeName,
+                    })}
+                    prefetch={false}
+                    className="flex items-center gap-4 block cursor-pointer"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                      <img src={storeImage} alt={storeName} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{storeName}</div>
+                      <div className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 max-w-sm">
+                        Acessar perfil do vendedor
+                      </div>
+                    </div>
+                    <ChevronRightIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />
+                  </Link>
+                </FormSection>
               </div>
 
               {/* Right column: resumo + ações */}
@@ -777,7 +790,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                         variant="outline"
                         className="w-full h-12 font-bold"
                         leftIcon={<BlockedIcon size={16} />}
-                        onClick={() => runAction("pause")}
+                        onClick={askPause}
                         disabled={actionLoading}
                       >
                         Pausar assinatura
@@ -788,7 +801,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                         variant="outline"
                         className="w-full h-12 font-bold"
                         leftIcon={<PlayIcon size={16} />}
-                        onClick={() => runAction("resume")}
+                        onClick={askResume}
                         disabled={actionLoading}
                       >
                         Reativar assinatura
@@ -835,7 +848,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                         <CalendarIcon size={16} />
                         Antecipar ciclo
                       </DropdownItem>
-                      <DropdownItem onClick={handleRefund} disabled={loadingRefund}>
+                      <DropdownItem onClick={askRefund} disabled={loadingRefund}>
                         <MoneyIcon size={16} />
                         {loadingRefund ? "Carregando..." : "Solicitar reembolso"}
                       </DropdownItem>
@@ -869,8 +882,69 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
             </div>
           </TabsContent>
 
+          <TabsContent value="notes" className="mt-0 focus-visible:ring-0">
+            <FormSection
+              title="Observações"
+              headerRight={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<EditIcon size={16} />}
+                  onClick={() => {
+                    if (editingNotes) {
+                      setEditingNotes(false)
+                      setEditNotes(sub.notes || "")
+                    } else {
+                      setEditNotes(sub.notes || "")
+                      setEditingNotes(true)
+                    }
+                  }}
+                  disabled={savingDetails}
+                >
+                  {editingNotes ? "Fechar edição" : "Editar observações"}
+                </Button>
+              }
+            >
+              {editingNotes ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={4}
+                    className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm py-2 px-3 text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-brand-green"
+                    placeholder="Instruções especiais ou observações para entrega/execução..."
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingNotes(false)
+                        setEditNotes(sub.notes || "")
+                      }}
+                      disabled={savingDetails}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button size="sm" onClick={handleSaveNotes} disabled={savingDetails}>
+                      {savingDetails ? "Salvando..." : "Salvar observações"}
+                    </Button>
+                  </div>
+                </div>
+              ) : sub.notes ? (
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">
+                  {sub.notes}
+                </p>
+              ) : (
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                  Nenhuma observação registrada.
+                </p>
+              )}
+            </FormSection>
+          </TabsContent>
+
           <TabsContent value="history" className="mt-0 focus-visible:ring-0">
-            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface p-6">
+            <div>
               {loadingHistory ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
@@ -878,9 +952,13 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
                   ))}
                 </div>
               ) : executions.length === 0 ? (
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                  Nenhuma cobrança registrada ainda.
-                </p>
+                <IconPlaceholder
+                  placeholderType="image"
+                  imageSrc="https://img.dudit.com.br/static/mascots/Transacoes.png"
+                  imageAlt="Sem cobranças"
+                  title="Você ainda não tem cobranças"
+                  subtitle="As cobranças vão aparecer aqui assim que forem geradas."
+                />
               ) : (
                 <div className="space-y-2">
                   {paginatedExecutions.map((exec) => {
@@ -941,6 +1019,87 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate }
         purchase={refundPurchase}
         partnerId={refundPurchase?.partnerId || refundPurchase?.partner_id || refundSub?.partnerId || ""}
       />
+
+      <DefaultModal
+        isOpen={addressModalOpen}
+        onClose={() => setAddressModalOpen(false)}
+        title="Selecione o endereço de entrega"
+      >
+        <div className="space-y-4">
+          {loadingAddresses ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <SkeletonLoader key={i} height={56} className="rounded-xl" />
+              ))}
+            </div>
+          ) : userAddresses.length === 0 ? (
+            <div className="text-center py-6 space-y-3">
+              <MapPinIcon size={32} className="mx-auto text-brand-inactive-text" />
+              <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                Nenhum endereço cadastrado
+              </p>
+              <Button onClick={() => router.push("/perfil?tab=enderecos")} className="w-full">
+                Cadastrar endereço
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+              {userAddresses.map((addr: any) => {
+                const fullAddress = `${addr.street}, ${addr.number}${addr.complement ? `, ${addr.complement}` : ""} - ${addr.neighborhood}, ${addr.city} - ${addr.state}, ${addr.zip_code}`
+                const isSelected = fullAddress === (sub.deliveryAddress || "")
+                return (
+                  <button
+                    key={addr.id}
+                    type="button"
+                    onClick={() => void handlePickAddress(addr)}
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
+                      isSelected
+                        ? "border-brand-green bg-brand-green/5 shadow-sm ring-1 ring-brand-green"
+                        : "border-brand-border dark:border-dark-border hover:border-brand-dark/40 dark:hover:border-dark-heading/40 bg-white dark:bg-dark-surface"
+                    }`}
+                  >
+                    <div className="mt-0.5">
+                      <RadioButton
+                        name="subscription_address_selection"
+                        value={addr.id}
+                        checked={isSelected}
+                        onChange={() => void handlePickAddress(addr)}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                          {addr.street}, {addr.number}
+                        </span>
+                        {addr.is_default && (
+                          <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
+                            Padrão
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                        {addr.neighborhood}, {addr.city} - {addr.state}
+                      </p>
+                      {addr.zip_code && (
+                        <p className="text-[11px] text-brand-inactive-text/80 dark:text-dark-body/80 mt-0.5">
+                          CEP: {addr.zip_code}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+              <Button
+                variant="outline"
+                onClick={() => router.push("/perfil?tab=enderecos")}
+                className="w-full mt-2"
+              >
+                Gerenciar endereços
+              </Button>
+            </div>
+          )}
+        </div>
+      </DefaultModal>
 
       <AlertModal
         isOpen={!!confirmDialog}

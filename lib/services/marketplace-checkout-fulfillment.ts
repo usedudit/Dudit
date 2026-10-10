@@ -747,6 +747,27 @@ async function createSubscriptionFromPlan(
 
   if (execError) throw execError
 
+  // Ciclo 1 ja foi pago no checkout: os creditos de servico do plano ficam
+  // disponiveis imediatamente (mesmo fluxo do grantCreditsForCycle dos ciclos
+  // seguintes). Best-effort: nao pode reverter a assinatura ja criada.
+  if (customerId) {
+    try {
+      const { grantSubscriptionCredits } = await import("@/lib/services/credit.service")
+      const granted = await grantSubscriptionCredits(supabase, {
+        partnerId,
+        customerId,
+        subscriptionId: subscription.id as string,
+        executionId: execution.id as string,
+        nextExecutionAt,
+      })
+      if (!granted.success) {
+        console.error("[marketplace fulfillment] grantSubscriptionCredits falhou:", granted.error)
+      }
+    } catch (creditErr) {
+      console.error("[marketplace fulfillment] grantSubscriptionCredits erro:", creditErr)
+    }
+  }
+
   // Ciclo 1 ja foi pago no checkout do Dudit: o preapproval do MP cobrara a
   // partir do proximo ciclo (nextExecutionAt).
   if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) + shipping.amount > 0) {

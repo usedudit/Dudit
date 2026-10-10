@@ -19,6 +19,7 @@ export interface AppointmentsReportData {
   staffPerformance: { id: string; label: string; value: string; appointments: number; cancelled: number }[]
   repeatCustomerRate: number
   avgDuration: number
+  attendanceRate: number
 }
 
 const getCachedAppointmentsData = cache(async (partnerId: string, period: Period = "monthly"): Promise<AppointmentsReportData> => {
@@ -210,6 +211,7 @@ const getCachedAppointmentsData = cache(async (partnerId: string, period: Period
           })),
         repeatCustomerRate,
         avgDuration: durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
+        attendanceRate,
       }
     },
     [`report-appointments-${partnerId}-${period}`],
