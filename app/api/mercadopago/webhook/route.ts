@@ -912,7 +912,7 @@ async function processWebhookWithRetry(
       orderStatus = "in_process"
     } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentInfo.status)) {
       // If order is already in payment_failed (card rejection during checkout),
-      // keep it in payment_failed to allow recovery — only move to cancelled
+      // keep it in payment_failed to allow recovery - only move to cancelled
       // for refunded/charged_back or when the rejection comes from a different context.
       if (paymentInfo.status === "rejected" && orderData.situation === "payment_failed") {
         orderStatus = "payment_failed"

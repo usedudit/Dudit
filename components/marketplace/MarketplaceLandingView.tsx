@@ -132,7 +132,7 @@ export function MarketplaceLandingView({
         <div className="w-full flex flex-col font-sans">
 
             {/* ═══════════════════════════════════════════════════════════
-                HERO 1 — LOCALIZAÇÃO / CIDADE VAZIA
+                HERO 1 - LOCALIZAÇÃO / CIDADE VAZIA
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-gradient-to-b from-brand-dark to-[#0a4a3a] text-white">
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1000px] py-8 md:py-12 flex flex-col md:flex-row items-center justify-center gap-10 md:gap-16">
@@ -250,7 +250,7 @@ export function MarketplaceLandingView({
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                HERO 2 — VOCÊ VENDE? (Situação: "Quero ser encontrado")
+                HERO 2 - VOCÊ VENDE? (Situação: "Quero ser encontrado")
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-white dark:bg-dark-background">
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1000px] py-8 md:py-10 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
@@ -285,7 +285,7 @@ export function MarketplaceLandingView({
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                HERO 3 — VOCÊ COMPRA? (Situação: "Preciso de algo")
+                HERO 3 - VOCÊ COMPRA? (Situação: "Preciso de algo")
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-brand-gray/40 dark:bg-dark-surface/50">
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1000px] py-8 md:py-10 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
@@ -320,7 +320,7 @@ export function MarketplaceLandingView({
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                HERO 4 — PRECISA DE ALGO? (Situação: consumidor)
+                HERO 4 - PRECISA DE ALGO? (Situação: consumidor)
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-white dark:bg-dark-background">
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1000px] py-8 md:py-10 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
@@ -355,7 +355,7 @@ export function MarketplaceLandingView({
             </section>
 
             {/* ═══════════════════════════════════════════════════════════
-                HERO 5 — CONVIDE QUEM VENDE
+                HERO 5 - CONVIDE QUEM VENDE
             ═══════════════════════════════════════════════════════════ */}
             <section className="py-10 px-4 bg-white dark:bg-dark-background relative">
                 <div className="max-w-[1200px] mx-auto relative z-10">

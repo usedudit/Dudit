@@ -319,7 +319,7 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                                     <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
                                                         <div className="flex justify-between">
                                                             <span>Mercado Pago ID</span>
-                                                            <span className="font-mono truncate max-w-[130px]">{sub.mp_user_id || "—"}</span>
+                                                            <span className="font-mono truncate max-w-[130px]">{sub.mp_user_id || "-"}</span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>Conexão</span>
@@ -343,7 +343,7 @@ export default function SubscriptionList({ initialData, initialStats }: Subscrip
                                                                 Desconectar
                                                             </Button>
                                                         ) : (
-                                                            <span className="text-xs text-brand-inactive-text">—</span>
+                                                            <span className="text-xs text-brand-inactive-text">-</span>
                                                         )}
                                                     </div>
                                                 </div>

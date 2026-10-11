@@ -171,7 +171,7 @@ export function useEntityState() {
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
-        // Clear local state (even if already closed, still clean the URL below —
+        // Clear local state (even if already closed, still clean the URL below -
         // local state and URL can drift when router.replace races with replaceState).
         const wasOpen = localStateRef.current.isOpen
         localStateRef.current = CLOSED_STATE

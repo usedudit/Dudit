@@ -261,7 +261,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                 <InfoCard
                     title="Saúde dos Preços"
                     color={pricingMeta.counts.loss > 0 ? "red" : "orange"}
-                    message={`${pricingMeta.counts.loss} produto(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% — metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
+                    message={`${pricingMeta.counts.loss} produto(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% - metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
                 />
             )}
             {pricingAlerts.map((a) => {
@@ -316,7 +316,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                             <div>
                                 <span className="text-brand-inactive-text block">Margem</span>
                                 <span className={`font-bold ${isLoss ? "text-brand-red" : "text-brand-orange"}`}>
-                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "—"}
+                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "-"}
                                 </span>
                             </div>
                         </div>

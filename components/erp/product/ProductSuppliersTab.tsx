@@ -304,7 +304,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         }
     }, [])
 
-    // Lista leve (1 query) — os detalhes de compras/custos são carregados
+    // Lista leve (1 query) - os detalhes de compras/custos são carregados
     // sob demanda dentro da sheet, evitando um fetch pesado ao montar a aba.
     const loadSuppliers = useCallback(async () => {
         if (!productId) return

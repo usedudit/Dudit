@@ -822,7 +822,7 @@ export async function duplicateServiceAction(serviceId: string) {
 }
 
 // ============================================================================
-// SUGESTÕES & OPORTUNIDADES — PRECIFICAÇÃO DE SERVIÇOS
+// SUGESTÕES & OPORTUNIDADES - PRECIFICAÇÃO DE SERVIÇOS
 // ============================================================================
 
 export interface ServicePricingAlert {

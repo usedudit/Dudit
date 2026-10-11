@@ -521,8 +521,8 @@ const Header: React.FC<HeaderProps> = ({
     const showOverlay = isSearchInputFocused || isUserMenuOpen
 
     // z-index dinâmico: a busca mobile em tela cheia abre acima de tudo que já estava aberto.
-    // (o backdrop z-[90] fica de propósito ATRÁS do <header> z-[100] — ele escurece a página
-    // enquanto o dropdown de busca/menu está aberto — por isso não recebe z-index dinâmico)
+    // (o backdrop z-[90] fica de propósito ATRÁS do <header> z-[100] - ele escurece a página
+    // enquanto o dropdown de busca/menu está aberto - por isso não recebe z-index dinâmico)
     const zIndex = useModalLayer(isMobileSearchOpen)
 
     useEffect(() => {

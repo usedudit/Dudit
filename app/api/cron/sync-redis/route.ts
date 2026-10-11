@@ -96,7 +96,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-
     const supabase = getAdminClient()
     
     // Buscar itens modificados recentemente dos 3 tipos
@@ -112,10 +111,27 @@ export async function GET(req: Request) {
       ...(partRes.data || []).map((i: any) => ({ ...i, type: 'loja' as const }))
     ]
 
+    // Fast-exit: se nenhum item do banco foi modificado na última hora,
+    // não há necessidade de chamar ZRANGE ou MGET no Redis (economiza 100% dos comandos quando ocioso).
+    const oneHourAgo = Date.now() - 60 * 60 * 1000
+    const hasRecentActivity = recentItems.some(i => i.updated_at && new Date(i.updated_at).getTime() > oneHourAgo)
+    const url = new URL(req.url)
+    const shouldAuditOrphans = url.searchParams.get('audit') === 'true'
+
+    if (!hasRecentActivity && !shouldAuditOrphans) {
+      return NextResponse.json({
+        status: 'idle',
+        synced: 0,
+        missed: 0,
+        message: 'No items modified in Postgres in the last hour. Skipped Redis reconciliation.',
+        elapsedMs: Date.now() - start
+      })
+    }
+
     let synced = 0
     let missed = 0
 
-    if (recentItems.length > 0) {
+    if (recentItems.length > 0 && hasRecentActivity) {
       // 1. O(N) memory reconciliation via MGET das chaves do objeto para validar stale data
       // O PIPELINE apenas dizia se existia, o MGET traz os JSONs para comparar updated_at
       const keys = recentItems.map(item => getExploreRedisDataKey(item.type, item.id))
@@ -159,7 +175,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const orphanReconciliation = await reconcileOrphanedExploreIndex()
+    const orphanReconciliation = shouldAuditOrphans ? await reconcileOrphanedExploreIndex() : null
 
     const elapsed = Date.now() - start
     return NextResponse.json({

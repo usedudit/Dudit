@@ -32,7 +32,7 @@ O **status de pagamento** indica se o dinheiro já foi recebido pelo vendedor:
 | :--- | :--- |
 | **Pago** | O pagamento foi confirmado. O pedido seguirá para a fase de preparo e entrega. |
 | **Pendente** | O pagamento está aguardando confirmação (Pix, boleto em processamento ou aprovação de parcelamento). |
-| **Cancelado** | O pedido foi cancelado — por você ou pelo vendedor. |
+| **Cancelado** | O pedido foi cancelado - por você ou pelo vendedor. |
 
 ## Status de entrega
 
@@ -155,7 +155,7 @@ Na tela de detalhes, use os botões **Anterior** e **Próximo** para navegar ent
 - O botão só aparece quando o status de entrega permite (Enviado, A caminho, Pronto para retirada). Aguarde a atualização do status.
 
 **O pedido aparece como Entregue mas não chegou**
-- Aguarde alguns minutos — o vendedor pode ter atualizado antecipado.
+- Aguarde alguns minutos - o vendedor pode ter atualizado antecipado.
 - Verifique com familiares ou vizinhos se alguém recebeu.
 - Abra um contato com o vendedor pelo WhatsApp ou entre em contato conosco.
 
@@ -171,7 +171,7 @@ A listagem mostra **10 pedidos por página**, com navegação simples entre as p
 Nesta versão, a filtragem é por status (abas). A busca por número também é disponibilizada.
 
 **O pedido cancelado some da lista?**
-Não — pedidos cancelados continuam visíveis na aba **Todos** com status Cancelado, para sua conexão ter histórico completo.
+Não - pedidos cancelados continuam visíveis na aba **Todos** com status Cancelado, para sua conexão ter histórico completo.
 
 **Preciso confirmar recebimento se a entrega foi feita?**
 Sim, confirmar garante que sua avaliação e eventuais trocas/devoluções funcionem corretamente. O sistema também tenta detectar a entrega automaticamente quando possível.

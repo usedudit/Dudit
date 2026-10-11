@@ -25,6 +25,7 @@ import {
   SUPERFRETE_SERVICE_IDS,
   DEFAULT_SUPERFRETE_EVENTS,
   SERVICE_LABELS,
+  buildCarrierTrackingUrl,
 } from "@/lib/services/shipping/superfrete"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
@@ -365,7 +366,7 @@ async function setupSuperFreteWebhookInternal(
       })
     } else {
       // Sem secret armazenado: (re)criar o webhook para capturar o
-      // secret_token retornado pela API — sem ele a rota de eventos
+      // secret_token retornado pela API - sem ele a rota de eventos
       // rejeita todas as notificações (401).
       if (existing) {
         try {
@@ -527,6 +528,7 @@ export async function generateSuperFreteLabelAction(payload: {
       external_label_id: order.id,
       price: typeof order.price === "number" ? order.price : null,
       tracking_number: order.tracking || null,
+      tracking_url: buildCarrierTrackingUrl(serviceId, order.tracking),
       label_url: order.print?.url || null,
       requested_at: new Date().toISOString(),
       payload: { service: payload.service, service_id: serviceId, response_status: order.status },
@@ -561,7 +563,7 @@ async function simulateSandboxCheckout(params: {
   result: { tracking?: string; trackingUrl?: string; printUrl?: string; status: string; simulated: boolean }
 }> {
   console.warn(
-    `[SuperFrete] SANDBOX SIMULATION — pagamento pulado (${params.reason}). label=${params.labelId} partner=${params.partnerId}`,
+    `[SuperFrete] SANDBOX SIMULATION - pagamento pulado (${params.reason}). label=${params.labelId} partner=${params.partnerId}`,
   )
 
   let printUrl: string | undefined
@@ -653,15 +655,15 @@ export async function checkoutSuperFreteLabelAction(payload: {
 
 type PerformCheckoutResult =
   | {
-      success: true
-      result: {
-        tracking?: string
-        trackingUrl?: string
-        printUrl?: string
-        status: string
-        simulated?: boolean
-      }
+    success: true
+    result: {
+      tracking?: string
+      trackingUrl?: string
+      printUrl?: string
+      status: string
+      simulated?: boolean
     }
+  }
   | { success: false; error: string }
 
 // Núcleo de pagamento de etiqueta (ida e devolução): checa saldo,
@@ -679,20 +681,22 @@ async function performLabelCheckout(
     // Preço vem do banco (order_shipments.price); saldo pode ter sido
     // buscado antes (em paralelo com a criação da etiqueta).
     let sandboxSkipReason: string | null = null
+    let shipmentServiceCode: string | null = null
     try {
       const [{ data: shipmentRow }, balanceRes] = await Promise.all([
         supabase
           .from("order_shipments")
-          .select("price")
+          .select("price, service_code")
           .eq("partner_id", partnerId)
           .eq("external_label_id", labelId)
           .maybeSingle(),
         balancePromise ??
-          client.getUserInfo().then(
-            (userInfo: any) => ({ userInfo, error: null as unknown }),
-            (error: unknown) => ({ userInfo: undefined, error }),
-          ),
+        client.getUserInfo().then(
+          (userInfo: any) => ({ userInfo, error: null as unknown }),
+          (error: unknown) => ({ userInfo: undefined, error }),
+        ),
       ])
+      shipmentServiceCode = (shipmentRow?.service_code as string | null) ?? null
       if (balanceRes.error) {
         console.warn("[SuperFrete] Balance pre-check failed (continuing):", balanceRes.error)
       } else {
@@ -747,7 +751,10 @@ async function performLabelCheckout(
     }
 
     const trackingUrl = orderData.tracking
-      ? `https://rastreio.superfrete.com/#/tracking/${orderData.tracking}`
+      ? buildCarrierTrackingUrl(
+          Number(orderData.service_id ?? shipmentServiceCode) || undefined,
+          orderData.tracking,
+        ) || undefined
       : undefined
 
     await supabase
@@ -844,7 +851,7 @@ async function syncReturnRequestAfterPayment(
         entityType: "return_request",
         entityId: returnRequest.id,
         actionType: "return_status_updated",
-        changeLines: ["Etiqueta de devolução paga — aguardando o envio do item pelo cliente."],
+        changeLines: ["Etiqueta de devolução paga - aguardando o envio do item pelo cliente."],
         source: "system",
         metadata: { from_status: "APPROVED", to_status: "WAITING_ITEM_RETURN", shipment_id: shipmentRow.id },
       })
@@ -874,7 +881,7 @@ async function syncReturnRequestAfterPayment(
       const { error: insertErr } = await supabase.from("transactions").insert({
         partner_id: partnerId,
         store_id: orderRow?.store_id || null,
-        description: `Frete de devolução — Pedido ${orderRow?.order_number || shipmentRow.order_id}`.trim(),
+        description: `Frete de devolução - Pedido ${orderRow?.order_number || shipmentRow.order_id}`.trim(),
         category: "Trocas e Devoluções",
         transaction_type: "expense",
         amount: price,
@@ -1313,14 +1320,14 @@ async function resolveDestinationAddress(
 
   const parsed = row
     ? {
-        address: row.street || "",
-        number: row.number || undefined,
-        complement: row.complement || undefined,
-        district: row.neighborhood || "",
-        city: row.city || "",
-        state_abbr: (row.state || "").toUpperCase(),
-        postal_code: (row.zip_code || "").replace(/\D/g, ""),
-      }
+      address: row.street || "",
+      number: row.number || undefined,
+      complement: row.complement || undefined,
+      district: row.neighborhood || "",
+      city: row.city || "",
+      state_abbr: (row.state || "").toUpperCase(),
+      postal_code: (row.zip_code || "").replace(/\D/g, ""),
+    }
     : parseDeliveryAddressString(order.delivery_address || "")
 
   if (!parsed || !parsed.address || !parsed.city || !parsed.state_abbr || !parsed.postal_code) {
@@ -1553,7 +1560,7 @@ export async function createOrderShippingLabelAction(payload: {
     if (!client) return { success: false, error: "SuperFrete não conectado." }
 
     // Tudo em paralelo: checagem de saldo + origem + destino. Em sandbox a
-    // checagem de saldo é dispensável (nunca bloqueia) — pula 1 roundtrip.
+    // checagem de saldo é dispensável (nunca bloqueia) - pula 1 roundtrip.
     const balancePromise = isSuperFreteSandboxIntegration(integration)
       ? Promise.resolve(undefined)
       : client.getUserInfo().catch(() => undefined)
@@ -1636,6 +1643,7 @@ export async function createOrderShippingLabelAction(payload: {
       external_label_id: label.id,
       price: typeof label.price === "number" ? label.price : null,
       tracking_number: label.tracking || null,
+      tracking_url: buildCarrierTrackingUrl(serviceId, label.tracking),
       label_url: label.print?.url || null,
       requested_at: new Date().toISOString(),
       payload: { service: requestedService, service_id: serviceId, response_status: label.status },
@@ -1669,7 +1677,7 @@ export async function createOrderShippingLabelAction(payload: {
 
 // Estado dos botões de etiqueta (Rastrear/Imprimir/Gerar) em UMA action:
 // uma única cadeia de auth, consultas em paralelo e SEM chamada remota ao
-// SuperFrete — o saldo é carregado à parte (getSuperFreteBalanceAction).
+// SuperFrete - o saldo é carregado à parte (getSuperFreteBalanceAction).
 export async function getOrderCarrierLabelStateAction(payload: { orderId: string }): Promise<{
   success: true
   connected: boolean
@@ -1716,7 +1724,7 @@ export async function getOrderCarrierLabelStateAction(payload: { orderId: string
   }
 }
 
-// Saldo da carteira SuperFrete (chamada remota) — carregar em background,
+// Saldo da carteira SuperFrete (chamada remota) - carregar em background,
 // nunca bloquear a exibição dos botões de etiqueta.
 export async function getSuperFreteBalanceAction(): Promise<{
   success: true
@@ -1957,22 +1965,22 @@ export async function getReturnShippingStateAction(payload: {
 type ReturnQuotePrepared =
   | { error: string }
   | {
-      data: {
-        context: {
-          integration: any
-          partner: any
-          order: any
-          config: any
-          supabase: ReturnType<typeof getAdminClient>
-        }
-        buyerAddress: ResolvedShippingAddress
-        storeAddress: ResolvedShippingAddress
-        client: SuperFreteClient
-        validQuotes: any[]
-        fromPostalCode: string
-        toPostalCode: string
+    data: {
+      context: {
+        integration: any
+        partner: any
+        order: any
+        config: any
+        supabase: ReturnType<typeof getAdminClient>
       }
+      buyerAddress: ResolvedShippingAddress
+      storeAddress: ResolvedShippingAddress
+      client: SuperFreteClient
+      validQuotes: any[]
+      fromPostalCode: string
+      toPostalCode: string
     }
+  }
 
 async function prepareReturnShipmentQuote(
   partnerId: string,
@@ -1983,7 +1991,7 @@ async function prepareReturnShipmentQuote(
   if ("error" in context && context.error) return { error: (context as any).error }
   const { integration, partner, order, config, supabase } = context as any
 
-  // Reverse route: buyer (from) -> store (to) — resolvidos em paralelo.
+  // Reverse route: buyer (from) -> store (to) - resolvidos em paralelo.
   const [buyerAddress, storeAddress] = await Promise.all([
     resolveDestinationAddress(supabase, order),
     resolveOriginAddress(supabase, order, partner, partnerId),
@@ -2014,7 +2022,7 @@ async function prepareReturnShipmentQuote(
       : ([1, 2] as SuperFreteServiceId[])
 
   // Modal já cotou ao abrir (getReturnShippingQuotesAction): quando o serviço
-  // vem escolhido, pula a cotação — 1 chamada de API a menos no clique.
+  // vem escolhido, pula a cotação - 1 chamada de API a menos no clique.
   if (opts?.skipFreightQuote) {
     return {
       data: {
@@ -2068,9 +2076,9 @@ export async function getReturnShippingQuotesAction(payload: {
   returnRequestId: string
 }): Promise<
   | {
-      success: true
-      quotes: { id: number; label: string; price: number; deliveryDays: number | null }[]
-    }
+    success: true
+    quotes: { id: number; label: string; price: number; deliveryDays: number | null }[]
+  }
   | { success: false; error: string }
 > {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -2119,19 +2127,19 @@ export async function createReturnShippingLabelAction(payload: {
   freightPayer?: ReturnShippingPayer
 }): Promise<
   | {
-      success: true
-      label: {
-        id: string
-        price: number
-        status: string
-        serviceId: number
-        tracking: string | null
-        labelUrl: string | null
-      }
-      paid: boolean
-      paymentError?: string
-      simulated?: boolean
+    success: true
+    label: {
+      id: string
+      price: number
+      status: string
+      serviceId: number
+      tracking: string | null
+      labelUrl: string | null
     }
+    paid: boolean
+    paymentError?: string
+    simulated?: boolean
+  }
   | { success: false; error: string }
 > {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -2209,8 +2217,8 @@ export async function createReturnShippingLabelAction(payload: {
     // usado por syncReturnRequestAfterPayment após o pagamento).
     const freightPayer: ReturnShippingPayer | null =
       payload.freightPayer === "seller" ||
-      payload.freightPayer === "customer" ||
-      payload.freightPayer === "case_by_case"
+        payload.freightPayer === "customer" ||
+        payload.freightPayer === "case_by_case"
         ? payload.freightPayer
         : null
     await Promise.all([
@@ -2228,6 +2236,7 @@ export async function createReturnShippingLabelAction(payload: {
         external_label_id: label.id,
         price: typeof label.price === "number" ? label.price : null,
         tracking_number: label.tracking || null,
+        tracking_url: buildCarrierTrackingUrl(labelServiceId, label.tracking),
         label_url: label.print?.url || null,
         requested_at: new Date().toISOString(),
         payload: {

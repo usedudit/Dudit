@@ -335,13 +335,13 @@ function DreA4TableRow({
         </td>
 
         <td className="py-2 px-4 text-right text-[11px] font-semibold text-gray-700">
-          {node.verticalPercent > 0 ? `${node.verticalPercent}%` : "—"}
+          {node.verticalPercent > 0 ? `${node.verticalPercent}%` : "-"}
         </td>
 
         {showComparison && (
           <>
             <td className="py-2 px-4 text-right text-[11px] text-gray-400">
-              {node.previousAmount !== undefined ? formatCurrency(node.previousAmount) : "—"}
+              {node.previousAmount !== undefined ? formatCurrency(node.previousAmount) : "-"}
             </td>
             <td className="py-2 pl-4 pr-6 text-right text-[11px]">
               <VariationBadgeA4 value={node.horizontalVariation} type={node.type} />
@@ -364,12 +364,12 @@ function DreA4TableRow({
               {formatCurrency(item.amount)}
             </td>
             <td className="py-1.5 px-4 text-right text-gray-500">
-              {item.verticalPercent > 0 ? `${item.verticalPercent}%` : "—"}
+              {item.verticalPercent > 0 ? `${item.verticalPercent}%` : "-"}
             </td>
             {showComparison && (
               <>
                 <td className="py-1.5 px-4 text-right text-gray-400">
-                  {item.previousAmount !== undefined ? formatCurrency(item.previousAmount) : "—"}
+                  {item.previousAmount !== undefined ? formatCurrency(item.previousAmount) : "-"}
                 </td>
                 <td className="py-1.5 pl-4 pr-6 text-right">
                   <VariationBadgeA4 value={item.horizontalVariation} type={node.type} />
@@ -389,7 +389,7 @@ function VariationBadgeA4({
   value?: number
   type: "income" | "expense" | "subtotal" | "result"
 }) {
-  if (value === undefined) return <span className="text-gray-400">—</span>
+  if (value === undefined) return <span className="text-gray-400">-</span>
   if (value === 0) return <span className="text-gray-400">0%</span>
 
   const isPositive = value > 0

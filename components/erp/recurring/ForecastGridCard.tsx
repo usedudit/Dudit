@@ -64,7 +64,7 @@ export const ForecastGridCard: React.FC<ForecastGridCardProps> = ({ row, canMana
           <div className="text-xs text-brand-primary font-medium mt-0.5 truncate">
             {row.frequencyType
               ? `Recorrência: ${getRecurringFrequencyLabel(row.frequencyType as any, Number(row.frequencyInterval || 1))}`
-              : "Recorrência —"}
+              : "Recorrência -"}
           </div>
         </div>
       </div>

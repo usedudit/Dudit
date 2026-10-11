@@ -612,7 +612,7 @@ export function generateAppointmentsInsights(input: AppointmentsInsightInput): I
     if (noShowPct > 10) {
       insights.push({
         id: "appt-noshow-high",
-        message: `${noShowPct}% de ausências — considere confirmação automática por WhatsApp.`,
+        message: `${noShowPct}% de ausências - considere confirmação automática por WhatsApp.`,
         tone: "warning",
         category: "Agendamentos",
         priority: 1,
@@ -623,7 +623,7 @@ export function generateAppointmentsInsights(input: AppointmentsInsightInput): I
   if (input.repeatCustomerRate > 50) {
     insights.push({
       id: "appt-repeat-high",
-      message: `${Math.round(input.repeatCustomerRate)}% dos clientes são recorrentes — excelente fidelização.`,
+      message: `${Math.round(input.repeatCustomerRate)}% dos clientes são recorrentes - excelente fidelização.`,
       tone: "positive",
       category: "Agendamentos",
       priority: 2,

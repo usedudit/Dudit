@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Allow both "pending" and "partially_paid" (deposit-only flow): a partially_paid
     // order still has a remaining balance that can be charged via retry-payment.
-    // Also allow "payment_failed" (card rejection recovery — can only recover via PIX).
+    // Also allow "payment_failed" (card rejection recovery - can only recover via PIX).
     if (order.situation !== "pending" && order.situation !== "partially_paid" && order.situation !== "payment_failed") {
       return NextResponse.json(
         { error: "Este pedido não está com pagamento pendente" },
@@ -95,33 +95,33 @@ export async function POST(request: NextRequest) {
     // Check if deposit is expired and auto-cancel is enabled
     const depositSummary = getOrderDepositSummary(order)
     if (depositSummary.usesDeposit && depositSummary.depositStatus === "expired" && depositSummary.paidAmount <= 0.009) {
-        let shouldCancel = false
-        try {
-            const settingsResult = await getSalesSettingsAction(order.partner_id || "")
-            if (settingsResult.success && settingsResult.data?.cancelExpiredDepositOrders) {
-                shouldCancel = true
-            }
-        } catch (_) {
-            // If settings check fails, proceed normally
+      let shouldCancel = false
+      try {
+        const settingsResult = await getSalesSettingsAction(order.partner_id || "")
+        if (settingsResult.success && settingsResult.data?.cancelExpiredDepositOrders) {
+          shouldCancel = true
         }
+      } catch (_) {
+        // If settings check fails, proceed normally
+      }
 
-        if (shouldCancel) {
-            await adminClient
-                .from("orders")
-            .update({
-                    situation: "cancelled",
-                    cancelled_at: new Date().toISOString(),
-                    notes: "Pedido cancelado automaticamente: sinal de entrada expirado sem pagamento.",
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", orderId)
+      if (shouldCancel) {
+        await adminClient
+          .from("orders")
+          .update({
+            situation: "cancelled",
+            cancelled_at: new Date().toISOString(),
+            notes: "Pedido cancelado automaticamente: sinal de entrada expirado sem pagamento.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orderId)
 
-            return NextResponse.json({
-                success: false,
-                error: "Este pedido foi cancelado automaticamente porque o sinal expirou sem pagamento. Entre em contato com a loja.",
-                cancelled: true,
-            }, { status: 410 })
-        }
+        return NextResponse.json({
+          success: false,
+          error: "Este pedido foi cancelado automaticamente porque o sinal expirou sem pagamento. Entre em contato com a loja.",
+          cancelled: true,
+        }, { status: 410 })
+      }
     }
 
     const totalAmount = Number(order.total_amount || 0)
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           const fetched = await mpResponse.json()
           if (fetched.status === "approved") {
             // The existing MP payment is approved. Determine if the order is
-            // FULLY paid (not just the deposit) — when the deposit was already
+            // FULLY paid (not just the deposit) - when the deposit was already
             // synced (paidAmount > 0) the mp_payment_id is the deposit payment,
             // so we must NOT treat it as fully paid. Only mark paid when either:
             //  1. Nothing is paid yet and the MP payment covers the full total,
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
             //     but defensive).
             const mpTransactionAmount = Number(fetched.transaction_amount || 0)
             if (paidAmount <= 0.009) {
-              // No payments recorded yet on the order — the MP payment should
+              // No payments recorded yet on the order - the MP payment should
               // be the full amount. Sync it to "paid".
               await adminClient
                 .from("orders")
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
                 .eq("id", order.id)
               return NextResponse.json({ success: true, alreadyPaid: true })
             }
-            // paidAmount > 0 (e.g. deposit already synced) — the existing MP
+            // paidAmount > 0 (e.g. deposit already synced) - the existing MP
             // payment was the deposit. Fall through to create a NEW Pix for the
             // remaining balance (computed as chargeAmount above).
             SecureLogger.info("Order partially paid via approved MP payment, generating remaining balance charge", {
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
         let errText = ""
         try {
           errText = await createResponse.text()
-        } catch (_) {}
+        } catch (_) { }
         SecureLogger.error("Failed to create MP Pix payment in retry-payment", {
           status: createResponse.status,
           error: errText,
@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
         .update({
           payment_provider: "Mercado Pago",
           mp_payment_id: paymentData.id.toString(),
-           situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "payment_failed" : "pending")),
+          situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "payment_failed" : "pending")),
           payment_expires_at: paymentData.date_of_expiration,
           updated_at: new Date().toISOString(),
         })

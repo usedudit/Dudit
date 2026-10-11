@@ -518,7 +518,7 @@ export function CheckoutPageClient() {
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
 
-    // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
+    // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
     const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
@@ -543,11 +543,11 @@ export function CheckoutPageClient() {
     }, [destinationCep])
 
     // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
-    // este efeito esperava o erro "raio" — serializando frete próprio
+    // este efeito esperava o erro "raio" - serializando frete próprio
     // (geocoding) + SuperFrete + uma segunda rodada de totais em 10-15s.
     // Agora as opções chegam junto com o "raio", tornando a seleção imediata.
     // NOTE: the dedupe key lives in a ref (not state) so this effect never
-    // re-runs on its own updates — otherwise the cleanup below would cancel
+    // re-runs on its own updates - otherwise the cleanup below would cancel
     // the in-flight request and discard its results.
     useEffect(() => {
         if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep || !partnerInfo.mpConnected) return
@@ -608,7 +608,7 @@ export function CheckoutPageClient() {
 
     // Apply carrier options once own delivery reports no coverage ("raio").
     // Runs independently of the fetch effect so it works whether the options
-    // arrive before or after the "raio" error — no visible gap/flash.
+    // arrive before or after the "raio" error - no visible gap/flash.
     useEffect(() => {
         if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
         if (carrierQuoteLoading) return
@@ -723,12 +723,12 @@ export function CheckoutPageClient() {
     const raioNoCoverage = Boolean(deliveryError && deliveryError.toLowerCase().includes("raio"))
     const carrierCheckoutEngaged = carrierDeliveryActive || raioNoCoverage
     // Enquanto "fora do raio" aguarda a cotação da transportadora, esconde o
-    // erro (sem flash) — a seção de transportadora mostra o estado de cálculo.
+    // erro (sem flash) - a seção de transportadora mostra o estado de cálculo.
     const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
     const displayDeliveryError = raioNoCoverage && carrierResolving ? null : deliveryError
     useEffect(() => {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
-            // Só força o modo manual quando nada foi escolhido ainda — nunca
+            // Só força o modo manual quando nada foi escolhido ainda - nunca
             // sobrescrever uma seleção explícita (ex.: créditos de assinatura).
             // Com entrega por transportadora ativa, o pagamento é online (MP).
             if (paymentOption === null && !carrierCheckoutEngaged) setPaymentOption("traditional")
@@ -740,10 +740,10 @@ export function CheckoutPageClient() {
     }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline, checkoutContext?.partner?.orderFlow, carrierCheckoutEngaged])
 
     // Entrega por transportadora (SuperFrete) deve ser paga online via Mercado Pago
-    // — em qualquer fluxo (inclusive WhatsApp, onde sem transportadora o pedido
+    // - em qualquer fluxo (inclusive WhatsApp, onde sem transportadora o pedido
     // continua fechado no chat com pagamento manual). O corte de cotação já exige
     // mpConnected. "Engaged" cobre também o período em que o frete próprio ainda
-    // não retornou (raio) — assim os métodos manuais não piscam antes do cálculo.
+    // não retornou (raio) - assim os métodos manuais não piscam antes do cálculo.
     useEffect(() => {
         if (carrierCheckoutEngaged) {
             if (paymentOption === "traditional" || paymentOption === null) {
@@ -761,7 +761,7 @@ export function CheckoutPageClient() {
         }
     }, [carrierCheckoutEngaged, paymentOption, isWhatsappFlow, selectedCarrierServiceId, requirements?.hasSubscriptionLines])
 
-    // Assinatura: o pagamento é recorrente pelo Mercado Pago — deixa o MP já
+    // Assinatura: o pagamento é recorrente pelo Mercado Pago - deixa o MP já
     // selecionado para o comprador não precisar escolher a forma de pagamento.
     const mpOptionAvailable = Boolean(partnerInfo.mpConnected) && (!isWhatsappFlow || carrierCheckoutEngaged)
     useEffect(() => {
@@ -1038,7 +1038,7 @@ export function CheckoutPageClient() {
     }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal, showDeliveryFeeRow, isPickup, deliveryFee, hasFreeDeliveryCoupon])
     const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0)
     // Frete exibido no resumo: para carrinho só de assinatura a cotação
-    // client-side não existe (a política vem do plano) — usa o total do servidor.
+    // client-side não existe (a política vem do plano) - usa o total do servidor.
     const subscriptionOnlyCart = Boolean(requirements?.hasSubscriptionLines) && !requirements?.hasProductLines && !requirements?.hasServiceLines
     const summaryDeliveryFee = subscriptionOnlyCart ? (checkoutAmounts?.deliveryFee ?? deliveryFee) : deliveryFee
     // Carrinho com assinatura: assinaturas recorrentes só aceitam cartão de
@@ -1121,7 +1121,7 @@ export function CheckoutPageClient() {
         requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
     )))
-    // Entrega por transportadora exige pagamento online (Mercado Pago) — oculta a
+    // Entrega por transportadora exige pagamento online (Mercado Pago) - oculta a
     // opção manual em qualquer fluxo enquanto a transportadora estiver ativa.
     const showManualPaymentOption = showTraditionalPaymentOption && !carrierCheckoutEngaged
 
@@ -2427,7 +2427,7 @@ export function CheckoutPageClient() {
         }
 
         try {
-            // Fluxo WhatsApp só fecha o pedido no chat quando o pagamento é manual —
+            // Fluxo WhatsApp só fecha o pedido no chat quando o pagamento é manual -
             // com Mercado Pago (ex.: entrega por transportadora) segue o fluxo normal
             // de preferência/pagamento online.
             if (isWhatsappFlow && paymentOption !== "mercadopago") {
@@ -4480,7 +4480,7 @@ export function CheckoutPageClient() {
                         const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
                         const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
                         // Entrega por transportadora exige Mercado Pago (sem tab
-                        // manual) em qualquer fluxo — incluindo enquanto o frete
+                        // manual) em qualquer fluxo - incluindo enquanto o frete
                         // próprio ainda reporta "fora do raio" (engaged). Sem
                         // transportadora, o fluxo WhatsApp fica apenas com o
                         // pagamento manual.
@@ -4513,7 +4513,7 @@ export function CheckoutPageClient() {
                         return (
                             <Tabs defaultValue={paymentOption || (hasSubscriptionCreditsForCheckout ? "subscription_credits" : showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => {
                                 setPaymentOption(val as "traditional" | "mercadopago" | "subscription_credits")
-                                // Mantém formData.paymentMethod consistente com a tab ativa —
+                                // Mantém formData.paymentMethod consistente com a tab ativa -
                                 // evita preview de pagamento com "mercadopago" em modo tradicional.
                                 setFormData(prev => {
                                     if (val === "mercadopago") return { ...prev, paymentMethod: "mercadopago", installments: 1 }

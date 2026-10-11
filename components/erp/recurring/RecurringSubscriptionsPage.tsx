@@ -457,10 +457,10 @@ export default function RecurringSubscriptionsPage({
       const rawPlan = item.plan
       const plan = rawPlan
         ? {
-            ...rawPlan,
-            frequencyType: rawPlan.frequencyType ?? rawPlan.frequency_type,
-            frequencyInterval: rawPlan.frequencyInterval ?? rawPlan.frequency_interval,
-          }
+          ...rawPlan,
+          frequencyType: rawPlan.frequencyType ?? rawPlan.frequency_type,
+          frequencyInterval: rawPlan.frequencyInterval ?? rawPlan.frequency_interval,
+        }
         : null
       return {
         ...item,
@@ -644,7 +644,7 @@ export default function RecurringSubscriptionsPage({
     return () => window.removeEventListener("resize", checkScroll)
   }, [checkScroll, viewMode, rawSubscriptions, currentTab])
 
-  // Filtro local (status + busca + filtros da seção) sobre o cache — igual às outras páginas do ERP
+  // Filtro local (status + busca + filtros da seção) sobre o cache - igual às outras páginas do ERP
   const filteredSubscriptions = useMemo(() => {
     const term = debouncedSearch.toLowerCase()
     return (rawSubscriptions || []).filter((sub: any) => {
@@ -763,23 +763,23 @@ export default function RecurringSubscriptionsPage({
     setConfirmDialog(
       action === "pause"
         ? {
-            title: "Pausar assinatura?",
-            message:
-              "As próximas execuções ficam suspensas até você reativar. Nenhuma nova cobrança será feita nesse período.",
-            confirmText: "Pausar assinatura",
-            cancelText: "Voltar",
-            variant: "warning",
-            onConfirm: then,
-          }
+          title: "Pausar assinatura?",
+          message:
+            "As próximas execuções ficam suspensas até você reativar. Nenhuma nova cobrança será feita nesse período.",
+          confirmText: "Pausar assinatura",
+          cancelText: "Voltar",
+          variant: "warning",
+          onConfirm: then,
+        }
         : {
-            title: "Cancelar assinatura?",
-            message:
-              "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
-            confirmText: "Cancelar assinatura",
-            cancelText: "Manter assinatura",
-            isDestructive: true,
-            onConfirm: then,
-          },
+          title: "Cancelar assinatura?",
+          message:
+            "As próximas cobranças e execuções serão interrompidas. Esta ação não pode ser desfeita.",
+          confirmText: "Cancelar assinatura",
+          cancelText: "Manter assinatura",
+          isDestructive: true,
+          onConfirm: then,
+        },
     )
   }
 
@@ -1431,13 +1431,13 @@ export default function RecurringSubscriptionsPage({
                           itemButton={
                             hasCreditsFilters || debouncedCreditsSearch
                               ? {
-                                  text: "Limpar filtros",
-                                  action: () => {
-                                    setCreditsSearch("")
-                                    setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
-                                  },
-                                  variant: "outline",
-                                }
+                                text: "Limpar filtros",
+                                action: () => {
+                                  setCreditsSearch("")
+                                  setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
+                                },
+                                variant: "outline",
+                              }
                               : undefined
                           }
                         />

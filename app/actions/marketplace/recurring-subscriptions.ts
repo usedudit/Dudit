@@ -569,143 +569,6 @@ export async function skipMySubscriptionCycleAction(subscriptionId: string) {
   }
 }
 
-export async function postponeMySubscriptionCycleAction(subscriptionId: string, days: number) {
-  try {
-    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
-    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
-
-    const user = await requireUser()
-    const admin = getAdminClient()
-
-    if (days <= 0 || days > 90) {
-      return { success: false, error: "Quantidade de dias inválida (máximo 90 dias)." }
-    }
-
-    const { data: sub } = await admin
-      .from("recurring_subscriptions")
-      .select(`
-        id, partner_id, next_execution_at, mp_preapproval_id,
-        customers!inner(user_id),
-        recurring_plans(frequency_type)
-      `)
-      .eq("id", subscriptionId)
-      .single()
-
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
-      return { success: false, error: "Assinatura não encontrada." }
-    }
-
-    // Ciclos longos não permitem adiar por dias (só pular ou antecipar).
-    const frequencyType = (sub as any)?.recurring_plans?.frequency_type
-    if (frequencyType === "monthly" || frequencyType === "yearly") {
-      return {
-        success: false,
-        error: "Planos mensais e anuais não permitem adiar o ciclo. Use pular ou antecipar.",
-      }
-    }
-
-    const currentNext = new Date(sub.next_execution_at)
-    currentNext.setDate(currentNext.getDate() + days)
-    const newNextStr = currentNext.toISOString()
-
-    if (sub.mp_preapproval_id) {
-      const { updateMpPreapprovalNextPaymentDate } = await import(
-        "@/lib/services/mercadopago/partner-preapproval"
-      )
-      await updateMpPreapprovalNextPaymentDate(sub.partner_id, sub.mp_preapproval_id, newNextStr)
-    }
-
-    const { data, error } = await admin
-      .from("recurring_subscriptions")
-      .update({
-        next_execution_at: newNextStr,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", subscriptionId)
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    await logAuditEvent({
-      partnerId: sub.partner_id,
-      actorUserId: user.id,
-      entityType: "recurring_subscription",
-      entityId: subscriptionId,
-      actionType: "updated",
-      changeLines: [`cliente adiou o ciclo por ${days} dias. Nova data: ${newNextStr.slice(0, 10)}.`],
-      source: "marketplace",
-    })
-
-    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
-  } catch (e: unknown) {
-    console.error("postponeMySubscriptionCycleAction error:", e)
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao adiar ciclo" }
-  }
-}
-
-export async function anticipateMySubscriptionCycleAction(subscriptionId: string) {
-  try {
-    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
-    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
-
-    const user = await requireUser()
-    const admin = getAdminClient()
-
-    const { data: sub } = await admin
-      .from("recurring_subscriptions")
-      .select(`
-        id, partner_id, next_execution_at, mp_preapproval_id,
-        customers!inner(user_id)
-      `)
-      .eq("id", subscriptionId)
-      .single()
-
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
-      return { success: false, error: "Assinatura não encontrada." }
-    }
-
-    // Anticipating executes today (or in 2 minutes to allow system batching)
-    const newNextStr = new Date(Date.now() + 2 * 60 * 1000).toISOString()
-
-    if (sub.mp_preapproval_id) {
-      const { updateMpPreapprovalNextPaymentDate } = await import(
-        "@/lib/services/mercadopago/partner-preapproval"
-      )
-      await updateMpPreapprovalNextPaymentDate(sub.partner_id, sub.mp_preapproval_id, newNextStr)
-    }
-
-    const { data, error } = await admin
-      .from("recurring_subscriptions")
-      .update({
-        next_execution_at: newNextStr,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", subscriptionId)
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    await logAuditEvent({
-      partnerId: sub.partner_id,
-      actorUserId: user.id,
-      entityType: "recurring_subscription",
-      entityId: subscriptionId,
-      actionType: "updated",
-      changeLines: [`cliente antecipou o ciclo para execução imediata.`],
-      source: "marketplace",
-    })
-
-    return { success: true, data: mapSubscriptionRow(data as Record<string, unknown>) }
-  } catch (e: unknown) {
-    console.error("anticipateMySubscriptionCycleAction error:", e)
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao antecipar ciclo" }
-  }
-}
-
 /**
  * Resolve the freight for a new delivery address against the plan's shipping
  * policy. Never called for repeated billing: freight is frozen at signup.
@@ -1396,7 +1259,7 @@ export async function bookServiceWithCreditAction(input: {
         discount_amount: 0,
         delivery_fee: 0,
         additional_costs: 0,
-        notes: `Agendamento com créditos da assinatura. ${input.notes || ""}`.trim(),
+        notes: sanitizeNotes(input.notes),
         payment_method: "Assinatura (Créditos)",
         payment_breakdown: [],
         recurring_subscription_id: subscriptionId,
@@ -1443,7 +1306,7 @@ export async function bookServiceWithCreditAction(input: {
         staff_name: staffName,
         price: 0,
         pricing_unit: "Por Serviço",
-        notes: ["Agendado com créditos da assinatura.", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        notes: sanitizeNotes(input.notes),
         status: "Reservado",
         source: "appointment",
         sales_channel: "online_storefront",

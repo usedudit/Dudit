@@ -1,6 +1,6 @@
 /**
  * Extracts an 8-digit Brazilian CEP from a free-form address string.
- * Pure helper — safe to import from client components.
+ * Pure helper - safe to import from client components.
  */
 export function extractPostalCodeFromAddress(address: string | null | undefined): string {
   const raw = (address || "").trim()

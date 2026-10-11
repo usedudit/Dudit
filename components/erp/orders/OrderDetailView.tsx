@@ -115,7 +115,7 @@ const getServiceScheduleInfo = (item: any, order: any) => {
     (line: any) =>
       line.itemType === "service_booking" &&
       line.bookingMetadata?.serviceName?.toLowerCase() ===
-        item.product_name?.toLowerCase(),
+      item.product_name?.toLowerCase(),
   );
   if (
     matchingLine?.bookingMetadata?.date &&
@@ -680,11 +680,11 @@ export default function OrderDetailView({
       ? order.payment_breakdown.filter((entry: any) => entry?.method)
       : Number(order.paid_amount || 0) > 0 && order.payment_method
         ? [
-            {
-              method: order.payment_method,
-              amount: Number(order.paid_amount || 0),
-            },
-          ]
+          {
+            method: order.payment_method,
+            amount: Number(order.paid_amount || 0),
+          },
+        ]
         : [];
   const itemCount = Number(order.order_items?.length || 0);
   const sortedOrderItems = [...(order.order_items || [])].sort(
@@ -723,63 +723,63 @@ export default function OrderDetailView({
   // a stale payment_method_extra_amount column (e.g. wrongly set to the sinal amount).
   const breakdownTotals = hasDetailedAmounts
     ? paymentBreakdown.reduce(
-        (acc: any, e: any) => {
-          const feeBearer = String(e?.feeBearer || "merchant")
-            .toLowerCase()
-            .trim();
-          const installmentFeeBearer = String(
-            e?.installmentFeeBearer || "merchant",
-          )
-            .toLowerCase()
-            .trim();
-          const isCustomerFeeBearer =
-            feeBearer === "customer" || feeBearer === "buyer";
-          const isCustomerInstallmentBearer =
-            installmentFeeBearer === "customer" ||
-            installmentFeeBearer === "buyer";
-          const entryInterest = Number(e.interestAmount || 0);
-          const entryInstallmentCost = Number(e.installmentCostAmount || 0);
-          const entryFixedInterest = Math.max(
-            0,
-            entryInterest - entryInstallmentCost,
-          );
-          const entryFee = Number(e.feeAmount || 0);
-          const entryFixedFee = Number(e.fixedFeeAmount || 0);
+      (acc: any, e: any) => {
+        const feeBearer = String(e?.feeBearer || "merchant")
+          .toLowerCase()
+          .trim();
+        const installmentFeeBearer = String(
+          e?.installmentFeeBearer || "merchant",
+        )
+          .toLowerCase()
+          .trim();
+        const isCustomerFeeBearer =
+          feeBearer === "customer" || feeBearer === "buyer";
+        const isCustomerInstallmentBearer =
+          installmentFeeBearer === "customer" ||
+          installmentFeeBearer === "buyer";
+        const entryInterest = Number(e.interestAmount || 0);
+        const entryInstallmentCost = Number(e.installmentCostAmount || 0);
+        const entryFixedInterest = Math.max(
+          0,
+          entryInterest - entryInstallmentCost,
+        );
+        const entryFee = Number(e.feeAmount || 0);
+        const entryFixedFee = Number(e.fixedFeeAmount || 0);
 
-          // Customer-visible portions
-          if (isCustomerFeeBearer) {
-            acc.customerInterest += entryFixedInterest;
-            acc.customerFee += entryFee;
-            acc.customerFixedFee += entryFixedFee;
-          } else {
-            acc.merchantInterest += entryFixedInterest;
-            acc.merchantFee += entryFee;
-            acc.merchantFixedFee += entryFixedFee;
-          }
-          if (isCustomerInstallmentBearer) {
-            acc.customerInterest += entryInstallmentCost;
-          } else {
-            acc.merchantInterest += entryInstallmentCost;
-          }
-          return acc;
-        },
-        {
-          customerInterest: 0,
-          merchantInterest: 0,
-          customerFee: 0,
-          merchantFee: 0,
-          customerFixedFee: 0,
-          merchantFixedFee: 0,
-        },
-      )
-    : {
+        // Customer-visible portions
+        if (isCustomerFeeBearer) {
+          acc.customerInterest += entryFixedInterest;
+          acc.customerFee += entryFee;
+          acc.customerFixedFee += entryFixedFee;
+        } else {
+          acc.merchantInterest += entryFixedInterest;
+          acc.merchantFee += entryFee;
+          acc.merchantFixedFee += entryFixedFee;
+        }
+        if (isCustomerInstallmentBearer) {
+          acc.customerInterest += entryInstallmentCost;
+        } else {
+          acc.merchantInterest += entryInstallmentCost;
+        }
+        return acc;
+      },
+      {
         customerInterest: 0,
         merchantInterest: 0,
         customerFee: 0,
         merchantFee: 0,
         customerFixedFee: 0,
         merchantFixedFee: 0,
-      };
+      },
+    )
+    : {
+      customerInterest: 0,
+      merchantInterest: 0,
+      customerFee: 0,
+      merchantFee: 0,
+      customerFixedFee: 0,
+      merchantFixedFee: 0,
+    };
   const customerVisibleFeeTotal =
     breakdownTotals.customerInterest +
     breakdownTotals.customerFee +
@@ -804,12 +804,12 @@ export default function OrderDetailView({
     Number(order.subtotal_value || 0) > 0
       ? Number(order.subtotal_value || 0)
       : Number(order.total_amount || 0) -
-        Number(order.delivery_fee || 0) -
-        Number(order.additional_costs || 0) +
-        Number(order.discount_value || 0) +
-        couponDiscountAmount +
-        paymentMethodDiscountAmount -
-        effectivePaymentMethodExtraAmount;
+      Number(order.delivery_fee || 0) -
+      Number(order.additional_costs || 0) +
+      Number(order.discount_value || 0) +
+      couponDiscountAmount +
+      paymentMethodDiscountAmount -
+      effectivePaymentMethodExtraAmount;
   const totalReceived = paymentBreakdown.reduce(
     (sum: number, e: any) => sum + Number(e?.amountReceived || 0),
     0,
@@ -818,16 +818,16 @@ export default function OrderDetailView({
     totalReceived > 0.005
       ? Math.max(0, totalReceived - Number(order.total_amount || 0))
       : Math.max(
-          0,
-          Number(order.paid_amount || 0) - Number(order.total_amount || 0),
-        );
+        0,
+        Number(order.paid_amount || 0) - Number(order.total_amount || 0),
+      );
   const cashEntry = Array.isArray(order.payment_breakdown)
     ? order.payment_breakdown.find((entry: any) => {
-        const m = String(entry?.method || "")
-          .toLowerCase()
-          .trim();
-        return m === "cash" || m === "dinheiro";
-      })
+      const m = String(entry?.method || "")
+        .toLowerCase()
+        .trim();
+      return m === "cash" || m === "dinheiro";
+    })
     : null;
   const wantsChange =
     cashEntry?.wantsChange ??
@@ -866,6 +866,7 @@ export default function OrderDetailView({
 
   const sourceServiceOrder = order.source_service_order || null;
   const sourceQuote = order.source_quote || null;
+  const sourceSubscriptionId = order.recurring_subscription_id || null;
 
   const getSourceSubtitle = () => {
     if (sourceServiceOrder) {
@@ -876,7 +877,7 @@ export default function OrderDetailView({
     }
     if (order.order_source === "Assinatura") {
       return order.payment_method === "Assinatura (Créditos)"
-        ? "Assinatura • Créditos — sem cobrança adicional"
+        ? "Assinatura • Créditos - sem cobrança adicional"
         : "Assinatura";
     }
     return normalizeOrderSource(order.order_source);
@@ -1274,6 +1275,13 @@ export default function OrderDetailView({
                                       >
                                         Orçamento {sourceQuote.quote_number}
                                       </a>
+                                    ) : sourceSubscriptionId ? (
+                                      <a
+                                        href={`/erp/recorrentes/assinaturas?view=${sourceSubscriptionId}`}
+                                        className="font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
+                                      >
+                                        Assinatura
+                                      </a>
                                     ) : (
                                       <strong className="text-brand-dark dark:text-dark-heading">
                                         {normalizeOrderSource(
@@ -1299,7 +1307,7 @@ export default function OrderDetailView({
                                   {timelineSteps.map((step, idx) => {
                                     const isLastFailed =
                                       order.delivery_status ===
-                                        "delivery_failed" &&
+                                      "delivery_failed" &&
                                       idx === timelineSteps.length - 1;
                                     return (
                                       <div
@@ -1363,9 +1371,9 @@ export default function OrderDetailView({
                                       <img
                                         src={getR2ImageUrl(
                                           item.image ||
-                                            item.products?.images ||
-                                            item.services?.images ||
-                                            null,
+                                          item.products?.images ||
+                                          item.services?.images ||
+                                          null,
                                           "thumbnail",
                                         )}
                                         className="w-full h-full object-cover rounded-xl"
@@ -1458,8 +1466,8 @@ export default function OrderDetailView({
                                                               {formatQuantityWithUnit(
                                                                 ret.quantity,
                                                                 ret.unit ||
-                                                                  item.products
-                                                                    ?.unit,
+                                                                item.products
+                                                                  ?.unit,
                                                               )}
                                                             </p>
                                                             <p>
@@ -1480,35 +1488,35 @@ export default function OrderDetailView({
                                                             </p>
                                                             {Number(
                                                               ret.refund_amount ||
-                                                                0,
+                                                              0,
                                                             ) > 0 && (
-                                                              <p>
-                                                                <strong>
-                                                                  Valor
-                                                                  reembolsado:
-                                                                </strong>{" "}
-                                                                {formatCurrency(
-                                                                  Number(
-                                                                    ret.refund_amount,
-                                                                  ),
-                                                                )}
-                                                              </p>
-                                                            )}
+                                                                <p>
+                                                                  <strong>
+                                                                    Valor
+                                                                    reembolsado:
+                                                                  </strong>{" "}
+                                                                  {formatCurrency(
+                                                                    Number(
+                                                                      ret.refund_amount,
+                                                                    ),
+                                                                  )}
+                                                                </p>
+                                                              )}
                                                             {Number(
                                                               ret.store_credit_amount ||
-                                                                0,
+                                                              0,
                                                             ) > 0 && (
-                                                              <p>
-                                                                <strong>
-                                                                  Vale-compra:
-                                                                </strong>{" "}
-                                                                {formatCurrency(
-                                                                  Number(
-                                                                    ret.store_credit_amount,
-                                                                  ),
-                                                                )}
-                                                              </p>
-                                                            )}
+                                                                <p>
+                                                                  <strong>
+                                                                    Vale-compra:
+                                                                  </strong>{" "}
+                                                                  {formatCurrency(
+                                                                    Number(
+                                                                      ret.store_credit_amount,
+                                                                    ),
+                                                                  )}
+                                                                </p>
+                                                              )}
                                                           </div>
                                                         </div>
                                                       );
@@ -1561,8 +1569,8 @@ export default function OrderDetailView({
                                                   <span className="text-xs text-brand-inactive-text line-through font-normal">
                                                     {formatCurrency(
                                                       item.subtotal ||
-                                                        basePrice *
-                                                          item.quantity,
+                                                      basePrice *
+                                                      item.quantity,
                                                     )}
                                                   </span>
                                                   <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -1575,7 +1583,7 @@ export default function OrderDetailView({
                                             }
                                             return formatCurrency(
                                               item.subtotal ||
-                                                basePrice * item.quantity,
+                                              basePrice * item.quantity,
                                             );
                                           })()}
                                         </span>
@@ -1730,7 +1738,7 @@ export default function OrderDetailView({
                                           className={`inline-flex items-center gap-1 font-bold ${depositSummary.depositStatus === "partially_paid" ? "text-brand-green" : "text-brand-orange"}`}
                                         >
                                           {depositSummary.depositStatus ===
-                                          "partially_paid" ? (
+                                            "partially_paid" ? (
                                             <ClockIcon
                                               size={14}
                                               className="shrink-0 text-brand-inactive-text dark:text-dark-body"
@@ -1756,9 +1764,9 @@ export default function OrderDetailView({
                                         <span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
                                           {translateMpStatus(mpPaymentStatus)}
                                           {mpPaymentStatusDetail &&
-                                          translateMpStatusDetail(
-                                            mpPaymentStatusDetail,
-                                          ) !==
+                                            translateMpStatusDetail(
+                                              mpPaymentStatusDetail,
+                                            ) !==
                                             translateMpStatus(mpPaymentStatus)
                                             ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})`
                                             : ""}
@@ -1778,8 +1786,8 @@ export default function OrderDetailView({
                                     (() => {
                                       const brand = getCardBrandInfo(
                                         mpLeg.mpPaymentMethodId ||
-                                          mpLeg.paymentMethodId ||
-                                          null,
+                                        mpLeg.paymentMethodId ||
+                                        null,
                                       );
                                       return (
                                         <PaymentRow
@@ -1810,8 +1818,8 @@ export default function OrderDetailView({
                                             {installmentCount}x de{" "}
                                             {formatCurrency(
                                               mpLeg?.installmentAmount ||
-                                                Number(mpLeg?.amount || 0) /
-                                                  installmentCount,
+                                              Number(mpLeg?.amount || 0) /
+                                              installmentCount,
                                             )}
                                           </span>
                                           <button
@@ -1904,8 +1912,8 @@ export default function OrderDetailView({
                                           (entry: any, index: number) => {
                                             const received = Number(
                                               entry.amountReceived ??
-                                                entry.amount ??
-                                                0,
+                                              entry.amount ??
+                                              0,
                                             );
                                             const baseAmount = Number(
                                               entry.amount || 0,
@@ -1926,10 +1934,10 @@ export default function OrderDetailView({
                                                 :{" "}
                                                 {formatCurrency(displayAmount)}
                                                 {baseAmount > 0.009 &&
-                                                received > 0.009 &&
-                                                Math.abs(
-                                                  baseAmount - received,
-                                                ) > 0.009 ? (
+                                                  received > 0.009 &&
+                                                  Math.abs(
+                                                    baseAmount - received,
+                                                  ) > 0.009 ? (
                                                   <span className="text-brand-muted font-normal">
                                                     {" "}
                                                     (de{" "}
@@ -1973,49 +1981,49 @@ export default function OrderDetailView({
                                 order.delivery_payer === "seller" ||
                                 Number(
                                   order.delivery_breakdown?.originalFee ||
-                                    order.delivery_breakdown?.deliverySubsidy ||
-                                    0,
+                                  order.delivery_breakdown?.deliverySubsidy ||
+                                  0,
                                 ) > 0) && (
-                                <PaymentRow
-                                  label="Valor da Entrega"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
-                                      {Number(order.delivery_fee || 0) > 0
-                                        ? formatCurrency(order.delivery_fee)
-                                        : formatCurrency(
+                                  <PaymentRow
+                                    label="Valor da Entrega"
+                                    value={
+                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                                        {Number(order.delivery_fee || 0) > 0
+                                          ? formatCurrency(order.delivery_fee)
+                                          : formatCurrency(
                                             Number(
                                               order.delivery_breakdown
                                                 ?.originalFee ||
-                                                order.delivery_breakdown
-                                                  ?.deliverySubsidy ||
-                                                0,
+                                              order.delivery_breakdown
+                                                ?.deliverySubsidy ||
+                                              0,
                                             ),
                                           )}
-                                      {Number(order.delivery_fee || 0) ===
-                                        0 && (
-                                        <span className="text-brand-green">
-                                          - Frete Grátis (Subsidiado pela loja)
-                                        </span>
-                                      )}
-                                      {Number(order.delivery_fee || 0) > 0 &&
-                                        order.delivery_payer === "seller" && (
-                                          <span className="text-brand-orange">
-                                            - Subsidiado pela loja
-                                          </span>
-                                        )}
-                                      {Number(
-                                        order.delivery_breakdown?.distanceKm ||
+                                        {Number(order.delivery_fee || 0) ===
+                                          0 && (
+                                            <span className="text-brand-green">
+                                              - Frete Grátis (Subsidiado pela loja)
+                                            </span>
+                                          )}
+                                        {Number(order.delivery_fee || 0) > 0 &&
+                                          order.delivery_payer === "seller" && (
+                                            <span className="text-brand-orange">
+                                              - Subsidiado pela loja
+                                            </span>
+                                          )}
+                                        {Number(
+                                          order.delivery_breakdown?.distanceKm ||
                                           0,
-                                      ) > 0 && (
-                                        <span className="text-xs text-brand-muted font-normal">
-                                          ({order.delivery_breakdown.distanceKm}{" "}
-                                          km)
-                                        </span>
-                                      )}
-                                    </span>
-                                  }
-                                />
-                              )}
+                                        ) > 0 && (
+                                            <span className="text-xs text-brand-muted font-normal">
+                                              ({order.delivery_breakdown.distanceKm}{" "}
+                                              km)
+                                            </span>
+                                          )}
+                                      </span>
+                                    }
+                                  />
+                                )}
 
                               {Number(order.additional_costs || 0) > 0 && (
                                 <PaymentRow
@@ -2123,8 +2131,8 @@ export default function OrderDetailView({
                                       -{" "}
                                       {formatCurrency(
                                         absorbedInterestAmount +
-                                          absorbedFeeAmount +
-                                          absorbedFixedFeeAmount,
+                                        absorbedFeeAmount +
+                                        absorbedFixedFeeAmount,
                                       )}
                                     </span>
                                   }
@@ -2265,6 +2273,32 @@ export default function OrderDetailView({
                             />
                           )}
 
+                          {sourceSubscriptionId && (
+                            <InfoCard
+                              title="Origem do Pedido"
+                              message={
+                                order.payment_method === "Assinatura (Créditos)"
+                                  ? "Assinatura • Créditos - sem cobrança adicional"
+                                  : "Assinatura"
+                              }
+                              color="blue"
+                              rightElement={
+                                <Button
+                                  variant="link"
+                                  className="text-brand-blue hover:text-brand-blue/70"
+                                  onClick={() =>
+                                    window.open(
+                                      `/erp/recorrentes/assinaturas?view=${sourceSubscriptionId}`,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Ver Assinatura
+                                </Button>
+                              }
+                            />
+                          )}
+
                           {hasPendingPayment && (
                             <InfoCard
                               title="Valor ainda em aberto"
@@ -2296,10 +2330,10 @@ export default function OrderDetailView({
                               order.customers ||
                               (order.customer_name
                                 ? {
-                                    name: order.customer_name,
-                                    email: order.buyer_email || null,
-                                    phone: null,
-                                  }
+                                  name: order.customer_name,
+                                  email: order.buyer_email || null,
+                                  phone: null,
+                                }
                                 : null)
                             }
                             address={
@@ -2343,20 +2377,18 @@ export default function OrderDetailView({
                                 onClick={() => setIsStepsSheetOpen(true)}
                                 left={
                                   <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                      order.delivery_status ===
-                                      "delivery_failed"
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${order.delivery_status ===
+                                        "delivery_failed"
                                         ? "bg-brand-red/10 text-brand-red"
                                         : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                    }`}
+                                      }`}
                                   >
                                     <div
-                                      className={`w-2.5 h-2.5 rounded-full ${
-                                        order.delivery_status ===
-                                        "delivery_failed"
+                                      className={`w-2.5 h-2.5 rounded-full ${order.delivery_status ===
+                                          "delivery_failed"
                                           ? "bg-brand-red"
                                           : "bg-brand-dark dark:bg-dark-heading"
-                                      }`}
+                                        }`}
                                     />
                                   </div>
                                 }
@@ -2414,6 +2446,34 @@ export default function OrderDetailView({
                           </FormSection>
                         )}
 
+                        {sourceSubscriptionId && (
+                          <FormSection title="" className="mt-0">
+                            <InfoCard
+                              title="Origem do Pedido"
+                              message={
+                                order.payment_method === "Assinatura (Créditos)"
+                                  ? "Assinatura • Créditos - sem cobrança adicional"
+                                  : "Assinatura"
+                              }
+                              color="blue"
+                              rightElement={
+                                <Button
+                                  variant="link"
+                                  className="text-brand-blue hover:text-brand-blue/70"
+                                  onClick={() =>
+                                    window.open(
+                                      `/erp/recorrentes/assinaturas?view=${sourceSubscriptionId}`,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Ver Assinatura
+                                </Button>
+                              }
+                            />
+                          </FormSection>
+                        )}
+
                         {/* 2. Observação */}
                         {(cleanNotes || cancelNote) && (
                           <FormSection title="" className="mt-0">
@@ -2433,10 +2493,10 @@ export default function OrderDetailView({
                             order.customers ||
                             (order.customer_name
                               ? {
-                                  name: order.customer_name,
-                                  email: order.buyer_email || null,
-                                  phone: null,
-                                }
+                                name: order.customer_name,
+                                email: order.buyer_email || null,
+                                phone: null,
+                              }
                               : null);
                           return customerObj ? (
                             <CustomerMobileBar
@@ -2481,9 +2541,9 @@ export default function OrderDetailView({
                                     <img
                                       src={getR2ImageUrl(
                                         item.image ||
-                                          item.products?.images ||
-                                          item.services?.images ||
-                                          null,
+                                        item.products?.images ||
+                                        item.services?.images ||
+                                        null,
                                         "thumbnail",
                                       )}
                                       className="w-full h-full object-cover rounded-xl"
@@ -2537,7 +2597,7 @@ export default function OrderDetailView({
                                                 <span className="text-xs text-brand-inactive-text line-through font-normal">
                                                   {formatCurrency(
                                                     item.subtotal ||
-                                                      basePrice * item.quantity,
+                                                    basePrice * item.quantity,
                                                   )}
                                                 </span>
                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -2550,7 +2610,7 @@ export default function OrderDetailView({
                                           }
                                           return formatCurrency(
                                             item.subtotal ||
-                                              basePrice * item.quantity,
+                                            basePrice * item.quantity,
                                           );
                                         })()}
                                       </span>
@@ -2705,7 +2765,7 @@ export default function OrderDetailView({
                                         className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.depositStatus === "partially_paid" ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
                                       >
                                         {depositSummary.depositStatus ===
-                                        "partially_paid"
+                                          "partially_paid"
                                           ? "pago"
                                           : "pendente"}
                                       </span>
@@ -2725,9 +2785,9 @@ export default function OrderDetailView({
                                           order.mp_payment_status,
                                         )}
                                         {order.mp_payment_status_detail &&
-                                        translateMpStatusDetail(
-                                          order.mp_payment_status_detail,
-                                        ) !==
+                                          translateMpStatusDetail(
+                                            order.mp_payment_status_detail,
+                                          ) !==
                                           translateMpStatus(
                                             order.mp_payment_status,
                                           )
@@ -2749,8 +2809,8 @@ export default function OrderDetailView({
                                   (() => {
                                     const brand = getCardBrandInfo(
                                       mpLeg.mpPaymentMethodId ||
-                                        mpLeg.paymentMethodId ||
-                                        null,
+                                      mpLeg.paymentMethodId ||
+                                      null,
                                     );
                                     return (
                                       <PaymentRow
@@ -2774,33 +2834,33 @@ export default function OrderDetailView({
                                   })()}
                                 {(order.mp_installments || installmentCount) >
                                   1 && (
-                                  <PaymentRow
-                                    label="Parcelas"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
-                                        <span>
-                                          {order.mp_installments ||
-                                            installmentCount}
-                                          x de{" "}
-                                          {formatCurrency(
-                                            mpLeg?.installmentAmount ||
+                                    <PaymentRow
+                                      label="Parcelas"
+                                      value={
+                                        <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
+                                          <span>
+                                            {order.mp_installments ||
+                                              installmentCount}
+                                            x de{" "}
+                                            {formatCurrency(
+                                              mpLeg?.installmentAmount ||
                                               Number(mpLeg?.amount || 0) /
-                                                (order.mp_installments ||
-                                                  installmentCount),
-                                          )}
+                                              (order.mp_installments ||
+                                                installmentCount),
+                                            )}
+                                          </span>
+                                          <button
+                                            onClick={() =>
+                                              setShowInstallmentModal(true)
+                                            }
+                                            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                          >
+                                            Ver parcelas
+                                          </button>
                                         </span>
-                                        <button
-                                          onClick={() =>
-                                            setShowInstallmentModal(true)
-                                          }
-                                          className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                        >
-                                          Ver parcelas
-                                        </button>
-                                      </span>
-                                    }
-                                  />
-                                )}
+                                      }
+                                    />
+                                  )}
                                 {showFinancialBreakdown &&
                                   order.mp_total_fee_amount != null && (
                                     <PaymentRow
@@ -2855,8 +2915,8 @@ export default function OrderDetailView({
                                         (entry: any, index: number) => {
                                           const received = Number(
                                             entry.amountReceived ??
-                                              entry.amount ??
-                                              0,
+                                            entry.amount ??
+                                            0,
                                           );
                                           const baseAmount = Number(
                                             entry.amount || 0,
@@ -2876,8 +2936,8 @@ export default function OrderDetailView({
                                               )}
                                               : {formatCurrency(displayAmount)}
                                               {baseAmount > 0.009 &&
-                                              received > 0.009 &&
-                                              Math.abs(baseAmount - received) >
+                                                received > 0.009 &&
+                                                Math.abs(baseAmount - received) >
                                                 0.009 ? (
                                                 <span className="text-brand-muted font-normal">
                                                   {" "}
@@ -2921,47 +2981,47 @@ export default function OrderDetailView({
                               order.delivery_payer === "seller" ||
                               Number(
                                 order.delivery_breakdown?.originalFee ||
-                                  order.delivery_breakdown?.deliverySubsidy ||
-                                  0,
+                                order.delivery_breakdown?.deliverySubsidy ||
+                                0,
                               ) > 0) && (
-                              <PaymentRow
-                                label="Valor da Entrega"
-                                value={
-                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
-                                    {Number(order.delivery_fee || 0) > 0
-                                      ? formatCurrency(order.delivery_fee)
-                                      : formatCurrency(
+                                <PaymentRow
+                                  label="Valor da Entrega"
+                                  value={
+                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                                      {Number(order.delivery_fee || 0) > 0
+                                        ? formatCurrency(order.delivery_fee)
+                                        : formatCurrency(
                                           Number(
                                             order.delivery_breakdown
                                               ?.originalFee ||
-                                              order.delivery_breakdown
-                                                ?.deliverySubsidy ||
-                                              0,
+                                            order.delivery_breakdown
+                                              ?.deliverySubsidy ||
+                                            0,
                                           ),
                                         )}
-                                    {Number(order.delivery_fee || 0) === 0 && (
-                                      <span className="text-brand-green">
-                                        - Frete Grátis (Subsidiado pela loja)
-                                      </span>
-                                    )}
-                                    {Number(order.delivery_fee || 0) > 0 &&
-                                      order.delivery_payer === "seller" && (
-                                        <span className="text-brand-orange">
-                                          - Subsidiado pela loja
+                                      {Number(order.delivery_fee || 0) === 0 && (
+                                        <span className="text-brand-green">
+                                          - Frete Grátis (Subsidiado pela loja)
                                         </span>
                                       )}
-                                    {Number(
-                                      order.delivery_breakdown?.distanceKm || 0,
-                                    ) > 0 && (
-                                      <span className="text-xs text-brand-muted font-normal">
-                                        ({order.delivery_breakdown.distanceKm}{" "}
-                                        km)
-                                      </span>
-                                    )}
-                                  </span>
-                                }
-                              />
-                            )}
+                                      {Number(order.delivery_fee || 0) > 0 &&
+                                        order.delivery_payer === "seller" && (
+                                          <span className="text-brand-orange">
+                                            - Subsidiado pela loja
+                                          </span>
+                                        )}
+                                      {Number(
+                                        order.delivery_breakdown?.distanceKm || 0,
+                                      ) > 0 && (
+                                          <span className="text-xs text-brand-muted font-normal">
+                                            ({order.delivery_breakdown.distanceKm}{" "}
+                                            km)
+                                          </span>
+                                        )}
+                                    </span>
+                                  }
+                                />
+                              )}
 
                             {Number(order.additional_costs || 0) > 0 && (
                               <PaymentRow
@@ -3061,8 +3121,8 @@ export default function OrderDetailView({
                                     -{" "}
                                     {formatCurrency(
                                       absorbedInterestAmount +
-                                        absorbedFeeAmount +
-                                        absorbedFixedFeeAmount,
+                                      absorbedFeeAmount +
+                                      absorbedFixedFeeAmount,
                                     )}
                                   </span>
                                 }
@@ -3187,69 +3247,69 @@ export default function OrderDetailView({
                         const carrierDelivery = isCarrierDeliveryOrder(order);
                         const carrier = carrierDelivery
                           ? {
-                              shipment: outboundShipment,
-                              breakdown: order.delivery_breakdown,
-                            }
+                            shipment: outboundShipment,
+                            breakdown: order.delivery_breakdown,
+                          }
                           : null;
 
                         const erpDriverInfo: DeliveryDriverInfo = order
                           .platform_driver?.isPlatformDriver
                           ? {
-                              type: "platform",
-                              name:
+                            type: "platform",
+                            name:
+                              order.platform_driver.fullName ||
+                              order.platform_driver.name ||
+                              "Entregador",
+                            avatarUrl:
+                              order.platform_driver.avatarUrl ||
+                              order.platform_driver.avatar_url ||
+                              null,
+                            isPlatformDriver: true,
+                            totalDeliveries:
+                              order.platform_driver.totalDeliveries ??
+                              order.platform_driver.total_deliveries,
+                            vehicleType:
+                              order.platform_driver.vehicleType ||
+                              order.platform_driver.vehicle_type,
+                            driverStatus: order.platform_driver.status,
+                            phone: order.platform_driver.phone,
+                            platformDriverData: {
+                              id:
+                                order.platform_driver.id ||
+                                order.platform_driver_id,
+                              fullName:
                                 order.platform_driver.fullName ||
                                 order.platform_driver.name ||
                                 "Entregador",
+                              phone: order.platform_driver.phone,
                               avatarUrl:
                                 order.platform_driver.avatarUrl ||
                                 order.platform_driver.avatar_url ||
                                 null,
-                              isPlatformDriver: true,
-                              totalDeliveries:
-                                order.platform_driver.totalDeliveries ??
-                                order.platform_driver.total_deliveries,
                               vehicleType:
                                 order.platform_driver.vehicleType ||
                                 order.platform_driver.vehicle_type,
-                              driverStatus: order.platform_driver.status,
-                              phone: order.platform_driver.phone,
-                              platformDriverData: {
-                                id:
-                                  order.platform_driver.id ||
-                                  order.platform_driver_id,
-                                fullName:
-                                  order.platform_driver.fullName ||
-                                  order.platform_driver.name ||
-                                  "Entregador",
-                                phone: order.platform_driver.phone,
-                                avatarUrl:
-                                  order.platform_driver.avatarUrl ||
-                                  order.platform_driver.avatar_url ||
-                                  null,
-                                vehicleType:
-                                  order.platform_driver.vehicleType ||
-                                  order.platform_driver.vehicle_type,
-                                totalDeliveries:
-                                  order.platform_driver.totalDeliveries ??
-                                  order.platform_driver.total_deliveries,
-                                status: order.platform_driver.status,
-                                isPlatformDriver: true,
-                                isPendingAcceptance:
-                                  order.platform_driver.isPendingAcceptance,
-                              },
-                            }
+                              totalDeliveries:
+                                order.platform_driver.totalDeliveries ??
+                                order.platform_driver.total_deliveries,
+                              status: order.platform_driver.status,
+                              isPlatformDriver: true,
+                              isPendingAcceptance:
+                                order.platform_driver.isPendingAcceptance,
+                            },
+                          }
                           : ds?.driverName
                             ? {
-                                type: "store",
-                                name: ds.driverName,
-                                avatarUrl: null,
-                                isPlatformDriver: false,
-                              }
+                              type: "store",
+                              name: ds.driverName,
+                              avatarUrl: null,
+                              isPlatformDriver: false,
+                            }
                             : {
-                                type: "none",
-                                name: "Entrega própria",
-                                isPlatformDriver: false,
-                              };
+                              type: "none",
+                              name: "Entrega própria",
+                              isPlatformDriver: false,
+                            };
 
                         return (
                           <div className="grid grid-cols-12 gap-y-6 lg:gap-y-0">
@@ -3443,9 +3503,9 @@ export default function OrderDetailView({
           preselectedClient={
             order?.buyer_id || order?.customer_name
               ? {
-                  id: order?.buyer_id || null,
-                  name: order?.customer_name || "Cliente",
-                }
+                id: order?.buyer_id || null,
+                name: order?.customer_name || "Cliente",
+              }
               : null
           }
           partnerId={partnerId}
@@ -3455,14 +3515,14 @@ export default function OrderDetailView({
             setSelectedOrderItemForAppointment(null);
           }}
           onSave={handleSaveAppointmentFromOrder}
-          onEnterSelectionMode={() => {}}
+          onEnterSelectionMode={() => { }}
         />
       )}
 
       <DefaultModal
         isOpen={showInstallmentModal}
         onClose={() => setShowInstallmentModal(false)}
-        title="Parcelas — Cartão de Crédito"
+        title="Parcelas - Cartão de Crédito"
         maxWidth="md"
       >
         <div className="overflow-x-auto">

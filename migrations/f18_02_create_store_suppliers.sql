@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 18 - store_suppliers (DEPRECATED — tabela dropada pela migração
+-- Fase 18 - store_suppliers (DEPRECATED - tabela dropada pela migração
 -- 20260728_simplify_multi_store_architecture.sql)
 -- 
 -- A arquitetura multi-store foi simplificada: suppliers agora possui

@@ -267,7 +267,7 @@ const AnnualPromoCard = ({
         {active ? (
             <div className="flex items-center gap-2 text-brand-green text-sm font-bold shrink-0 md:pl-4">
                 <CheckCircleIcon size={18} />
-                Anual ativo — desconto garantido
+                Anual ativo - desconto garantido
             </div>
         ) : (
             <Button

@@ -133,58 +133,9 @@ function inferCategoryFromQuery(term: string, demandType?: string): string {
 // ─── Recording Telemetry (Fire-and-Forget, Non-blocking) ────────────────────
 
 export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInput): Promise<void> {
-    try {
-        const rawQuery = input.query ? input.query.trim() : ""
-        if (!rawQuery) return
-
-        // Skip bot/scanner searches to keep analytics clean
-        if (isBotSearch(rawQuery)) return
-
-        const normalizedTerm = normalizeSearchQuery(rawQuery).slice(0, 100)
-        if (!normalizedTerm) return
-
-        const dateStr = formatDateKey()
-        const cleanCity = cleanCitySlug(input.citySlug)
-        const cityPrefix = cleanCity ? `city:${cleanCity}:` : ""
-
-        // Multi / Pipeline operations in Redis
-        const p = redis.pipeline()
-        const pendingExpiry: PendingTelemetryExpiry[] = []
-
-        // 1. Daily global counters
-        addTelemetryCounter(p, `ddt:search:${dateStr}:total`, pendingExpiry)
-
-        if (cleanCity) {
-            addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:total`, pendingExpiry)
-        }
-
-        if (input.hasResults) {
-            addTelemetryCounter(p, `ddt:search:${dateStr}:with_results`, pendingExpiry)
-
-            if (cleanCity) {
-                addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:with_results`, pendingExpiry)
-            }
-        } else {
-            // Apenas contabiliza a métrica quantitativa de buscas sem resultado para a taxa de sucesso.
-            // NÃO salva o termo como demanda (demanda só é registrada se o usuário clicar em 'Estou procurando isso' e enviar).
-            addTelemetryCounter(p, `ddt:search:${dateStr}:zero_results`, pendingExpiry)
-
-            if (cleanCity) {
-                addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:zero_results`, pendingExpiry)
-            }
-        }
-
-        const pipelineResult = await p.exec().catch((err) => {
-            console.warn("[ANALYTICS_TELEMETRY] Redis pipeline failed gracefully:", err?.message)
-            return null
-        })
-        if (pipelineResult) {
-            await expireNewTelemetryKeys(pipelineResult, pendingExpiry)
-        }
-    } catch (err: any) {
-        // Fail-safe: search must never fail because of analytics
-        console.warn("[ANALYTICS_TELEMETRY] Error logging search telemetry:", err?.message)
-    }
+    // Non-blocking no-op: Marketplace search analytics are tracked via PostHog on the client.
+    // Bypassing Redis pipelines completely eliminates dozens of command bursts per search.
+    return
 }
 
 export async function recordDemandEventTelemetry(input: DemandEventInput): Promise<void> {

@@ -3,7 +3,7 @@ TRUNCATE marketplace_product_categories CASCADE;
 TRUNCATE marketplace_service_categories CASCADE;
 
 -- ============================================================
--- PRODUTOS (9 CATEGORIAS PRINCIPAIS — sem subcategorias)
+-- PRODUTOS (9 CATEGORIAS PRINCIPAIS - sem subcategorias)
 -- ============================================================
 INSERT INTO marketplace_product_categories (name, icon_url) VALUES
   ('Alimentação', 'https://img.dudit.com.br/static/categories/products/Alimentacao.png'),
@@ -17,7 +17,7 @@ INSERT INTO marketplace_product_categories (name, icon_url) VALUES
   ('Outros', '');
 
 -- ============================================================
--- SERVIÇOS (4 PRINCIPAIS + OUTROS — sem subcategorias)
+-- SERVIÇOS (4 PRINCIPAIS + OUTROS - sem subcategorias)
 -- ============================================================
 INSERT INTO marketplace_service_categories (name, icon_url) VALUES
   ('Reformas e Manutenção', 'hammer'),

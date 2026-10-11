@@ -381,24 +381,24 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
 
     const plan: RecurringSubscriptionDetail["plan"] = planRow
       ? {
-          ...mapPlanRow(planRow as Record<string, unknown>),
-          items: ((planRow.recurring_plan_items || []) as Record<string, any>[]).map((item) => ({
-            id: String(item.id),
-            planId: String(planRow.id),
-            itemType: item.item_type as RecurringPlanItemType,
-            productId: item.product_id ?? null,
-            variantId: item.variant_id ?? null,
-            serviceId: item.service_id ?? null,
-            quantity: Number(item.quantity || 0),
-            unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
-            staffPartnerUserId: item.staff_partner_user_id ?? null,
-            preferredTime: item.preferred_time ?? null,
-            durationMinutes: item.duration_minutes != null ? Number(item.duration_minutes) : null,
-            sortOrder: Number(item.sort_order || 0),
-            product: item.products || null,
-            service: item.services || null,
-          })),
-        }
+        ...mapPlanRow(planRow as Record<string, unknown>),
+        items: ((planRow.recurring_plan_items || []) as Record<string, any>[]).map((item) => ({
+          id: String(item.id),
+          planId: String(planRow.id),
+          itemType: item.item_type as RecurringPlanItemType,
+          productId: item.product_id ?? null,
+          variantId: item.variant_id ?? null,
+          serviceId: item.service_id ?? null,
+          quantity: Number(item.quantity || 0),
+          unitPrice: item.unit_price != null ? Number(item.unit_price) : null,
+          staffPartnerUserId: item.staff_partner_user_id ?? null,
+          preferredTime: item.preferred_time ?? null,
+          durationMinutes: item.duration_minutes != null ? Number(item.duration_minutes) : null,
+          sortOrder: Number(item.sort_order || 0),
+          product: item.products || null,
+          service: item.services || null,
+        })),
+      }
       : null
 
     const items: RecurringSubscriptionDetailItem[] = (
@@ -655,7 +655,7 @@ export async function updateSubscriptionStockShortageResolvedAction(partnerId: s
         .from("recurring_subscriptions")
         .update({ status: "active", updated_at: new Date().toISOString() })
         .eq("id", subscriptionId)
-        
+
       return { success: true, message: "Assinatura ativada com sucesso." }
     }
 
@@ -670,7 +670,7 @@ export async function updateSubscriptionStockShortageResolvedAction(partnerId: s
 
     // 3. Try to process the claimed execution again
     const { executeRecurringClaim } = await import("@/lib/services/recurring-execution.service")
-    
+
     await executeRecurringClaim({
       executionId: exec.id,
       subscriptionId,
@@ -857,7 +857,7 @@ export async function scheduleSubscriptionServiceAction(input: {
         discount_amount: 0,
         delivery_fee: 0,
         additional_costs: 0,
-        notes: ["Agendamento com créditos da assinatura (pelo vendedor).", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        notes: sanitizeNotes(input.notes),
         payment_method: "Assinatura (Créditos)",
         payment_breakdown: [],
         recurring_subscription_id: subscriptionId,
@@ -903,7 +903,7 @@ export async function scheduleSubscriptionServiceAction(input: {
         staff_name: staffName,
         price: 0,
         pricing_unit: "Por Serviço",
-        notes: ["Agendado com créditos da assinatura (pelo vendedor).", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        notes: sanitizeNotes(input.notes),
         status: "Reservado",
         source: "appointment",
         sales_channel: "online_storefront",
@@ -963,7 +963,7 @@ export async function scheduleSubscriptionServiceAction(input: {
 /**
  * Vendedor registra a entrega parcial de produtos da assinatura.
  * Cria pedido R$0 (preços reais, total/paid 0), debita créditos de produto e
- * move o estoque (reserve + finalize) — o pedido do ciclo não baixa estoque.
+ * move o estoque (reserve + finalize) - o pedido do ciclo não baixa estoque.
  */
 export async function createSubscriptionDeliveryOrderAction(input: {
   partnerId: string
@@ -1027,9 +1027,9 @@ export async function createSubscriptionDeliveryOrderAction(input: {
         .eq("partner_id", partnerId),
       variantIds.length
         ? supabase
-            .from("product_variants")
-            .select("id, product_id, variant_name, price, cost_price")
-            .in("id", variantIds)
+          .from("product_variants")
+          .select("id, product_id, variant_name, price, cost_price")
+          .in("id", variantIds)
         : Promise.resolve({ data: [] as any[] }),
     ])
 
@@ -1125,7 +1125,7 @@ export async function createSubscriptionDeliveryOrderAction(input: {
         discount_amount: 0,
         delivery_fee: 0,
         additional_costs: 0,
-        notes: ["Entrega registrada com créditos da assinatura.", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        notes: sanitizeNotes(input.notes),
         payment_method: "Assinatura (Créditos)",
         payment_breakdown: [],
         delivery_address: deliveryType === "delivery" ? sub.delivery_address : null,

@@ -263,8 +263,8 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
               Demonstração do Resultado do Exercício (DRE)
             </h1>
             <p className="text-sm font-semibold text-black mt-1">
-               {report?.companyInfo?.partnerName} {report?.companyInfo?.documentNumber ? `• ${report?.companyInfo?.documentType === "cpf" ? "CPF" : "CNPJ"}: ${report.companyInfo.documentNumber}` : ""}
-             </p>
+              {report?.companyInfo?.partnerName} {report?.companyInfo?.documentNumber ? `• ${report?.companyInfo?.documentType === "cpf" ? "CPF" : "CNPJ"}: ${report.companyInfo.documentNumber}` : ""}
+            </p>
             <p className="text-xs text-gray-700">
               Unidade: {report?.companyInfo?.storeName} • {report?.companyInfo?.taxRegimeLabel}
             </p>
@@ -596,13 +596,13 @@ function DreTableRow({ node, isExpanded, onToggle, showComparison }: DreTableRow
         </td>
 
         <td className="py-3 px-4 text-right text-xs font-semibold text-brand-dark dark:text-dark-body">
-          {node.verticalPercent > 0 ? `${node.verticalPercent}%` : "—"}
+          {node.verticalPercent > 0 ? `${node.verticalPercent}%` : "-"}
         </td>
 
         {showComparison && (
           <>
             <td className="py-3 px-4 text-right text-xs text-brand-inactive-text dark:text-dark-body">
-              {node.previousAmount !== undefined ? formatCurrency(node.previousAmount) : "—"}
+              {node.previousAmount !== undefined ? formatCurrency(node.previousAmount) : "-"}
             </td>
             <td className="py-3 px-4 text-right text-xs">
               <VariationBadge value={node.horizontalVariation} type={node.type} />
@@ -633,13 +633,13 @@ function DreTableRow({ node, isExpanded, onToggle, showComparison }: DreTableRow
               </td>
 
               <td className="py-2.5 px-4 text-right text-brand-inactive-text dark:text-dark-body">
-                {item.verticalPercent > 0 ? `${item.verticalPercent}%` : "—"}
+                {item.verticalPercent > 0 ? `${item.verticalPercent}%` : "-"}
               </td>
 
               {showComparison && (
                 <>
                   <td className="py-2.5 px-4 text-right text-brand-inactive-text dark:text-dark-body">
-                    {item.previousAmount !== undefined ? formatCurrency(item.previousAmount) : "—"}
+                    {item.previousAmount !== undefined ? formatCurrency(item.previousAmount) : "-"}
                   </td>
                   <td className="py-2.5 px-4 text-right">
                     <VariationBadge value={item.horizontalVariation} type={node.type} />
@@ -655,7 +655,7 @@ function DreTableRow({ node, isExpanded, onToggle, showComparison }: DreTableRow
 }
 
 function VariationBadge({ value, type }: { value?: number; type: "income" | "expense" | "subtotal" | "result" }) {
-  if (value === undefined) return <span className="text-brand-inactive-text dark:text-dark-body">—</span>
+  if (value === undefined) return <span className="text-brand-inactive-text dark:text-dark-body">-</span>
   if (value === 0) return <span className="text-brand-inactive-text dark:text-dark-body">0%</span>
 
   const isPositive = value > 0
@@ -666,11 +666,10 @@ function VariationBadge({ value, type }: { value?: number; type: "income" | "exp
 
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
-        isGood
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${isGood
           ? "bg-brand-green-secondary text-brand-green"
           : "bg-[#fce6e5] text-[#cc4745]"
-      }`}
+        }`}
     >
       {isPositive ? `+${value}%` : `${value}%`}
     </span>

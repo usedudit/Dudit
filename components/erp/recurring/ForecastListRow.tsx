@@ -102,7 +102,7 @@ export const ForecastListRow: React.FC<ForecastListRowProps> = ({
                 {row.customerName}
               </span>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {row.customerEmail || "—"}
+                {row.customerEmail || "-"}
               </span>
             </div>
           </div>
@@ -116,7 +116,7 @@ export const ForecastListRow: React.FC<ForecastListRowProps> = ({
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
               {row.frequencyType
                 ? getRecurringFrequencyLabel(row.frequencyType as any, Number(row.frequencyInterval || 1))
-                : "—"}
+                : "-"}
             </span>
           </div>
         )

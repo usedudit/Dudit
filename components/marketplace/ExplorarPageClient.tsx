@@ -277,7 +277,7 @@ export function ExplorarPageClient({
         // Feedback de carregamento é 100% real: vem do react-query (isLoading/isFetching)
         // quando a query key muda. Um delay artificial aqui só adicionava latência
         // percebida (220-380ms de skeleton) e remontava a grade inteira a cada troca
-        // de filtro — algo especialmente ruim em mobile/tablet.
+        // de filtro - algo especialmente ruim em mobile/tablet.
     }, [])
 
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -1901,7 +1901,7 @@ export function ExplorarPageClient({
                             />
                         )}
 
-                        {/* Filtros / Ordenar / Lista-Grid — fixos logo abaixo do título */}
+                        {/* Filtros / Ordenar / Lista-Grid - fixos logo abaixo do título */}
                         {!isLandingPage && (
                             <ExplorarViewControls
                                 viewMode={viewMode}
@@ -2078,7 +2078,7 @@ export function ExplorarPageClient({
                                         </div>
                                     ) : null}
 
-                                    {/* Itens e Lojas distantes — listados direto, respondendo aos filtros/ordenação da página */}
+                                    {/* Itens e Lojas distantes - listados direto, respondendo aos filtros/ordenação da página */}
                                     {!!query && (moreDistantSellers.length > 0 || filteredDistant.length > 0) && (
                                         <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
                                             <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Um pouco mais distantes do seu raio de busca</h2>

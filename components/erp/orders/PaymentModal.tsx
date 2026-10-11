@@ -1800,7 +1800,7 @@ const PaymentModal = ({
         }
         const installmentNumber = Math.max(1, Number(installments || 1));
         // In split mode, calculate discount/fee based on the leg's amount (calcBaseAmount), not the full total.
-        // For single-leg partial payments, price only the amount being charged now — not the full remaining.
+        // For single-leg partial payments, price only the amount being charged now - not the full remaining.
         const singleLegPartialBase =
             editingPaymentIndex === null &&
                 paymentBaseAmount > 0.009 &&
@@ -2559,7 +2559,7 @@ const PaymentModal = ({
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
 
-        // Compare against the full order value — chargeTarget may be only the remaining balance.
+        // Compare against the full order value - chargeTarget may be only the remaining balance.
         const isUnderpaid = paidToRegister < fullOrderTotal - 0.005;
 
         // Incorporate deposit payment into the payload when it was generated and confirmed

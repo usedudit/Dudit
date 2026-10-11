@@ -89,7 +89,7 @@ export const BillingListRow: React.FC<BillingListRowProps> = ({ row, columns, on
                 {row.customer_name || "Cliente"}
               </span>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {row.payment_method || "—"}
+                {row.payment_method || "-"}
               </span>
             </div>
           </div>
@@ -97,7 +97,7 @@ export const BillingListRow: React.FC<BillingListRowProps> = ({ row, columns, on
       case "date":
         return (
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-            {row.created_at ? formatDate(row.created_at) : "—"}
+            {row.created_at ? formatDate(row.created_at) : "-"}
           </span>
         )
       case "value":

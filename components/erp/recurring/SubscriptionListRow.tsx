@@ -67,7 +67,7 @@ export const SubscriptionListRow: React.FC<SubscriptionListRowProps> = ({
                 {sub.customer?.name || sub.customerId}
               </span>
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                {sub.customer?.email || "—"}
+                {sub.customer?.email || "-"}
               </span>
             </div>
           </div>

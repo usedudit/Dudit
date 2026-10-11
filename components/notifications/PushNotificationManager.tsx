@@ -134,100 +134,100 @@ export async function syncFcmToken(userId: string, force = false): Promise<strin
  * contrário, se a permissão for resolvida para "granted" após o primeiro
  * render (conta ativada por padrão, aceite via chrome do browser, Safari
  * enterprise etc.), o state fica travado em "default" e o banner
- * "Receber alertas no aparelho" reaparece a cada abertura — mesmo que o
+ * "Receber alertas no aparelho" reaparece a cada abertura - mesmo que o
  * push já este ativo.
  */
 export function usePushNotificationStatus() {
-	const { user } = useSupabase()
-	const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() => {
-		if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-			return "unsupported"
-		}
-		return Notification.permission
-	})
-	const [isEnabling, setIsEnabling] = useState(false)
+  const { user } = useSupabase()
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() => {
+    if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
+      return "unsupported"
+    }
+    return Notification.permission
+  })
+  const [isEnabling, setIsEnabling] = useState(false)
 
-	const refreshPermission = useCallback(() => {
-		if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-			return
-		}
-		const current = Notification.permission as NotificationPermission
-		setPermission((prev) => (prev === current ? prev : current))
-	}, [])
+  const refreshPermission = useCallback(() => {
+    if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
+      return
+    }
+    const current = Notification.permission as NotificationPermission
+    setPermission((prev) => (prev === current ? prev : current))
+  }, [])
 
-	// Re-visita a permissão do browser sempre que a aba ganha foco, volta a
-	// ficar visível, ou o próprio objeto de permissão emite `change`.
-	useEffect(() => {
-		if (typeof window === "undefined" || !("Notification" in window)) return
+  // Re-visita a permissão do browser sempre que a aba ganha foco, volta a
+  // ficar visível, ou o próprio objeto de permissão emite `change`.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return
 
-		const disposers: Array<() => void> = []
+    const disposers: Array<() => void> = []
 
-		refreshPermission()
+    refreshPermission()
 
-		window.addEventListener("focus", refreshPermission)
-		disposers.push(() => window.removeEventListener("focus", refreshPermission))
+    window.addEventListener("focus", refreshPermission)
+    disposers.push(() => window.removeEventListener("focus", refreshPermission))
 
-		const onVisibility = () => {
-			if (document.visibilityState === "visible") refreshPermission()
-		}
-		document.addEventListener("visibilitychange", onVisibility)
-		disposers.push(() => document.removeEventListener("visibilitychange", onVisibility))
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshPermission()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    disposers.push(() => document.removeEventListener("visibilitychange", onVisibility))
 
-		if ("permissions" in navigator && "PermissionStatus" in window) {
-			navigator.permissions
-				.query({ name: "notifications" })
-				.then((status) => {
-					const onChange = () => refreshPermission()
-					status.addEventListener("change", onChange)
-					disposers.push(() => status.removeEventListener("change", onChange))
-					// sincroniza também no primeiro resolve
-					refreshPermission()
-				})
-				.catch(() => {})
-		}
+    if ("permissions" in navigator && "PermissionStatus" in window) {
+      navigator.permissions
+        .query({ name: "notifications" })
+        .then((status) => {
+          const onChange = () => refreshPermission()
+          status.addEventListener("change", onChange)
+          disposers.push(() => status.removeEventListener("change", onChange))
+          // sincroniza também no primeiro resolve
+          refreshPermission()
+        })
+        .catch(() => { })
+    }
 
-		return () => disposers.forEach((d) => d())
-	}, [refreshPermission])
+    return () => disposers.forEach((d) => d())
+  }, [refreshPermission])
 
-	// Quando a permissão passa a "granted" (inclusive por fora do banner, e.g.
-	// conta ativada por padrão), garante que o token FCM seja registrado no
-	// backend — caso contrário a "ativação" não teria efeito prático.
-	useEffect(() => {
-		if (permission === "granted" && user?.id) {
-			void syncFcmToken(user.id, false)
-		}
-	}, [permission, user?.id])
+  // Quando a permissão passa a "granted" (inclusive por fora do banner, e.g.
+  // conta ativada por padrão), garante que o token FCM seja registrado no
+  // backend - caso contrário a "ativação" não teria efeito prático.
+  useEffect(() => {
+    if (permission === "granted" && user?.id) {
+      void syncFcmToken(user.id, false)
+    }
+  }, [permission, user?.id])
 
-	const requestEnable = useCallback(async (): Promise<boolean> => {
-		if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-			return false
-		}
+  const requestEnable = useCallback(async (): Promise<boolean> => {
+    if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
+      return false
+    }
 
-		setIsEnabling(true)
-		try {
-			const perm = await Notification.requestPermission()
-			setPermission(perm)
+    setIsEnabling(true)
+    try {
+      const perm = await Notification.requestPermission()
+      setPermission(perm)
 
-			if (perm === "granted" && user?.id) {
-				await syncFcmToken(user.id, true)
-				return true
-			}
-			return false
-		} catch (err) {
-			console.warn("[push] requestPermission failed", err)
-			return false
-		} finally {
-			setIsEnabling(false)
-		}
-	}, [user?.id])
+      if (perm === "granted" && user?.id) {
+        await syncFcmToken(user.id, true)
+        return true
+      }
+      return false
+    } catch (err) {
+      console.warn("[push] requestPermission failed", err)
+      return false
+    } finally {
+      setIsEnabling(false)
+    }
+  }, [user?.id])
 
-	return {
-		permission,
-		isSupported: permission !== "unsupported",
-		isGranted: permission === "granted",
-		isEnabling,
-		requestEnable,
-	}
+  return {
+    permission,
+    isSupported: permission !== "unsupported",
+    isGranted: permission === "granted",
+    isEnabling,
+    requestEnable,
+  }
 }
 
 /**
@@ -279,7 +279,7 @@ export function PushNotificationManager() {
 
     const handleControllerChange = () => {
       if (user?.id && Notification.permission === "granted") {
-        syncFcmToken(user.id, true).catch(() => {})
+        syncFcmToken(user.id, true).catch(() => { })
       }
     }
 

@@ -54,7 +54,7 @@ const getInitials = (name: string) =>
 
 const formatDateBr = (iso: string) => {
     const [y, m, d] = String(iso || "").split("-").map(Number)
-    if (!y || !m || !d) return iso || "—"
+    if (!y || !m || !d) return iso || "-"
     return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`
 }
 
@@ -251,7 +251,7 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
                         <InfoCard
                             title="Impacto das Faltas"
                             color={noShowCounts.lost_value > 0 ? "red" : "orange"}
-                            message={`${noShowCounts.absences} falta(s) de ${noShowCounts.clients} cliente(s) nos últimos ${noShowPeriod} dias${noShowCounts.lost_value > 0 ? ` — ${formatCurrency(noShowCounts.lost_value)} deixaram de entrar` : ""}. ${noShowCounts.future_appointments} agendamento(s) futuro(s) desses clientes.`}
+                            message={`${noShowCounts.absences} falta(s) de ${noShowCounts.clients} cliente(s) nos últimos ${noShowPeriod} dias${noShowCounts.lost_value > 0 ? ` - ${formatCurrency(noShowCounts.lost_value)} deixaram de entrar` : ""}. ${noShowCounts.future_appointments} agendamento(s) futuro(s) desses clientes.`}
                         />
                     )}
                     <p className="text-xs font-semibold text-brand-inactive-text px-1">
@@ -427,7 +427,7 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
                 <InfoCard
                     title="Saúde dos Preços"
                     color={pricingMeta.counts.loss > 0 ? "red" : "orange"}
-                    message={`${pricingMeta.counts.loss} serviço(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% — metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
+                    message={`${pricingMeta.counts.loss} serviço(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% - metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
                 />
             )}
             {pricingAlerts.map((a) => {
@@ -485,7 +485,7 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
                             <div>
                                 <span className="text-brand-inactive-text block">Margem</span>
                                 <span className={`font-bold ${isLoss ? "text-brand-red" : "text-brand-orange"}`}>
-                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "—"}
+                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "-"}
                                 </span>
                             </div>
                         </div>

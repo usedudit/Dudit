@@ -66,7 +66,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     })
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
-    // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
+    // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
     const deliveryQuoteSeqRef = useRef<Record<string, number>>({})
     const carrierFetchedKeysRef = useRef<Record<string, string>>({})
@@ -678,7 +678,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 const isServicesOnly = hasOnlyServices(data.items || [])
                 if (isServicesOnly || partnerItemsTotal <= 0) {
                     // Só serviços (ou nada selecionado): não cota frete próprio nem transportadora.
-                    // Limpa estado antigo — senão um erro "raio" de quando havia produtos
+                    // Limpa estado antigo - senão um erro "raio" de quando havia produtos
                     // selecionados permaneceria e dispararia a cotação de transportadora.
                     deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
                     delete carrierFetchedKeysRef.current[storeKey]
@@ -809,7 +809,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     }
 
     // A transportadora só é válida/exibida quando o frete próprio falhou por
-    // raio — a cotação SuperFrete é pré-buscada em paralelo e fica oculta
+    // raio - a cotação SuperFrete é pré-buscada em paralelo e fica oculta
     // enquanto o frete próprio cobre normalmente.
     const isOwnQuoteRaio = (storeKey?: string) => {
         if (!storeKey) return false
@@ -843,7 +843,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                         className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${cq.selectedServiceId === opt.serviceId
                             ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
                             : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
-                        }`}
+                            }`}
                     >
                         <span className="flex flex-col">
                             <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">

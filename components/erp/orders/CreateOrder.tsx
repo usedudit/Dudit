@@ -1331,7 +1331,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const handleClosePaymentModal = () => {
         setIsPaymentModalOpen(false)
         if (wasSaleSuccessful) {
-            // Full cleanup (edit + payment) is done by onBack/closeEntity —
+            // Full cleanup (edit + payment) is done by onBack/closeEntity -
             // clearPaymentParam now uses window.history.replaceState so there's
             // no async router.replace race that could re-add ?edit=*id*.
             resetForm()

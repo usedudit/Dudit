@@ -96,7 +96,7 @@ export async function submitSupportTicketAction(
     user_role: input.metadata?.user_role ? sanitizeString(input.metadata.user_role, 50) : undefined,
   }
 
-  // 5. Get user info if authenticated (optional — support works for non-logged users too)
+  // 5. Get user info if authenticated (optional - support works for non-logged users too)
   let userId: string | null = null
   let userName: string | null = null
   let partnerName: string | null = null
@@ -113,12 +113,12 @@ export async function submitSupportTicketAction(
         admin.from("user_profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
         sanitizedPartnerId
           ? admin
-              .from("stores")
-              .select("name")
-              .eq("partner_id", sanitizedPartnerId)
-              .order("is_headquarters", { ascending: false })
-              .limit(1)
-              .maybeSingle()
+            .from("stores")
+            .select("name")
+            .eq("partner_id", sanitizedPartnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
           : Promise.resolve({ data: null }),
       ])
 

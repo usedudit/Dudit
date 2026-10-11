@@ -51,7 +51,7 @@ function isExemptPath(pathname: string): boolean {
 }
 
 let memoryCache: { data: CachedMaintenance | null; expiresAt: number } | null = null
-const MAINTENANCE_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes local in-memory cache (invalidated on-demand via admin toggle)
+const MAINTENANCE_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour local in-memory cache (invalidated on-demand via admin toggle)
 
 export function clearMaintenanceMemoryCache(): void {
   memoryCache = null

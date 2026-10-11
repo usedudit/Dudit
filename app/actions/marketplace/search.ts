@@ -322,7 +322,7 @@ export const searchMarketplaceDirectFull = cache(async (
     const isCity = limits.cidade && limits.cidade !== "brasil" && !limits.cidade.startsWith("estado-")
     const shouldFetchDistant = isCity && !limits.cursor && !limits.lastId && query && query.trim() !== ""
 
-    // Coordenadas conhecidas sem rede (repassadoras pelo cliente) — usadas direto quando possível.
+    // Coordenadas conhecidas sem rede (repassadoras pelo cliente) - usadas direto quando possível.
     const immediateCoords = limits.latitude && limits.longitude
         ? { lat: limits.latitude, lng: limits.longitude }
         : null
@@ -522,25 +522,16 @@ export const searchMarketplace = async (
     return { items, nextCursor, hasMore, moreDistantSellers, moreDistantItems }
 }
 
-const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
+let localGlobalVersion = 1
 
-let cachedGlobalVersion: { version: number; expiresAt: number } | null = null
-
-async function getCachedGlobalVersion(): Promise<number> {
-    const now = Date.now()
-    if (cachedGlobalVersion && cachedGlobalVersion.expiresAt > now) {
-        return cachedGlobalVersion.version
-    }
-    let version = 3
-    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch { }
-    cachedGlobalVersion = { version, expiresAt: now + 5 * 60 * 1000 } // 5min in-memory TTL (invalidated via invalidateInMemoryVersionCache)
-    return version
+function getCachedGlobalVersion(): number {
+    return localGlobalVersion
 }
 
 const searchMemoryCache = new Map<string, { results: any[]; filteredIds: string[]; expiresAt: number }>()
 
 export async function invalidateInMemoryVersionCache(): Promise<void> {
-    cachedGlobalVersion = null
+    localGlobalVersion++
     searchMemoryCache.clear()
 }
 
@@ -593,7 +584,7 @@ async function _searchMarketplaceCore(
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
     const cacheKey = `mp:cache:v${version}:ids:${safeHash}`
 
-    // 0. TRY IN-MEMORY SWR HIT (Zero network, 0ms, 0 Redis commands)
+    // 0. IN-MEMORY CACHE (0ms latency, ZERO Redis network roundtrips)
     if (!isPagination) {
         const memHit = searchMemoryCache.get(cacheKey)
         if (memHit && memHit.expiresAt > Date.now()) {
@@ -601,46 +592,16 @@ async function _searchMarketplaceCore(
         }
     }
 
-    // 1. TRY CACHE HIT (IDs in Redis -> hydrate via MGET)
-    if (!isPagination) {
-        try {
-            const cachedIds = await redis.get<string[]>(cacheKey)
-            if (cachedIds && Array.isArray(cachedIds)) {
-                const dataKeys = cachedIds.map(id => `data:v2:${id}`)
-                const objectsRaw = await redis.mget(...dataKeys)
-
-                const objects = (objectsRaw || [])
-                    .map((obj: any) => typeof obj === 'string' ? JSON.parse(obj) : obj)
-                    .filter(Boolean)
-
-                // If we found ALL objects in Redis, return immediately
-                if (objects.length === cachedIds.length) {
-                    const penalized = applyShowcasePenalty(objects)
-                    const filteredIds = penalized.map((r: any) => `${r.itemType}:${r.id}`)
-                    searchMemoryCache.set(cacheKey, { results: penalized, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
-                    return { results: penalized, filteredIds }
-                }
-            }
-        } catch (err) {
-            console.error("[REDIS] Error reading ID cache", err)
-        }
-    }
-
-    // 2. CACHE MISS / PARTIAL MISS: Run search logic
+    // 1. FAST POSTGRES FTS SEARCH (uses gin index & pg_trgm in ~5-10ms)
     let { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
 
-    // 3. Apply showcase penalty for items from inactive vitrines
+    // 2. Apply showcase penalty for items from inactive vitrines
     results = applyShowcasePenalty(results)
     filteredIds = results.map(r => `${r.itemType}:${r.id}`)
 
-    // 4. WRITE TO CACHE (Redis + local in-memory)
+    // 3. SAVE TO LOCAL RAM CACHE (60s SWR, zero remote Redis writes)
     if (!isPagination && filteredIds && filteredIds.length > 0) {
         searchMemoryCache.set(cacheKey, { results, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
-        try {
-            await redis.set(cacheKey, JSON.stringify(filteredIds), { ex: 60 * 60 * 24 })
-        } catch (err) {
-            console.error("[REDIS] Error setting ID cache", err)
-        }
     }
 
     return { results, filteredIds }

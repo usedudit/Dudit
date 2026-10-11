@@ -135,15 +135,15 @@ export async function priceMarketplaceCartCheckout(
 
   const shouldQuoteDelivery = hasOnlySubscriptionLines
     ? subscriptionShippingNeedsQuote &&
-      Boolean(params.deliveryAddress) &&
-      params.deliveryType === "delivery"
+    Boolean(params.deliveryAddress) &&
+    params.deliveryType === "delivery"
     : !hasOnlyServiceLines &&
-      (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) &&
-      Boolean(params.deliveryAddress) &&
-      params.deliveryType === "delivery"
+    (hasDeliveryLines || (hasProducts && params.deliveryType === "delivery")) &&
+    Boolean(params.deliveryAddress) &&
+    params.deliveryType === "delivery"
 
   if (shouldQuoteDelivery) {
-    // Transportadora selecionada (SuperFrete) é a fonte autoritativa do frete —
+    // Transportadora selecionada (SuperFrete) é a fonte autoritativa do frete -
     // pula a cotação do frete próprio (geocoding + raio) que tornava o checkout
     // lento: cada recálculo de totais re-cotava o frete próprio mesmo com o
     // carrier já escolhido. Fallback para o frete próprio só se o carrier falhar.
@@ -254,13 +254,13 @@ export async function priceMarketplaceCartCheckout(
 
   if (freeShippingApplies && isFreeShippingCoupon) {
     if (hasOnlySubscriptionLines && !subscriptionShippingNeedsQuote) {
-      // Frete fixo do plano — não precisa (nem pode) re-cotar o frete próprio.
+      // Frete fixo do plano - não precisa (nem pode) re-cotar o frete próprio.
       deliveryFee = 0
       if (deliveryBreakdown) {
         deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
       }
     } else if (carrierApplied) {
-      // Frete do carrier já resolvido — não re-cotar o frete próprio só pra zerar.
+      // Frete do carrier já resolvido - não re-cotar o frete próprio só pra zerar.
       deliveryFee = 0
       if (deliveryBreakdown) {
         deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
@@ -281,24 +281,24 @@ export async function priceMarketplaceCartCheckout(
     }
   }
 
-   const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
+  const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
 
-   const pricingResult = calculateOrderPricing({
-     items: pricingItems,
-     shippingCost: deliveryFee,
-     coupon: couponPricingData,
-     promotions: promotionsData,
-     paymentMethod: params.paymentMethod ?? undefined,
-   })
+  const pricingResult = calculateOrderPricing({
+    items: pricingItems,
+    shippingCost: deliveryFee,
+    coupon: couponPricingData,
+    promotions: promotionsData,
+    paymentMethod: params.paymentMethod ?? undefined,
+  })
 
-   // Zero out delivery fee when free shipping comes from a campaign promotion
-   // (coupon-driven free shipping is already handled above)
-   if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
-     deliveryFee = 0
-     if (deliveryBreakdown) {
-       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
-     }
-   }
+  // Zero out delivery fee when free shipping comes from a campaign promotion
+  // (coupon-driven free shipping is already handled above)
+  if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
+    deliveryFee = 0
+    if (deliveryBreakdown) {
+      deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+    }
+  }
 
   const giftProductIds = pricingResult.appliedGiftProductIds || []
   if (giftProductIds.length > 0) {

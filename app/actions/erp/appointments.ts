@@ -491,7 +491,7 @@ export async function getAppointmentsByDateRangeAction(
 }
 
 /**
- * Sugestões & Oportunidades — clientes com faltas recorrentes ("Ausência") no período.
+ * Sugestões & Oportunidades - clientes com faltas recorrentes ("Ausência") no período.
  */
 export async function getNoShowAlertsAction(
   partnerId: string,
@@ -544,7 +544,7 @@ export async function getNoShowAlertsAction(
 }
 
 /**
- * Sugestões & Oportunidades — serviços ativos sem nenhum agendamento no período.
+ * Sugestões & Oportunidades - serviços ativos sem nenhum agendamento no período.
  */
 export async function getStagnantServicesAction(
   partnerId: string,
@@ -655,19 +655,19 @@ export async function getAvailableTimeSlotsAction(
         !["cancelado", "cancelled", "canceled"].includes(String(apt.status || "").toLowerCase())
       )
       .map((apt: any) => {
-      const [sh, sm] = String(apt.start_time || "").split(":").map(Number)
-      const startMin = (sh || 0) * 60 + (sm || 0)
+        const [sh, sm] = String(apt.start_time || "").split(":").map(Number)
+        const startMin = (sh || 0) * 60 + (sm || 0)
 
-      let endMin: number
-      if (apt.end_time) {
-        const [eh, em] = String(apt.end_time).split(":").map(Number)
-        endMin = (eh || 0) * 60 + (em || 0)
-        if (endMin <= startMin) endMin = startMin + Number(apt.duration_minutes || 60)
-      } else {
-        endMin = startMin + Number(apt.duration_minutes || 60)
-      }
+        let endMin: number
+        if (apt.end_time) {
+          const [eh, em] = String(apt.end_time).split(":").map(Number)
+          endMin = (eh || 0) * 60 + (em || 0)
+          if (endMin <= startMin) endMin = startMin + Number(apt.duration_minutes || 60)
+        } else {
+          endMin = startMin + Number(apt.duration_minutes || 60)
+        }
 
-      // Add buffer after each appointment
+        // Add buffer after each appointment
         return { start: startMin, end: endMin + bufferMinutes }
       })
 

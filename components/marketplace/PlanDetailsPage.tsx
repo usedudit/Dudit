@@ -525,7 +525,7 @@ export function PlanDetailsPageClient({
                 <TruckIcon size={14} className="text-brand-primary mt-0.5 shrink-0" />
                 <span>
                     {!acceptsDelivery ? (
-                        <>Somente retirada no local — nenhuma cobrança de frete.</>
+                        <>Somente retirada no local - nenhuma cobrança de frete.</>
                     ) : planShippingMode === "flat" ? (
                         <>Frete fixo de <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(planShippingFlat)}</strong> cobrado em cada ciclo, sem re-cotação.</>
                     ) : planShippingMode === "quote" ? (
@@ -632,7 +632,7 @@ export function PlanDetailsPageClient({
                                         </div>
                                         <div className="text-right">
                                             {deliveryType !== "delivery" ? (
-                                                <p className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">—</p>
+                                                <p className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">-</p>
                                             ) : planShippingMode === "flat" ? (
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(planShippingFlat)}</p>
                                             ) : planShippingMode === "quote" ? (

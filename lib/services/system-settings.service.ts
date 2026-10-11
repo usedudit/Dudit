@@ -41,7 +41,7 @@ const DEFAULT_ANNOUNCEMENT_CONFIG: GlobalAnnouncementConfig = {
 
 let memoryMaintenanceConfig: { config: MaintenanceConfig; expiresAt: number } | null = null
 let memoryAnnouncementConfig: { config: GlobalAnnouncementConfig; expiresAt: number } | null = null
-const SETTINGS_MEMORY_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes in-memory cache
+const SETTINGS_MEMORY_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour in-memory cache (invalidated on-demand via admin updates)
 
 export function clearSystemSettingsMemoryCache(): void {
   memoryMaintenanceConfig = null

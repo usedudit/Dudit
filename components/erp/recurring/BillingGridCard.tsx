@@ -58,7 +58,7 @@ export const BillingGridCard: React.FC<BillingGridCardProps> = ({ row, onOpen, o
           <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-              {row.created_at ? formatDate(row.created_at) : "—"}
+              {row.created_at ? formatDate(row.created_at) : "-"}
             </span>
           </div>
 

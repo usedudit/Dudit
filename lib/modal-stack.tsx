@@ -11,7 +11,7 @@ import * as React from "react"
  *
  * Solução: toda camada que abre se registra aqui e recebe um z-index dinâmico,
  * sempre maior que o de todas as camadas que já estavam abertas. A última
- * camada a abrir fica sempre por cima — na ordem de abertura, nunca o contrário.
+ * camada a abrir fica sempre por cima - na ordem de abertura, nunca o contrário.
  *
  * Uso:
  *   const zIndex = useModalLayer(isOpen)        // componente tem prop isOpen/open
@@ -79,35 +79,35 @@ function zIndexOf(layerId: number) {
 // Layout effect no cliente (aplica antes do paint, sem "pisca" do z-index),
 // effect no servidor (no-op) para não avisar em SSR.
 const useIsomorphicLayoutEffect =
-    typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect
+  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect
 
 function useNewLayerId(): number {
-    const ref = React.useRef<number | null>(null)
-    if (ref.current === null) ref.current = nextLayerId++
-    return ref.current
+  const ref = React.useRef<number | null>(null)
+  if (ref.current === null) ref.current = nextLayerId++
+  return ref.current
 }
 
 function useLayerStack(layerId: number, active: boolean): number | undefined {
-    const [zIndex, setZIndex] = React.useState<number | undefined>(undefined)
+  const [zIndex, setZIndex] = React.useState<number | undefined>(undefined)
 
-    useIsomorphicLayoutEffect(() => {
-        if (!active) {
-            setZIndex(undefined)
-            return
-        }
+  useIsomorphicLayoutEffect(() => {
+    if (!active) {
+      setZIndex(undefined)
+      return
+    }
 
-        retain(layerId)
-        const unsubscribe = subscribe(() => setZIndex(zIndexOf(layerId)))
-        setZIndex(zIndexOf(layerId))
+    retain(layerId)
+    const unsubscribe = subscribe(() => setZIndex(zIndexOf(layerId)))
+    setZIndex(zIndexOf(layerId))
 
-        return () => {
-            unsubscribe()
-            release(layerId)
-        }
-    }, [layerId, active])
+    return () => {
+      unsubscribe()
+      release(layerId)
+    }
+  }, [layerId, active])
 
-    // Camada fechada: não sobrescreve o z-index da classe (mantém o comportamento atual).
-    return active ? zIndex : undefined
+  // Camada fechada: não sobrescreve o z-index da classe (mantém o comportamento atual).
+  return active ? zIndex : undefined
 }
 
 /**
@@ -115,8 +115,8 @@ function useLayerStack(layerId: number, active: boolean): number | undefined {
  * Enquanto estiver aberta, fica acima de todas as camadas anteriores.
  */
 export function useModalLayer(isOpen: boolean): number | undefined {
-    const layerId = useNewLayerId()
-    return useLayerStack(layerId, isOpen)
+  const layerId = useNewLayerId()
+  return useLayerStack(layerId, isOpen)
 }
 
 /**
@@ -125,8 +125,8 @@ export function useModalLayer(isOpen: boolean): number | undefined {
  * (ex.: `{isOpen && <Modal />}` dentro de um AnimatePresence).
  */
 export function useMountedModalLayer(): number | undefined {
-    const layerId = useNewLayerId()
-    return useLayerStack(layerId, true)
+  const layerId = useNewLayerId()
+  return useLayerStack(layerId, true)
 }
 
 /**
@@ -137,21 +137,21 @@ export function useMountedModalLayer(): number | undefined {
 let scrollLockCount = 0
 
 export function useBodyScrollLock(active: boolean) {
-    React.useEffect(() => {
-        if (!active || typeof document === "undefined") return
+  React.useEffect(() => {
+    if (!active || typeof document === "undefined") return
 
-        scrollLockCount += 1
-        const body = document.body
-        const previousOverflow = body.style.overflow
-        body.style.overflow = "hidden"
+    scrollLockCount += 1
+    const body = document.body
+    const previousOverflow = body.style.overflow
+    body.style.overflow = "hidden"
 
-        return () => {
-            scrollLockCount = Math.max(0, scrollLockCount - 1)
-            if (scrollLockCount === 0) {
-                body.style.overflow = previousOverflow
-            }
-        }
-    }, [active])
+    return () => {
+      scrollLockCount = Math.max(0, scrollLockCount - 1)
+      if (scrollLockCount === 0) {
+        body.style.overflow = previousOverflow
+      }
+    }
+  }, [active])
 }
 
 const ModalLayerContext = React.createContext<number | null>(null)
@@ -162,8 +162,8 @@ const ModalLayerContext = React.createContext<number | null>(null)
  * recebem o mesmo z-index (o conteúdo fica acima do overlay pela ordem no DOM).
  */
 export function ModalLayerProvider({ children }: { children: React.ReactNode }) {
-    const layerId = useNewLayerId()
-    return <ModalLayerContext.Provider value={layerId}>{children}</ModalLayerContext.Provider>
+  const layerId = useNewLayerId()
+  return <ModalLayerContext.Provider value={layerId}>{children}</ModalLayerContext.Provider>
 }
 
 /**
@@ -171,7 +171,7 @@ export function ModalLayerProvider({ children }: { children: React.ReactNode }) 
  * cria uma camada própria. Registrada enquanto o componente estiver montado.
  */
 export function useSharedModalLayer(): number | undefined {
-    const contextLayerId = React.useContext(ModalLayerContext)
-    const ownLayerId = useNewLayerId()
-    return useLayerStack(contextLayerId ?? ownLayerId, true)
+  const contextLayerId = React.useContext(ModalLayerContext)
+  const ownLayerId = useNewLayerId()
+  return useLayerStack(contextLayerId ?? ownLayerId, true)
 }

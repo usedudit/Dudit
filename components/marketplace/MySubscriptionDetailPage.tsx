@@ -18,6 +18,10 @@ import {
   IconPlaceholder,
   DefaultModal,
   RadioButton,
+  InfoCard,
+  DatePicker,
+  FormTextarea,
+  ListItem,
 } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { useToast } from "@/hooks/use-toast"
@@ -27,8 +31,6 @@ import {
   pauseMyRecurringSubscriptionAction,
   resumeMyRecurringSubscriptionAction,
   skipMySubscriptionCycleAction,
-  postponeMySubscriptionCycleAction,
-  anticipateMySubscriptionCycleAction,
   updateMySubscriptionDetailsAction,
   confirmMySubscriptionAddressChangeAction,
   respondToMySubscriptionPriceChangeAction,
@@ -48,7 +50,6 @@ import {
   ClockIcon,
   BlockedIcon,
   PlayIcon,
-  CalendarIcon,
   InfoIcon,
   CheckCircleIcon,
   CancelCircleIcon,
@@ -126,12 +127,13 @@ interface MySubscriptionDetailPageProps {
   onBack: () => void
   onUpdate: (updated: any) => void
   userId?: string | null
+  initialTab?: "details" | "credits" | "notes" | "history"
 }
 
-export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, userId }: MySubscriptionDetailPageProps) {
+export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, userId, initialTab }: MySubscriptionDetailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"details" | "credits" | "notes" | "history">("details")
+  const [activeTab, setActiveTab] = useState<"details" | "credits" | "notes" | "history">(initialTab || "details")
   const [actionLoading, setActionLoading] = useState(false)
 
   const [credits, setCredits] = useState<any[]>([])
@@ -188,10 +190,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
     (sum: number, item: any) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0),
     0,
   )
-  const cycleType = sub.plan?.frequency_type || sub.plan?.frequencyType
-  // Planos longos (mensal/anual) não permitem adiar dias: só pular ou antecipar o ciclo.
-  const supportsPostpone = cycleType !== "monthly" && cycleType !== "yearly"
-
   const historyTotalPages = Math.ceil(executions.length / HISTORY_PAGE_SIZE)
   const paginatedExecutions = useMemo(() => {
     const start = (historyPage - 1) * HISTORY_PAGE_SIZE
@@ -225,6 +223,82 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
     if (activeTab === "credits" && !creditsLoaded) void loadCredits()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  // Itens do plano unidos às linhas de crédito: todo item contratado aparece
+  // sempre (mesmo sem crédito liberado ainda — saldo 0).
+  const mergedCredits = useMemo(() => {
+    type MergedCredit = {
+      key: string
+      itemName: string
+      itemType: "service" | "product"
+      serviceId: string | null
+      productId: string | null
+      quantity: number
+      consumed: number
+      remaining: number
+      expiresAt: string | null
+      staffPartnerUserId: string | null
+      durationMinutes: number | null
+    }
+
+    const rows: MergedCredit[] = []
+    const indexByKey = new Map<string, MergedCredit>()
+
+    for (const item of sub.items || []) {
+      const isProduct = item.itemType === "product"
+      const serviceId = isProduct ? null : item.service?.id || null
+      const productId = isProduct ? item.product?.id || null : null
+      const row: MergedCredit = {
+        key: `item-${item.id}`,
+        itemName: item.product?.name || item.service?.name || (isProduct ? "Produto" : "Serviço"),
+        itemType: isProduct ? "product" : "service",
+        serviceId,
+        productId,
+        quantity: 0,
+        consumed: 0,
+        remaining: 0,
+        expiresAt: null,
+        staffPartnerUserId: null,
+        durationMinutes: item.durationMinutes ?? null,
+      }
+      rows.push(row)
+      if (serviceId) indexByKey.set(`s:${serviceId}`, row)
+      if (productId) indexByKey.set(`p:${productId}`, row)
+    }
+
+    for (const credit of credits) {
+      const key = credit.productId
+        ? `p:${credit.productId}`
+        : credit.serviceId
+          ? `s:${credit.serviceId}`
+          : null
+      const target = key ? indexByKey.get(key) : undefined
+      const row: MergedCredit = target ?? {
+        key: credit.id,
+        itemName: credit.itemName,
+        itemType: credit.itemType === "product" ? "product" : "service",
+        serviceId: credit.serviceId || null,
+        productId: credit.productId || null,
+        quantity: 0,
+        consumed: 0,
+        remaining: 0,
+        expiresAt: null,
+        staffPartnerUserId: null,
+        durationMinutes: credit.durationMinutes ?? null,
+      }
+      if (!target) rows.push(row)
+      row.quantity += Number(credit.totalCredits || 0)
+      row.consumed += Number(credit.consumedCredits || 0)
+      row.remaining += Number(credit.remainingCredits || 0)
+      if (credit.expiresAt && (!row.expiresAt || credit.expiresAt < row.expiresAt)) {
+        row.expiresAt = credit.expiresAt
+      }
+      if (credit.staffPartnerUserId) row.staffPartnerUserId = credit.staffPartnerUserId
+      if (credit.durationMinutes != null) row.durationMinutes = credit.durationMinutes
+    }
+
+    return rows
+  }, [sub.items, credits])
 
   // Carrega horários sempre que data/profissional/duração do modal mudam
   useEffect(() => {
@@ -322,30 +396,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
       return
     }
     toast({ title: "Próximo ciclo pulado com sucesso!" })
-    if (res.data) onUpdate(res.data)
-  }
-
-  const handlePostpone = async (days: number) => {
-    setActionLoading(true)
-    const res = await postponeMySubscriptionCycleAction(sub.id, days)
-    setActionLoading(false)
-    if (!res.success) {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-      return
-    }
-    toast({ title: `Ciclo adiado por ${days} dias com sucesso!` })
-    if (res.data) onUpdate(res.data)
-  }
-
-  const handleAnticipate = async () => {
-    setActionLoading(true)
-    const res = await anticipateMySubscriptionCycleAction(sub.id)
-    setActionLoading(false)
-    if (!res.success) {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-      return
-    }
-    toast({ title: "Cobrança antecipada com sucesso! O ciclo será processado em instantes." })
     if (res.data) onUpdate(res.data)
   }
 
@@ -498,16 +548,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
       onConfirm: handleSkip,
     })
 
-  const askAnticipate = () =>
-    setConfirmDialog({
-      title: "Antecipar a cobrança?",
-      message: "A cobrança e a execução do ciclo serão feitas agora, em vez da data prevista.",
-      confirmText: "Antecipar ciclo",
-      cancelText: "Voltar",
-      variant: "warning",
-      onConfirm: handleAnticipate,
-    })
-
   const askRejectPriceChange = () =>
     setConfirmDialog({
       title: "Recusar a mudança de preço?",
@@ -603,51 +643,45 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
 
                 {/* Pending price change */}
                 {sub.priceChangeRequestedAt && !sub.priceChangeDecision && (
-                  <div className="border border-brand-blue/50 bg-blue-50 dark:bg-dark-surface rounded-xl p-4 space-y-3">
-                    <div className="flex items-start gap-2">
-                      <InfoIcon size={16} className="text-brand-blue mt-0.5 shrink-0" />
-                      <div className="text-sm">
-                        <p className="font-semibold text-brand-dark dark:text-dark-heading">
-                          {sub.status === "awaiting_customer_decision"
-                            ? "Plano atualizado - resposta pendente"
-                            : "O plano foi atualizado"}
-                        </p>
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed">
-                          {sub.status === "awaiting_customer_decision" ? (
-                            <>
-                              O prazo para responder acabou e sua cobrança foi congelada em{" "}
-                              <strong>{formatCurrency(Number(sub.contractedAmount || 0))}</strong> até você decidir. O novo
-                              valor é <strong>{formatCurrency(proposedAmount)}</strong>.
-                            </>
-                          ) : (
-                            <>
-                              Novo valor: <strong>{formatCurrency(proposedAmount)}</strong> (hoje você paga{" "}
-                              {formatCurrency(Number(sub.contractedAmount || 0))}). Responda até{" "}
-                              <strong>
-                                {sub.priceChangeExpiresAt
-                                  ? formatFullDate(sub.priceChangeExpiresAt).slice(0, 10)
-                                  : "o fim do prazo"}
-                              </strong>{" "}
-                              - até lá nada muda na sua cobrança.
-                            </>
-                          )}
-                        </p>
+                  <ListItem
+                    icon={<InfoIcon />}
+                    title={
+                      sub.status === "awaiting_customer_decision"
+                        ? "Plano atualizado - resposta pendente"
+                        : "O plano foi atualizado"
+                    }
+                    description={
+                      sub.status === "awaiting_customer_decision" ? (
+                        <>
+                          O prazo para responder acabou e sua cobrança foi congelada em{" "}
+                          <strong>{formatCurrency(Number(sub.contractedAmount || 0))}</strong> até você decidir. O novo
+                          valor é <strong>{formatCurrency(proposedAmount)}</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Novo valor: <strong>{formatCurrency(proposedAmount)}</strong> (hoje você paga{" "}
+                          {formatCurrency(Number(sub.contractedAmount || 0))}). Responda até{" "}
+                          <strong>
+                            {sub.priceChangeExpiresAt
+                              ? formatFullDate(sub.priceChangeExpiresAt).slice(0, 10)
+                              : "o fim do prazo"}
+                          </strong>{" "}
+                          - até lá nada muda na sua cobrança.
+                        </>
+                      )
+                    }
+                    className="p-4"
+                    right={
+                      <div className="flex gap-2 justify-end flex-wrap shrink-0">
+                        <Button variant="link" onClick={askRejectPriceChange} disabled={actionLoading}>
+                          Recusar e encerrar no fim do ciclo
+                        </Button>
+                        <Button variant="link" onClick={() => handlePriceChangeResponse("accept")} disabled={actionLoading}>
+                          {actionLoading ? "Aplicando..." : "Aceitar nova condição"}
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={askRejectPriceChange}
-                        disabled={actionLoading}
-                      >
-                        Recusar e encerrar no fim do ciclo
-                      </Button>
-                      <Button size="sm" onClick={() => handlePriceChangeResponse("accept")} disabled={actionLoading}>
-                        {actionLoading ? "Aplicando..." : "Aceitar nova condição"}
-                      </Button>
-                    </div>
-                  </div>
+                    }
+                  />
                 )}
 
                 {/* Section: itens */}
@@ -688,7 +722,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                                 </span>
                                 <span className="text-brand-border dark:text-dark-border">|</span>
                                 <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                  {item.unitPrice != null ? formatCurrency(item.unitPrice) : "—"}
+                                  {item.unitPrice != null ? formatCurrency(item.unitPrice) : "-"}
                                 </span>
                               </div>
                             </div>
@@ -726,7 +760,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                 {/* Section: plano */}
                 <FormSection title="Plano" hasSeparator>
                   <div>
-                    <DetailRow label="Recorrência" value={sub.frequencyLabel || "—"} />
+                    <DetailRow label="Recorrência" value={sub.frequencyLabel || "-"} />
                     <DetailRow
                       label="Início da assinatura"
                       value={formatFullDate(sub.startedAt || sub.createdAt)}
@@ -843,7 +877,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                             ? statusConfig.label
                             : sub.nextExecutionAt
                               ? formatDate(sub.nextExecutionAt)
-                              : "—"}
+                              : "-"}
                         </span>
                       </div>
                       {sub.contractedAmount != null && Math.abs(Number(sub.contractedAmount) - cycleAmount) > 0.009 && (
@@ -926,26 +960,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                         <RepeatIcon size={16} />
                         Pular ciclo
                       </DropdownItem>
-                      {supportsPostpone && (
-                        <>
-                          <DropdownItem onClick={() => handlePostpone(7)}>
-                            <ClockIcon size={16} />
-                            Adiar 7 dias
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handlePostpone(15)}>
-                            <ClockIcon size={16} />
-                            Adiar 15 dias
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handlePostpone(30)}>
-                            <ClockIcon size={16} />
-                            Adiar 30 dias
-                          </DropdownItem>
-                        </>
-                      )}
-                      <DropdownItem onClick={askAnticipate}>
-                        <CalendarIcon size={16} />
-                        Antecipar ciclo
-                      </DropdownItem>
                       <DropdownItem onClick={askRefund} disabled={loadingRefund}>
                         <MoneyIcon size={16} />
                         {loadingRefund ? "Carregando..." : "Solicitar reembolso"}
@@ -965,16 +979,12 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                 )}
 
                 {isClosed && (
-                  <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-brand-gray/30 dark:bg-dark-surface">
-                    <div className="flex items-start gap-2">
-                      <InfoIcon size={16} className="text-brand-inactive-text dark:text-dark-body mt-0.5 shrink-0" />
-                      <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {sub.status === "cancelled"
-                          ? "Assinatura cancelada. Não há novas cobranças e os valores não mudam mais."
-                          : "Assinatura encerrada. Não há novas cobranças e os valores não mudam mais."}
-                      </p>
-                    </div>
-                  </div>
+                  <InfoCard message={
+                    sub.status === "cancelled"
+                      ? "Assinatura cancelada. Não há novas cobranças e os valores não mudam mais."
+                      : "Assinatura encerrada. Não há novas cobranças e os valores não mudam mais."
+                  }
+                  />
                 )}
               </div>
             </div>
@@ -988,24 +998,24 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                     <SkeletonLoader key={i} height={72} className="rounded-xl" />
                   ))}
                 </div>
-              ) : credits.length === 0 ? (
+              ) : mergedCredits.length === 0 ? (
                 <div className="text-center py-10 space-y-3">
-                  <IconPlaceholder placeholderType="image" className="w-16 h-16 mx-auto" />
-                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                    Nenhum crédito disponível no momento.
-                  </p>
-                  <p className="text-xs text-brand-inactive-text/80 dark:text-dark-body/80">
-                    Os créditos são liberados a cada ciclo da assinatura.
-                  </p>
+                  <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                    imageAlt="Nenhum crédito"
+                    title="Nenhum crédito disponível"
+                    subtitle="Os créditos são liberados a cada ciclo da assinatura."
+                  />
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {credits.map((credit) => {
+                  {mergedCredits.map((credit) => {
                     const isService = credit.itemType === "service"
                     const expiryDate = credit.expiresAt ? String(credit.expiresAt).slice(0, 10) : null
                     return (
                       <div
-                        key={credit.id}
+                        key={credit.key}
                         className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border border-brand-border/60 dark:border-dark-border/60 bg-white dark:bg-dark-card"
                       >
                         <div className="flex-1 min-w-0">
@@ -1018,15 +1028,27 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                             </Badge>
                           </div>
                           <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                            {credit.remainingCredits} de {credit.totalCredits} créditos disponíveis
-                            {expiryDate ? ` • Válidos até ${expiryDate.split("-").reverse().join("/")}` : " • Sem validade"}
+                            {credit.quantity > 0 ? (
+                              <>
+                                {credit.remaining} de {credit.quantity} créditos disponíveis
+                                {expiryDate ? ` • Válidos até ${expiryDate.split("-").reverse().join("/")}` : " • Sem validade"}
+                              </>
+                            ) : (
+                              "Sem saldo — libera no próximo ciclo"
+                            )}
                           </p>
                         </div>
                         <div className="shrink-0">
                           {isService ? (
-                            <Button size="sm" onClick={() => openBookingModal(credit)} disabled={credit.remainingCredits < 1}>
-                              Agendar
-                            </Button>
+                            credit.remaining > 0 ? (
+                              <Button size="sm" onClick={() => openBookingModal(credit)}>
+                                Agendar
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Sem saldo — libera no próximo ciclo
+                              </span>
+                            )
                           ) : (
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body">
                               A loja registra a entrega
@@ -1211,11 +1233,10 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                     key={addr.id}
                     type="button"
                     onClick={() => void handlePickAddress(addr)}
-                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
-                      isSelected
-                        ? "border-brand-green bg-brand-green/5 shadow-sm ring-1 ring-brand-green"
-                        : "border-brand-border dark:border-dark-border hover:border-brand-dark/40 dark:hover:border-dark-heading/40 bg-white dark:bg-dark-surface"
-                    }`}
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${isSelected
+                      ? "border-brand-green bg-brand-green/5 shadow-sm ring-1 ring-brand-green"
+                      : "border-brand-border dark:border-dark-border hover:border-brand-dark/40 dark:hover:border-dark-heading/40 bg-white dark:bg-dark-surface"
+                      }`}
                   >
                     <div className="mt-0.5">
                       <RadioButton
@@ -1264,35 +1285,53 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
         isOpen={!!bookingCredit}
         onClose={() => setBookingCredit(null)}
         title="Agendar com créditos"
+        maxWidth="md"
       >
         {bookingCredit && (
           <div className="space-y-4">
-            <div className="p-3 rounded-xl bg-brand-green/5 border border-brand-green/30">
-              <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                {bookingCredit.itemName}
-              </p>
-              <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                Agendamento sem cobrança — usa 1 crédito da assinatura.
-              </p>
-            </div>
+            <InfoCard
+              color="green"
+              title={bookingCredit.itemName}
+              message={
+                Number(bookingCredit.remaining || 0) > 1
+                  ? `Agendamento sem cobrança - usa 1 crédito da assinatura (${bookingCredit.remaining} disponíveis).`
+                  : "Agendamento sem cobrança - usa 1 crédito da assinatura."
+              }
+            />
+
+            <DatePicker
+              label="Data"
+              required
+              value={bookingDate || undefined}
+              onChange={(d: any) => {
+                if (!d) {
+                  setBookingDate("")
+                  return
+                }
+                const pad = (n: number) => String(n).padStart(2, "0")
+                const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+                const today = new Date()
+                const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+                if (iso < todayIso) {
+                  toast({ title: "Data inválida", description: "Escolha uma data a partir de hoje.", variant: "destructive" })
+                  return
+                }
+                const expiryIso = bookingCredit.expiresAt ? String(bookingCredit.expiresAt).slice(0, 10) : null
+                if (expiryIso && iso > expiryIso) {
+                  toast({
+                    title: "Data inválida",
+                    description: `Os créditos valem até ${expiryIso.split("-").reverse().join("/")}.`,
+                    variant: "destructive",
+                  })
+                  return
+                }
+                setBookingDate(iso)
+              }}
+            />
 
             <div>
-              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                Data
-              </label>
-              <input
-                type="date"
-                value={bookingDate}
-                min={new Date().toISOString().slice(0, 10)}
-                max={bookingCredit.expiresAt ? String(bookingCredit.expiresAt).slice(0, 10) : undefined}
-                onChange={(e) => setBookingDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                Horário
+              <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">
+                Horário <span className="text-brand-red">*</span>
               </label>
               {!bookingDate ? (
                 <p className="text-xs text-brand-inactive-text dark:text-dark-body">
@@ -1309,36 +1348,29 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {bookingSlots.map((slot) => (
-                    <button
+                    <Button
                       key={slot}
                       type="button"
+                      variant={bookingTime === slot ? "default" : "outline"}
+                      size="sm"
                       onClick={() => setBookingTime(slot)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                        bookingTime === slot
-                          ? "border-brand-green bg-brand-green/10 text-brand-green"
-                          : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-dark/40"
-                      }`}
                     >
                       {slot}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                Observações (opcional)
-              </label>
-              <textarea
-                value={bookingNotes}
-                onChange={(e) => setBookingNotes(e.target.value)}
-                rows={2}
-                maxLength={500}
-                placeholder="Alguma preferência para o atendimento?"
-                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
-              />
-            </div>
+            <FormTextarea
+              label="Observações (opcional)"
+              placeholder="Alguma preferência para o atendimento?"
+              value={bookingNotes}
+              onChange={(e) => setBookingNotes(e.target.value)}
+              rows={2}
+              maxLength={500}
+              showCharacterCount
+            />
 
             <Button
               className="w-full"

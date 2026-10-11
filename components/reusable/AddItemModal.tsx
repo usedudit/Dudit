@@ -35,7 +35,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [promoValue, setPromoValue] = useState(0)
 
   // z-index dinâmico: este modal só existe no DOM enquanto está aberto
-  // (não tem prop isOpen — o pai renderiza condicionalmente).
+  // (não tem prop isOpen - o pai renderiza condicionalmente).
   const zIndex = useMountedModalLayer()
 
   const handleSave = () => {

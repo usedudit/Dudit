@@ -74,7 +74,7 @@ export async function computeMarketplaceCheckoutAmounts(
   // We do NOT rely on line.depositAmount from the resolver because the resolver
   // skips computing it when the service's payment_requirement is "full_payment"
   // (or null, which defaults to "full_payment" in capabilities). The deposit
-  // option is still valid for these services — the partner enabled it globally.
+  // option is still valid for these services - the partner enabled it globally.
   const serviceDepositDelta = params.depositAvailable && serviceFullTotal > 0
     ? Math.round(serviceFullTotal * (1 - params.depositPercent / 100) * 100) / 100
     : 0
@@ -102,7 +102,7 @@ export async function computeMarketplaceCheckoutAmounts(
       depositChargeTotal = calculatedTotal
       fullOrderTotal = Number((calculatedTotal + serviceDepositDelta).toFixed(2))
     } else {
-      // calculatedTotal uses full prices — subtract delta to get deposit charge
+      // calculatedTotal uses full prices - subtract delta to get deposit charge
       fullOrderTotal = calculatedTotal
       depositChargeTotal = Math.max(0, Number((calculatedTotal - serviceDepositDelta).toFixed(2)))
     }

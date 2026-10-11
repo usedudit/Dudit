@@ -1,6 +1,6 @@
-POLÍTICA DE PRIVACIDADE — PLATAFORMA DUDIT
-Versão 1.5 — Última atualização: Julho de 2026
-Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018) e o Marco Civil da Internet (Lei 12.965/2014).
+POLÍTICA DE PRIVACIDADE - PLATAFORMA DUDIT
+Versão 1.5 - Última atualização: Julho de 2026
+Esta Política de Privacidade descreve como a DUDIT coleta, usa, armazena e protege os dados pessoais de seus usuários, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018) e o Marco Civil da Internet (Lei 12.965/2014).
 Controlador dos Dados: [SEU NOME COMPLETO] CPF: [XXX.XXX.XXX-XX] E-mail de contato: [contato@dudit.com.br] Endereço: Lucélia/SP
 ________________________________________
 1. DADOS COLETADOS
@@ -51,7 +51,7 @@ ________________________________________
 5. LOGS E SEGURANÇA
 5.1. Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.
 5.2. Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.
-5.3. Senhas nunca são armazenadas em texto simples — utilizamos hash seguro (bcrypt ou equivalente).
+5.3. Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).
 5.4. Tokens de integração com gateways de pagamento são criptografados e nunca expostos em logs ou interfaces.
 5.5. A DUDIT adota moderação de conteúdo automatizada para imagens, vídeos e textos, visando proteger a plataforma e seus usuários.
 5.6. Armazenamento de Imagens, Vídeos e Arquivos: Imagens, vídeos e arquivos enviados por Parceiros e Usuários são armazenados em infraestrutura de terceiros (Cloudflare R2). Conteúdos públicos (imagens e vídeos de anúncios e da vitrine) passam por processo de moderação, conforme item 5.5 dos Termos de Uso. Arquivos e anexos de caráter privado, trocados entre Parceiro e Usuário, não são monitorados rotineiramente, mas a DUDIT possui acesso técnico a todo o conteúdo armazenado, o qual poderá ser acessado para fins de moderação, suporte, segurança, apuração de denúncias ou cumprimento de obrigação legal, sempre limitado a essas finalidades.
@@ -63,7 +63,7 @@ Dados de cadastro (Parceiro ativo)	Enquanto a conta estiver ativa
 Dados de cadastro (após exclusão)	Até 6 meses (para fins de segurança e disputas)
 Logs de acesso (IP, data, hora)	6 meses (conforme Marco Civil da Internet)
 Dados de transações financeiras	5 anos (obrigação fiscal e legal)
-Dados de pedidos	5 anos (CDC — prazo de prescrição)
+Dados de pedidos	5 anos (CDC - prazo de prescrição)
 ________________________________________
 7. DIREITOS LGPD
 Em conformidade com a LGPD, você tem direito a:
@@ -93,4 +93,4 @@ ________________________________________
 11. ALTERAÇÕES DESTA POLÍTICA
 Esta Política pode ser atualizada periodicamente. A data da última atualização estará sempre indicada no topo do documento. O uso continuado da plataforma após alterações implica aceitação da nova versão.
 ________________________________________
-DUDIT — Lucélia/SP — dudit.com.br
+DUDIT - Lucélia/SP - dudit.com.br

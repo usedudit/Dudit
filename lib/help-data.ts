@@ -3133,7 +3133,7 @@ Um produto pode aparecer em diferentes lugares da Vitrine Online, e cada local u
 O ranqueamento é **dinâmico**: ele acompanha o desempenho do catálogo ao longo do tempo. Um produto que hoje está em destaque pode subir ou descer conforme o comportamento dos clientes muda.
 
 ## Fatores que influenciam a posição
-Vários fatores são considerados em conjunto para definir a posição de um produto. Nenhum fator isolado garante o topo — o equilíbrio entre eles é o que importa:
+Vários fatores são considerados em conjunto para definir a posição de um produto. Nenhum fator isolado garante o topo - o equilíbrio entre eles é o que importa:
 
 | Fator | Como influencia | Como melhorar |
 | :--- | :--- | :--- |

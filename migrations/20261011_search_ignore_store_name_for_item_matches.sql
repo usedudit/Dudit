@@ -4,7 +4,7 @@
 -- products/services.fts inclui o nome da loja com peso 'D' (ver
 -- 20260607_marketplace_search_relevance.sql → build_marketplace_tsvector).
 -- Como mp_search_row_matches aceitava qualquer match em p_fts @@ p_tsq, uma
--- busca pelo nome do vendedor fazia TODOS os produtos/serviços dele casarem —
+-- busca pelo nome do vendedor fazia TODOS os produtos/serviços dele casarem -
 -- mesmo quando o nome do item não tinha relação nenhuma com a busca.
 --
 -- Agora o ramo FTS de mp_search_row_matches ignora termos com peso 'D'

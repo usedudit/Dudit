@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { generateShortId, generateSecurePublicToken, isUuid } from "@/lib/utils/short-id"
 
 describe("Security Hardening Tests", () => {
-    describe("P2 — Cryptographically Secure Public Tokens & Resource Isolation", () => {
+    describe("P2 - Cryptographically Secure Public Tokens & Resource Isolation", () => {
         it("should generate tokens with at least 128 bits of entropy (22 url-safe chars)", () => {
             const token1 = generateShortId()
             const token2 = generateShortId()
@@ -31,7 +31,7 @@ describe("Security Hardening Tests", () => {
         })
     })
 
-    describe("P1 — Approval Code Cryptographic Generation and Metadata Sanitization", () => {
+    describe("P1 - Approval Code Cryptographic Generation and Metadata Sanitization", () => {
         it("should generate 4-digit code using cryptographically secure random integers", async () => {
             const crypto = await import("crypto")
             const codes = new Set<string>()
@@ -65,7 +65,7 @@ describe("Security Hardening Tests", () => {
         })
     })
 
-    describe("P2 — Customer PII Masking Rules", () => {
+    describe("P2 - Customer PII Masking Rules", () => {
         function maskEmail(email?: string | null): string | null {
             if (!email || typeof email !== "string") return null
             const parts = email.split("@")
@@ -100,7 +100,7 @@ describe("Security Hardening Tests", () => {
         })
     })
 
-    describe("P3 — Direct-to-R2 Upload Validation Policy", () => {
+    describe("P3 - Direct-to-R2 Upload Validation Policy", () => {
         const ALLOWED_SIGNATURE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"]
         const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024
 

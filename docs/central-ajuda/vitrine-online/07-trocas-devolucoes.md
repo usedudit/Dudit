@@ -22,7 +22,7 @@ A possibilidade de solicitar troca, devolução ou cancelamento depende do **sta
 > [!IMPORTANT]
 > A **troca** só é permitida para pedidos **já entregues**. Se o pedido ainda não saiu, prefira **cancelar** e fazer um novo pedido.
 >
-> **Tudo — prazos, condições, valores, meios de reembolso — é definido pela política do vendedor.** A Dudit apenas conecta e organiza o processo; o vendedor é o responsável por aprovar, processar e devolver o valor ou produto.
+> **Tudo - prazos, condições, valores, meios de reembolso - é definido pela política do vendedor.** A Dudit apenas conecta e organiza o processo; o vendedor é o responsável por aprovar, processar e devolver o valor ou produto.
 
 ## Como funciona o processo
 
@@ -49,7 +49,7 @@ Legenda: Criação → Análise do vendedor → Aprovação → Envio do produto
 
 Marque os itens que deseja trocar ou devolver:
 
-- Você pode selecionar **apenas alguns itens** do pedido — não precisa devolver tudo.
+- Você pode selecionar **apenas alguns itens** do pedido - não precisa devolver tudo.
 - Para **serviços**, só é possível solicitar reembolso ou vale-compra (serviços não são trocados).
 
 [IMAGEM: Lista de itens do pedido com checkboxes para seleção]
@@ -123,7 +123,7 @@ Sua solicitação passa por etapas. O status atual aparece destacado na tela de 
 | **Processando** | O vendedor recebeu o item devolvido e está finalizando o reembolso/troca. |
 | **Escalada (em disputa)** | A Dudit foi acionada para mediar um impasse entre você e o vendedor. |
 | **Recusada** | O vendedor não aprovou a solicitação (ele informa o motivo). |
-| **Concluída** | Tudo resolvido — reembolso, troca ou vale-compra finalizados. |
+| **Concluída** | Tudo resolvido - reembolso, troca ou vale-compra finalizados. |
 | **Expirada** | O prazo definido pela loja para esta solicitação foi ultrapassado. |
 
 [IMAGEM: Indicador visual de status com cores (laranja = análise, azul = aguardando, verde = concluído, roxo = disputa)]
@@ -169,7 +169,7 @@ Se ainda não enviou o pedido, você pode solicitar o cancelamento:
 
 ### Cancelamento imediato (pedido pendente)
 
-Se o status de pagamento está como **Pendente** (ainda não confirmado), o cancelamento é **imediato** — basta clicar no botão e confirmar o motivo.
+Se o status de pagamento está como **Pendente** (ainda não confirmado), o cancelamento é **imediato** - basta clicar no botão e confirmar o motivo.
 
 ### Cancelamento solicitado (pedido pago, sem envio)
 
@@ -199,7 +199,7 @@ Quando você opta por receber o valor como **vale-compra**, o crédito:
 - Fica ligado **àquela loja específica** onde você comprou.
 - Pode ser usado em compras futuras **só nessa loja**.
 - Aparece automaticamente como opção de pagamento na próxima compra na mesma loja.
-- **Não** é um saldo Dudit — não é transferível entre lojas.
+- **Não** é um saldo Dudit - não é transferível entre lojas.
 
 > [!] O valor e a validade do vale-compra são definidos pelo vendedor na política da loja.
 
@@ -207,13 +207,13 @@ Quando você opta por receber o valor como **vale-compra**, o crédito:
 
 Quando o vendedor opta por reembolsar, ele decide:
 
-- A **forma de pagamento original** (Pix, cartão, boleto, etc.) — o reembolso volta para lá.
-- O **prazo** — pode variar de instantâneo a alguns dias úteis.
+- A **forma de pagamento original** (Pix, cartão, boleto, etc.) - o reembolso volta para lá.
+- O **prazo** - pode variar de instantâneo a alguns dias úteis.
 
 | Forma de pagamento original | Como costuma funcionar |
 | :--- | :--- |
 | **Pix** | O vendedor devolve pela mesma chave (pode ser rápido ou levar alguns dias, dependendo do vendedor) |
-| **Cartão de crédito** | Estorno na fatura do cartão pelo vendedor — prazo depende da administradora e do próprio vendedor |
+| **Cartão de crédito** | Estorno na fatura do cartão pelo vendedor - prazo depende da administradora e do próprio vendedor |
 | **Boleto** | Definido pelo vendedor (Pix, transferência ou outro método) |
 | **Vale-compra na loja** | Crédito liberado na loja após aprovação |
 
@@ -226,12 +226,12 @@ A Dudit oferece um canal de mediação em casos de impasse:
 | Situação | Como ajudamos |
 | :--- | :--- |
 | **Vendedor não responde** | A solicitação pode ser escalonada automaticamente para análise da Dudit |
-| **Vendedor recusa sem justificativa** | Você pode abrir uma disputa — a Dudit analisa as evidências de ambas as partes |
+| **Vendedor recusa sem justificativa** | Você pode abrir uma disputa - a Dudit analisa as evidências de ambas as partes |
 | **Produto nunca devolvido** | O status da solicitação mostra o andamento; a Dudit mede as etapas |
 | **Vendedor e cliente não se concordam** | A Dudit pode interpor para mediação |
 
 > [!NOTE]
-> A Dudit age como **mediadora** em casos de conflito, analisando as provas e aplicando as regras da plataforma. Mas o **reembolso físico do dinheiro** sempre depende do vendedor — a Dudit não tem acesso ao dinheiro das transações.
+> A Dudit age como **mediadora** em casos de conflito, analisando as provas e aplicando as regras da plataforma. Mas o **reembolso físico do dinheiro** sempre depende do vendedor - a Dudit não tem acesso ao dinheiro das transações.
 
 ## Política de arrependimento
 
@@ -239,7 +239,7 @@ O direito de arrependimento (conhecido como "prazo de arrependimento") é garant
 
 | Tipo de compra | Prazo de arrependimento |
 | :--- | :--- |
-| **Produtos** | Geralmente **7 dias corridos** a partir do recebimento — mas o prazo exato é definido pela política da loja |
+| **Produtos** | Geralmente **7 dias corridos** a partir do recebimento - mas o prazo exato é definido pela política da loja |
 | **Serviços** | Definido pela política do vendedor |
 | **Assinaturas** | Definido pela política do vendedor |
 

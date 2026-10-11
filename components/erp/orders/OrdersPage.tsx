@@ -316,7 +316,7 @@ export default function OrdersPage({
         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
-        // Ensure URL is fully clean — closeEntity() uses window.history.replaceState
+        // Ensure URL is fully clean - closeEntity() uses window.history.replaceState
         // which doesn't notify Next.js router, so we also use router.replace as a
         // belt-and-suspenders cleanup if any entity params remain.
         if (typeof window !== "undefined") {
@@ -531,7 +531,7 @@ export default function OrdersPage({
                     case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
                     case "customer": aVal = a.customer_name; bVal = b.customer_name; break
                     case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
-            case "channel": aVal = a.order_source; bVal = b.order_source; break
+                    case "channel": aVal = a.order_source; bVal = b.order_source; break
 
                     default: return 0
                 }

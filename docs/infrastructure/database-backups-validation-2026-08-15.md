@@ -1,4 +1,4 @@
-# Validação operacional dos backups — 15/08/2026
+# Validação operacional dos backups - 15/08/2026
 
 ## Status
 

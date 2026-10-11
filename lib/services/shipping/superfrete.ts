@@ -31,6 +31,31 @@ export const SERVICE_LABELS: Record<number, string> = {
   33: "J&T",
 }
 
+// Link de rastreio nativo da transportadora (fallback: rastreio agregado da
+// SuperFrete). Correios aceita ?objeto= (URL de integração oficial);
+// Jadlog, Loggi e J&T não expõem GET com o código — levam à página oficial.
+export function buildCarrierTrackingUrl(
+  serviceId: number | null | undefined,
+  tracking: string | null | undefined,
+): string | null {
+  const code = String(tracking ?? "").trim()
+  if (!code) return null
+  switch (Number(serviceId)) {
+    case 1:
+    case 2:
+    case 17:
+      return `https://rastreamento.correios.com.br/app/index.php?objeto=${encodeURIComponent(code)}`
+    case 3:
+      return "https://www.jadlog.com.br/jadlog/rastreie"
+    case 31:
+      return "https://www.loggi.com/rastreador/"
+    case 33:
+      return "https://www.jtexpress.com.br/rastreio"
+    default:
+      return `https://rastreio.superfrete.com/#/tracking/${encodeURIComponent(code)}`
+  }
+}
+
 export interface SuperFreteUserInfo {
   id: string
   name: string

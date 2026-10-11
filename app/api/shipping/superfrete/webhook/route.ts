@@ -12,7 +12,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 
 const SUPERFRETE_PROVIDER = "superfrete"
 
-// Ordem dos status de entrega do Dudit — usada para impedir regressão
+// Ordem dos status de entrega do Dudit - usada para impedir regressão
 // (ex.: retry atrasado de order.released depois de order.delivered).
 const DELIVERY_STATUS_RANK: Record<string, number> = {
   not_sent: 0,
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
       }
 
       // Reverse shipments (buyer -> store) never change the order's own
-      // delivery status — only outbound labels (store -> buyer) do.
+      // delivery status - only outbound labels (store -> buyer) do.
       // Preenche os mesmos campos do fluxo de delivery padrão do Dudit
       // (delivery_departure_at / delivery_arrived_at / delivery_completed_at).
       if (deliveryStatus && shipment.kind !== "return") {
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
             entityType: "return_request",
             entityId: returnRequest.id,
             actionType: "return_item_received",
-            changeLines: ["Item da devolução entregue na loja (transportadora) — status: PROCESSING"],
+            changeLines: ["Item da devolução entregue na loja (transportadora) - status: PROCESSING"],
             source: "webhook",
             metadata: {
               shipment_id: shipment.id,

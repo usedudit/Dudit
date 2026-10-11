@@ -326,7 +326,7 @@ async function createRecurringOrder(params: {
   }
 
   // Modelo de créditos: este pedido do ciclo é SÓ registro financeiro (a cobrança).
-  // O estoque de produtos NÃO é reservado/baixado aqui — ele move no pedido de
+  // O estoque de produtos NÃO é reservado/baixado aqui - ele move no pedido de
   // entrega criado com créditos (createSubscriptionDeliveryOrderAction), evitando
   // baixa dupla (ciclo + entrega).
 
@@ -353,7 +353,7 @@ async function createRecurringOrder(params: {
 /**
  * Concede os créditos de serviço do ciclo recem-concluído.
  * Best-effort: o ciclo já foi concluído, então uma falha aqui não pode
- * reverter a execução — apenas loga.
+ * reverter a execução - apenas loga.
  */
 async function grantCreditsForCycle(
   supabase: SupabaseClient,
@@ -781,7 +781,7 @@ export async function processPreapprovalPaymentWebhook(params: {
     // 5. Stock check
     const productItems = items.filter((i: any) => i.item_type === "product") as PlanItemRow[]
     const stockStatus = await checkStockAvailability(supabase, sub.partner_id, productItems)
-    
+
     let targetSubscriptionStatus: "active" | "awaiting_restock" = "active"
     let shortageDeficit: any = null
 

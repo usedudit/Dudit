@@ -9,7 +9,7 @@ import { useEffect, useState } from "react"
  * blank "Application error" page instead of this custom one.
  *
  * That is why everything is inline-styled and every optional side-effect is
- * wrapped in try/catch — this component must never throw.
+ * wrapped in try/catch - this component must never throw.
  */
 export default function GlobalError({
     error,

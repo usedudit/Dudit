@@ -51,19 +51,19 @@ export const ExecutionListRow: React.FC<ExecutionListRowProps> = ({
       case "scheduled_for":
         return (
           <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-            {formatDate(execution.scheduled_for) || "—"}
+            {formatDate(execution.scheduled_for) || "-"}
           </span>
         )
       case "orders":
         return execution.orders?.order_number ? (
           <span className="text-[13px] font-bold text-brand-primary">#{execution.orders.order_number}</span>
         ) : (
-          <span className="text-brand-inactive-text dark:text-dark-body">—</span>
+          <span className="text-brand-inactive-text dark:text-dark-body">-</span>
         )
       case "completed_at":
         return (
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-            {execution.completed_at ? formatDateTime(execution.completed_at) : "—"}
+            {execution.completed_at ? formatDateTime(execution.completed_at) : "-"}
           </span>
         )
       case "actions":

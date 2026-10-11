@@ -1,6 +1,6 @@
 # Página de Explorar
 
-A página **Explorar** é o coração da navegação na Vitrine Online. É aqui que você encontra produtos, serviços e lojas perto de você — seja buscando algo específico ou descobrindo novidades pela sua região.
+A página **Explorar** é o coração da navegação na Vitrine Online. É aqui que você encontra produtos, serviços e lojas perto de você - seja buscando algo específico ou descobrindo novidades pela sua região.
 
 [IMAGEM: Tela da página Explorar mostrando categorias em círculos e carrosséis de itens em destaque]
 
@@ -21,10 +21,10 @@ Você pode chegar na página Explorar de diversas formas:
 
 A página Explorar adapta os resultados automaticamente à sua localização. O sistema tenta resolver a cidade na seguinte ordem:
 
-1. **Sua cidade cadastrada no perfil** — se você tem um perfil com cidade e estado definidos.
-2. **Cookie de cidade** — uma cidade salva em cookie/localStorage de visitas anteriores.
-3. **Geolocalização do navegador** — se você permitir, o sistema usa sua localização atual.
-4. **Brasil** — fallback nacional, mostrando itens de todo o país.
+1. **Sua cidade cadastrada no perfil** - se você tem um perfil com cidade e estado definidos.
+2. **Cookie de cidade** - uma cidade salva em cookie/localStorage de visitas anteriores.
+3. **Geolocalização do navegador** - se você permitir, o sistema usa sua localização atual.
+4. **Brasil** - fallback nacional, mostrando itens de todo o país.
 
 ### Escopos de localização
 
@@ -127,8 +127,8 @@ A página Explorar oferece dois modos de exibição dos resultados:
 
 | Modo | Características |
 | :--- | :--- |
-| **Grade** (padrão) | Grid de cards com imagens grandes — ideal para navegar visualmente. |
-| **Lista** | Linhas horizontais com informações resumidas — ideal para comparar preços e detalhes. |
+| **Grade** (padrão) | Grid de cards com imagens grandes - ideal para navegar visualmente. |
+| **Lista** | Linhas horizontais com informações resumidas - ideal para comparar preços e detalhes. |
 
 [IMAGEM: Ícones de alternância entre grade e lista]
 
@@ -215,7 +215,7 @@ A página Explorar exibe **anúncios patrocinados** de vendedores que pagam pela
 
 ## Vídeos da comunidade
 
-Quando disponíveis, a página Explorar mostra um carrossel de **vídeos da comunidade** — vídeos deixados por vendedores para apresentar produtos e serviços.
+Quando disponíveis, a página Explorar mostra um carrossel de **vídeos da comunidade** - vídeos deixados por vendedores para apresentar produtos e serviços.
 
 ## Navegação móvel
 
@@ -246,7 +246,7 @@ No celular, elementos da navegação são adaptados para o formato:
 - Use o butão **Limpar filtros** para recomeçar.
 
 **Resultados mudam de posição sozinho**
-- O ranqueamento é dinâmico e muda conforme o engajamento de outros usuários e novos cadastros. Isso é normal — veja mais na [Visão geral da Vitrine Online](./01-visao-geral.md).
+- O ranqueamento é dinâmico e muda conforme o engajamento de outros usuários e novos cadastros. Isso é normal - veja mais na [Visão geral da Vitrine Online](./01-visao-geral.md).
 
 ## Perguntas frequentes
 

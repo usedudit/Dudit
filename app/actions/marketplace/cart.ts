@@ -167,12 +167,12 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
     cartCount: (cartItems || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0),
     userProfile: profileResult.data
       ? {
-          full_name: profileResult.data.full_name || null,
-          address: defaultAddress?.city && defaultAddress?.state
-            ? `${defaultAddress.city} - ${defaultAddress.state}`
-            : null,
-          avatar_url: profileResult.data.avatar_url || null,
-        }
+        full_name: profileResult.data.full_name || null,
+        address: defaultAddress?.city && defaultAddress?.state
+          ? `${defaultAddress.city} - ${defaultAddress.state}`
+          : null,
+        avatar_url: profileResult.data.avatar_url || null,
+      }
       : null,
     userAddresses,
   }
@@ -1059,8 +1059,8 @@ export async function checkoutCartAction(
       .single(),
     productIds.length
       ? (targetStoreId
-          ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", targetStoreId)
-          : adminClient.from("products").select("*").in("id", productIds))
+        ? adminClient.from("products").select("*").in("id", productIds).eq("store_id", targetStoreId)
+        : adminClient.from("products").select("*").in("id", productIds))
       : Promise.resolve({ data: [] as any[] }),
     adminClient
       .from("stores")
@@ -1186,7 +1186,7 @@ export async function checkoutCartAction(
     }
   }
 
-  // Entrega por transportadora exige pagamento online via Mercado Pago —
+  // Entrega por transportadora exige pagamento online via Mercado Pago -
   // exceto pagamentos já adiantados por crédito (vale-compra / assinatura).
   if (
     carrierApplied &&
@@ -1246,7 +1246,7 @@ export async function checkoutCartAction(
     }
   }
 
-   // ── Single engine call with payment method ──
+  // ── Single engine call with payment method ──
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
     shippingCost: deliveryFee,
@@ -1257,26 +1257,26 @@ export async function checkoutCartAction(
 
   // Zero out delivery fee when free shipping comes from a campaign promotion
   // (coupon-driven free shipping is already handled above)
-   if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
-     deliveryFee = 0
-     if (deliveryBreakdown) {
-       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
-     }
-   }
+  if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
+    deliveryFee = 0
+    if (deliveryBreakdown) {
+      deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+    }
+  }
 
-   totalAmount = pricingResult.finalAmountWithPayment
-   couponDiscountAmount = pricingResult.couponDiscountAmount
-   const paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
-   const isCustomerFeeBearer = pmtConfig?.feeBearer !== "merchant"
-   const isCustomerInstallmentFeeBearer = pmtConfig?.installmentFeeBearer !== "merchant"
-   const totalInterest = pricingResult.paymentMethodInterestAmount || 0
-   const installmentCost = pricingResult.paymentMethodInstallmentCostAmount || 0
-   const fixedInterest = Math.max(0, totalInterest - installmentCost)
-   const customerInterest = (isCustomerFeeBearer ? fixedInterest : 0)
-         + (isCustomerInstallmentFeeBearer ? installmentCost : 0)
-   const customerFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFeeAmount || 0) : 0
-   const customerFixedFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFixedFeeAmount || 0) : 0
-   const paymentMethodExtraAmount = customerInterest + customerFee + customerFixedFee
+  totalAmount = pricingResult.finalAmountWithPayment
+  couponDiscountAmount = pricingResult.couponDiscountAmount
+  const paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
+  const isCustomerFeeBearer = pmtConfig?.feeBearer !== "merchant"
+  const isCustomerInstallmentFeeBearer = pmtConfig?.installmentFeeBearer !== "merchant"
+  const totalInterest = pricingResult.paymentMethodInterestAmount || 0
+  const installmentCost = pricingResult.paymentMethodInstallmentCostAmount || 0
+  const fixedInterest = Math.max(0, totalInterest - installmentCost)
+  const customerInterest = (isCustomerFeeBearer ? fixedInterest : 0)
+    + (isCustomerInstallmentFeeBearer ? installmentCost : 0)
+  const customerFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFeeAmount || 0) : 0
+  const customerFixedFee = isCustomerFeeBearer ? (pricingResult.paymentMethodFixedFeeAmount || 0) : 0
+  const paymentMethodExtraAmount = customerInterest + customerFee + customerFixedFee
 
   // Handle gift items insertion
   const giftProductIds = pricingResult.appliedGiftProductIds || []
@@ -1479,11 +1479,11 @@ export async function checkoutCartAction(
       effectiveAmount: remainingBalanceToPay,
       netAmount: pmtConfig?.feeBearer === "merchant"
         ? Math.max(0, remainingBalanceToPay
-            - (isCustomerFeeBearer ? 0 : fixedInterest)
-            - (isCustomerInstallmentFeeBearer ? 0 : installmentCost)
-            - (pricingResult.paymentMethodFeeAmount || 0)
-            - (pricingResult.paymentMethodFixedFeeAmount || 0)
-          )
+          - (isCustomerFeeBearer ? 0 : fixedInterest)
+          - (isCustomerInstallmentFeeBearer ? 0 : installmentCost)
+          - (pricingResult.paymentMethodFeeAmount || 0)
+          - (pricingResult.paymentMethodFixedFeeAmount || 0)
+        )
         : remainingBalanceToPay,
       ...(payDepositOnly ? (() => {
         const serviceDepositTotal = resolvedLines

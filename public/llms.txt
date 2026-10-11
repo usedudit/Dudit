@@ -5,7 +5,7 @@
 ## Sobre a Plataforma
 A Dudit resolve a dor de taxas abusivas cobradas por grandes marketplaces e a falta de visibilidade digital e ferramentas de gestão acessíveis para pequenos empreendedores brasileiros. A plataforma engloba:
 - **Marketplace Hiperlocal**: Descoberta de produtos, serviços e vitrines comerciais por proximidade geográfica e cidade, com contato direto via WhatsApp e sem taxa de intermediação.
-- **Mini-ERP Integrado**: Gestão completa para pequenas empresas e autônomos — incluindo Ordens de Serviço (OS), Agendamento Online 24h, Orçamentos e Recibos, Frente de Caixa / PDV e Controle de Estoque.
+- **Mini-ERP Integrado**: Gestão completa para pequenas empresas e autônomos - incluindo Ordens de Serviço (OS), Agendamento Online 24h, Orçamentos e Recibos, Frente de Caixa / PDV e Controle de Estoque.
 - **Catálogo Online / Vitrine Digital**: Página própria do estabelecimento com catálogo de produtos/serviços, fotos, horário de funcionamento, localização e botão de pedido direto no WhatsApp.
 
 ## Estrutura de URLs Principais

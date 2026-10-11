@@ -2464,7 +2464,7 @@ export default function CreateReturnPage({
                                     setValue={(v) => setSelectedReturnService(Number(v))}
                                     options={returnQuotes.map((q) => ({
                                         value: String(q.id),
-                                        label: `${q.label} — ${formatCurrency(q.price)}${q.deliveryDays != null ? ` • ${q.deliveryDays} dia(s)` : ""}`,
+                                        label: `${q.label} - ${formatCurrency(q.price)}${q.deliveryDays != null ? ` • ${q.deliveryDays} dia(s)` : ""}`,
                                     }))}
                                 />
                             )}

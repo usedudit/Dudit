@@ -199,7 +199,7 @@ function PlanUpgradeCTA({ tabId, currentPlan }: { tabId: TabId; currentPlan: str
                 <StarIcon size={28} className="text-brand-green" />
             </div>
             <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                {tab?.label} — Plano {label}
+                {tab?.label} - Plano {label}
             </h3>
             <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mb-6">
                 Este relatório está disponível no plano <strong>{label}</strong>.

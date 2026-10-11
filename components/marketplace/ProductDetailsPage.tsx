@@ -197,7 +197,7 @@ export function ProductDetailsPageClient({
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [deliveryLoading, setDeliveryLoading] = useState(false)
-    // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
+    // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
     const carrierQuoteKeyRef = useRef<string | null>(null)
@@ -806,11 +806,11 @@ export function ProductDetailsPageClient({
     }, [userId, selectedAddress?.zip_code, cep])
 
     // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
-    // este efeito esperava o erro "raio" — serializando geocoding + SuperFrete.
+    // este efeito esperava o erro "raio" - serializando geocoding + SuperFrete.
     // Agora dispara assim que há CEP de destino; as opções ficam ocultas até
     // o frete próprio falhar (gate de render/apply por "raio"/superfrete).
     // NOTE: the dedupe key lives in a ref so this effect never re-runs on its
-    // own updates — otherwise the cleanup would cancel the in-flight request.
+    // own updates - otherwise the cleanup would cancel the in-flight request.
     useEffect(() => {
         const targetPartnerId = partner.partner_id || partner.id
         if (!carrierDestinationCep || !targetPartnerId || !partner.mp_user_id) {
@@ -827,25 +827,25 @@ export function ProductDetailsPageClient({
         setCarrierQuoteLoading(true)
         setCarrierOptions([])
         setCarrierError(null)
-        ;(async () => {
-            try {
-                const res = await quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: carrierDestinationCep })
-                if (!active) return
-                if (res.success && res.options.length > 0) {
-                    setCarrierOptions(res.options)
-                    setCarrierError(null)
-                } else {
-                    setCarrierOptions([])
-                    setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
+            ; (async () => {
+                try {
+                    const res = await quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: carrierDestinationCep })
+                    if (!active) return
+                    if (res.success && res.options.length > 0) {
+                        setCarrierOptions(res.options)
+                        setCarrierError(null)
+                    } else {
+                        setCarrierOptions([])
+                        setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
+                    }
+                } catch {
+                    if (!active) return
+                    setCarrierError("Não foi possível calcular o frete agora.")
+                } finally {
+                    completed = true
+                    if (active) setCarrierQuoteLoading(false)
                 }
-            } catch {
-                if (!active) return
-                setCarrierError("Não foi possível calcular o frete agora.")
-            } finally {
-                completed = true
-                if (active) setCarrierQuoteLoading(false)
-            }
-        })()
+            })()
         return () => {
             active = false
             if (!completed) carrierQuoteKeyRef.current = null
@@ -1913,37 +1913,37 @@ export function ProductDetailsPageClient({
                                         ((deliveryError && deliveryError.toLowerCase().includes("raio")) ||
                                             deliveryBreakdown?.source === "superfrete") &&
                                         (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
-                                        <div className="pt-3 space-y-2">
-                                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
-                                                <TruckIcon size={14} />
-                                                Entrega por transportadora (SuperFrete)
-                                            </p>
-                                            {carrierOptions.map((opt) => (
-                                                <div
-                                                    key={opt.serviceId}
-                                                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3 text-left bg-transparent"
-                                                >
-                                                    <span className="flex flex-col">
-                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                            {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
-                                                        </span>
+                                            <div className="pt-3 space-y-2">
+                                                <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
+                                                    <TruckIcon size={14} />
+                                                    Entrega por transportadora (SuperFrete)
+                                                </p>
+                                                {carrierOptions.map((opt) => (
+                                                    <div
+                                                        key={opt.serviceId}
+                                                        className="w-full flex items-center justify-between gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3 text-left bg-transparent"
+                                                    >
+                                                        <span className="flex flex-col">
+                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
+                                                            </span>
                                                             <span className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                                 {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
                                                             </span>
-                                                    </span>
-                                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(Number(opt.price))}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                            {carrierQuoteLoading && (
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
-                                            )}
-                                            {carrierError && !carrierQuoteLoading && (
-                                                <p className="text-xs text-red-500">{carrierError}</p>
-                                            )}
-                                        </div>
-                                    )}
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(Number(opt.price))}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {carrierQuoteLoading && (
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
+                                                )}
+                                                {carrierError && !carrierQuoteLoading && (
+                                                    <p className="text-xs text-red-500">{carrierError}</p>
+                                                )}
+                                            </div>
+                                        )}
 
                                     {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>

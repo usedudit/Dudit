@@ -115,8 +115,8 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
             .then((res) => {
                 if (res.success) setInvites(res.items || [])
             })
-            .catch(() => {})
-        getDeliveryDriverStatsAdminAction().then(setStats).catch(() => {})
+            .catch(() => { })
+        getDeliveryDriverStatsAdminAction().then(setStats).catch(() => { })
     }, [])
 
     const handleConfirmToggle = () => {
@@ -579,7 +579,7 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                                                 </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                                                                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                        {inv.phone || "—"}
+                                                                        {inv.phone || "-"}
                                                                     </span>
                                                                 </td>
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
@@ -631,7 +631,7 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                                                             </Button>
                                                                         </div>
                                                                     ) : (
-                                                                        <span className="text-[13px] text-brand-inactive-text">—</span>
+                                                                        <span className="text-[13px] text-brand-inactive-text">-</span>
                                                                     )}
                                                                 </td>
                                                             </tr>
@@ -809,7 +809,7 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                                             </td>
                                                             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                                                                 <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                    {driver.profile?.phone || "—"}
+                                                                    {driver.profile?.phone || "-"}
                                                                 </span>
                                                             </td>
                                                             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">

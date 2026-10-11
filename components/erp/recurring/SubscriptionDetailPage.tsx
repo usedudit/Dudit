@@ -11,9 +11,11 @@ import {
   AlertModal,
   Badge,
   Button,
+  DatePicker,
   DefaultModal,
   DropdownItem,
   FormSection,
+  FormTextarea,
   IconPlaceholder,
   InfoCard,
   Input,
@@ -204,6 +206,82 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
       setExecutions(res.data || [])
     }
   }, [partnerId, subscriptionId])
+
+  // Itens do plano unidos às linhas de crédito: todo item contratado aparece
+  // sempre (mesmo sem crédito liberado ainda — saldo 0).
+  const mergedCredits = useMemo(() => {
+    type MergedCredit = {
+      id: string
+      itemName: string
+      itemType: "service" | "product"
+      serviceId: string | null
+      productId: string | null
+      quantity: number
+      consumed: number
+      remaining: number
+      expiresAt: string | null
+      staffPartnerUserId: string | null
+      durationMinutes: number | null
+    }
+
+    const rows: MergedCredit[] = []
+    const indexByKey = new Map<string, MergedCredit>()
+
+    for (const item of detail?.items || []) {
+      const isProduct = item.itemType === "product"
+      const serviceId = isProduct ? null : item.service?.id || null
+      const productId = isProduct ? item.product?.id || null : null
+      const row: MergedCredit = {
+        id: `item-${item.id}`,
+        itemName: item.product?.name || item.service?.name || "Item",
+        itemType: isProduct ? "product" : "service",
+        serviceId,
+        productId,
+        quantity: 0,
+        consumed: 0,
+        remaining: 0,
+        expiresAt: null,
+        staffPartnerUserId: null,
+        durationMinutes: item.durationMinutes ?? null,
+      }
+      rows.push(row)
+      if (serviceId) indexByKey.set(`s:${serviceId}`, row)
+      if (productId) indexByKey.set(`p:${productId}`, row)
+    }
+
+    for (const credit of detail?.credits || []) {
+      const key = credit.productId
+        ? `p:${credit.productId}`
+        : credit.serviceId
+          ? `s:${credit.serviceId}`
+          : null
+      const target = key ? indexByKey.get(key) : undefined
+      const row: MergedCredit = target ?? {
+        id: credit.id,
+        itemName: credit.itemName,
+        itemType: credit.itemType,
+        serviceId: credit.serviceId,
+        productId: credit.productId,
+        quantity: 0,
+        consumed: 0,
+        remaining: 0,
+        expiresAt: null,
+        staffPartnerUserId: null,
+        durationMinutes: credit.durationMinutes ?? null,
+      }
+      if (!target) rows.push(row)
+      row.quantity += credit.quantity
+      row.consumed += credit.consumed
+      row.remaining += credit.remaining
+      if (credit.expiresAt && (!row.expiresAt || credit.expiresAt < row.expiresAt)) {
+        row.expiresAt = credit.expiresAt
+      }
+      if (credit.staffPartnerUserId) row.staffPartnerUserId = credit.staffPartnerUserId
+      if (credit.durationMinutes != null) row.durationMinutes = credit.durationMinutes
+    }
+
+    return rows
+  }, [detail?.items, detail?.credits])
 
   // Reaproveita o detalhe buscado pela página de lista; só busca por conta própria
   // quando a página pai não fornece (ou não tem) dados.
@@ -667,10 +745,10 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                               <InfoRow label="Cliente" value={customer?.name || subscription.customerId} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <InfoRow label="E-mail" value={customer?.email || "—"} />
+                              <InfoRow label="E-mail" value={customer?.email || "-"} />
                             </div>
                             <div className="col-span-12 md:col-span-6">
-                              <InfoRow label="Telefone" value={customer?.phone || "—"} />
+                              <InfoRow label="Telefone" value={customer?.phone || "-"} />
                             </div>
                           </div>
                         </FormSection>
@@ -683,7 +761,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                 value={
                                   plan
                                     ? getRecurringFrequencyLabel(plan.frequencyType, plan.frequencyInterval)
-                                    : "—"
+                                    : "-"
                                 }
                               />
                             </div>
@@ -779,7 +857,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 
                         <SidebarCard hasSeparator hasTopStrip title="Ciclo e Cobrança">
                           <div className="flex flex-col gap-3">
-                            <SidebarRow label="Status" value={status ? getRecurringStatusLabel(status) : "—"} />
+                            <SidebarRow label="Status" value={status ? getRecurringStatusLabel(status) : "-"} />
                             <SidebarRow label="Início" value={formatFullDate(subscription.startedAt)} />
                             <SidebarRow
                               label="Próxima Execução"
@@ -788,7 +866,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                             <SidebarRow
                               label="Última Execução"
                               value={
-                                subscription.lastExecutionAt ? formatFullDate(subscription.lastExecutionAt) : "—"
+                                subscription.lastExecutionAt ? formatFullDate(subscription.lastExecutionAt) : "-"
                               }
                             />
                             <SidebarRow
@@ -886,13 +964,13 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
 
                 {activeTab === "credits" && (
                   <FadeIn key="credits" className="block">
-                    {detail.credits.length ? (
+                    {mergedCredits.length ? (
                       <FormSection
                         title="Créditos da Assinatura"
-                        description="Saldo liberado por esta assinatura. Serviços podem ser agendados e produtos entregues usando créditos."
+                        description="Itens do plano e saldo de créditos. Serviços podem ser agendados e produtos entregues usando créditos."
                       >
                         <div className="space-y-4">
-                          {detail.credits.map((credit) => (
+                          {mergedCredits.map((credit) => (
                             <div
                               key={credit.id}
                               className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4"
@@ -907,10 +985,16 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                   </Badge>
                                 </div>
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                  {credit.expiresAt
-                                    ? `Válido até ${formatFullDate(credit.expiresAt)}`
-                                    : "Sem validade"}
-                                  {` • ${credit.consumed} consumidos`}
+                                  {credit.quantity > 0 ? (
+                                    <>
+                                      {credit.expiresAt
+                                        ? `Válido até ${formatFullDate(credit.expiresAt)}`
+                                        : "Sem validade"}
+                                      {` • ${credit.consumed} consumidos`}
+                                    </>
+                                  ) : (
+                                    "Libera no próximo ciclo"
+                                  )}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
@@ -928,6 +1012,11 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                   <Button size="sm" onClick={openDeliveryModal}>
                                     Registrar entrega
                                   </Button>
+                                )}
+                                {credit.remaining <= 0 && (
+                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Sem saldo — libera no próximo ciclo
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -1127,33 +1216,45 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         >
           {scheduleCredit && (
             <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-brand-green/5 border border-brand-green/30">
-                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                  {scheduleCredit.itemName}
-                </p>
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                  Agendamento sem cobrança — debita 1 crédito da assinatura do cliente.
-                </p>
-              </div>
+              <InfoCard
+                color="blue"
+                title={scheduleCredit.itemName}
+                message="Agendamento sem cobrança - debita 1 crédito da assinatura do cliente."
+              />
+
+              <DatePicker
+                label="Data"
+                required
+                value={scheduleDate || undefined}
+                onChange={(d: any) => {
+                  if (!d) {
+                    setScheduleDate("")
+                    return
+                  }
+                  const pad = (n: number) => String(n).padStart(2, "0")
+                  const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+                  const today = new Date()
+                  const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+                  if (iso < todayIso) {
+                    toast({ title: "Data inválida", description: "Escolha uma data a partir de hoje.", variant: "destructive" })
+                    return
+                  }
+                  const expiryIso = scheduleCredit.expiresAt ? String(scheduleCredit.expiresAt).slice(0, 10) : null
+                  if (expiryIso && iso > expiryIso) {
+                    toast({
+                      title: "Data inválida",
+                      description: `Os créditos valem até ${expiryIso.split("-").reverse().join("/")}.`,
+                      variant: "destructive",
+                    })
+                    return
+                  }
+                  setScheduleDate(iso)
+                }}
+              />
 
               <div>
-                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                  Data
-                </label>
-                <Input
-                  type="date"
-                  name="scheduleDate"
-                  value={scheduleDate}
-                  min={new Date().toISOString().slice(0, 10)}
-                  max={scheduleCredit.expiresAt ? String(scheduleCredit.expiresAt).slice(0, 10) : undefined}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  variant="full-rounded"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                  Horário
+                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">
+                  Horário <span className="text-brand-red">*</span>
                 </label>
                 {!scheduleDate ? (
                   <p className="text-xs text-brand-inactive-text dark:text-dark-body">
@@ -1170,36 +1271,29 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {scheduleSlots.map((slot) => (
-                      <button
+                      <Button
                         key={slot}
                         type="button"
+                        variant={scheduleTime === slot ? "default" : "outline"}
+                        size="sm"
                         onClick={() => setScheduleTime(slot)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          scheduleTime === slot
-                            ? "border-brand-green bg-brand-green/10 text-brand-green"
-                            : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-dark/40"
-                        }`}
                       >
                         {slot}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                  Observações (opcional)
-                </label>
-                <textarea
-                  value={scheduleNotes}
-                  onChange={(e) => setScheduleNotes(e.target.value)}
-                  rows={2}
-                  maxLength={500}
-                  placeholder="Instruções para o atendimento..."
-                  className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
-                />
-              </div>
+              <FormTextarea
+                label="Observações (opcional)"
+                placeholder="Instruções para o atendimento..."
+                value={scheduleNotes}
+                onChange={(e) => setScheduleNotes(e.target.value)}
+                rows={2}
+                maxLength={500}
+                showCharacterCount
+              />
 
               <Button
                 className="w-full"
@@ -1219,6 +1313,10 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           maxWidth="md"
         >
           <div className="space-y-4">
+            <InfoCard
+              color="blue"
+              message="Registre a entrega ou retirada dos produtos. O estoque é baixado e 1 crédito é consumido por unidade."
+            />
             {(detail?.credits || [])
               .filter((c) => c.itemType === "product" && c.remaining > 0)
               .map((credit) => (
@@ -1267,8 +1365,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
               ))}
 
             <div>
-              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                Tipo de entrega
+              <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">
+                Tipo de entrega <span className="text-brand-red">*</span>
               </label>
               <div className="flex gap-2">
                 {(["pickup", "delivery"] as const).map((t) => (
@@ -1284,19 +1382,15 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
-                Observações (opcional)
-              </label>
-              <textarea
-                value={deliveryNotes}
-                onChange={(e) => setDeliveryNotes(e.target.value)}
-                rows={2}
-                maxLength={500}
-                placeholder="Instruções para a entrega..."
-                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
-              />
-            </div>
+            <FormTextarea
+              label="Observações (opcional)"
+              placeholder="Instruções para a entrega..."
+              value={deliveryNotes}
+              onChange={(e) => setDeliveryNotes(e.target.value)}
+              rows={2}
+              maxLength={500}
+              showCharacterCount
+            />
 
             <Button
               className="w-full"

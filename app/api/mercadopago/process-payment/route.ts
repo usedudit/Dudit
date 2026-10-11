@@ -321,8 +321,8 @@ async function handler(request: NextRequest) {
 
       const methodAllowed = methodId === "pix" ? accepted.pix !== false
         : methodId === "bolbradesco" ? accepted.boleto !== false
-        : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
-        : true
+          : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
+            : true
 
       if (!methodAllowed) {
         return NextResponse.json({ error: "Método de pagamento não habilitado pelo vendedor" }, { status: 400 })
@@ -521,14 +521,14 @@ async function handler(request: NextRequest) {
 
           // Only subtract the delta if the resolver actually adjusted unitPrice.
           // When depositAmount is null (services with payment_requirement "full_payment"),
-          // totalAmount is already the full order total — no subtraction needed.
+          // totalAmount is already the full order total - no subtraction needed.
           const resolverAdjustedPrices = (priced.data.resolvedLines || []).some(
             (line) => line.itemType === "service_booking" && line.depositAmount != null,
           )
           if (resolverAdjustedPrices) {
             // totalAmount from first pricing run is already the deposit-adjusted total
           } else {
-            // totalAmount is the full total — subtract delta to get the deposit charge
+            // totalAmount is the full total - subtract delta to get the deposit charge
             totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
           }
 
@@ -871,13 +871,13 @@ async function handler(request: NextRequest) {
     const finalAdditionalItems = additionalItems.length > 0
       ? additionalItems
       : [{
-          id: String(targetOrderId).slice(0, 32),
-          title: `Pedido ${existingOrder?.order_number ? '#' + existingOrder.order_number : 'Dudit'}`.slice(0, 256),
-          description: `Compra realizada no Dudit - ${customerName}`.slice(0, 256),
-          category_id: "others",
-          quantity: 1,
-          unit_price: chargeAmount,
-        }]
+        id: String(targetOrderId).slice(0, 32),
+        title: `Pedido ${existingOrder?.order_number ? '#' + existingOrder.order_number : 'Dudit'}`.slice(0, 256),
+        description: `Compra realizada no Dudit - ${customerName}`.slice(0, 256),
+        category_id: "others",
+        quantity: 1,
+        unit_price: chargeAmount,
+      }]
 
     // Dados do pagador no additional_info
     const additionalPayer: Record<string, any> = {
@@ -1175,7 +1175,7 @@ async function handler(request: NextRequest) {
 
     let newOrder: any
     let orderError: any
-    
+
     if (existingOrderId && existingOrder) {
       const existingBreakdown = Array.isArray(existingOrder.payment_breakdown) ? existingOrder.payment_breakdown : []
       // Keep store credit, pending legs (e.g. unpaid sinal), and any already-received
@@ -1305,7 +1305,7 @@ async function handler(request: NextRequest) {
         })
         .select()
         .single()
-      
+
       newOrder = insertedOrder
       orderError = insertError
     }
@@ -1346,11 +1346,11 @@ async function handler(request: NextRequest) {
 
       const reserveResult = reserveItems.length > 0
         ? await reserveOrderInventory({
-            client: adminClient,
-            partnerId,
-            orderId: newOrder.id,
-            items: reserveItems,
-          })
+          client: adminClient,
+          partnerId,
+          orderId: newOrder.id,
+          items: reserveItems,
+        })
         : { success: true as const }
 
       if ("error" in reserveResult) {

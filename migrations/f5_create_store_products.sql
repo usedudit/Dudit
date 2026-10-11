@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 5 - store_products (DEPRECATED — tabela dropada pela migração
+-- Fase 5 - store_products (DEPRECATED - tabela dropada pela migração
 -- 20260728_simplify_multi_store_architecture.sql)
 -- 
 -- A arquitetura multi-store foi simplificada: products agora possui store_id

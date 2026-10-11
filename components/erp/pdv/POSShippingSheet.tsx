@@ -285,7 +285,7 @@ export default function POSShippingSheet({
 
     // Transportadora em paralelo com o frete próprio; só aparece na UI quando
     // o frete próprio não cobre o endereço. Efeito separado com deps só de
-    // identidade (CEP/cliente) — trocar de aba ou subtotal não refaz a cotação.
+    // identidade (CEP/cliente) - trocar de aba ou subtotal não refaz a cotação.
     const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
     useEffect(() => {
         if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
@@ -366,7 +366,7 @@ export default function POSShippingSheet({
                                     className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
                                         ? "border-brand-green bg-green-50/40 dark:bg-green-900/10"
                                         : "border-brand-border dark:border-dark-border hover:border-brand-green/60 dark:hover:border-brand-green/40"
-                                    }`}
+                                        }`}
                                 >
                                     <span className="min-w-0">
                                         <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">

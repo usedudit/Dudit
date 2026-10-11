@@ -504,7 +504,7 @@ const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: stri
   const supabase = getAdminClient()
   const guess = citySlugWithoutState.split("-").join(" ")
 
-  // Fast path: exact (case-insensitive) match — 1 row instead of the whole state.
+  // Fast path: exact (case-insensitive) match - 1 row instead of the whole state.
   const fast = await supabase
     .from("addresses")
     .select("city, state")

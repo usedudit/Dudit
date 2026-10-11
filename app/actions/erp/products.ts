@@ -439,7 +439,7 @@ export async function createProductComprehensiveAction(data: {
 }): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     try {
-        // 1. GATEKEEPER — isolado (bloqueia abuso sem consumir recursos)
+        // 1. GATEKEEPER - isolado (bloqueia abuso sem consumir recursos)
         await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
 
         // 2. CSRF + Auth em paralelo (independentes entre si)
@@ -2200,7 +2200,7 @@ export async function updateProductPromotionalPriceAction(params: {
 
         if (error) return { error: error.message }
 
-        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => {})
+        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => { })
 
         return { success: true }
     } catch (error: any) {
@@ -2370,7 +2370,7 @@ export async function updateProductSalePriceAction(params: {
 
         if (error) return { error: error.message }
 
-        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => {})
+        await invalidateProductCache(params.productId, params.partnerId, "update").catch(() => { })
 
         return { success: true }
     } catch (error: any) {
@@ -2522,7 +2522,7 @@ export async function duplicateProductsAction(productIds: string[]) {
             return { success: false, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
         }
 
-        // SKU puro (zero queries) — unicidade pelo banco
+        // SKU puro (zero queries) - unicidade pelo banco
         const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
         const duplicated = await Promise.all(products.map(async (p: any) => {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2556,7 +2556,7 @@ export async function duplicateProductsAction(productIds: string[]) {
             }
 
             const result = await supabase.from("products").insert(
-              duplicated.map((d: any) => { const { is_active, ...rest } = d; return rest })
+                duplicated.map((d: any) => { const { is_active, ...rest } = d; return rest })
             ).select()
 
             if (!result.error) {
@@ -2735,10 +2735,10 @@ export async function getProducts(partnerId: string, storeId?: string) {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
-        
+
         let q = supabase.from("products").select("*").eq("partner_id", partnerId)
         if (storeId) q = q.eq("store_id", storeId)
-        
+
         const { data } = await scopeActiveOnly(q).order("created_at", { ascending: false }).limit(100)
         return data || []
     } catch (error) {

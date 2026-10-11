@@ -44,7 +44,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
   // Enter-settle guard: a sheet aberta ainda está executando a animação de
   // slide-in (spring ~300-400ms). Um toque/drag nesse janela vence o backdrop
   // ou o drag-to-close e a sheet some em menos de 1s. Ignoramos qualquer
-  // tentativa de fechamento — inclusive via backdrop/overlay — até que a
+  // tentativa de fechamento - inclusive via backdrop/overlay - até que a
   // animação de entrada tenha finalizado, deixando o foco no conteúdo.
   const settledRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

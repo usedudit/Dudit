@@ -4,7 +4,7 @@
 -- When MP charges the card successfully → webhook fires → sync creates the
 -- CURRENT purchase as "completed" with invoice.
 -- When MP fails → sync creates the CURRENT purchase as "pending" (past_due).
--- The "next" purchase is NOT pre-generated — it will be created when the
+-- The "next" purchase is NOT pre-generated - it will be created when the
 -- actual payment webhook arrives for the next cycle.
 -- ============================================================================
 

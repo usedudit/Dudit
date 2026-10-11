@@ -300,17 +300,17 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
       const ordersArr = Array.isArray(row.orders) && row.orders.length > 0
         ? [...row.orders]
         : [{
-            order_id: row.order_id,
-            order_number: row.order_number,
-            customer_name: row.customer_name,
-            customer_phone: row.customer_phone,
-            delivery_address: row.delivery_address,
-            total_amount: Number(row.total_amount || 0),
-            delivery_fee: Number(row.delivery_fee || 0),
-            payment_method: row.payment_method,
-            payment_status: row.payment_status,
-            items: Array.isArray(row.items) ? row.items : [],
-          }]
+          order_id: row.order_id,
+          order_number: row.order_number,
+          customer_name: row.customer_name,
+          customer_phone: row.customer_phone,
+          delivery_address: row.delivery_address,
+          total_amount: Number(row.total_amount || 0),
+          delivery_fee: Number(row.delivery_fee || 0),
+          payment_method: row.payment_method,
+          payment_status: row.payment_status,
+          items: Array.isArray(row.items) ? row.items : [],
+        }]
 
       groupedMap.set(key, {
         ...row,
@@ -709,7 +709,7 @@ export async function markSingleOrderDeliveredAction(params: {
       .neq("status", "delivered")
 
     if (!pendingOrders || pendingOrders.length === 0) {
-      // All orders delivered — mark the whole delivery + assignment as delivered
+      // All orders delivered - mark the whole delivery + assignment as delivered
       await getAdminClient()
         .from("deliveries")
         .update({ status: "delivered", delivered_at: nowIso, completed_at: nowIso })
@@ -738,7 +738,7 @@ export async function markSingleOrderDeliveredAction(params: {
       metadata: { assignment_id: params.assignmentId, delivery_id: assignment.delivery_id },
       source: "delivery_driver_app",
     })
-  } catch {}
+  } catch { }
 
   await revalidateOrderHistory(params.orderId)
   revalidatePath("/entregadores")

@@ -80,7 +80,7 @@ export async function exportDreToXLSX({
   cellA2.alignment = { vertical: "middle", horizontal: "left" }
 
   const cellD2 = sheet.getCell("D2")
-  cellD2.value = `CNPJ/CPF: ${report.companyInfo?.documentNumber || "—"}`
+  cellD2.value = `CNPJ/CPF: ${report.companyInfo?.documentNumber || "-"}`
   cellD2.font = { bold: false, size: 10, color: { argb: "FF1D2939" } }
   cellD2.alignment = { vertical: "middle", horizontal: "left" }
   sheet.getRow(2).height = 18
@@ -265,7 +265,7 @@ export function exportDreToCSV({
   storeName,
 }: ExportDreExcelParams) {
   let csv = `RELATÓRIO DE DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)\n`
-  csv += `Empresa: ${report.companyInfo?.partnerName || "Empresa Matriz"};CNPJ/CPF: ${report.companyInfo?.documentNumber || "—"}\n`
+  csv += `Empresa: ${report.companyInfo?.partnerName || "Empresa Matriz"};CNPJ/CPF: ${report.companyInfo?.documentNumber || "-"}\n`
   csv += `Unidade: ${storeName};Regime Contábil: ${regime === "competencia" ? "Competência" : "Caixa"}\n`
   csv += `Período: ${formatDateBR(startDate)} até ${formatDateBR(endDate)};Gerado em: ${report.companyInfo?.generatedAt || ""}\n\n`
   csv += "Estrutura / Conta Contábil;Tipo;Período Atual (R$);Análise Vertical (AV %);Período Anterior (R$);Variação Horizontal (AH %)\n"

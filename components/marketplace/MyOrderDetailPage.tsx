@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
     ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon,
-    WhatsappIcon, TruckIcon, ReturnIcon
+    WhatsappIcon, TruckIcon, ReturnIcon, RepeatIcon
 } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
@@ -864,6 +864,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const getPaymentTypeLabel = () => {
+        if (order.payment_method === "Assinatura (Créditos)") {
+            return "Assinatura (Créditos)";
+        }
         let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const methodEntries = breakdown.filter((e: any) => e?.method);
@@ -898,6 +901,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             }
         }
         if (hasMultiplePaidMethods) {
+            return baseLabel;
+        }
+        if (order.payment_method === "Assinatura (Créditos)") {
             return baseLabel;
         }
         if (hasReceivedMpPayment(order) && !baseLabel.toLowerCase().includes("mercado pago")) {
@@ -935,6 +941,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
+        const isSubscriptionCredits = order.payment_method === "Assinatura (Créditos)";
+        if (isSubscriptionCredits) {
+            return <div className="flex items-center gap-1.5"><RepeatIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" /></div>;
+        }
         if (isStoreCredit) {
             icons.push(
                 <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />
@@ -1994,10 +2004,24 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     title="Pedido da assinatura"
                                                     message={
                                                         order.payment_method === "Assinatura (Créditos)"
-                                                            ? "Este pedido foi criado usando créditos da sua assinatura — sem cobrança adicional."
+                                                            ? "Este pedido foi criado usando créditos da sua assinatura - sem cobrança adicional."
                                                             : "Este pedido foi gerado automaticamente pela sua assinatura recorrente."
                                                     }
                                                     color="blue"
+                                                    rightElement={
+                                                        order.recurring_subscription_id ? (
+                                                            <Button
+                                                                variant="link"
+                                                                className="text-brand-blue hover:text-brand-blue/70"
+                                                                onClick={() =>
+                                                                    window.open(`/assinaturas?view=${order.recurring_subscription_id}`)
+                                                                }
+                                                                type="button"
+                                                            >
+                                                                Ver assinatura
+                                                            </Button>
+                                                        ) : undefined
+                                                    }
                                                 />
                                             )}
 

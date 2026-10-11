@@ -444,7 +444,7 @@ export async function addSubscriptionToCartAction(
     .eq("recurring_plan_id", plan.id)
     .maybeSingle()
 
-  // Modo de recebimento escolhido na página do plano — só persiste se o plano aceitar.
+  // Modo de recebimento escolhido na página do plano - só persiste se o plano aceitar.
   const planAllowedModes: string[] = Array.isArray(plan.fulfillment_modes)
     ? plan.fulfillment_modes as string[]
     : ["delivery", "pickup"]

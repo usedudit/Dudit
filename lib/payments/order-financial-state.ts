@@ -75,24 +75,24 @@ export type OrderDepositSummary = {
 }
 
 export const DEPOSIT_STATUS_LABELS: Record<string, string> = {
-    pending: "Sinal pendente",
-    partially_paid: "Sinal pago - saldo pendente",
-    paid: "Quitado",
-    not_required: "Sem sinal",
-    expired: "Sinal expirado",
+  pending: "Sinal pendente",
+  partially_paid: "Sinal pago - saldo pendente",
+  paid: "Quitado",
+  not_required: "Sem sinal",
+  expired: "Sinal expirado",
 };
 
 /** Returns true when the sinal is still actionable (can generate/pay it). */
 export function canPaySinal(depositSummary: OrderDepositSummary | null): boolean {
-    if (!depositSummary?.usesDeposit) return false;
-    return depositSummary.depositStatus === "pending";
+  if (!depositSummary?.usesDeposit) return false;
+  return depositSummary.depositStatus === "pending";
 }
 
 /** Returns true when the sinal row should be displayed (pending or paid). */
 export function shouldShowSinal(depositSummary: OrderDepositSummary | null): boolean {
-    if (!depositSummary?.usesDeposit || depositSummary.depositAmount <= 0.009) return false;
-    const status = depositSummary.depositStatus;
-    return status === "pending" || status === "partially_paid";
+  if (!depositSummary?.usesDeposit || depositSummary.depositAmount <= 0.009) return false;
+  const status = depositSummary.depositStatus;
+  return status === "pending" || status === "partially_paid";
 }
 
 export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepositSummary {
@@ -108,14 +108,14 @@ export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepo
     if (isExpired) {
       depositStatus = "expired"
     } else if (meta.depositStatus === "paid" || meta.depositStatus === "partially_paid") {
-      // Sinal was actually paid/confirmed via MP webhook — trust meta.depositStatus
+      // Sinal was actually paid/confirmed via MP webhook - trust meta.depositStatus
       if (paidAmount >= fullOrderTotal - 0.005) {
         depositStatus = "paid"
       } else {
         depositStatus = "partially_paid"
       }
     } else {
-      // Sinal not confirmed paid via MP yet — regardless of other payments on the order
+      // Sinal not confirmed paid via MP yet - regardless of other payments on the order
       depositStatus = "pending"
     }
   }
@@ -160,7 +160,7 @@ export function patchDepositCheckoutOnPayment(
 
   let depositStatus: DepositCheckoutMeta["depositStatus"] = "pending"
   if (initialCharge > 0) {
-    // Sinal is an atomic MP charge — only "paid" when paid covers the initial charge
+    // Sinal is an atomic MP charge - only "paid" when paid covers the initial charge
     if (paid >= initialCharge - 0.005) {
       depositStatus = "paid"
     } else {

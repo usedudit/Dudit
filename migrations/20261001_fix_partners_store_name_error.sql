@@ -5,7 +5,7 @@
 -- 20260729_clean_partners_schema.sql (data moved to `stores.name`).
 --
 -- Several legacy views still select `p.store_name`, `p.store_description`,
--- `p.store_image_url`, `p.rating`, etc. — all dropped columns — which causes
+-- `p.store_image_url`, `p.rating`, etc. - all dropped columns - which causes
 -- PostgreSQL/PostgREST to throw:
 --   "column partners.store_name does not exist"
 -- whenever those views are queried (e.g. via RLS policy triggers or direct

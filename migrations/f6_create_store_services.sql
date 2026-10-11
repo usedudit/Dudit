@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fase 6 - store_services (DEPRECATED — tabela dropada pela migração
+-- Fase 6 - store_services (DEPRECATED - tabela dropada pela migração
 -- 20260728_simplify_multi_store_architecture.sql)
 -- 
 -- A arquitetura multi-store foi simplificada: services agora possui store_id

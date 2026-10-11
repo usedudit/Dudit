@@ -137,17 +137,24 @@ export async function requireRateLimit(
             endpointName
         )
 
+        // Authenticated ERP operators have valid session tokens & RBAC permissions.
+        // Bypassing remote Redis for ERP_GENERAL completely eliminates Redis spikes while browsing the ERP.
+        if (category === RateLimitCategory.ERP_GENERAL) {
+            return { success: true }
+        }
+
         // Memory pre-check for non-critical routes to save Redis commands during fast UI interaction
         if (!config.failClosed) {
             const now = Date.now()
             const cached = localShortCircuitCache.get(identifier)
             if (cached && cached.resetAt > now) {
                 cached.count++
-                if (cached.count <= Math.max(3, Math.floor(config.maxRequests * 0.3))) {
+                if (cached.count <= Math.max(10, Math.floor(config.maxRequests * 0.5))) {
                     return { success: true }
                 }
             } else {
-                localShortCircuitCache.set(identifier, { count: 1, resetAt: now + 5000 })
+                localShortCircuitCache.set(identifier, { count: 1, resetAt: now + 15000 })
+                return { success: true }
             }
         }
 

@@ -43,7 +43,7 @@ export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({ execution,
                 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate"
                 title={formatDate(execution.scheduled_for)}
               >
-                <span className="truncate">{formatDate(execution.scheduled_for) || "—"}</span>
+                <span className="truncate">{formatDate(execution.scheduled_for) || "-"}</span>
               </h3>
               <Badge variant={statusVariant(execution.status)} className="whitespace-nowrap scale-90 shrink-0">
                 {getRecurringExecutionStatusLabel(execution.status)}
@@ -67,14 +67,14 @@ export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({ execution,
           <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Agendada</span>
             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-              {formatDate(execution.scheduled_for) || "—"}
+              {formatDate(execution.scheduled_for) || "-"}
             </span>
           </div>
 
           <div className="flex flex-col gap-0.5 items-end min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Concluída em</span>
             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-              {execution.completed_at ? formatDateTime(execution.completed_at) : "—"}
+              {execution.completed_at ? formatDateTime(execution.completed_at) : "-"}
             </span>
           </div>
         </div>
@@ -83,7 +83,7 @@ export const ExecutionGridCard: React.FC<ExecutionGridCardProps> = ({ execution,
           <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pedido</span>
             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-              {orderNumber ? `#${orderNumber}` : "—"}
+              {orderNumber ? `#${orderNumber}` : "-"}
             </span>
           </div>
         </div>
