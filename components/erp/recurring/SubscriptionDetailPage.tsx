@@ -33,7 +33,10 @@ import {
   resumeRecurringSubscriptionAction,
   syncSubscriptionWithMpErpAction,
   updateSubscriptionStockShortageResolvedAction,
+  scheduleSubscriptionServiceAction,
+  createSubscriptionDeliveryOrderAction,
 } from "@/app/actions/erp/recurring-subscriptions"
+import { getAvailableTimeSlotsAction } from "@/app/actions/erp/appointments"
 import {
   getRecurringFrequencyLabel,
   getRecurringShippingSourceLabel,
@@ -146,6 +149,22 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   const [busy, setBusy] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
 
+  // Agendar serviço com créditos
+  const [scheduleCredit, setScheduleCredit] = useState<any | null>(null)
+  const [scheduleDate, setScheduleDate] = useState("")
+  const [scheduleTime, setScheduleTime] = useState("")
+  const [scheduleNotes, setScheduleNotes] = useState("")
+  const [scheduleSlots, setScheduleSlots] = useState<string[]>([])
+  const [loadingScheduleSlots, setLoadingScheduleSlots] = useState(false)
+  const [submittingSchedule, setSubmittingSchedule] = useState(false)
+
+  // Registrar entrega de produtos com créditos
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false)
+  const [deliveryQuantities, setDeliveryQuantities] = useState<Record<string, number>>({})
+  const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("pickup")
+  const [deliveryNotes, setDeliveryNotes] = useState("")
+  const [submittingDelivery, setSubmittingDelivery] = useState(false)
+
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
   const executionsRequestedRef = useRef(false)
@@ -213,6 +232,123 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   useEffect(() => {
     setHistoryPage(1)
   }, [historySearch])
+
+  // Horários do modal de agendamento com créditos
+  useEffect(() => {
+    if (!scheduleCredit || !scheduleDate || !scheduleCredit.staffPartnerUserId) {
+      setScheduleSlots([])
+      return
+    }
+    let cancelled = false
+    setLoadingScheduleSlots(true)
+    setScheduleTime("")
+    getAvailableTimeSlotsAction(
+      scheduleDate,
+      scheduleCredit.staffPartnerUserId,
+      Number(scheduleCredit.durationMinutes || 60),
+      0,
+      detail?.subscription?.storeId || null,
+    )
+      .then((res) => {
+        if (cancelled) return
+        const conflicts = new Set<string>((res.conflictingSlots as string[]) || [])
+        setScheduleSlots(((res.slots as string[]) || []).filter((s) => !conflicts.has(s)))
+      })
+      .catch(() => {
+        if (!cancelled) setScheduleSlots([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingScheduleSlots(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleCredit, scheduleDate])
+
+  const openScheduleModal = (credit: any) => {
+    setScheduleCredit(credit)
+    setScheduleDate("")
+    setScheduleTime("")
+    setScheduleNotes("")
+    setScheduleSlots([])
+  }
+
+  const openDeliveryModal = () => {
+    const productCredits = (detail?.credits || []).filter((c) => c.itemType === "product" && c.remaining > 0)
+    const initial: Record<string, number> = {}
+    for (const c of productCredits) initial[c.id] = 1
+    setDeliveryQuantities(initial)
+    setDeliveryType(detail?.subscription?.deliveryType === "delivery" ? "delivery" : "pickup")
+    setDeliveryNotes("")
+    setDeliveryModalOpen(true)
+  }
+
+  const handleScheduleWithCredits = async () => {
+    if (!scheduleCredit || !scheduleDate || !scheduleTime || submittingSchedule) return
+    setSubmittingSchedule(true)
+    try {
+      const res = await scheduleSubscriptionServiceAction({
+        partnerId,
+        subscriptionId,
+        serviceId: scheduleCredit.serviceId,
+        date: scheduleDate,
+        time: scheduleTime,
+        staffPartnerUserId: scheduleCredit.staffPartnerUserId,
+        notes: scheduleNotes || undefined,
+      })
+      if (res.success) {
+        toast({
+          title: "Agendado com créditos",
+          description: `Pedido #${res.orderNumber} criado sem cobrança.`,
+        })
+        setScheduleCredit(null)
+        void loadDetail()
+      } else {
+        toast({ title: "Não foi possível agendar", description: res.error, variant: "destructive" })
+      }
+    } finally {
+      setSubmittingSchedule(false)
+    }
+  }
+
+  const handleRegisterDelivery = async () => {
+    if (submittingDelivery) return
+    const productCredits = (detail?.credits || []).filter((c) => c.itemType === "product" && c.remaining > 0)
+    const items = productCredits
+      .filter((c) => Number(deliveryQuantities[c.id] || 0) > 0)
+      .map((c) => ({
+        productId: c.productId as string,
+        quantity: Number(deliveryQuantities[c.id] || 0),
+      }))
+    if (items.length === 0) {
+      toast({ title: "Informe a quantidade", description: "Ao menos um item deve ter quantidade maior que zero.", variant: "destructive" })
+      return
+    }
+    setSubmittingDelivery(true)
+    try {
+      const res = await createSubscriptionDeliveryOrderAction({
+        partnerId,
+        subscriptionId,
+        items,
+        deliveryType,
+        notes: deliveryNotes || undefined,
+      })
+      if (res.success) {
+        toast({
+          title: "Entrega registrada",
+          description: `Pedido #${res.orderNumber} criado sem cobrança. Confira em Pedidos.`,
+        })
+        setDeliveryModalOpen(false)
+        void loadDetail()
+        onChanged?.()
+      } else {
+        toast({ title: "Não foi possível registrar", description: res.error, variant: "destructive" })
+      }
+    } finally {
+      setSubmittingDelivery(false)
+    }
+  }
 
   const pageTitle = detail?.plan?.name || "Assinatura"
 
@@ -752,34 +888,47 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                   <FadeIn key="credits" className="block">
                     {detail.credits.length ? (
                       <FormSection
-                        title="Créditos de Serviço"
-                        description="Saldo de serviços liberado por esta assinatura."
+                        title="Créditos da Assinatura"
+                        description="Saldo liberado por esta assinatura. Serviços podem ser agendados e produtos entregues usando créditos."
                       >
                         <div className="space-y-4">
                           {detail.credits.map((credit) => (
                             <div
                               key={credit.id}
-                              className="flex items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4"
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                  {credit.serviceName}
-                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {credit.itemName}
+                                  </p>
+                                  <Badge variant={credit.itemType === "service" ? "blue" : "purple"}>
+                                    {credit.itemType === "service" ? "Serviço" : "Produto"}
+                                  </Badge>
+                                </div>
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                   {credit.expiresAt
                                     ? `Válido até ${formatFullDate(credit.expiresAt)}`
                                     : "Sem validade"}
+                                  {` • ${credit.consumed} consumidos`}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                  {credit.consumed} consumidos
-                                </span>
                                 <span
                                   className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${credit.remaining > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
                                 >
                                   {credit.remaining}/{credit.quantity}
                                 </span>
+                                {canManage && credit.remaining > 0 && credit.itemType === "service" && (
+                                  <Button size="sm" onClick={() => openScheduleModal(credit)}>
+                                    Agendar
+                                  </Button>
+                                )}
+                                {canManage && credit.remaining > 0 && credit.itemType === "product" && (
+                                  <Button size="sm" onClick={openDeliveryModal}>
+                                    Registrar entrega
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -791,7 +940,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                           placeholderType="image"
                           imageSrc="https://img.dudit.com.br/static/mascots/ValesCompra.png"
                           imageAlt="Nenhum crédito"
-                          title="Nenhum crédito de serviço"
+                          title="Nenhum crédito disponível"
                           subtitle="Créditos liberados por esta assinatura aparecerão aqui."
                         />
                       </div>
@@ -968,6 +1117,195 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           maxWidth="md"
         >
           <p className="text-sm text-brand-red whitespace-pre-wrap">{executionError}</p>
+        </DefaultModal>
+
+        <DefaultModal
+          isOpen={!!scheduleCredit}
+          onClose={() => setScheduleCredit(null)}
+          title="Agendar serviço com créditos"
+          maxWidth="md"
+        >
+          {scheduleCredit && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-brand-green/5 border border-brand-green/30">
+                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                  {scheduleCredit.itemName}
+                </p>
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                  Agendamento sem cobrança — debita 1 crédito da assinatura do cliente.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                  Data
+                </label>
+                <Input
+                  type="date"
+                  name="scheduleDate"
+                  value={scheduleDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  max={scheduleCredit.expiresAt ? String(scheduleCredit.expiresAt).slice(0, 10) : undefined}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  variant="full-rounded"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                  Horário
+                </label>
+                {!scheduleDate ? (
+                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                    Escolha a data para ver os horários.
+                  </p>
+                ) : loadingScheduleSlots ? (
+                  <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                    <ThreeDotsLoader /> Carregando horários...
+                  </div>
+                ) : scheduleSlots.length === 0 ? (
+                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                    Nenhum horário livre nesta data. Tente outro dia.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {scheduleSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setScheduleTime(slot)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          scheduleTime === slot
+                            ? "border-brand-green bg-brand-green/10 text-brand-green"
+                            : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-dark/40"
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                  Observações (opcional)
+                </label>
+                <textarea
+                  value={scheduleNotes}
+                  onChange={(e) => setScheduleNotes(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Instruções para o atendimento..."
+                  className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
+                />
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={() => void handleScheduleWithCredits()}
+                disabled={!scheduleDate || !scheduleTime || submittingSchedule}
+              >
+                {submittingSchedule ? "Confirmando..." : "Confirmar agendamento"}
+              </Button>
+            </div>
+          )}
+        </DefaultModal>
+
+        <DefaultModal
+          isOpen={deliveryModalOpen}
+          onClose={() => setDeliveryModalOpen(false)}
+          title="Registrar entrega com créditos"
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            {(detail?.credits || [])
+              .filter((c) => c.itemType === "product" && c.remaining > 0)
+              .map((credit) => (
+                <div key={credit.id} className="flex items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                      {credit.itemName}
+                    </p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                      {credit.remaining} crédito(s) disponível(is)
+                      {credit.expiresAt ? ` • Válido até ${formatFullDate(credit.expiresAt)}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setDeliveryQuantities((prev) => ({
+                          ...prev,
+                          [credit.id]: Math.max(0, Number(prev[credit.id] || 0) - 1),
+                        }))
+                      }
+                      disabled={Number(deliveryQuantities[credit.id] || 0) <= 0}
+                    >
+                      −
+                    </Button>
+                    <span className="w-8 text-center text-sm font-bold text-brand-dark dark:text-dark-heading">
+                      {Number(deliveryQuantities[credit.id] || 0)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setDeliveryQuantities((prev) => ({
+                          ...prev,
+                          [credit.id]: Math.min(credit.remaining, Number(prev[credit.id] || 0) + 1),
+                        }))
+                      }
+                      disabled={Number(deliveryQuantities[credit.id] || 0) >= credit.remaining}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+            <div>
+              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                Tipo de entrega
+              </label>
+              <div className="flex gap-2">
+                {(["pickup", "delivery"] as const).map((t) => (
+                  <Button
+                    key={t}
+                    variant={deliveryType === t ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDeliveryType(t)}
+                  >
+                    {t === "pickup" ? "Retirada" : "Entrega"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                Observações (opcional)
+              </label>
+              <textarea
+                value={deliveryNotes}
+                onChange={(e) => setDeliveryNotes(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="Instruções para a entrega..."
+                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
+              />
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={() => void handleRegisterDelivery()}
+              disabled={submittingDelivery}
+            >
+              {submittingDelivery ? "Registrando..." : "Registrar entrega"}
+            </Button>
+          </div>
         </DefaultModal>
 
         <AlertModal

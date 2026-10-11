@@ -144,15 +144,36 @@ const fetchReturnsDataStatic = unstable_cache(
       rejected: "Recusado",
       completed: "Concluído",
       cancelled: "Cancelado",
+      canceled: "Cancelado",
       awaiting_return: "Aguardando devolução",
       in_transit: "Em trânsito",
       partially_refunded: "Reembolso parcial",
       fully_refunded: "Reembolso total",
+      partial_refund: "Reembolso parcial",
+      full_refund: "Reembolso total",
       pending_review: "Análise pendente",
+      under_review: "Em análise",
+      in_review: "Em análise",
       processing: "Processando",
       refunded: "Reembolsado",
       closed: "Fechado",
       open: "Aberto",
+      received: "Recebido",
+      inspected: "Inspecionado",
+      shipped: "Enviado",
+      delivered: "Entregue",
+      awaiting_shipment: "Aguardando envio",
+      return_received: "Devolução recebida",
+      expired: "Expirado",
+      disputed: "Em disputa",
+      resolved: "Resolvido",
+      new: "Novo",
+    }
+
+    const humanizeStatus = (raw: string) => {
+      const cleaned = String(raw || "").replace(/[_-]+/g, " ").trim()
+      if (!cleaned) return "Pendente"
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
     }
 
     return {
@@ -163,16 +184,16 @@ const fetchReturnsDataStatic = unstable_cache(
       totalRefundedFormatted: brl(totalRefunded),
       byReason: Array.from(byReason.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([key, value]) => ({ label: reasonLabels[key] || key, value })),
+        .map(([key, value]) => ({ label: reasonLabels[String(key).trim().toLowerCase()] || key, value })),
       byStatus: Array.from(byStatus.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([key, value]) => ({ label: statusLabels[key] || key, value })),
+        .map(([key, value]) => ({ label: statusLabels[String(key).trim().toLowerCase()] || humanizeStatus(key), value })),
       recentReturns: periodReturns.slice(0, 8).map((r: any) => ({
         id: r.id,
         customer: r.customer_name_snapshot || "Cliente",
-        reason: reasonLabels[r.reason] || r.reason || r.customer_reason || "Outro",
+        reason: reasonLabels[String(r.reason || "").trim().toLowerCase()] || r.reason || r.customer_reason || "Outro",
         amount: brl(money(r.refund_amount ?? r.order_total_snapshot)),
-        status: statusLabels[r.status] || r.status,
+        status: statusLabels[String(r.status || "").trim().toLowerCase()] || humanizeStatus(r.status),
         date: new Date(r.created_at).toLocaleDateString("pt-BR"),
       })),
       returnEvolution,

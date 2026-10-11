@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Portal from "@/components/Portal"
-import { Button, Input, FormDropdown } from "@/components/reusable"
+import { Button, Input } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
@@ -10,15 +10,6 @@ import { motion, AnimatePresence, useMotionValue } from "framer-motion"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss"
-
-const RADIUS_OPTIONS = [
-    { value: "", label: "Toda a cidade (sem limite)" },
-    { value: "5", label: "Até 5 km" },
-    { value: "10", label: "Até 10 km" },
-    { value: "25", label: "Até 25 km" },
-    { value: "50", label: "Até 50 km" },
-    { value: "100", label: "Até 100 km" },
-]
 
 const CONDITION_FILTER_OPTIONS = [
     { value: "", label: "Todos os estados" },
@@ -32,7 +23,6 @@ export interface AppliedFilters {
     minPrice: string | number
     maxPrice: string | number
     promoOn: boolean
-    radius: number | null
     condition?: string
 }
 
@@ -46,7 +36,6 @@ interface ExplorarFiltersBottomSheetProps {
     formatCitySlug: (slug: string) => string
     currentType: string
     selectedCategories: string[]
-    selectedRadius?: number | null
     selectedCondition?: string
     minPrice: string | number
     maxPrice: string | number
@@ -69,7 +58,6 @@ export function ExplorarFiltersBottomSheet({
     formatCitySlug,
     currentType,
     selectedCategories,
-    selectedRadius,
     selectedCondition,
     minPrice,
     maxPrice,
@@ -78,8 +66,7 @@ export function ExplorarFiltersBottomSheet({
     productCategories,
     serviceCategories,
     partnerCategories,
-    userProfile,
-    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true },
 }: ExplorarFiltersBottomSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
@@ -105,7 +92,6 @@ export function ExplorarFiltersBottomSheet({
     const [draftMinPrice, setDraftMinPrice] = useState<string | number>(minPrice)
     const [draftMaxPrice, setDraftMaxPrice] = useState<string | number>(maxPrice)
     const [draftPromo, setDraftPromo] = useState(promoOn)
-    const [draftRadius, setDraftRadius] = useState<number | null>(selectedRadius ?? null)
     const [draftCondition, setDraftCondition] = useState(selectedCondition || "")
 
     useEffect(() => {
@@ -115,7 +101,6 @@ export function ExplorarFiltersBottomSheet({
         setDraftMinPrice(minPrice)
         setDraftMaxPrice(maxPrice)
         setDraftPromo(promoOn)
-        setDraftRadius(selectedRadius ?? null)
         setDraftCondition(selectedCondition || "")
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
@@ -125,7 +110,6 @@ export function ExplorarFiltersBottomSheet({
         || !!draftMinPrice
         || !!draftMaxPrice
         || draftPromo
-        || !!draftRadius
         || !!draftCondition
 
     const draftCategoryList = useMemo(() => {
@@ -141,7 +125,6 @@ export function ExplorarFiltersBottomSheet({
             minPrice: draftMinPrice,
             maxPrice: draftMaxPrice,
             promoOn: draftPromo,
-            radius: draftRadius,
             condition: draftCondition,
         })
         onClose()
@@ -164,7 +147,7 @@ export function ExplorarFiltersBottomSheet({
     const bodySections = (
         <>
             {/* Local Section */}
-            {filterConfig.showRadius !== false && (
+            {filterConfig.showCategory !== false && (
                 <section>
                     <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Local</h4>
                     <button
@@ -181,18 +164,6 @@ export function ExplorarFiltersBottomSheet({
                         </span>
                         <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
                     </button>
-                </section>
-            )}
-
-            {/* Raio de busca */}
-            {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && (
-                <section>
-                    <FormDropdown
-                        label="Raio de busca"
-                        value={String(draftRadius || "")}
-                        setValue={(v) => setDraftRadius(v ? Number(v) : null)}
-                        options={RADIUS_OPTIONS}
-                    />
                 </section>
             )}
 

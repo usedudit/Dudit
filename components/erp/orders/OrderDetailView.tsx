@@ -874,6 +874,11 @@ export default function OrderDetailView({
     if (sourceQuote) {
       return `Orçamento • ${sourceQuote?.quote_number || ""}`;
     }
+    if (order.order_source === "Assinatura") {
+      return order.payment_method === "Assinatura (Créditos)"
+        ? "Assinatura • Créditos — sem cobrança adicional"
+        : "Assinatura";
+    }
     return normalizeOrderSource(order.order_source);
   };
 

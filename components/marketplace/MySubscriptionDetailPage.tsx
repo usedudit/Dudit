@@ -32,7 +32,10 @@ import {
   updateMySubscriptionDetailsAction,
   confirmMySubscriptionAddressChangeAction,
   respondToMySubscriptionPriceChangeAction,
+  getMySubscriptionCreditsAction,
+  bookServiceWithCreditAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
+import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
 import { formatCurrency, formatDate, formatFullDate } from "@/lib/utils"
@@ -128,8 +131,20 @@ interface MySubscriptionDetailPageProps {
 export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, userId }: MySubscriptionDetailPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<"details" | "notes" | "history">("details")
+  const [activeTab, setActiveTab] = useState<"details" | "credits" | "notes" | "history">("details")
   const [actionLoading, setActionLoading] = useState(false)
+
+  const [credits, setCredits] = useState<any[]>([])
+  const [loadingCredits, setLoadingCredits] = useState(false)
+  const [creditsLoaded, setCreditsLoaded] = useState(false)
+
+  const [bookingCredit, setBookingCredit] = useState<any | null>(null)
+  const [bookingDate, setBookingDate] = useState("")
+  const [bookingTime, setBookingTime] = useState("")
+  const [bookingNotes, setBookingNotes] = useState("")
+  const [bookingSlots, setBookingSlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [submittingBooking, setSubmittingBooking] = useState(false)
 
   const [editNotes, setEditNotes] = useState("")
   const [editingNotes, setEditingNotes] = useState(false)
@@ -196,6 +211,88 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
     if (activeTab === "history" && !historyLoaded) void loadHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  const loadCredits = async () => {
+    setCreditsLoaded(true)
+    setLoadingCredits(true)
+    const res = await getMySubscriptionCreditsAction(sub.id)
+    setLoadingCredits(false)
+    if (res.success) setCredits(res.data || [])
+    else toast({ title: "Erro", description: res.error, variant: "destructive" })
+  }
+
+  useEffect(() => {
+    if (activeTab === "credits" && !creditsLoaded) void loadCredits()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Carrega horários sempre que data/profissional/duração do modal mudam
+  useEffect(() => {
+    if (!bookingCredit || !bookingDate || !bookingCredit.staffPartnerUserId) {
+      setBookingSlots([])
+      return
+    }
+    let cancelled = false
+    setLoadingSlots(true)
+    setBookingTime("")
+    getPublicAvailableTimeSlots(
+      sub.partnerId,
+      bookingCredit.staffPartnerUserId,
+      bookingDate,
+      Number(bookingCredit.durationMinutes || 60),
+      0,
+      sub.storeId || undefined,
+    )
+      .then((res) => {
+        if (cancelled) return
+        setBookingSlots(res.success ? res.slots || [] : [])
+        if (!res.success && res.error) {
+          toast({ title: "Erro", description: res.error, variant: "destructive" })
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingCredit, bookingDate])
+
+  const openBookingModal = (credit: any) => {
+    setBookingCredit(credit)
+    setBookingDate("")
+    setBookingTime("")
+    setBookingNotes("")
+    setBookingSlots([])
+  }
+
+  const handleBookWithCredits = async () => {
+    if (!bookingCredit || !bookingDate || !bookingTime) return
+    setSubmittingBooking(true)
+    try {
+      const res = await bookServiceWithCreditAction({
+        subscriptionId: sub.id,
+        serviceId: bookingCredit.serviceId,
+        date: bookingDate,
+        time: bookingTime,
+        staffPartnerUserId: bookingCredit.staffPartnerUserId,
+        notes: bookingNotes || undefined,
+      })
+      if (res.success) {
+        toast({
+          title: "Agendado com créditos",
+          description: `Pedido #${res.orderNumber} criado sem cobrança. Confira em Meus Pedidos.`,
+        })
+        setBookingCredit(null)
+        void loadCredits()
+      } else {
+        toast({ title: "Não foi possível agendar", description: res.error, variant: "destructive" })
+      }
+    } finally {
+      setSubmittingBooking(false)
+    }
+  }
 
   const runAction = async (action: "pause" | "resume" | "cancel") => {
     setActionLoading(true)
@@ -463,6 +560,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger value="details">Detalhes da Assinatura</TabsTrigger>
+            <TabsTrigger value="credits">Créditos</TabsTrigger>
             <TabsTrigger value="notes">Observações</TabsTrigger>
             <TabsTrigger value="history">Histórico de Cobranças</TabsTrigger>
           </TabsList>
@@ -882,6 +980,67 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
             </div>
           </TabsContent>
 
+          <TabsContent value="credits" className="mt-0 focus-visible:ring-0">
+            <FormSection title="Créditos da Assinatura">
+              {loadingCredits ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <SkeletonLoader key={i} height={72} className="rounded-xl" />
+                  ))}
+                </div>
+              ) : credits.length === 0 ? (
+                <div className="text-center py-10 space-y-3">
+                  <IconPlaceholder placeholderType="image" className="w-16 h-16 mx-auto" />
+                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                    Nenhum crédito disponível no momento.
+                  </p>
+                  <p className="text-xs text-brand-inactive-text/80 dark:text-dark-body/80">
+                    Os créditos são liberados a cada ciclo da assinatura.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {credits.map((credit) => {
+                    const isService = credit.itemType === "service"
+                    const expiryDate = credit.expiresAt ? String(credit.expiresAt).slice(0, 10) : null
+                    return (
+                      <div
+                        key={credit.id}
+                        className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border border-brand-border/60 dark:border-dark-border/60 bg-white dark:bg-dark-card"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                              {credit.itemName}
+                            </span>
+                            <Badge variant={isService ? "blue" : "purple"}>
+                              {isService ? "Serviço" : "Produto"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
+                            {credit.remainingCredits} de {credit.totalCredits} créditos disponíveis
+                            {expiryDate ? ` • Válidos até ${expiryDate.split("-").reverse().join("/")}` : " • Sem validade"}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          {isService ? (
+                            <Button size="sm" onClick={() => openBookingModal(credit)} disabled={credit.remainingCredits < 1}>
+                              Agendar
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                              A loja registra a entrega
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </FormSection>
+          </TabsContent>
+
           <TabsContent value="notes" className="mt-0 focus-visible:ring-0">
             <FormSection
               title="Observações"
@@ -1099,6 +1258,97 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
             </div>
           )}
         </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={!!bookingCredit}
+        onClose={() => setBookingCredit(null)}
+        title="Agendar com créditos"
+      >
+        {bookingCredit && (
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-brand-green/5 border border-brand-green/30">
+              <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                {bookingCredit.itemName}
+              </p>
+              <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                Agendamento sem cobrança — usa 1 crédito da assinatura.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                Data
+              </label>
+              <input
+                type="date"
+                value={bookingDate}
+                min={new Date().toISOString().slice(0, 10)}
+                max={bookingCredit.expiresAt ? String(bookingCredit.expiresAt).slice(0, 10) : undefined}
+                onChange={(e) => setBookingDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                Horário
+              </label>
+              {!bookingDate ? (
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                  Escolha a data para ver os horários disponíveis.
+                </p>
+              ) : loadingSlots ? (
+                <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                  <Spinner size={14} /> Carregando horários...
+                </div>
+              ) : bookingSlots.length === 0 ? (
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                  Nenhum horário disponível nesta data. Tente outro dia.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {bookingSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setBookingTime(slot)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        bookingTime === slot
+                          ? "border-brand-green bg-brand-green/10 text-brand-green"
+                          : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:border-brand-dark/40"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body block mb-1.5">
+                Observações (opcional)
+              </label>
+              <textarea
+                value={bookingNotes}
+                onChange={(e) => setBookingNotes(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="Alguma preferência para o atendimento?"
+                className="w-full px-3 py-2.5 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-card text-sm text-brand-dark dark:text-dark-heading resize-none"
+              />
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={() => void handleBookWithCredits()}
+              disabled={!bookingDate || !bookingTime || submittingBooking}
+            >
+              {submittingBooking ? "Confirmando..." : "Confirmar agendamento"}
+            </Button>
+          </div>
+        )}
       </DefaultModal>
 
       <AlertModal

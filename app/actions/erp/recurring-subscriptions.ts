@@ -356,7 +356,12 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
         .maybeSingle(),
       supabase
         .from("subscription_item_credits")
-        .select("id, quantity, consumed, expires_at, services(name)")
+        .select(`
+          id, service_id, product_id, quantity, consumed, expires_at,
+          recurring_subscription_items(staff_partner_user_id, duration_minutes),
+          services(name),
+          products(name)
+        `)
         .eq("partner_id", partnerId)
         .eq("subscription_id", subscriptionId)
         .order("expires_at", { ascending: true, nullsFirst: false }),
@@ -416,11 +421,18 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
       (creditRows || []) as Record<string, any>[]
     ).map((credit) => ({
       id: String(credit.id),
-      serviceName: credit.services?.name || "Serviço",
+      itemName: credit.services?.name || credit.products?.name || "Item",
+      itemType: credit.service_id ? "service" : "product",
+      serviceId: credit.service_id ?? null,
+      productId: credit.product_id ?? null,
       quantity: Number(credit.quantity || 0),
       consumed: Number(credit.consumed || 0),
       remaining: Math.max(Number(credit.quantity || 0) - Number(credit.consumed || 0), 0),
       expiresAt: credit.expires_at != null ? String(credit.expires_at) : null,
+      staffPartnerUserId: credit.recurring_subscription_items?.staff_partner_user_id ?? null,
+      durationMinutes: credit.recurring_subscription_items?.duration_minutes != null
+        ? Number(credit.recurring_subscription_items.duration_minutes)
+        : null,
     }))
 
     const detail: RecurringSubscriptionDetail = {
@@ -583,9 +595,10 @@ export async function getSubscriptionCreditsAction(partnerId: string, search: st
     let query = supabase
       .from("subscription_item_credits")
       .select(`
-        id, customer_id, service_id, quantity, consumed, expires_at, created_at,
+        id, customer_id, service_id, product_id, quantity, consumed, expires_at, created_at,
         customers(name),
-        services(name)
+        services(name),
+        products(name)
       `)
       .eq("partner_id", partnerId)
 
@@ -598,7 +611,10 @@ export async function getSubscriptionCreditsAction(partnerId: string, search: st
       id: row.id,
       customerId: row.customer_id,
       customerName: row.customers?.name || "Cliente",
-      serviceName: row.services?.name || "Serviço",
+      serviceName: row.services?.name || row.products?.name || "Item",
+      itemType: row.service_id ? "service" : "product",
+      serviceId: row.service_id ?? null,
+      productId: row.product_id ?? null,
       quantity: row.quantity,
       consumed: row.consumed,
       remaining: row.quantity - row.consumed,
@@ -686,6 +702,541 @@ export async function syncSubscriptionWithMpErpAction(partnerId: string, subscri
     return await syncSubscriptionWithMpAction(partnerId, subscriptionId)
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao sincronizar" }
+  }
+}
+
+/**
+ * Vendedor agenda um serviço da assinatura usando os créditos do cliente.
+ * Espelho do bookServiceWithCreditAction (marketplace), escopado por partner.
+ */
+export async function scheduleSubscriptionServiceAction(input: {
+  partnerId: string
+  subscriptionId: string
+  serviceId: string
+  date: string
+  time: string
+  staffPartnerUserId?: string | null
+  notes?: string
+}) {
+  try {
+    await requirePermission(input.partnerId, "recurring_subscriptions", "manage")
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const { partnerId, subscriptionId, serviceId, date, time } = input
+    if (!subscriptionId || !serviceId || !date || !time) {
+      return { success: false, error: "Parâmetros inválidos." }
+    }
+
+    const supabase = await getSupabaseServerClient()
+
+    const { data: sub } = await supabase
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, store_id, status, delivery_address, next_execution_at,
+        customers(id, name, user_id)
+      `)
+      .eq("id", subscriptionId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (!sub) return { success: false, error: "Assinatura não encontrada." }
+    if (!["active", "awaiting_restock"].includes(sub.status)) {
+      return { success: false, error: "Esta assinatura não está ativa." }
+    }
+
+    const customerId = (sub as any).customers?.id as string | undefined
+    if (!customerId) return { success: false, error: "Assinatura sem cliente vinculado." }
+
+    // Item de serviço (staff/duração preferidos)
+    const { data: subItem } = await supabase
+      .from("recurring_subscription_items")
+      .select("staff_partner_user_id, duration_minutes")
+      .eq("subscription_id", subscriptionId)
+      .eq("service_id", serviceId)
+      .eq("item_type", "service")
+      .maybeSingle()
+
+    // Crédito disponível
+    const nowIso = new Date().toISOString()
+    const { data: creditRows } = await supabase
+      .from("subscription_item_credits")
+      .select("quantity, consumed, expires_at")
+      .eq("partner_id", partnerId)
+      .eq("customer_id", customerId)
+      .eq("service_id", serviceId)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+
+    const remaining = (creditRows || []).reduce(
+      (acc, c) => acc + Math.max(0, Number(c.quantity) - Number(c.consumed)),
+      0,
+    )
+    if (remaining < 1) {
+      return { success: false, error: "O cliente não tem créditos para este serviço." }
+    }
+
+    const earliestExpiry = (creditRows || [])
+      .map((c) => c.expires_at)
+      .filter(Boolean)
+      .sort()[0] as string | undefined
+    if (earliestExpiry && date > earliestExpiry.slice(0, 10)) {
+      return { success: false, error: "A data escolhida é posterior à validade dos créditos." }
+    }
+
+    // Serviço + staff
+    const { data: service } = await supabase
+      .from("services")
+      .select("id, name, duration_minutes, store_id")
+      .eq("id", serviceId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!service) return { success: false, error: "Serviço indisponível." }
+
+    const staffId = input.staffPartnerUserId || subItem?.staff_partner_user_id || null
+    if (!staffId) return { success: false, error: "Serviço sem profissional definido." }
+
+    const durationMinutes = Number(subItem?.duration_minutes || service.duration_minutes || 60)
+    const storeId = (sub.store_id as string | null) || (service.store_id as string | null) || null
+
+    const { isStaffSlotAvailable } = await import("@/lib/commerce/scheduling-availability")
+    let openingHours: any = null
+    if (storeId) {
+      const { data: storeRow } = await supabase
+        .from("stores")
+        .select("opening_hours")
+        .eq("id", storeId)
+        .maybeSingle()
+      openingHours = storeRow?.opening_hours || null
+    }
+
+    const slotOk = await isStaffSlotAvailable(supabase as any, {
+      partnerId,
+      staffId,
+      date,
+      startTime: time,
+      durationMinutes,
+      openingHours,
+      storeId,
+    })
+    if (!slotOk) return { success: false, error: "Este horário não está disponível." }
+
+    let staffName = "Profissional"
+    const { data: puRow } = await supabase
+      .from("partner_users")
+      .select("user_id")
+      .eq("id", staffId)
+      .maybeSingle()
+    if (puRow?.user_id) {
+      const { data: prof } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", puRow.user_id)
+        .maybeSingle()
+      if (prof?.full_name) staffName = prof.full_name
+    }
+
+    const user = await import("@/lib/auth/authorization").then((m) => m.requireUser())
+
+    // Pedido R$0 de registro
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        partner_id: partnerId,
+        store_id: storeId,
+        customer_id: customerId,
+        buyer_id: (sub as any).customers?.user_id || null,
+        customer_name: (sub as any).customers?.name || "Cliente",
+        order_source: "Assinatura",
+        delivery_type: "pickup",
+        situation: "paid",
+        delivery_status: "delivered",
+        total_amount: 0,
+        paid_amount: 0,
+        discount_value: 0,
+        discount_type: "fixed",
+        discount_amount: 0,
+        delivery_fee: 0,
+        additional_costs: 0,
+        notes: ["Agendamento com créditos da assinatura (pelo vendedor).", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        payment_method: "Assinatura (Créditos)",
+        payment_breakdown: [],
+        recurring_subscription_id: subscriptionId,
+        created_by: user?.id || null,
+      })
+      .select("id, order_number")
+      .single()
+
+    if (orderErr || !order) throw orderErr || new Error("Falha ao criar pedido.")
+
+    await supabase.from("order_items").insert({
+      order_id: order.id,
+      product_id: null,
+      variant_id: null,
+      product_name: service.name,
+      product_price: 0,
+      quantity: 1,
+      subtotal: 0,
+      service_id: serviceId,
+      line_type: "service_booking",
+    })
+
+    // Agendamento
+    const [h, m] = time.split(":").map(Number)
+    const endMinutes = h * 60 + m + durationMinutes
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`
+
+    const { data: appointment, error: aptErr } = await supabase
+      .from("appointments")
+      .insert({
+        partner_id: partnerId,
+        store_id: storeId,
+        customer_id: customerId,
+        customer_name: (sub as any).customers?.name || "Cliente",
+        service_id: serviceId,
+        service_name: service.name,
+        start_date: date,
+        start_time: time,
+        end_date: date,
+        end_time: endTime,
+        duration_minutes: durationMinutes,
+        staff_partner_user_id: staffId,
+        staff_name: staffName,
+        price: 0,
+        pricing_unit: "Por Serviço",
+        notes: ["Agendado com créditos da assinatura (pelo vendedor).", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        status: "Reservado",
+        source: "appointment",
+        sales_channel: "online_storefront",
+        payment_status: "paid",
+        marketplace_order_id: order.id,
+        recurring_subscription_id: subscriptionId,
+      })
+      .select("id")
+      .single()
+
+    if (aptErr || !appointment) {
+      await supabase.from("orders").delete().eq("id", order.id)
+      throw aptErr || new Error("Falha ao criar agendamento.")
+    }
+
+    // Débito de créditos
+    const { consumeSubscriptionCredits } = await import("@/lib/services/credit.service")
+    const consumeResult = await consumeSubscriptionCredits(supabase as any, {
+      partnerId,
+      customerId,
+      serviceId,
+      quantity: 1,
+      orderId: order.id,
+      appointmentId: appointment.id,
+      idempotencyKey: `sub-credit-book:${order.id}`,
+    })
+
+    if (!consumeResult.success) {
+      await supabase.from("appointments").delete().eq("id", appointment.id)
+      await supabase.from("orders").delete().eq("id", order.id)
+      return { success: false, error: consumeResult.error || "Falha ao consumir créditos." }
+    }
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user?.id || null,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [`vendedor agendou "${service.name}" para ${date} às ${time} usando créditos do cliente.`],
+      source: "erp",
+      metadata: { order_id: order.id, appointment_id: appointment.id, service_id: serviceId },
+    })
+
+    return {
+      success: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      appointmentId: appointment.id,
+    }
+  } catch (e: unknown) {
+    console.error("scheduleSubscriptionServiceAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao agendar com créditos" }
+  }
+}
+
+/**
+ * Vendedor registra a entrega parcial de produtos da assinatura.
+ * Cria pedido R$0 (preços reais, total/paid 0), debita créditos de produto e
+ * move o estoque (reserve + finalize) — o pedido do ciclo não baixa estoque.
+ */
+export async function createSubscriptionDeliveryOrderAction(input: {
+  partnerId: string
+  subscriptionId: string
+  items: Array<{ productId: string; variantId?: string | null; quantity: number }>
+  deliveryType?: "delivery" | "pickup"
+  notes?: string
+}) {
+  try {
+    await requirePermission(input.partnerId, "recurring_subscriptions", "manage")
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const { partnerId, subscriptionId } = input
+    const items = (input.items || []).filter(
+      (i) => i && i.productId && Number(i.quantity || 0) > 0,
+    )
+    if (items.length === 0 || items.length > 20) {
+      return { success: false, error: "Informe de 1 a 20 itens para entrega." }
+    }
+    if (items.some((i) => Number(i.quantity) > 999)) {
+      return { success: false, error: "Quantidade inválida em um dos itens." }
+    }
+
+    const supabase = await getSupabaseServerClient()
+    const user = await import("@/lib/auth/authorization").then((m) => m.requireUser())
+
+    const { data: sub } = await supabase
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, store_id, status, delivery_type, delivery_address,
+        finance_account_id, customers(id, name, user_id)
+      `)
+      .eq("id", subscriptionId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (!sub) return { success: false, error: "Assinatura não encontrada." }
+    if (!["active", "awaiting_restock"].includes(sub.status)) {
+      return { success: false, error: "Esta assinatura não está ativa." }
+    }
+
+    const customerId = (sub as any).customers?.id as string | undefined
+    if (!customerId) return { success: false, error: "Assinatura sem cliente vinculado." }
+
+    const deliveryType =
+      input.deliveryType === "delivery" || input.deliveryType === "pickup"
+        ? input.deliveryType
+        : sub.delivery_type === "delivery"
+          ? "delivery"
+          : "pickup"
+
+    const productIds = Array.from(new Set(items.map((i) => i.productId)))
+    const variantIds = Array.from(new Set(items.map((i) => i.variantId).filter(Boolean))) as string[]
+
+    const [{ data: products }, { data: variants }] = await Promise.all([
+      supabase
+        .from("products")
+        .select("id, name, price, cost_price")
+        .in("id", productIds)
+        .eq("partner_id", partnerId),
+      variantIds.length
+        ? supabase
+            .from("product_variants")
+            .select("id, product_id, variant_name, price, cost_price")
+            .in("id", variantIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ])
+
+    const productsMap = new Map((products || []).map((p: any) => [p.id, p]))
+    const variantsMap = new Map((variants || []).map((v: any) => [v.id, v]))
+
+    for (const item of items) {
+      const product = productsMap.get(item.productId)
+      if (!product) return { success: false, error: "Produto indisponível para esta assinatura." }
+      if (item.variantId && !variantsMap.get(item.variantId)) {
+        return { success: false, error: "Variante de produto indisponível." }
+      }
+    }
+
+    // Créditos de produto disponíveis
+    const nowIso = new Date().toISOString()
+    const { data: creditRows } = await supabase
+      .from("subscription_item_credits")
+      .select("product_id, quantity, consumed")
+      .eq("partner_id", partnerId)
+      .eq("customer_id", customerId)
+      .in("product_id", productIds)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+
+    const creditRemaining = new Map<string, number>()
+    for (const c of creditRows || []) {
+      if (!c.product_id) continue
+      creditRemaining.set(
+        c.product_id,
+        (creditRemaining.get(c.product_id) || 0) + Math.max(0, Number(c.quantity) - Number(c.consumed)),
+      )
+    }
+
+    const requestedByProduct = new Map<string, number>()
+    for (const item of items) {
+      requestedByProduct.set(
+        item.productId,
+        (requestedByProduct.get(item.productId) || 0) + Number(item.quantity),
+      )
+    }
+    for (const [productId, qty] of requestedByProduct) {
+      const available = creditRemaining.get(productId) || 0
+      const product = productsMap.get(productId) as any
+      if (qty > available) {
+        return {
+          success: false,
+          error: `Créditos insuficientes para "${product?.name || "produto"}" (disponível: ${available}, solicitado: ${qty}).`,
+        }
+      }
+    }
+
+    // Linhas com preços reais (total/paid ficam 0; desconto = soma das linhas)
+    let linesSubtotal = 0
+    const orderItemsPayload = items.map((item, index) => {
+      const product = productsMap.get(item.productId) as any
+      const variant = item.variantId ? (variantsMap.get(item.variantId) as any) : null
+      const unitPrice = variant ? Number(variant.price || 0) : Number(product.price || 0)
+      const unitCost = variant
+        ? Number(variant.cost_price || product.cost_price || 0)
+        : Number(product.cost_price || 0)
+      const qty = Number(item.quantity)
+      const subtotal = unitPrice * qty
+      linesSubtotal += subtotal
+      return {
+        product_id: item.productId,
+        variant_id: item.variantId || null,
+        product_name: variant ? `${product.name} - ${variant.variant_name}` : product.name,
+        product_price: unitPrice,
+        quantity: qty,
+        subtotal,
+        sort_order: index,
+        unit_cost: unitCost,
+        line_type: "product",
+      }
+    })
+
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        partner_id: partnerId,
+        store_id: sub.store_id || null,
+        customer_id: customerId,
+        buyer_id: (sub as any).customers?.user_id || null,
+        customer_name: (sub as any).customers?.name || "Cliente",
+        order_source: "Assinatura",
+        delivery_type: deliveryType,
+        situation: "paid",
+        delivery_status: deliveryType === "pickup" ? "delivered" : "not_sent",
+        total_amount: 0,
+        paid_amount: 0,
+        discount_value: linesSubtotal,
+        discount_type: "fixed",
+        discount_amount: 0,
+        delivery_fee: 0,
+        additional_costs: 0,
+        notes: ["Entrega registrada com créditos da assinatura.", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        payment_method: "Assinatura (Créditos)",
+        payment_breakdown: [],
+        delivery_address: deliveryType === "delivery" ? sub.delivery_address : null,
+        finance_account_id: sub.finance_account_id || null,
+        recurring_subscription_id: subscriptionId,
+        created_by: user?.id || null,
+      })
+      .select("id, order_number")
+      .single()
+
+    if (orderErr || !order) throw orderErr || new Error("Falha ao criar pedido de entrega.")
+
+    const { error: itemsErr } = await supabase
+      .from("order_items")
+      .insert(orderItemsPayload.map((item) => ({ ...item, order_id: order.id })))
+
+    if (itemsErr) {
+      await supabase.from("orders").delete().eq("id", order.id)
+      throw itemsErr
+    }
+
+    const stockItems = items.map((item) => ({
+      product_id: item.productId,
+      variant_id: item.variantId || null,
+      quantity: Number(item.quantity),
+    }))
+    const storeId = (sub.store_id as string | null) || null
+
+    const { reserveOrderInventory, finalizeOrderInventory } = await import("@/lib/stock/reservations")
+
+    const reserveResult = await reserveOrderInventory({
+      client: supabase as any,
+      partnerId,
+      orderId: order.id,
+      items: stockItems,
+      storeId,
+    })
+    if ("error" in reserveResult) {
+      await supabase.from("order_items").delete().eq("order_id", order.id)
+      await supabase.from("orders").delete().eq("id", order.id)
+      return { success: false, error: reserveResult.error || "Falha ao reservar estoque." }
+    }
+
+    // Débito de créditos de produto (idempotente por pedido)
+    let consumedAny = false
+    for (const [productId, qty] of requestedByProduct) {
+      const { consumeSubscriptionCredits } = await import("@/lib/services/credit.service")
+      const consumeResult = await consumeSubscriptionCredits(supabase as any, {
+        partnerId,
+        customerId,
+        productId,
+        quantity: qty,
+        orderId: order.id,
+        idempotencyKey: `sub-credit-delivery:${order.id}:${productId}`,
+      })
+      if (!consumeResult.success) {
+        const { releaseOrderInventory } = await import("@/lib/stock/reservations")
+        await releaseOrderInventory({
+          client: supabase as any,
+          partnerId,
+          orderId: order.id,
+          items: stockItems,
+          storeId,
+        })
+        await supabase.from("order_items").delete().eq("order_id", order.id)
+        await supabase.from("orders").delete().eq("id", order.id)
+        return { success: false, error: consumeResult.error || "Falha ao consumir créditos." }
+      }
+      consumedAny = true
+    }
+    if (!consumedAny) {
+      return { success: false, error: "Nenhum crédito consumido." }
+    }
+
+    const finalizeResult = await finalizeOrderInventory({
+      client: supabase as any,
+      partnerId,
+      orderId: order.id,
+      createdBy: (user?.id || null) as any,
+      reason: "Venda de Produtos",
+      notes: "Entrega de assinatura registrada com créditos.",
+      items: stockItems,
+      storeId,
+    })
+    if ("error" in finalizeResult) {
+      console.error("[SUB-DELIVERY] Falha ao baixar estoque da entrega:", finalizeResult.error)
+    } else {
+      await supabase.from("orders").update({ inventory_deducted: true }).eq("id", order.id)
+    }
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user?.id || null,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [
+        `vendedor registrou entrega de ${items.length} item(ns) usando créditos da assinatura (pedido #${order.order_number}).`,
+      ],
+      source: "erp",
+      metadata: { order_id: order.id, items: orderItemsPayload.map((i) => ({ product_id: i.product_id, quantity: i.quantity })) },
+    })
+
+    return {
+      success: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+    }
+  } catch (e: unknown) {
+    console.error("createSubscriptionDeliveryOrderAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao registrar entrega" }
   }
 }
 

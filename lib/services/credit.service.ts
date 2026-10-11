@@ -34,10 +34,13 @@ export async function grantSubscriptionCredits(
 
     const plan = sub.recurring_plans as any
     const items = (sub.recurring_subscription_items || []) as any[]
-    const serviceItems = items.filter(item => item.item_type === 'service' && item.service_id)
+    const grantableItems = items.filter(item =>
+      (item.item_type === 'service' && item.service_id) ||
+      (item.item_type === 'product' && item.product_id)
+    )
 
-    if (serviceItems.length === 0) {
-      return { success: true, grantedCount: 0 } // No services, nothing to grant
+    if (grantableItems.length === 0) {
+      return { success: true, grantedCount: 0 } // No services/products, nothing to grant
     }
 
     // 2. Calculate credit expiration date
@@ -57,8 +60,8 @@ export async function grantSubscriptionCredits(
 
     let grantedCount = 0
 
-    // 3. Grant credits for each service item
-    for (const item of serviceItems) {
+    // 3. Grant credits for each service/product item
+    for (const item of grantableItems) {
       const quantity = Number(item.quantity || 1)
       const idempotencyKey = `grant:${input.executionId}:${item.id}`
 
@@ -81,8 +84,8 @@ export async function grantSubscriptionCredits(
           customer_id: input.customerId,
           subscription_id: input.subscriptionId,
           subscription_item_id: item.id,
-          service_id: item.service_id,
-          product_id: null,
+          service_id: item.service_id || null,
+          product_id: item.product_id || null,
           quantity,
           consumed: 0,
           expires_at: expiresAt,
@@ -101,8 +104,8 @@ export async function grantSubscriptionCredits(
         .insert({
           partner_id: input.partnerId,
           customer_id: input.customerId,
-          service_id: item.service_id,
-          product_id: null,
+          service_id: item.service_id || null,
+          product_id: item.product_id || null,
           quantity,
           transaction_type: 'grant',
           credit_id: credit.id,
@@ -132,18 +135,24 @@ export async function consumeSubscriptionCredits(
   input: {
     partnerId: string
     customerId: string
-    serviceId: string
+    serviceId?: string | null
+    productId?: string | null
     quantity: number
     appointmentId?: string | null
     orderId?: string | null
     idempotencyKey?: string | null
   }
 ): Promise<{ success: boolean; error?: string }> {
+  if (!input.serviceId && !input.productId) {
+    return { success: false, error: "Informe serviceId ou productId." }
+  }
+
   // Call the database function
   const { data, error } = await supabase.rpc("consume_credits_fifo", {
     p_partner_id: input.partnerId,
     p_customer_id: input.customerId,
-    p_service_id: input.serviceId,
+    p_service_id: input.serviceId || null,
+    p_product_id: input.productId || null,
     p_quantity: input.quantity,
     p_appointment_id: input.appointmentId || null,
     p_order_id: input.orderId || null,

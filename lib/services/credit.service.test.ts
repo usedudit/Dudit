@@ -123,6 +123,43 @@ describe("credit.service", () => {
       expect(client.from).toHaveBeenCalledWith("subscription_item_credit_ledger")
     })
 
+    it("grants credits for product items with product_id set", async () => {
+      const { client, setTableResponses } = createSupabaseMock()
+
+      setTableResponses("recurring_subscriptions", [
+        {
+          data: {
+            id: "sub-123",
+            next_execution_at: "2026-08-11T12:00:00Z",
+            recurring_plans: { billing_mode: "prepaid", credit_expiration_policy: "end_of_cycle" },
+            recurring_subscription_items: [
+              { id: "item-p1", item_type: "product", product_id: "prod-1", quantity: 3 },
+            ],
+          },
+          error: null,
+        }
+      ])
+
+      setTableResponses("subscription_item_credit_ledger", [
+        { data: null, error: null }, // idempotency check
+        { data: null, error: null }, // insert ledger entry
+      ])
+
+      setTableResponses("subscription_item_credits", [
+        { data: { id: "credit-product-1" }, error: null }
+      ])
+
+      const result = await grantSubscriptionCredits(client, {
+        partnerId: "partner-1",
+        customerId: "customer-1",
+        subscriptionId: "sub-123",
+        executionId: "exec-1",
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.grantedCount).toBe(3)
+    })
+
     it("respects idempotency and skips granting if already granted", async () => {
       const { client, setTableResponses } = createSupabaseMock()
 
@@ -177,11 +214,56 @@ describe("credit.service", () => {
         p_partner_id: "partner-1",
         p_customer_id: "customer-1",
         p_service_id: "svc-1",
+        p_product_id: null,
         p_quantity: 1,
         p_appointment_id: null,
         p_order_id: null,
         p_idempotency_key: "idem-key-1",
       })
+    })
+
+    it("passes productId and null serviceId when consuming product credits", async () => {
+      const { client, setRpcResponse } = createSupabaseMock()
+      setRpcResponse({
+        data: true,
+        error: null,
+      })
+
+      const result = await consumeSubscriptionCredits(client, {
+        partnerId: "partner-1",
+        customerId: "customer-1",
+        productId: "prod-1",
+        quantity: 2,
+        orderId: "order-789",
+        idempotencyKey: "delivery-key-1",
+      })
+
+      expect(result.success).toBe(true)
+      expect(client.rpc).toHaveBeenCalledWith("consume_credits_fifo", {
+        p_partner_id: "partner-1",
+        p_customer_id: "customer-1",
+        p_service_id: null,
+        p_product_id: "prod-1",
+        p_quantity: 2,
+        p_appointment_id: null,
+        p_order_id: "order-789",
+        p_idempotency_key: "delivery-key-1",
+      })
+    })
+
+    it("fails fast when neither serviceId nor productId is provided", async () => {
+      const { client, setRpcResponse } = createSupabaseMock()
+      setRpcResponse({ data: true, error: null })
+
+      const result = await consumeSubscriptionCredits(client, {
+        partnerId: "partner-1",
+        customerId: "customer-1",
+        quantity: 1,
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe("Informe serviceId ou productId.")
+      expect(client.rpc).not.toHaveBeenCalled()
     })
 
     it("returns error if RPC returns false", async () => {

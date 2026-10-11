@@ -3,7 +3,6 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { finalizeOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
 import { increment_usage_counter, getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -326,59 +325,10 @@ async function createRecurringOrder(params: {
     throw itemsError
   }
 
-  // Estoque igual a um pedido normal do ERP: reserva sempre e baixa fisica
-  // quando o pedido nasce pago ou com entrega ja concluida (retirada).
-  if (productItems.length > 0) {
-    const stockItems = productItems.map((item) => ({
-      product_id: item.product_id!,
-      variant_id: item.variant_id || null,
-      quantity: Number(item.quantity || 1),
-    }))
-    const storeId = (subShipping?.store_id as string | null) || null
-
-    const reserveResult = await reserveOrderInventory({
-      client: supabase as any,
-      partnerId: claim.partnerId,
-      orderId: order.id,
-      items: stockItems,
-      storeId,
-    })
-
-    if ("error" in reserveResult) {
-      if (situation === "paid") {
-        // Pagamento ja aconteceu no MP: nao derruba o pedido por falta de estoque
-        // (o fluxo de awaiting_restock/deficit ja cobre esta situacao).
-        console.error("[RECURRING] Falha ao reservar estoque do ciclo pago:", reserveResult.error)
-      } else {
-        await supabase.from("order_items").delete().eq("order_id", order.id)
-        await supabase.from("orders").delete().eq("id", order.id)
-        throw new Error(reserveResult.error)
-      }
-    } else if (shouldDeductInventory(orderPayload.delivery_status as string) || situation === "paid") {
-      const finalizeResult = await finalizeOrderInventory({
-        client: supabase as any,
-        partnerId: claim.partnerId,
-        orderId: order.id,
-        createdBy: null as any,
-        reason: "Venda de Produtos",
-        notes: "Pedido gerado automaticamente por assinatura recorrente.",
-        items: stockItems,
-        storeId,
-      })
-
-      if ("error" in finalizeResult) {
-        if (situation === "paid") {
-          console.error("[RECURRING] Falha ao baixar estoque do ciclo pago:", finalizeResult.error)
-        } else {
-          await supabase.from("order_items").delete().eq("order_id", order.id)
-          await supabase.from("orders").delete().eq("id", order.id)
-          throw new Error(finalizeResult.error)
-        }
-      } else {
-        await supabase.from("orders").update({ inventory_deducted: true }).eq("id", order.id)
-      }
-    }
-  }
+  // Modelo de créditos: este pedido do ciclo é SÓ registro financeiro (a cobrança).
+  // O estoque de produtos NÃO é reservado/baixado aqui — ele move no pedido de
+  // entrega criado com créditos (createSubscriptionDeliveryOrderAction), evitando
+  // baixa dupla (ciclo + entrega).
 
   await logAuditEvent({
     partnerId: claim.partnerId,

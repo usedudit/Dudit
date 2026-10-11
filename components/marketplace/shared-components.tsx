@@ -71,9 +71,10 @@ interface VitrineCardProps {
     locationContext?: LocationContext | null
     userCoords?: { lat: number; lng: number } | null
     preferCityLabel?: boolean
+    locationOnly?: boolean
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null, preferCityLabel = false }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null, preferCityLabel = false, locationOnly = false }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -134,11 +135,11 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         && maxDeliveryKm > 0
         && distanceKm > maxDeliveryKm
 
-    const deliveryTime = (showDeliveryTime && !outOfRadius)
+    const deliveryTime = (showDeliveryTime && !outOfRadius && !locationOnly)
         ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted || vitrine.delivery_time_formatted) : null))
         : null
 
-    const deliveryFeeLabel = outOfRadius ? null : (estimateDeliveryFeeLabel({
+    const deliveryFeeLabel = (outOfRadius || locationOnly) ? null : (estimateDeliveryFeeLabel({
         distanceKm,
         baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
         includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,

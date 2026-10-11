@@ -26,8 +26,6 @@ interface ExplorarFilterSidebarProps {
     onPromoToggle: () => void
     activeFiltersCount: number
     onClearFilters: () => void
-    selectedRadius?: number | null
-    onRadiusChange?: (radius: number | null) => void
     selectedCondition?: string
     onConditionChange?: (condition: string) => void
     userProfile?: any
@@ -36,15 +34,6 @@ interface ExplorarFilterSidebarProps {
     sectionId?: string | null
     collapsed?: boolean
 }
-
-const RADIUS_OPTIONS = [
-    { value: "", label: "Toda a cidade (sem limite)" },
-    { value: "5", label: "Até 5 km" },
-    { value: "10", label: "Até 10 km" },
-    { value: "25", label: "Até 25 km" },
-    { value: "50", label: "Até 50 km" },
-    { value: "100", label: "Até 100 km" },
-]
 
 const CONDITION_FILTER_OPTIONS = [
     { value: "", label: "Todos os estados" },
@@ -73,12 +62,10 @@ export function ExplorarFilterSidebar({
     onPromoToggle,
     activeFiltersCount,
     onClearFilters,
-    selectedRadius,
-    onRadiusChange,
     selectedCondition,
     onConditionChange,
     userProfile,
-    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
+    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true },
     pageMode,
     sectionId,
     collapsed = false,
@@ -111,7 +98,7 @@ export function ExplorarFilterSidebar({
                 <Separator className="my-0" />
 
                 {/* Local Section */}
-                {filterConfig.showRadius !== false && (
+                {filterConfig.showCategory !== false && (
                     <section>
                         <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Local</h3>
                         <button
@@ -123,19 +110,6 @@ export function ExplorarFilterSidebar({
                             </span>
                             <MapPin className="h-4 w-4 shrink-0 text-brand-green" />
                         </button>
-                    </section>
-                )}
-
-                {/* Raio de busca */}
-                {filterConfig.showRadius !== false && ((selectedCitySlug && selectedCitySlug !== "brasil" && !selectedCitySlug.startsWith("estado-")) || !!userProfile) && onRadiusChange && (
-                    <section>
-                        <Separator className="my-6" />
-                        <FormDropdown
-                            label="Raio de busca"
-                            value={String(selectedRadius || "")}
-                            setValue={(v) => onRadiusChange(v ? Number(v) : null)}
-                            options={RADIUS_OPTIONS}
-                        />
                     </section>
                 )}
 

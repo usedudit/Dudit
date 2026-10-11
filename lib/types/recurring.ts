@@ -181,11 +181,16 @@ export type RecurringSubscriptionDetailItem = {
 
 export type RecurringSubscriptionDetailCredit = {
   id: string
-  serviceName: string
+  itemName: string
+  itemType: "service" | "product"
+  serviceId: string | null
+  productId: string | null
   quantity: number
   consumed: number
   remaining: number
   expiresAt: string | null
+  staffPartnerUserId?: string | null
+  durationMinutes?: number | null
 }
 
 export type RecurringSubscriptionDetail = {

@@ -1149,7 +1149,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                             title="Evolução de Ordens de Serviço"
                             legendItems={[{ label: "Ordens", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
-                        <DashboardLineChart data={evoData} />
+                        <DashboardLineChart data={evoData} legendLabels={{ value: "Ordens", secondary: "Período Anterior" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1380,7 +1380,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                             title="Fluxo de Caixa"
                             legendItems={[{ label: "Entradas", color: "#059669" }, { label: "Saídas", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} format="currency" />
+                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} format="currency" legendLabels={{ value: "Entradas", secondary: "Saídas" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1556,7 +1556,7 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
                             title="Ativos vs Novos Clientes"
                             legendItems={[{ label: "Ativos", color: "#059669" }, { label: "Novos", color: "#2563eb" }]}
                         />
-                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} />
+                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} legendLabels={{ value: "Ativos", secondary: "Novos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -2068,7 +2068,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                             { id: "status", label: "Status", align: "center", width: "150px" },
                         ]}
                         data={returnsData.recentReturns.slice(0, 5)}
-                        onRowClick={() => router.push("/erp/devolucoes")}
+                        onRowClick={(row) => router.push(`/erp/devolucoes?view=${row.id}`)}
                         renderCell={(colId, row) => {
                             switch (colId) {
                                 case "return":

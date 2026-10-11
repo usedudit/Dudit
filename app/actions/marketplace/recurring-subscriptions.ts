@@ -1011,7 +1011,7 @@ export async function confirmMySubscriptionAddressChangeAction(
   }
 }
 
-export async function getMySubscriptionCreditsAction() {
+export async function getMySubscriptionCreditsAction(subscriptionId?: string) {
   try {
     const user = await requireUser()
     const admin = getAdminClient()
@@ -1026,17 +1026,24 @@ export async function getMySubscriptionCreditsAction() {
     if (customerIds.length === 0) return { success: true, data: [] }
 
     // 2. Fetch credits
-    const { data, error } = await admin
+    let query = admin
       .from("subscription_item_credits")
       .select(`
-        id, subscription_id, quantity, consumed, expires_at, created_at,
+        id, subscription_id, service_id, product_id, quantity, consumed, expires_at, created_at,
         recurring_subscriptions(recurring_plans(name), stores(name)),
-        services(name),
+        recurring_subscription_items(staff_partner_user_id, duration_minutes, preferred_time),
+        services(name, price),
         products(name)
       `)
       .in("customer_id", customerIds)
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .order("expires_at", { ascending: true, nullsFirst: false })
+
+    if (subscriptionId) {
+      query = query.eq("subscription_id", subscriptionId)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
@@ -1045,9 +1052,16 @@ export async function getMySubscriptionCreditsAction() {
       data: (data || []).map((row: any) => ({
         id: row.id,
         subscriptionId: row.subscription_id,
+        serviceId: row.service_id || null,
+        productId: row.product_id || null,
+        itemType: row.service_id ? "service" : row.product_id ? "product" : "unknown",
         planName: row.recurring_subscriptions?.recurring_plans?.name || "Plano",
         storeName: row.recurring_subscriptions?.stores?.name || "Vendedor",
         itemName: row.services?.name || row.products?.name || "Item",
+        durationMinutes: row.recurring_subscription_items?.duration_minutes || null,
+        preferredTime: row.recurring_subscription_items?.preferred_time || null,
+        price: row.services?.price != null ? Number(row.services.price) : null,
+        staffPartnerUserId: row.recurring_subscription_items?.staff_partner_user_id || null,
         totalCredits: row.quantity,
         consumedCredits: row.consumed,
         remainingCredits: Math.max(0, row.quantity - row.consumed),
@@ -1217,6 +1231,276 @@ export async function respondToMySubscriptionPriceChangeAction(
   } catch (e: unknown) {
     console.error("respondToMySubscriptionPriceChangeAction error:", e)
     return { success: false, error: e instanceof Error ? e.message : "Erro ao responder mudança" }
+  }
+}
+
+/**
+ * Cliente agenda um serviço usando créditos da assinatura.
+ * Cria pedido R$0 ("Assinatura (Créditos)") + agendamento e debita o saldo via
+ * consume_credits_fifo (idempotente por pedido).
+ */
+export async function bookServiceWithCreditAction(input: {
+  subscriptionId: string
+  serviceId: string
+  date: string // YYYY-MM-DD
+  time: string // HH:mm
+  staffPartnerUserId?: string | null
+  notes?: string
+}) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    const { subscriptionId, serviceId, date, time } = input
+    if (!isUuid(subscriptionId) || !isUuid(serviceId) || !date || !time) {
+      return { success: false, error: "Parâmetros inválidos." }
+    }
+
+    const user = await requireUser()
+    const admin = getAdminClient()
+
+    // 1. Assinatura ativa e do usuário logado
+    const { data: sub } = await admin
+      .from("recurring_subscriptions")
+      .select(`
+        id, partner_id, store_id, status, delivery_address, next_execution_at,
+        customers!inner(user_id, id, name),
+        recurring_plans(credit_expiration_policy)
+      `)
+      .eq("id", subscriptionId)
+      .single()
+
+    if (!sub || (sub as any).customers?.user_id !== user.id) {
+      return { success: false, error: "Assinatura não encontrada." }
+    }
+    if (!["active", "awaiting_restock"].includes(sub.status)) {
+      return { success: false, error: "Esta assinatura não está ativa." }
+    }
+
+    const customerId = (sub as any).customers.id as string
+    const partnerId = sub.partner_id as string
+
+    // 2. Item de serviço desta assinatura (staff/duração preferidos do snapshot)
+    const { data: subItem } = await admin
+      .from("recurring_subscription_items")
+      .select("id, staff_partner_user_id, duration_minutes, preferred_time")
+      .eq("subscription_id", subscriptionId)
+      .eq("service_id", serviceId)
+      .eq("item_type", "service")
+      .maybeSingle()
+
+    // 3. Crédito disponível e validade
+    const nowIso = new Date().toISOString()
+    const { data: creditRows } = await admin
+      .from("subscription_item_credits")
+      .select("id, quantity, consumed, expires_at")
+      .eq("customer_id", customerId)
+      .eq("service_id", serviceId)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+
+    const remaining = (creditRows || []).reduce(
+      (acc: number, c: { quantity: number; consumed: number }) => acc + Math.max(0, Number(c.quantity) - Number(c.consumed)),
+      0,
+    )
+    if (remaining < 1) {
+      return { success: false, error: "Você não tem créditos disponíveis para este serviço." }
+    }
+
+    const earliestExpiry = (creditRows || [])
+      .map((c: { expires_at: string | null }) => c.expires_at)
+      .filter(Boolean)
+      .sort()[0] as string | undefined
+
+    if (earliestExpiry && date > earliestExpiry.slice(0, 10)) {
+      return { success: false, error: "A data escolhida é posterior à validade dos créditos." }
+    }
+    if (!earliestExpiry && sub.next_execution_at && date > String(sub.next_execution_at).slice(0, 10)) {
+      // Política end_of_cycle com expires_at ainda null: trava no fim do ciclo vigente.
+      return { success: false, error: "A data escolhida é posterior ao fim do ciclo atual da assinatura." }
+    }
+
+    // 4. Serviço + staff
+    const { data: service } = await admin
+      .from("services")
+      .select("id, name, duration_minutes, store_id")
+      .eq("id", serviceId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+
+    if (!service) return { success: false, error: "Serviço indisponível." }
+
+    const staffId = input.staffPartnerUserId || subItem?.staff_partner_user_id || null
+    if (!staffId) return { success: false, error: "Serviço sem profissional definido." }
+
+    const durationMinutes = Number(subItem?.duration_minutes || service.duration_minutes || 60)
+
+    // 5. Slot disponível
+    const { isStaffSlotAvailable } = await import("@/lib/commerce/scheduling-availability")
+    const storeId = (sub.store_id as string | null) || (service.store_id as string | null) || null
+
+    let openingHours: any = null
+    if (storeId) {
+      const { data: storeRow } = await admin
+        .from("stores")
+        .select("opening_hours")
+        .eq("id", storeId)
+        .maybeSingle()
+      openingHours = storeRow?.opening_hours || null
+    }
+
+    const slotOk = await isStaffSlotAvailable(admin as any, {
+      partnerId,
+      staffId,
+      date,
+      startTime: time,
+      durationMinutes,
+      openingHours,
+      storeId,
+    })
+    if (!slotOk) {
+      return { success: false, error: "Este horário não está mais disponível." }
+    }
+
+    // 6. Nome do profissional (partner_users → user_profiles)
+    let staffName = "Profissional"
+    const { data: puRow } = await admin
+      .from("partner_users")
+      .select("user_id")
+      .eq("id", staffId)
+      .maybeSingle()
+    if (puRow?.user_id) {
+      const { data: prof } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", puRow.user_id)
+        .maybeSingle()
+      if (prof?.full_name) staffName = prof.full_name
+    }
+
+    // 7. Pedido R$0 de registro (sem cobrança; F108 não gera transação)
+    const { data: order, error: orderErr } = await admin
+      .from("orders")
+      .insert({
+        partner_id: partnerId,
+        store_id: storeId,
+        buyer_id: user.id,
+        customer_name: (sub as any).customers?.name || user.email?.split("@")[0] || "Cliente",
+        order_source: "Assinatura",
+        delivery_type: "pickup",
+        situation: "paid",
+        delivery_status: "delivered",
+        total_amount: 0,
+        paid_amount: 0,
+        discount_value: 0,
+        discount_type: "fixed",
+        discount_amount: 0,
+        delivery_fee: 0,
+        additional_costs: 0,
+        notes: `Agendamento com créditos da assinatura. ${input.notes || ""}`.trim(),
+        payment_method: "Assinatura (Créditos)",
+        payment_breakdown: [],
+        recurring_subscription_id: subscriptionId,
+        finance_account_id: null,
+      })
+      .select("id, order_number")
+      .single()
+
+    if (orderErr || !order) throw orderErr || new Error("Falha ao criar pedido.")
+
+    // Linha do pedido (registro do serviço com preço real, total continua 0)
+    await admin.from("order_items").insert({
+      order_id: order.id,
+      product_id: null,
+      variant_id: null,
+      product_name: service.name,
+      product_price: 0,
+      quantity: 1,
+      subtotal: 0,
+      service_id: serviceId,
+      line_type: "service_booking",
+    })
+
+    // 8. Agendamento (service_id preenchido, preço 0, vinculado ao pedido)
+    const [h, m] = time.split(":").map(Number)
+    const endMinutes = h * 60 + m + durationMinutes
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`
+
+    const { data: appointment, error: aptErr } = await admin
+      .from("appointments")
+      .insert({
+        partner_id: partnerId,
+        store_id: storeId,
+        customer_id: customerId,
+        customer_name: (sub as any).customers?.name || "Cliente",
+        service_id: serviceId,
+        service_name: service.name,
+        start_date: date,
+        start_time: time,
+        end_date: date,
+        end_time: endTime,
+        duration_minutes: durationMinutes,
+        staff_partner_user_id: staffId,
+        staff_name: staffName,
+        price: 0,
+        pricing_unit: "Por Serviço",
+        notes: ["Agendado com créditos da assinatura.", sanitizeNotes(input.notes)].filter(Boolean).join(" "),
+        status: "Reservado",
+        source: "appointment",
+        sales_channel: "online_storefront",
+        payment_status: "paid",
+        marketplace_order_id: order.id,
+        recurring_subscription_id: subscriptionId,
+      })
+      .select("id")
+      .single()
+
+    if (aptErr || !appointment) {
+      // Rollback do pedido
+      await admin.from("orders").delete().eq("id", order.id)
+      throw aptErr || new Error("Falha ao criar agendamento.")
+    }
+
+    // 9. Débito de crédito (idempotente por pedido)
+    const { consumeSubscriptionCredits } = await import("@/lib/services/credit.service")
+    const consumeResult = await consumeSubscriptionCredits(admin as any, {
+      partnerId,
+      customerId,
+      serviceId,
+      quantity: 1,
+      orderId: order.id,
+      appointmentId: appointment.id,
+      idempotencyKey: `sub-credit-book:${order.id}`,
+    })
+
+    if (!consumeResult.success) {
+      await admin.from("appointments").delete().eq("id", appointment.id)
+      await admin.from("orders").delete().eq("id", order.id)
+      return { success: false, error: consumeResult.error || "Falha ao consumir créditos." }
+    }
+
+    const { increment_usage_counter } = await import("@/lib/services/subscription.service")
+    increment_usage_counter(partnerId, "appointments_month_count").catch(console.error)
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "recurring_subscription",
+      entityId: subscriptionId,
+      actionType: "updated",
+      changeLines: [`cliente agendou "${service.name}" para ${date} às ${time} usando créditos da assinatura.`],
+      source: "marketplace",
+      metadata: { order_id: order.id, appointment_id: appointment.id, service_id: serviceId },
+    })
+
+    return {
+      success: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      appointmentId: appointment.id,
+    }
+  } catch (e: unknown) {
+    console.error("bookServiceWithCreditAction error:", e)
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao agendar com créditos" }
   }
 }
 

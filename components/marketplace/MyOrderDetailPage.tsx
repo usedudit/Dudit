@@ -1989,6 +1989,18 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 />
                                             )}
 
+                                            {order.order_source === "Assinatura" && (
+                                                <InfoCard
+                                                    title="Pedido da assinatura"
+                                                    message={
+                                                        order.payment_method === "Assinatura (Créditos)"
+                                                            ? "Este pedido foi criado usando créditos da sua assinatura — sem cobrança adicional."
+                                                            : "Este pedido foi gerado automaticamente pela sua assinatura recorrente."
+                                                    }
+                                                    color="blue"
+                                                />
+                                            )}
+
                                             {isPendingExchangeShortfall && (
                                                 hasMercadoPagoOnline ? (
                                                     <InfoCard

@@ -1078,24 +1078,35 @@ export async function fulfillMarketplaceOrder(
 
           if (customer?.id) {
             for (const svc of group.services) {
-              const { data: svcRow } = await supabase
-                .from("services")
-                .select("id")
-                .eq("partner_id", order.partner_id)
-                .eq("name", svc.serviceName)
-                .maybeSingle()
+              let serviceId: string | null = svc.serviceId || null
 
-              if (svcRow?.id) {
+              if (!serviceId) {
+                const { data: svcRow } = await supabase
+                  .from("services")
+                  .select("id")
+                  .eq("partner_id", order.partner_id)
+                  .eq("name", svc.serviceName)
+                  .maybeSingle()
+                serviceId = svcRow?.id || null
+              }
+
+              if (serviceId) {
                 const { consumeSubscriptionCredits } = await import("@/lib/services/credit.service")
-                await consumeSubscriptionCredits(supabase, {
+                const consumeResult = await consumeSubscriptionCredits(supabase, {
                   partnerId: order.partner_id,
                   customerId: customer.id,
-                  serviceId: svcRow.id,
+                  serviceId,
                   quantity: svc.quantity,
                   orderId: order.id,
                   appointmentId: bookingResult.appointmentId,
-                  idempotencyKey: `checkout:credits:${order.id}:${bookingResult.appointmentId}:${svc.serviceName}`,
+                  idempotencyKey: `checkout:credits:${order.id}:${bookingResult.appointmentId}:${serviceId}`,
                 })
+
+                if (!consumeResult.success) {
+                  console.error("[fulfillment] Failed to consume subscription credits for service:", serviceId, consumeResult.error)
+                }
+              } else {
+                console.error("[fulfillment] Could not resolve service for credit consumption:", svc.serviceName)
               }
             }
           }

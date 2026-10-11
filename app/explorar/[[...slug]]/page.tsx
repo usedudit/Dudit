@@ -319,7 +319,6 @@ export default async function ExplorarPage({
     const hasSearchIntent = !!query
         || type !== "tudo"
         || !!section
-        || typeof resolvedSearchParams.radius === "string"
         || typeof resolvedSearchParams.categoria === "string"
 
     const normalizeCityToSlug = (city: string, state: string) => {
@@ -685,8 +684,7 @@ export default async function ExplorarPage({
 
     // TanStack Query Hydration: pre-populate cache with server data
     const queryClient = new QueryClient()
-    const radius = typeof resolvedSearchParams.radius === "string" ? Number(resolvedSearchParams.radius) : undefined
-    const queryKey = ["explore", query, serverFetchType, searchSlug, radius, section]
+    const queryKey = ["explore", query, serverFetchType, searchSlug, section]
 
     queryClient.setQueryData(queryKey, {
         pages: [{

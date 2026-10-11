@@ -1907,7 +1907,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 onCitySelect={() => { }}
                 currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
                 selectedCategories={[]}
-                selectedRadius={null}
                 minPrice={categoryMinPrice}
                 maxPrice={categoryMaxPrice}
                 promoOn={categoryPromoOn}
@@ -1921,7 +1920,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     showPrice: true,
                     showSort: false,
                     showPromo: true,
-                    showRadius: false,
                 }}
             />
 

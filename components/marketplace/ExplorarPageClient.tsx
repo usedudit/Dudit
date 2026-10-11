@@ -161,10 +161,6 @@ export function ExplorarPageClient({
     const [currentType, setCurrentType] = useState<any>(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
     const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || pathCity || null)
-    const [selectedRadius, setSelectedRadius] = useState<number | null>(() => {
-        const urlRadius = searchParams.get("radius")
-        return urlRadius ? Number(urlRadius) : null
-    })
     const [selectedSection, setSelectedSection] = useState<string | null>(() => {
         return initialSection || searchParams.get("section") || null
     })
@@ -288,12 +284,12 @@ export function ExplorarPageClient({
     const MAX_ITEMS = 300 // Memory cap
     const fetchFnMountedRef = useRef(false) // Dev-mode strict-mode guard
 
-    const queryKeyString = `${query}:${currentType}:${selectedCitySlug}:${selectedRadius}:${selectedSection}`
+    const queryKeyString = `${query}:${currentType}:${selectedCitySlug}:${selectedSection}`
     useEffect(() => {
         fetchFnMountedRef.current = false
     }, [queryKeyString])
 
-    // Reset moreDistant state when the search context changes (new query, city, type, radius, section).
+    // Reset moreDistant state when the search context changes (new query, city, type, section).
     // On client-side navigation the component doesn't remount, so useState initial values won't update.
     // This syncs the server-provided initialMoreDistant* props into state whenever the search key changes,
     // preventing stale "more distant" results from a previous search from persisting.
@@ -315,19 +311,12 @@ export function ExplorarPageClient({
         categories: string[],
         searchQ: string,
         typeStr: string,
-        radiusVal?: number | null,
         sectionVal?: string | null,
         forceFullNavigation = false
     ) => {
         const queryParams = new URLSearchParams()
         if (searchQ) queryParams.set("q", searchQ)
         if (typeStr && typeStr !== "tudo") queryParams.set("type", typeStr)
-
-        const rVal = radiusVal !== undefined ? radiusVal : selectedRadius
-        const isCity = city && city !== "brasil" && !city.startsWith("estado-")
-        if (rVal && isCity) {
-            queryParams.set("radius", String(rVal))
-        }
 
         const sVal = sectionVal !== undefined ? sectionVal : selectedSection
         if (sVal) {
@@ -374,9 +363,6 @@ export function ExplorarPageClient({
             setSelectedCitySlug(cidade)
         }
 
-        const urlRadius = searchParams.get("radius")
-        setSelectedRadius(urlRadius ? Number(urlRadius) : null)
-
         const urlSection = searchParams.get("section")
         setSelectedSection(urlSection || null)
 
@@ -395,7 +381,7 @@ export function ExplorarPageClient({
 
         setSelectedCategories(nextCats)
 
-        const currentFilterKey = `${urlType}:${urlRadius || ""}:${urlSection || ""}:${urlCity || ""}:${nextCats.join(",")}`
+        const currentFilterKey = `${urlType}:${urlSection || ""}:${urlCity || ""}:${nextCats.join(",")}`
         if (isFirstMountParamsRef.current) {
             isFirstMountParamsRef.current = false
             prevParamsKeyRef.current = currentFilterKey
@@ -417,12 +403,10 @@ export function ExplorarPageClient({
             const pCat = pCatSlug ? (CATEGORY_SLUG_MAP[pCatSlug] || pCatSlug) : null
 
             const typeParam = url.searchParams.get("type") || "tudo"
-            const radiusParam = url.searchParams.get("radius")
             const sectionParam = url.searchParams.get("section")
             const catParam = url.searchParams.get("categoria")
 
             setCurrentType(typeParam as any)
-            setSelectedRadius(radiusParam ? Number(radiusParam) : null)
             setSelectedSection(sectionParam || null)
             if (pCity) setSelectedCitySlug(pCity)
 
@@ -523,11 +507,10 @@ export function ExplorarPageClient({
         any,
         MarketplaceListCursor
     >({
-        queryKey: ["explore", query, fetchType, selectedCitySlug, selectedRadius, selectedSection],
+        queryKey: ["explore", query, fetchType, selectedCitySlug, selectedSection],
         initialPage: (() => {
             const match = ((fetchType === type && selectedCitySlug === cidade) ||
                 (isLandingPage && type === 'tudo' && selectedCitySlug === cidade)) &&
-                selectedRadius === (searchParams.get("radius") ? Number(searchParams.get("radius")) : null) &&
                 selectedSection === (searchParams.get("section") || null)
             if (!match) return undefined
 
@@ -565,7 +548,6 @@ export function ExplorarPageClient({
                 ...limitConfig,
                 cursor,
                 cidade: selectedCitySlug || undefined,
-                radius: selectedRadius || undefined,
                 latitude: userCoords?.lat,
                 longitude: userCoords?.lng,
                 section: selectedSection || undefined,
@@ -1008,7 +990,7 @@ export function ExplorarPageClient({
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
-        updateUrl(citySlug, selectedCategories, query, currentType, selectedRadius, selectedSection, true)
+        updateUrl(citySlug, selectedCategories, query, currentType, selectedSection, true)
     }
 
     // Filter cities list by search input
@@ -1277,8 +1259,7 @@ export function ExplorarPageClient({
         setSelectedCondition("")
         setSortBy("relevancia")
         setCurrentType("tudo")
-        setSelectedRadius(null)
-        updateUrl(selectedCitySlug, [], query, "tudo", null)
+        updateUrl(selectedCitySlug, [], query, "tudo")
     }
 
     const applyFilters = (filters: {
@@ -1287,7 +1268,6 @@ export function ExplorarPageClient({
         minPrice: string | number
         maxPrice: string | number
         promoOn: boolean
-        radius: number | null
         condition?: string
     }) => {
         triggerFilterLoading()
@@ -1296,9 +1276,8 @@ export function ExplorarPageClient({
         setMinPrice(filters.minPrice)
         setMaxPrice(filters.maxPrice)
         setPromoOn(filters.promoOn)
-        setSelectedRadius(filters.radius)
         setSelectedCondition(filters.condition || "")
-        updateUrl(selectedCitySlug, filters.categories, query, filters.type, filters.radius, selectedSection)
+        updateUrl(selectedCitySlug, filters.categories, query, filters.type, selectedSection)
     }
 
     const typeOptions = [
@@ -1366,18 +1345,6 @@ export function ExplorarPageClient({
                 },
             })
         }
-        if (selectedRadius) {
-            chips.push({
-                key: "radius",
-                label: "Distância",
-                value: `Até ${selectedRadius} km`,
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setSelectedRadius(null)
-                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, null, selectedSection)
-                },
-            })
-        }
         if (sortBy !== "relevancia") {
             const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
             chips.push({
@@ -1404,7 +1371,7 @@ export function ExplorarPageClient({
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType, selectedCitySlug, query, selectedRadius, resolveCategoryName, triggerFilterLoading])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType, selectedCitySlug, query, resolveCategoryName, triggerFilterLoading])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1516,6 +1483,13 @@ export function ExplorarPageClient({
                                         {(item.category || item.subcategoryName) && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
                                         <span className="shrink-0">{locationLabel}</span>
                                     </>
+                                ) : locationOnly ? (
+                                    locationLabel ? (
+                                        <>
+                                            {(item.category || item.subcategoryName) && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
+                                            <span className="shrink-0">{locationLabel}</span>
+                                        </>
+                                    ) : null
                                 ) : (
                                     <>
                                         {(item.category || item.subcategoryName) && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
@@ -1663,7 +1637,7 @@ export function ExplorarPageClient({
         if (viewMode === "list") return renderListRow(item, true)
 
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
+            return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationOnly locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
         return <ItemCard key={`dist-${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} preferCityLabel locationOnly className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
     }
@@ -1785,7 +1759,7 @@ export function ExplorarPageClient({
         setSelectedSection(null)
         setCurrentType(groupType)
         setSelectedCondition("")
-        updateUrl(selectedCitySlug, [], query, groupType, undefined, null)
+        updateUrl(selectedCitySlug, [], query, groupType, null)
     }
 
     const selectGroupCategory = (groupType: string, catName: string) => {
@@ -1913,7 +1887,7 @@ export function ExplorarPageClient({
                                     if (selectedSection) {
                                         triggerFilterLoading()
                                         setSelectedSection(null)
-                                        updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
+                                        updateUrl(selectedCitySlug, selectedCategories, query, currentType, null)
                                     } else if (isCategoryMode) {
                                         triggerFilterLoading()
                                         setSelectedCategories([])
@@ -1924,6 +1898,18 @@ export function ExplorarPageClient({
                                 }}
                                 viewMode={viewMode}
                                 onViewModeChange={setViewMode}
+                            />
+                        )}
+
+                        {/* Filtros / Ordenar / Lista-Grid — fixos logo abaixo do título */}
+                        {!isLandingPage && (
+                            <ExplorarViewControls
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
+                                onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
+                                onOpenSort={() => setIsSortBottomSheetOpen(true)}
+                                hasActiveFilters={activeFiltersCount > 0}
+                                activeFilterChips={activeFilterChips}
                             />
                         )}
 
@@ -2035,20 +2021,14 @@ export function ExplorarPageClient({
                                         </div>
                                     )}
 
-                                    {/* View Controls and Results */}
-                                    <ExplorarViewControls
-                                        viewMode={viewMode}
-                                        onViewModeChange={setViewMode}
-                                        onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
-                                        onOpenSort={() => setIsSortBottomSheetOpen(true)}
-                                        hasActiveFilters={activeFiltersCount > 0}
-                                        activeFilterChips={activeFilterChips}
-                                    />
-
+                                    {/* Título da seção de resultados (sem filtro de tipo) */}
+                                    {currentType === 'tudo' && filteredResults.length > 0 && (
+                                        <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mt-8 mb-4">Todos os resultados</h2>
+                                    )}
 
                                     {filteredResults.length > 0 ? (
                                         <div className={viewMode === "grid"
-                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
+                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
                                             : "mt-4"
                                         }>
                                             {filteredResults.map((item) => renderListingItem(item))}
@@ -2159,7 +2139,6 @@ export function ExplorarPageClient({
                 onCitySelect={() => setIsCityModalOpen(true)}
                 currentType={currentType}
                 selectedCategories={selectedCategories}
-                selectedRadius={selectedRadius}
                 selectedCondition={selectedCondition}
                 minPrice={minPrice}
                 maxPrice={maxPrice}
