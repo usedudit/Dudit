@@ -1043,7 +1043,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                         title={
                           <span className="inline-flex items-center gap-2 min-w-0">
                             <span className="truncate">{credit.itemName}</span>
-                            <Badge variant={isService ? "blue" : "purple"}>
+                            <Badge variant={isService ? "blue" : "purple"} icon={null}>
                               {isService ? "Serviço" : "Produto"}
                             </Badge>
                           </span>
@@ -1062,18 +1062,14 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                         right={
                           <div className="flex items-center justify-end gap-3 shrink-0 flex-wrap">
                             {isService ? (
-                              credit.remaining > 0 ? (
+                              credit.remaining > 0 && (
                                 <Button size="sm" onClick={() => openBookingModal(credit)}>
                                   Agendar
                                 </Button>
-                              ) : (
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                  Sem saldo - libera no próximo ciclo
-                                </span>
                               )
                             ) : (
-                              <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                A loja registra a entrega
+                              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                Vendedor registra a entrega
                               </span>
                             )}
                           </div>

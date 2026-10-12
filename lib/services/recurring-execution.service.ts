@@ -470,9 +470,12 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
   }
 
   const billingMode = subDetails?.billing_mode || (subDetails?.recurring_plans as any)?.billing_mode || "manual"
-  if (billingMode === "auto_mercado_pago") {
-    // For auto_mercado_pago, we do NOT execute and create orders in the background.
-    // Instead, we wait for the webhook, so we transition the execution to awaiting_payment.
+  if (billingMode === "auto_mercado_pago" && subDetails?.mp_preapproval_id) {
+    // For auto_mercado_pago WITH preapproval, we do NOT execute and create orders in
+    // the background. Instead, we wait for the webhook, so we transition the execution
+    // to awaiting_payment. Sem preapproval (plano gratis ou falha ao criar o preapproval)
+    // o ciclo cai na execucao direta, igual a cobranca manual — senao ficaria preso em
+    // awaiting_payment para sempre esperando um webhook que nunca chega.
     await supabase
       .from("recurring_executions")
       .update({ status: "awaiting_payment" })

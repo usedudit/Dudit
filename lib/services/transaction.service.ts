@@ -139,6 +139,18 @@ async function applyAccountBalanceDelta(
     }
 }
 
+/**
+ * Descrição exibida no financeiro. Pedidos de assinatura ganham o prefixo
+ * "Assinatura · " para o lojista identificar a origem sem abrir o pedido.
+ */
+function describeOrderTransaction(orderData: {
+    order_number?: string | null
+    order_source?: string | null
+}): string {
+    const label = String(orderData.order_number || "")
+    return String(orderData.order_source || "").trim() === "Assinatura" ? `Assinatura · ${label}` : label
+}
+
 function buildEntries(orderData: OrderDataForTransaction): LedgerEntry[] {
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => {
@@ -334,7 +346,7 @@ async function createInstallmentGroupForSale(
             .insert({
                 partner_id: orderData.partner_id,
                 store_id: orderData.store_id || null,
-                description: orderData.order_number,
+                description: describeOrderTransaction(orderData),
                 total_amount: entry.net,
                 installments_count: entry.installmentNumber,
                 frequency: "monthly",
@@ -399,7 +411,7 @@ async function refineLedgerEntry(
         await supabase.from("transactions").insert({
             partner_id: orderData.partner_id,
             store_id: orderData.store_id || null,
-            description: orderData.order_number,
+            description: describeOrderTransaction(orderData),
             category: "Taxas de Pagamento",
             contact_id: null,
             contact_type: "customer",
@@ -566,7 +578,7 @@ export async function createTransactionFromOrder(
                     const { error: settleError } = await supabase.from("transactions").insert({
                         partner_id: orderData.partner_id,
                         store_id: orderData.store_id || null,
-                        description: orderData.order_number,
+                        description: describeOrderTransaction(orderData),
                         category: "Vendas",
                         contact_id: null,
                         contact_type: "customer",
@@ -600,7 +612,7 @@ export async function createTransactionFromOrder(
                 const { error: settleError } = await supabase.from("transactions").insert({
                     partner_id: orderData.partner_id,
                     store_id: orderData.store_id || null,
-                    description: orderData.order_number,
+                    description: describeOrderTransaction(orderData),
                     category: "Vendas",
                     contact_id: null,
                     contact_type: "customer",
@@ -753,6 +765,7 @@ export async function syncReceivableForOrder(
                     .update({
                         amount: unpaidBalance,
                         original_amount: unpaidBalance,
+                        description: describeOrderTransaction(orderData),
                         due_date: dueDate,
                         customer_id: orderData.customer_id || null,
                         account_id: accountId,
@@ -766,7 +779,7 @@ export async function syncReceivableForOrder(
             const transactionData = {
                 partner_id: orderData.partner_id,
                 store_id: orderData.store_id || null,
-                description: orderData.order_number,
+                description: describeOrderTransaction(orderData),
                 category: "Vendas",
                 contact_id: null,
                 contact_type: "customer",
@@ -837,7 +850,8 @@ export async function findOrderSettlements(params: {
         .eq("kind", "settlement")
 
     if (paymentIds.length > 0) query = query.in("payment_id", paymentIds)
-    else if (params.orderNumber) query = query.eq("description", params.orderNumber)
+    else if (params.orderNumber)
+        query = query.in("description", [params.orderNumber, `Assinatura · ${params.orderNumber}`])
     else return []
 
     const { data } = await query

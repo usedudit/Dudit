@@ -836,6 +836,24 @@ async function linkMpPreapproval(
       entityId: params.subscriptionId,
       metadata: { partnerId: params.partnerId },
     })
+    // Avisa o lojista na timeline da assinatura: sem preapproval os proximos
+    // ciclos saem como cobranca manual (A combinar) em vez de automaticos.
+    try {
+      const { logAuditEvent } = await import("@/lib/services/timeline.service")
+      await logAuditEvent({
+        partnerId: params.partnerId,
+        actorUserId: null,
+        entityType: "recurring_subscription",
+        entityId: params.subscriptionId,
+        actionType: "updated",
+        changeLines: [
+          "falha ao ativar a cobrança automática no Mercado Pago: os próximos ciclos serão gerados como cobrança manual (A combinar).",
+        ],
+        source: "system",
+      })
+    } catch (auditErr) {
+      console.error("[linkMpPreapproval] Falha ao registrar aviso na timeline:", auditErr)
+    }
   }
 }
 

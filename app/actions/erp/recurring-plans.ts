@@ -279,7 +279,7 @@ export async function createRecurringPlanAction(input: {
         end_date: input.endDate || null,
         show_in_marketplace: input.showInMarketplace !== false,
         images: input.images || [],
-        billing_mode: input.billingMode || "manual",
+        billing_mode: input.billingMode || "auto_mercado_pago",
         credit_expiration_policy: input.creditExpirationPolicy || "end_of_cycle",
         credit_expiration_days: input.creditExpirationDays ?? null,
         shipping_mode: shipping.mode,

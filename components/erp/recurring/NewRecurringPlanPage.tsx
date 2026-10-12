@@ -97,7 +97,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     const [items, setItems] = useState<any[]>([])
 
     // Novas configuracoes de cobranca e validade dos creditos
-    const [billingMode, setBillingMode] = useState<"manual" | "auto_mercado_pago">("manual")
+    const [billingMode, setBillingMode] = useState<"manual" | "auto_mercado_pago">("auto_mercado_pago")
     const [creditExpirationPolicy, setCreditExpirationPolicy] = useState<"never" | "end_of_cycle" | "fixed_days">("end_of_cycle")
     const [creditExpirationDays, setCreditExpirationDays] = useState<number | null>(null)
 
@@ -757,7 +757,13 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         value={billingMode}
                                                         setValue={(val) => setBillingMode(val as any)}
                                                         options={billingModeOptions}
+                                                        disabled
                                                     />
+                                                    <p className="text-xs text-brand-muted dark:text-dark-muted leading-relaxed">
+                                                        {billingMode === "auto_mercado_pago"
+                                                            ? "Renovações cobradas automaticamente via Mercado Pago."
+                                                            : "Plano legado: renovações cobradas manualmente (A combinar)."}
+                                                    </p>
 
                                                     <FormDropdown
                                                         label="Validade dos Créditos"

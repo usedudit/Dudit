@@ -166,6 +166,9 @@ export async function createRecurringSubscriptionAction(input: {
         customer_id: input.customerId,
         recurring_plan_id: input.planId,
         status: "active",
+        // Criada no ERP sem preapproval do Mercado Pago: renovação manual evita
+        // que o ciclo trave em "awaiting_payment" esperando um webhook que nunca chega.
+        billing_mode: "manual",
         next_execution_at: nextExecutionAt,
         delivery_type: input.deliveryType || "pickup",
         delivery_address: input.deliveryAddress || null,

@@ -1001,7 +1001,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                               title={
                                 <span className="inline-flex items-center gap-2 min-w-0">
                                   <span className="truncate">{credit.itemName}</span>
-                                  <Badge variant={credit.itemType === "service" ? "blue" : "purple"}>
+                                  <Badge variant={credit.itemType === "service" ? "blue" : "purple"} icon={null}>
                                     {credit.itemType === "service" ? "Serviço" : "Produto"}
                                   </Badge>
                                 </span>
@@ -1037,7 +1037,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                                     </Button>
                                   )}
                                   {credit.remaining <= 0 && (
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                       Sem saldo - libera no próximo ciclo
                                     </span>
                                   )}

@@ -7013,12 +7013,6 @@ const PENDING_RETURN_INSIGHT_STATUSES = [
   "WAITING_ITEM_RETURN",
 ];
 
-function latestIso(a?: string | null, b?: string | null): string | null {
-  if (!a) return b || null;
-  if (!b) return a;
-  return String(a) >= String(b) ? String(a) : String(b);
-}
-
 export async function getOrdersInsightsAction(
   partnerId: string,
   periodDays: number = 30,
@@ -7063,13 +7057,6 @@ export async function getOrdersInsightsAction(
       .is("deleted_at", null)
       .in("status", PENDING_RETURN_INSIGHT_STATUSES);
 
-    const historyQuery = admin
-      .from("orders_history")
-      .select("order_id, created_at")
-      .eq("partner_id", partnerId)
-      .order("created_at", { ascending: false })
-      .limit(3000);
-
     if (storeId) {
       recentQuery = recentQuery.or(`store_id.eq.${storeId},store_id.is.null`);
       staleQuery = staleQuery.or(`store_id.eq.${storeId},store_id.is.null`);
@@ -7079,27 +7066,19 @@ export async function getOrdersInsightsAction(
     const [
       { data: recent, error },
       { data: stale, error: staleError },
-      { data: history, error: historyError },
       { data: returnRequests, error: returnsError },
     ] = await Promise.all([
       recentQuery.order("created_at", { ascending: false }).limit(300),
       staleQuery.order("updated_at", { ascending: true }).limit(200),
-      historyQuery,
       returnsQuery.order("created_at", { ascending: true }).limit(100),
     ]);
 
     if (error) return { error: error.message };
     if (staleError) return { error: staleError.message };
-    if (historyError) return { error: historyError.message };
-    if (returnsError) return { error: returnsError.message };
-
-    const movementByOrder = new Map<string, string>();
-    for (const row of history || []) {
-      if (!row?.order_id || !row?.created_at) continue;
-      const current = movementByOrder.get(String(row.order_id));
-      if (!current || String(row.created_at) > current) {
-        movementByOrder.set(String(row.order_id), String(row.created_at));
-      }
+    if (returnsError) {
+      // A aba de devoluções é complementar: degrada para vazio em vez de
+      // quebrar o painel inteiro se a tabela/columna não existir.
+      console.error("[getOrdersInsightsAction] returns query error:", returnsError.message);
     }
 
     const ordersById = new Map<string, any>();
@@ -7107,10 +7086,7 @@ export async function getOrdersInsightsAction(
       if (row?.id) ordersById.set(String(row.id), row);
     }
 
-    const allOrders = Array.from(ordersById.values()).map((row) => ({
-      ...row,
-      last_movement_at: latestIso(row.updated_at, movementByOrder.get(String(row.id))),
-    }));
+    const allOrders = Array.from(ordersById.values());
 
     const staleIds = new Set((stale || []).map((row: any) => String(row.id)));
     const staleOrders = allOrders.filter((row) => staleIds.has(String(row.id)));
