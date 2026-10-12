@@ -83,7 +83,7 @@ export async function confirmPickupPaymentAction(params: {
   })
 
   try {
-    const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+    const { createTransactionFromOrder, syncReceivableForOrder } = await import("@/lib/services/transaction.service")
     await createTransactionFromOrder(adminClient, {
       order_id: params.orderId,
       order_number: order.order_number || order.id,
@@ -94,6 +94,20 @@ export async function confirmPickupPaymentAction(params: {
       payment_provider: "pickup",
       payment_date: now,
       payment_breakdown: [{ method: paymentMethodLabels[params.paymentMethod], amount: order.total_amount }],
+      customer_id: order.customer_id || order.buyer_id || null,
+      customer_name: null,
+    })
+
+    // Recebível pendente criado na abertura do pedido: sem isto, a transação
+    // "A receber" ficaria órfã depois do pagamento confirmado na retirada.
+    await syncReceivableForOrder(adminClient, {
+      order_number: order.order_number || order.id,
+      partner_id: ctx.partnerId,
+      store_id: order.store_id || null,
+      total_amount: Number(order.total_amount || 0),
+      paid_amount: Number(order.total_amount || 0),
+      situation: "paid",
+      payment_method: paymentMethodLabels[params.paymentMethod],
       customer_id: order.customer_id || order.buyer_id || null,
       customer_name: null,
     })

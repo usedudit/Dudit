@@ -38,6 +38,7 @@ import {
     DeliveryPickupIcon,
     DeliveryFailedIcon,
     PartiallyPaidIcon,
+    StarIcon,
 } from "@/lib/icons"
 
 import { formatDate, formatTime, formatCurrency } from "@/lib/utils"
@@ -51,7 +52,7 @@ import {
     isDatePeriodFilterActive,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
-import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
+import { cleanOrderNotes, normalizeOrderSource, resolveOrderPaymentMethodLabel, UNDEFINED_PAYMENT_PLACEHOLDERS } from "@/lib/orders/order-utils"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -60,7 +61,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
-import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel, canonicalDeliveryStatus, DELIVERY_STATUS_FILTER_OPTIONS, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -68,6 +69,9 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { usePermissions } from "@/lib/permission-context"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { OrdersSuggestionsSheet } from "./OrdersSuggestionsSheet"
 
 // --- TYPES & INTERFACES ---
 
@@ -103,6 +107,7 @@ interface Order {
     is_refunded?: boolean;
     refunded_amount?: number;
     payment_method?: string;
+    payment_method_label?: string;
     payment_breakdown?: any;
     payment_provider?: string;
     has_items_to_restore?: boolean;
@@ -117,6 +122,10 @@ interface Order {
 interface FilterState {
     status: string[]
     channel: string[]
+    deliveryStatus: string[]
+    deliveryType: string[]
+    paymentMethod: string[]
+    totalRange: { min: string; max: string }
     datePeriod: DatePeriodFilterValue
 }
 
@@ -126,8 +135,23 @@ type SortDirection = "asc" | "desc";
 const INITIAL_FILTERS: FilterState = {
     status: [],
     channel: [],
+    deliveryStatus: [],
+    deliveryType: [],
+    paymentMethod: [],
+    totalRange: { min: "", max: "" },
     datePeriod: { ...EMPTY_DATE_PERIOD },
 }
+
+const DELIVERY_TYPE_ORDER = ["delivery", "pickup", "on_site", "customer_location"]
+
+const sortDeliveryTypes = (values: string[]) =>
+    [...values].sort((a, b) => {
+        const ai = DELIVERY_TYPE_ORDER.indexOf(a)
+        const bi = DELIVERY_TYPE_ORDER.indexOf(b)
+        return (ai === -1 ? DELIVERY_TYPE_ORDER.length : ai) - (bi === -1 ? DELIVERY_TYPE_ORDER.length : bi)
+    })
+
+const STATUS_FILTER_OPTIONS = ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise", "Parcialmente Pago", "Entregue"]
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
@@ -146,14 +170,6 @@ const CHANGE_STATUS_REASONS = [
     { value: "payment_issue", label: "Problema com pagamento" },
     { value: "other", label: "Outro" }
 ]
-
-const UNDEFINED_PAYMENT_PLACEHOLDERS = [
-    "método não definido",
-    "metodo nao definido",
-    "não informado",
-    "nao informado",
-    "",
-];
 
 const hasDefinedPaymentMethod = (order: {
     payment_method?: string;
@@ -224,6 +240,14 @@ export default function OrdersPage({
     const { toast } = useToast()
     const router = useRouter()
     const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const hasEscalarPlan = hasMinimumPlan(planSlug, "escalar")
+    const [showSuggestions, setShowSuggestions] = useState(false)
+
+    const handleOpenSuggestions = useCallback(() => {
+        if (hasEscalarPlan) setShowSuggestions(true)
+        else openPlanUpgrade("escalar")
+    }, [hasEscalarPlan, openPlanUpgrade])
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
@@ -300,6 +324,12 @@ export default function OrdersPage({
         customReasonText: string
     } | null>(null)
 
+    // Volta para a primeira página quando os filtros/busca mudam, evitando
+    // exibir uma página vazia quando o resultado cai para menos de 8 itens.
+    useEffect(() => {
+        setPage(1)
+    }, [filters, activeTab, debouncedSearch])
+
     const undoManager = useUndoGracePeriod(10000)
 
 
@@ -371,21 +401,59 @@ export default function OrdersPage({
     }, [effectiveOrders, cache])
 
 
-    const filterSections: FilterSectionConfig[] = useMemo(
-        () => [
+    const filterSections: FilterSectionConfig[] = useMemo(() => {
+        const rows: any[] = effectiveOrders || []
+
+        const channelOptions = Array.from(
+            new Set(rows.map((o) => normalizeOrderSource(o.order_source))),
+        ) as string[]
+
+        const deliveryTypeValues = sortDeliveryTypes(
+            Array.from(new Set(rows.map((o) => o.delivery_type || "delivery"))) as string[],
+        )
+
+        const paymentMethodOptions = Array.from(
+            new Set(rows.map((o) => resolveOrderPaymentMethodLabel(o))),
+        ).sort((a, b) => a.localeCompare(b, "pt-BR"))
+
+        const deliveryStatusValues = DELIVERY_STATUS_FILTER_OPTIONS.map((o) => o.value)
+
+        return [
             { id: "datePeriod", title: "Data do pedido", type: "date-period" },
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
+            { id: "status", title: "Status do pagamento", type: "checkbox-list", options: STATUS_FILTER_OPTIONS },
             {
-                id: "channel",
-                title: "Origem",
+                id: "deliveryStatus",
+                title: "Status de entrega",
                 type: "checkbox-list",
-                options: Array.from(
-                    new Set(effectiveOrders?.map((o: any) => normalizeOrderSource(o.order_source)) || []),
-                ) as string[],
+                options: deliveryStatusValues,
+                optionLabels: Object.fromEntries(
+                    DELIVERY_STATUS_FILTER_OPTIONS.map((o) => [o.value, o.label]),
+                ),
             },
-        ],
-        [effectiveOrders],
-    )
+            {
+                id: "paymentMethod",
+                title: "Método de pagamento",
+                type: "checkbox-list",
+                options: paymentMethodOptions,
+            },
+            { id: "channel", title: "Origem", type: "checkbox-list", options: channelOptions },
+            {
+                id: "deliveryType",
+                title: "Tipo de entrega",
+                type: "checkbox-list",
+                options: deliveryTypeValues,
+                optionLabels: Object.fromEntries(
+                    deliveryTypeValues.map((value) => [value, getFulfillmentModeLabel(value)]),
+                ),
+            },
+            {
+                id: "totalRange",
+                title: "Valor do pedido",
+                type: "range",
+                rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" },
+            },
+        ]
+    }, [effectiveOrders])
 
     const filteredOrders: Order[] = useMemo(() => {
         if (!effectiveOrders) return []
@@ -484,6 +552,7 @@ export default function OrdersPage({
                     is_refunded: Boolean(o.is_refunded),
                     refunded_amount: Number(o.refunded_amount || 0),
                     payment_method: o.payment_method || "",
+                    payment_method_label: resolveOrderPaymentMethodLabel(o),
                     payment_breakdown: o.payment_breakdown || null,
                     payment_provider: o.payment_provider || "",
                     has_items_to_restore: Boolean(o.has_items_to_restore),
@@ -513,10 +582,31 @@ export default function OrdersPage({
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(o.statusLabel)
                 const channelFilterMatch = filters.channel.length === 0 || filters.channel.includes(o.order_source)
+                const deliveryStatusMatch =
+                    filters.deliveryStatus.length === 0 ||
+                    filters.deliveryStatus.includes(canonicalDeliveryStatus(o.delivery_status))
+                const deliveryTypeMatch =
+                    filters.deliveryType.length === 0 ||
+                    filters.deliveryType.includes(o.delivery_type || "delivery")
+                const paymentMethodMatch =
+                    filters.paymentMethod.length === 0 ||
+                    filters.paymentMethod.includes(o.payment_method_label || "")
+                const minTotal = filters.totalRange.min ? Number.parseFloat(filters.totalRange.min) : 0
+                const maxTotal = filters.totalRange.max ? Number.parseFloat(filters.totalRange.max) : Number.POSITIVE_INFINITY
+                const totalMatch = o.total_amount >= minTotal && o.total_amount <= maxTotal
                 const orderYmd = msToBrazilYmd(o.created_at_time)
                 const matchesDate = !dateBoundsActive || ymdInBounds(orderYmd, startYmd, endYmd)
 
-                return tabMatch && statusFilterMatch && channelFilterMatch && matchesDate
+                return (
+                    tabMatch &&
+                    statusFilterMatch &&
+                    channelFilterMatch &&
+                    deliveryStatusMatch &&
+                    deliveryTypeMatch &&
+                    paymentMethodMatch &&
+                    totalMatch &&
+                    matchesDate
+                )
             })
 
         let sortedResult = result
@@ -562,6 +652,11 @@ export default function OrdersPage({
     const hasActiveFilters =
         filters.status.length > 0 ||
         filters.channel.length > 0 ||
+        filters.deliveryStatus.length > 0 ||
+        filters.deliveryType.length > 0 ||
+        filters.paymentMethod.length > 0 ||
+        !!filters.totalRange.min ||
+        !!filters.totalRange.max ||
         debouncedSearch.length > 0 ||
         isDatePeriodFilterActive(filters.datePeriod)
     const hasOrders = (effectiveOrders?.length || 0) > 0
@@ -590,6 +685,11 @@ export default function OrdersPage({
                 activeTab,
                 status: filters.status,
                 channels: filters.channel,
+                deliveryStatus: filters.deliveryStatus,
+                deliveryType: filters.deliveryType,
+                paymentMethods: filters.paymentMethod,
+                totalMin: filters.totalRange.min,
+                totalMax: filters.totalRange.max,
                 datePeriod: filters.datePeriod,
             },
         })
@@ -1162,6 +1262,13 @@ export default function OrdersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="outlineorange"
+                                        className="w-[42px] h-[42px]"
+                                        onClick={handleOpenSuggestions}
+                                        leftIcon={<StarIcon size={18} />}
+                                    >
+                                    </Button>
                                     <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                         {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
@@ -1187,6 +1294,7 @@ export default function OrdersPage({
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
                                     tabCounts={tabCounts}
+                                    onOpenSuggestions={handleOpenSuggestions}
                                 />
                             )}
 
@@ -1661,6 +1769,14 @@ export default function OrdersPage({
                 canExportAllColumns={columnSelectionModal.canExportAllColumns}
                 onConfirm={handleColumnConfirm}
                 onClose={closeColumnSelectionModal}
+            />
+
+            <OrdersSuggestionsSheet
+                isOpen={showSuggestions}
+                onClose={() => setShowSuggestions(false)}
+                partnerId={partnerId}
+                storeId={selectedStore?.id || undefined}
+                onOpenOrder={(orderId) => openEntity("view", orderId)}
             />
 
             <UndoGracePeriodToast

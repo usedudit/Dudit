@@ -1,6 +1,8 @@
 import "server-only"
 
 import { unstable_cache } from "next/cache"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
@@ -18,101 +20,133 @@ const addDays = (ymd: string, days: number) => {
 
 // Per-request loaders to consolidate overlapping database queries during parallel renders
 const loadRawOrdersGeneralTab = cache(async (partnerId: string, todayYmd: string, tz: string) => {
-  const fromYmd = addDays(todayYmd, -59)
-  const supabase = createAdminClient()
-  const fromIso = startOfDay(fromYmd, tz).toISOString()
-  const { data, error } = await supabase
-    .from("orders")
-    .select("id, total_amount, order_number, customer_name, situation, created_at, order_source")
-    .eq("partner_id", partnerId)
-    .gte("created_at", fromIso)
-    .order("created_at", { ascending: false })
-  if (error) throw error
-  return data || []
+  return getCachedErpPage(
+    ["raw-orders-general-tab", partnerId, todayYmd, tz],
+    [TAGS.orders(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
+      const fromYmd = addDays(todayYmd, -59)
+      const supabase = createAdminClient()
+      const fromIso = startOfDay(fromYmd, tz).toISOString()
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, total_amount, order_number, customer_name, situation, created_at, order_source")
+        .eq("partner_id", partnerId)
+        .gte("created_at", fromIso)
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+    60,
+  )
 })
 
 const loadRawOrderItemsForAbc = cache(async (partnerId: string, todayYmd: string, tz: string) => {
-  const fromYmd = addDays(todayYmd, -29)
-  const supabase = createAdminClient()
-  const fromIso = startOfDay(fromYmd, tz).toISOString()
-  const { data, error } = await supabase
-    .from("order_items")
-    .select("product_name, net_item_value, created_at, orders!inner(partner_id)")
-    .eq("orders.partner_id", partnerId)
-    .gte("created_at", fromIso)
-    .order("created_at", { ascending: false })
-  if (error) throw error
-  return data || []
+  return getCachedErpPage(
+    ["raw-order-items-abc", partnerId, todayYmd, tz],
+    [TAGS.orders(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
+      const fromYmd = addDays(todayYmd, -29)
+      const supabase = createAdminClient()
+      const fromIso = startOfDay(fromYmd, tz).toISOString()
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("product_name, net_item_value, created_at, orders!inner(partner_id)")
+        .eq("orders.partner_id", partnerId)
+        .gte("created_at", fromIso)
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+    60,
+  )
 })
 
 const loadRawTransactionsGeneralTab = cache(async (partnerId: string, todayYmd: string, tz: string) => {
-  const fromYmd = addDays(todayYmd, -59)
-  const supabase = createAdminClient()
-  const fromIso = startOfDay(fromYmd, tz).toISOString()
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind")
-    .eq("partner_id", partnerId)
-    .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
-    .or(`created_at.gte.${fromIso},due_date.gte.${todayYmd}`)
-    .order("created_at", { ascending: false })
-  if (error) throw error
-  return data || []
+  return getCachedErpPage(
+    ["raw-transactions-general-tab", partnerId, todayYmd, tz],
+    [TAGS.transactions(partnerId), DASHBOARD_TAGS.general(partnerId), DASHBOARD_TAGS.financial(partnerId)],
+    async () => {
+      const fromYmd = addDays(todayYmd, -59)
+      const supabase = createAdminClient()
+      const fromIso = startOfDay(fromYmd, tz).toISOString()
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind")
+        .eq("partner_id", partnerId)
+        .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
+        .or(`created_at.gte.${fromIso},due_date.gte.${todayYmd}`)
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+    60,
+  )
 })
 
 const loadRawProductsGeneralTab = cache(async (partnerId: string) => {
-  const supabase = createAdminClient()
-  const { data, error } = await scopeActiveOnly(
-    supabase
-      .from("products")
-      .select("id, name, stock_quantity, unit, is_active, category_id, category:product_categories!category_id(name)")
+  return getCachedErpPage(
+    ["raw-products-general-tab", partnerId],
+    [TAGS.products(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
+      const supabase = createAdminClient()
+      const { data, error } = await scopeActiveOnly(
+        supabase
+          .from("products")
+          .select("id, name, stock_quantity, unit, is_active, category_id, category:product_categories!category_id(name)")
+      )
+        .eq("partner_id", partnerId)
+        .eq("status", "ativo")
+      if (error) throw error
+      return data || []
+    },
+    60,
   )
-    .eq("partner_id", partnerId)
-    .eq("status", "ativo")
-  if (error) throw error
-  return data || []
 })
 
 const loadRawAppointmentsFuture = cache(async (partnerId: string, todayYmd: string) => {
-  const next7 = addDays(todayYmd, 7)
-  const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from("appointments")
-    .select("id, status, start_date, start_time, duration_minutes, staff_name, price, source, customer_name, service_name")
-    .eq("partner_id", partnerId)
-    .gte("start_date", todayYmd)
-    .lte("start_date", next7)
-    .order("start_date")
-    .order("start_time")
-  if (error) throw error
-  return data || []
+  return getCachedErpPage(
+    ["raw-appointments-future", partnerId, todayYmd],
+    [TAGS.appointments(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
+      const next7 = addDays(todayYmd, 7)
+      const supabase = createAdminClient()
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("id, status, start_date, start_time, duration_minutes, staff_name, price, source, customer_name, service_name")
+        .eq("partner_id", partnerId)
+        .gte("start_date", todayYmd)
+        .lte("start_date", next7)
+        .order("start_date")
+        .order("start_time")
+      if (error) throw error
+      return data || []
+    },
+    60,
+  )
 })
 
 const loadRawAppointmentsPast = cache(async (partnerId: string, fromYmd: string, todayYmd: string) => {
-  const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from("appointments")
-    .select("id, status, start_date, start_time, duration_minutes, staff_name, price, source, customer_name, service_name")
-    .eq("partner_id", partnerId)
-    .gte("start_date", fromYmd)
-    .lte("start_date", todayYmd)
-    .order("start_date")
-    .order("start_time")
-  if (error) throw error
-  return data || []
+  return getCachedErpPage(
+    ["raw-appointments-past", partnerId, fromYmd, todayYmd],
+    [TAGS.appointments(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
+      const supabase = createAdminClient()
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("id, status, start_date, start_time, duration_minutes, staff_name, price, source, customer_name, service_name")
+        .eq("partner_id", partnerId)
+        .gte("start_date", fromYmd)
+        .lte("start_date", todayYmd)
+        .order("start_date")
+        .order("start_time")
+      if (error) throw error
+      return data || []
+    },
+    60,
+  )
 })
 
-// Cache maps to prevent unstable_cache recreation anti-pattern
-const generalDashboardCacheMap = new Map<string, any>()
-const generalMetricsCacheMap = new Map<string, any>()
-const generalAlertsCacheMap = new Map<string, any>()
-const generalRevenueChartCacheMap = new Map<string, any>()
-const generalRevenueOriginCacheMap = new Map<string, any>()
-const generalActivityCacheMap = new Map<string, any>()
-const generalAbcCurveCacheMap = new Map<string, any>()
-const generalOrdersChartCacheMap = new Map<string, any>()
-const generalTopCategoriesCacheMap = new Map<string, any>()
-const productsDashboardCacheMap = new Map<string, any>()
+// Shared dashboard cache tags and helpers
 
 // Per-request timezone resolved from the partner's store configuration.
 // Set by the exported getDashboard* functions before calling cached loaders.
@@ -123,9 +157,7 @@ const getTodayYmdInTz = () => getTodayYmd(_requestTimezone)
 
 /** Converts a YYYY-MM-DD string to ISO start-of-day in the request timezone. */
 const toStartOfDayIso = (ymd: string) => startOfDay(ymd, _requestTimezone).toISOString()
-const servicesDashboardCacheMap = new Map<string, any>()
-const financialDashboardCacheMap = new Map<string, any>()
-const operationsDashboardCacheMap = new Map<string, any>()
+
 
 function getDateRangeForPeriod(period: Period, todayOverride?: string) {
   const today = todayOverride || getTodayYmdInTz()
@@ -361,10 +393,10 @@ const topFromMap = (map: Map<string, number>, limit = 5) => {
 
 async function getCachedGeneral(partnerId: string, storeId = "", tz?: string): Promise<GeneralDashboardData> {
   const resolvedTz = tz || "America/Sao_Paulo"
-  let cachedFn = generalDashboardCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-general", partnerId, storeId],
+    [DASHBOARD_TAGS.general(partnerId)],
+    async () => {
         const today = getTodayYmdInTz()
         const from = addDays(today, -29)
         const previousFrom = addDays(today, -59)
@@ -446,20 +478,16 @@ async function getCachedGeneral(partnerId: string, storeId = "", tz?: string): P
             tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange",
           })),
         }
-      },
-      ["dashboard-general", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
-    )
-    generalDashboardCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedProducts(partnerId: string, storeId = ""): Promise<ProductsDashboardData> {
-  let cachedFn = productsDashboardCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-products", partnerId, storeId],
+    [DASHBOARD_TAGS.products(partnerId)],
+    async () => {
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
           scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).limit(300),
@@ -511,20 +539,16 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
           salesEvolution: bucketByDate(orderRows, "created_at", "total_amount"),
           busyHours: topFromMap(hours, 8),
         }
-      },
-      ["dashboard-products", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.products(partnerId)], revalidate: 120 },
-    )
-    productsDashboardCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedServices(partnerId: string, storeId = ""): Promise<ServicesDashboardData> {
-  let cachedFn = servicesDashboardCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-services", partnerId, storeId],
+    [DASHBOARD_TAGS.services(partnerId)],
+    async () => {
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const from = addDays(today, -29)
@@ -591,20 +615,16 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
           categoryRows: topFromMap(categories, 8).map((item) => ({ id: item.label, title: item.label, subtitle: "serviços ativos", value: String(item.value), tone: "default" })) as DashboardListItem[],
           serviceRows: Array.from(byService.entries()).sort((a, b) => b[1].count - a[1].count).slice(0, 8).map(rowFrom),
         }
-      },
-      ["dashboard-services", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.services(partnerId)], revalidate: 120 },
-    )
-    servicesDashboardCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedFinancial(partnerId: string, storeId = ""): Promise<FinancialDashboardData> {
-  let cachedFn = financialDashboardCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-financial", partnerId, storeId],
+    [DASHBOARD_TAGS.financial(partnerId)],
+    async () => {
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const from = addDays(today, -120)
@@ -773,20 +793,16 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
             tone: "red",
           })),
         }
-      },
-      ["dashboard-financial", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.financial(partnerId)], revalidate: 120 },
-    )
-    financialDashboardCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedOperations(partnerId: string, storeId = ""): Promise<OperationsDashboardData> {
-  let cachedFn = operationsDashboardCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-operations", partnerId, storeId],
+    [DASHBOARD_TAGS.operations(partnerId)],
+    async () => {
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const [deliveries, appointments] = await Promise.all([
@@ -830,13 +846,9 @@ async function getCachedOperations(partnerId: string, storeId = ""): Promise<Ope
             tone: "orange",
           })),
         }
-      },
-      ["dashboard-operations", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.operations(partnerId)], revalidate: 120 },
-    )
-    operationsDashboardCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 export async function getDashboardGeneralData(partnerId: string, storeId = "") {
@@ -871,11 +883,10 @@ export async function getDashboardOperationsData(partnerId: string, storeId = ""
 // ============================================================================
 
 async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: Period = "monthly", todayOverride?: string): Promise<{ metrics: Metric[] }> {
-  const mapKey = `${partnerId}:${period}:${todayOverride || ""}`
-  let cachedFn = generalMetricsCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-metrics", partnerId, storeId, period, todayOverride || ""],
+    [DASHBOARD_TAGS.metrics(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const { today, from, previousFrom } = getDateRangeForPeriod(period, todayOverride)
 
         const [allOrders, allTransactions] = await Promise.all([
@@ -901,21 +912,16 @@ async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: 
             { title: "Clientes Atendidos", value: String(uniqueCustomers.size), trend: "0% vs período anterior", tone: "default" as const },
           ],
         }
-      },
-      ["dashboard-metrics", partnerId, storeId, period, todayOverride || ""],
-      { tags: [DASHBOARD_TAGS.metrics(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 60 },
-    )
-    generalMetricsCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    60,
+  )
 }
 
 async function getCachedGeneralAlerts(partnerId: string, storeId = "", activeResources: string[] = ["products", "services"]): Promise<{ alerts: AlertItem[] }> {
-  const mapKey = `${partnerId}:${activeResources.sort().join(",")}`
-  let cachedFn = generalAlertsCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-alerts", partnerId, storeId, activeResources.sort().join(",")],
+    [DASHBOARD_TAGS.alerts(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const next7 = addDays(today, 7)
@@ -959,21 +965,16 @@ async function getCachedGeneralAlerts(partnerId: string, storeId = "", activeRes
         }
 
         return { alerts }
-      },
-      ["dashboard-alerts", partnerId, storeId, activeResources.sort().join(",")],
-      { tags: [DASHBOARD_TAGS.alerts(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
-    )
-    generalAlertsCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    60,
+  )
 }
 
 async function getCachedGeneralRevenueChart(partnerId: string, storeId = "", period: Period = "monthly", todayOverride?: string): Promise<{ revenue: any[]; total: number; trend: string }> {
-  const mapKey = `${partnerId}:${period}:${todayOverride || ""}`
-  let cachedFn = generalRevenueChartCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-revenue", partnerId, storeId, period, todayOverride || ""],
+    [DASHBOARD_TAGS.revenue(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const { today, from } = getDateRangeForPeriod(period, todayOverride)
         const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
         const prevFrom = addDays(from, -daysInPeriod)
@@ -1000,21 +1001,16 @@ async function getCachedGeneralRevenueChart(partnerId: string, storeId = "", per
         }))
 
         return { revenue, total, trend }
-      },
-      ["dashboard-revenue", partnerId, storeId, period, todayOverride || ""],
-      { tags: [DASHBOARD_TAGS.revenue(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
-    )
-    generalRevenueChartCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ origins: ChartPoint[] }> {
-  const mapKey = `${partnerId}:${period}`
-  let cachedFn = generalRevenueOriginCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-revenue-origin", partnerId, storeId, period],
+    [DASHBOARD_TAGS.revenueOrigin(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const { today, from } = getDateRangeForPeriod(period)
         const allOrders = await loadRawOrdersGeneralTab(partnerId, today, _requestTimezone)
         const data = allOrders.filter((o: any) => String(o.created_at).slice(0, 10) >= from).slice(0, 300)
@@ -1026,13 +1022,9 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", pe
         }
         const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)
         return { origins }
-      },
-      ["dashboard-revenue-origin", partnerId, storeId, period],
-      { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
-    )
-    generalRevenueOriginCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 const bucketCountByDate = (rows: any[], dateKey: string, days = 30) => {
@@ -1053,11 +1045,10 @@ const bucketCountByDate = (rows: any[], dateKey: string, days = 30) => {
 }
 
 async function getCachedGeneralOrdersChart(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ orders: ChartPoint[]; total: number }> {
-  const mapKey = `${partnerId}:${period}`
-  let cachedFn = generalOrdersChartCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-orders-chart", partnerId, storeId, period],
+    [DASHBOARD_TAGS.ordersChart(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const { today, from } = getDateRangeForPeriod(period)
         const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
         const allOrders = await loadRawOrdersGeneralTab(partnerId, today, _requestTimezone)
@@ -1067,22 +1058,17 @@ async function getCachedGeneralOrdersChart(partnerId: string, storeId = "", peri
           orders: bucketCountByDate(current, "created_at", daysInPeriod),
           total: current.length,
         }
-      },
-      ["dashboard-orders-chart", partnerId, storeId, period],
-      { tags: [DASHBOARD_TAGS.ordersChart(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
-    )
-    generalOrdersChartCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 
 async function getCachedGeneralAbcCurve(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ abcCurve: AbcCurvePoint[] }> {
-  const mapKey = `${partnerId}:${period}`
-  let cachedFn = generalAbcCurveCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-abc-curve", partnerId, storeId, period],
+    [DASHBOARD_TAGS.abcCurve(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const { today, from } = getDateRangeForPeriod(period)
         const items = await loadRawOrderItemsForAbc(partnerId, today, _requestTimezone)
         const data = (items || []).filter((item: any) => String(item.created_at).slice(0, 10) >= from).slice(0, 600)
@@ -1109,20 +1095,16 @@ async function getCachedGeneralAbcCurve(partnerId: string, storeId = "", period:
         })
 
         return { abcCurve }
-      },
-      ["dashboard-abc-curve", partnerId, storeId, period],
-      { tags: [DASHBOARD_TAGS.abcCurve(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
-    )
-    generalAbcCurveCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promise<{ activity: ActivityItem[] }> {
-  let cachedFn = generalActivityCacheMap.get(partnerId)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-activity", partnerId, storeId],
+    [DASHBOARD_TAGS.activity(partnerId), DASHBOARD_TAGS.general(partnerId)],
+    async () => {
         const supabase = createAdminClient()
 
         // Fetch logs
@@ -1292,21 +1274,16 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
         })
 
         return { activity }
-      },
-      ["dashboard-activity", partnerId, storeId],
-      { tags: [DASHBOARD_TAGS.activity(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
-    )
-    generalActivityCacheMap.set(partnerId, cachedFn)
-  }
-  return cachedFn()
+    },
+    60,
+  )
 }
 
 async function getCachedGeneralTopCategories(partnerId: string, storeId = "", activeResources: string[] = ["products", "services"], period: Period = "monthly"): Promise<{ categories: ChartPoint[] }> {
-  const mapKey = `${partnerId}:${activeResources.sort().join(",")}:${period}`
-  let cachedFn = generalTopCategoriesCacheMap.get(mapKey)
-  if (!cachedFn) {
-    cachedFn = unstable_cache(
-      async () => {
+  return getCachedErpPage(
+    ["dashboard-categories", partnerId, storeId, activeResources.sort().join(","), period],
+    [DASHBOARD_TAGS.categories(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)],
+    async () => {
         const supabase = createAdminClient()
         const { today, from } = getDateRangeForPeriod(period)
         const categoryMap = new Map<string, number>()
@@ -1343,13 +1320,9 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", ac
         }
 
         return { categories: topFromMap(categoryMap) }
-      },
-      ["dashboard-categories", partnerId, storeId, activeResources.sort().join(","), period],
-      { tags: [DASHBOARD_TAGS.categories(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
-    )
-    generalTopCategoriesCacheMap.set(mapKey, cachedFn)
-  }
-  return cachedFn()
+    },
+    120,
+  )
 }
 
 // ============================================================================

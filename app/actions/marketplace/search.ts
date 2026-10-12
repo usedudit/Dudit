@@ -649,253 +649,9 @@ async function _searchMarketplaceInternal(
         return searchMarketplacePostgresFTS(query, type, limits)
     }
 
-    try {
-        const limitCount = type === 'tudo' ? geral : (type === 'vitrines' ? vitLimit : (type === 'produtos' ? prodLimit : (type === 'planos' ? planosLimit : servLimit)))
-        const indexKey = type === 'tudo' ? 'explore:index:all' : `explore:index:${type}`
-
-        const tRedisZero = performance.now()
-
-        // COMPOSITE CURSOR LOGIC (Evita duplicados quando dois itens têm exatamente o mesmo score/timestamp)
-        // Usamos range EXCLUSIVA com `(` para não re-incluir itens do cursor anterior
-        const startScore = cursor ? `(${cursor}` : "+inf"
-        const ids = (await redis.zrange(indexKey, startScore as any, "-inf", { byScore: true, rev: true, offset: 0, count: limitCount + 5 })) as string[]
-
-        if (!ids || ids.length === 0) {
-            // SAFE FALLBACK: Se o índice do Redis estiver vazio (ex: após limpeza ou falha de sync),
-            // tentamos buscar no Postgres FTS para não deixar o marketplace vazio.
-            // Apenas para a primeira página (sem cursor/lastId).
-            if (!cursor && !lastId) {
-                console.log(`[REDIS] Index ${indexKey} is empty. Falling back to Postgres browse-by-score for ${type}.`)
-                return await browseMarketplaceByScore(type, limits)
-            }
-            return { results: [], filteredIds: [] }
-        }
-
-        let filteredIds = ids
-        if (lastId) {
-            let prefix = 'produto'
-            switch (type) {
-                case 'tudo':
-                case 'produtos':
-                    prefix = 'produto'
-                    break
-                case 'servicos':
-                    prefix = 'servico'
-                    break
-                case 'vitrines':
-                    prefix = 'loja'
-                    break
-                case 'planos':
-                    prefix = 'plano'
-                    break
-            }
-            // Buscando o index que foi visto por útimo
-            const lastIdx = ids.findIndex(id => id.endsWith(`:${lastId}`))
-            if (lastIdx !== -1) {
-                // Ignoramos todos os elementos que vieram antes e incluindo o lastId
-                filteredIds = ids.slice(lastIdx + 1)
-            } else {
-                // Se não achou o lastId no lote, mas tinha um score, pra não duplicar ou dar ruim, fazemos fallback de exclusividade
-                // Isso ocorre raramente se o item mudar de score entre buscas
-            }
-        }
-
-        filteredIds = filteredIds.slice(0, limitCount)
-        if (!filteredIds.length) return { results: [], filteredIds: [] }
-
-        const dataKeys = filteredIds.map(id => `data:v2:${id}`)
-
-        const tRedisKeys = performance.now()
-        const cachedObjectsRaw = await redis.mget(...dataKeys)
-
-        const cachedObjects = cachedObjectsRaw.map((obj: any) =>
-            typeof obj === 'string' ? JSON.parse(obj) : obj
-        )
-
-        const missingIndices = cachedObjects.reduce((acc: number[], obj: any, idx: number) => {
-            if (!obj) acc.push(idx)
-            return acc
-        }, [])
-
-        let finalData = [...cachedObjects]
-
-        // SAFE POSTGRES FALLBACK logic (sem writes na rota de read para evitar bottleneck na view)
-        if (missingIndices.length > 0) {
-            const supabase = getAdminClient()
-            const missingIds = missingIndices.map(idx => filteredIds[idx])
-
-            const produtosIds = missingIds.filter((id: string) => id.startsWith('produto:')).map((id: string) => id.replace('produto:', ''))
-            const servicosIds = missingIds.filter((id: string) => id.startsWith('servico:')).map((id: string) => id.replace('servico:', ''))
-            const lojasIds = missingIds.filter((id: string) => id.startsWith('loja:')).map((id: string) => id.replace('loja:', ''))
-            const planosIds = missingIds.filter((id: string) => id.startsWith('plano:')).map((id: string) => id.replace('plano:', ''))
-
-            const promises = []
-
-            let _prodIdx = -1, _servIdx = -1
-
-            if (produtosIds.length > 0) {
-                _prodIdx = promises.length
-                promises.push(
-                    supabase.from("products").select(`
-                        id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating, sales_last_30_days,
-                        category_id, category:product_categories!category_id(name), created_at,
-                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
-                        partners(id, is_showcase_active),
-                        stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)),
-                        product_variants(variant_options, price_adjustment, is_active),
-                        show_price_in_store
-                    `)
-                        .in("id", produtosIds)
-                        .eq("status", "ativo")
-                        .eq("show_in_marketplace", true)
-                )
-            }
-            if (servicosIds.length > 0) {
-                _servIdx = promises.length
-                promises.push(
-                    supabase.from("services").select(`
-                        id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
-                        marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                        partners(id),
-                        stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)),
-                        show_price_in_store
-                    `)
-                        .in("id", servicosIds)
-                        .in("status", ["ativo", "active"])
-                        .is("deleted_at", null)
-                        .eq("show_in_marketplace", true)
-                )
-            }
-            if (lojasIds.length > 0) {
-                promises.push(
-                    supabase.from("stores").select(`
-                        id, short_id, name, slug, description, logo_url, banner_url, phone, rating, is_showcase_active, partner_id, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
-                        partners!inner(id, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
-                    `).in("id", lojasIds)
-                        .eq("is_active", true)
-                )
-            }
-            if (planosIds.length > 0) {
-                promises.push(
-                    supabase.from("recurring_plans").select(`
-                        id, short_id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                        partners(id, is_showcase_active),
-                        stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
-                        recurring_plan_items(
-                            id, item_type, product_id, variant_id, service_id, quantity, unit_price,
-                            products:product_id(id, short_id, name, price, images),
-                            services:service_id(id, short_id, name, price, duration_minutes)
-                        )
-                    `)
-                        .in("id", planosIds)
-                        .eq("status", "active")
-                        .eq("show_in_marketplace", true)
-                )
-            }
-
-            const results = await Promise.all(promises)
-
-            let fallbackRecords: any[] = []
-
-            results.forEach((res) => {
-                if (res.data) fallbackRecords = fallbackRecords.concat(res.data)
-            })
-
-            const normalizeRecord = (item: any) => {
-                if (item.name && item.description !== undefined && item.logo_url !== undefined) {
-                    // This is a store record from stores table
-                    return {
-                        id: item.id, short_id: item.short_id || null, name: item.name, slug: item.slug, description: item.description,
-                        images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                        rating: item.rating, itemType: 'loja', category: item.partners?.category?.parent?.name || item.partners?.category?.name || 'Loja Parceira',
-                        partners: {
-                            id: item.id, short_id: item.short_id || null, store_name: item.name, slug: item.slug,
-                            store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
-                            banner_url: item.banner_url || null,
-                            latitude: item.addresses?.[0]?.latitude,
-                            longitude: item.addresses?.[0]?.longitude,
-                            city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
-                            neighborhood: item.addresses?.[0]?.neighborhood || null,
-                            reviewsCount: item.reviews?.[0]?.count || 0
-                        }, created_at: item.created_at
-                    }
-                }
-
-                if (item.frequency_type !== undefined) {
-                    return normalizePlan(item)
-                }
-
-                const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-                const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
-                const storeImage = rawStore?.logo_url
-                const partner = rawPartner ? {
-                    ...rawPartner,
-                    store_name: rawStore?.name,
-                    slug: rawStore?.slug,
-                    store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
-                    store_image_url: storeImage,
-                    latitude: rawStore?.addresses?.[0]?.latitude ?? null,
-                    longitude: rawStore?.addresses?.[0]?.longitude ?? null,
-                    city: rawStore?.addresses?.[0]?.city || null,
-                    state: rawStore?.addresses?.[0]?.state || null,
-                    neighborhood: rawStore?.addresses?.[0]?.neighborhood || null
-                } : null
-
-                if (item.product_variants !== undefined) {
-                    const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
-                    const { product_variants, ...rest } = item
-                    return {
-                        ...rest,
-                        category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
-                        subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
-                        itemType: 'produto',
-                        partners: partner,
-                        ...variantFallback
-                    }
-                }
-
-                const serviceCategoryName = item.marketplace_category?.parent?.name || item.marketplace_category?.name || null
-                return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null }
-            }
-
-            for (const idx of missingIndices) {
-                const globalId = filteredIds[idx]
-                const rawId = globalId.split(':')[1]
-
-                const found = fallbackRecords.find(r => r.id === rawId)
-                if (found) {
-                    const normalized = normalizeRecord(found)
-                    finalData[idx] = normalized
-                    // NÃO SALVA NO REDIS AQUI: O Webhook/Cron job cuidará disso para manter O(1) reads puros.
-                }
-            }
-        }
-
-        const cleanData = finalData.filter(Boolean)
-        if (process.env.NODE_ENV !== "production" && cleanData.length < filteredIds.length) {
-            console.warn(`[MarketplaceTrace] API/search: ${filteredIds.length - cleanData.length} ids sem objeto (${type}, query="${query}")`)
-        }
-        const tFinal = performance.now()
-
-        const totalRequested = filteredIds.length
-        const hits = totalRequested - missingIndices.length
-        const hitRate = totalRequested > 0 ? ((hits / totalRequested) * 100).toFixed(1) : "0.0"
-        const redisLatency = (tRedisKeys - tRedisZero).toFixed(1)
-        const mgetLatency = (tFinal - tRedisKeys).toFixed(1)
-        const source = missingIndices.length === 0 ? 'Redis' : (hits === 0 ? 'Postgres' : 'Mixed')
-
-        return { results: cleanData, filteredIds: filteredIds }
-
-    } catch (error) {
-        console.error("[Redis DOWN] Falling back to Postgres:", error)
-        try {
-            console.warn(`[DEGRADED MODE] Redis unavailable, using Postgres fallback`)
-            return await searchMarketplacePostgresFTS("", type, { vitrines: vitLimit, produtos: prodLimit, servicos: servLimit })
-        } catch (pgError) {
-            console.error("[TOTAL FAILURE] Both Redis and Postgres failed. Returning empty:", pgError)
-            return { results: [], filteredIds: [] }
-        }
-    }
+    // Navegação geral sem texto: usa Postgres direto ordenado por score (com cache SWR em RAM de 60s em _searchMarketplaceCore)
+    // Elimina milhares de leituras diárias de zrange e mget no Upstash Redis
+    return await browseMarketplaceByScore(type, limits)
 }
 
 
@@ -909,25 +665,8 @@ async function hydrateMarketplaceSearchHits(
 ): Promise<any[]> {
     if (!hits.length) return []
 
-    // 0. Tentativa de hidratação ultrarrápida via Redis MGET (Zero DB queries se todos existirem no cache)
-    try {
-        const dataKeys = hits.map(h => `data:v2:${h.item_type}:${h.id}`)
-        const cachedRaw = await redis.mget(...dataKeys)
-        const cachedObjects = (cachedRaw || [])
-            .map((raw: any) => typeof raw === 'string' ? JSON.parse(raw) : raw)
-            .filter(Boolean)
-
-        if (cachedObjects.length === hits.length) {
-            const hitRankMap = new Map(hits.map(h => [`${h.item_type}:${h.id}`, h.rank]))
-            return cachedObjects.map(obj => ({
-                ...obj,
-                _searchRank: hitRankMap.get(`${obj.itemType}:${obj.id}`) ?? 0
-            }))
-        }
-    } catch {
-        // Fallback transparente para o Supabase abaixo
-    }
-
+    // Hidratação direta via Postgres com chaves primárias (3-5ms, ZERO comandos no Redis)
+    const hitRankMap = new Map(hits.map(h => [`${h.item_type}:${h.id}`, h.rank]))
     const produtosIds = hits.filter(h => h.item_type === "produto").map(h => h.id)
     const servicosIds = hits.filter(h => h.item_type === "servico").map(h => h.id)
     const lojasIds = hits.filter(h => h.item_type === "loja").map(h => h.id)
@@ -1010,7 +749,8 @@ async function hydrateMarketplaceSearchHits(
 
     const results: any[] = []
 
-    for (const hit of hits) {
+    for (let idx = 0; idx < hits.length; idx++) {
+        const hit = hits[idx]
         const item = recordMap.get(hit.id)
         if (!item) continue
 
@@ -1605,8 +1345,8 @@ async function browseMarketplaceByScore(
     const { data: hits, error } = await supabase.rpc("browse_marketplace_by_score", {
         p_type: rpcType,
         p_limit: limitCount,
-        p_cursor_score: null,
-        p_cursor_id: null,
+        p_cursor_score: limits.cursor ? Number(limits.cursor) : null,
+        p_cursor_id: limits.lastId ? String(limits.lastId) : null,
         p_partner_ids: limits.partnerIds?.length ? limits.partnerIds : null,
         p_store_ids: null,
     })

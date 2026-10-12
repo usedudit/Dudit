@@ -19,7 +19,12 @@ import {
     CalendarIcon,
     InfoIcon,
     StoreIcon,
+    CreditCardIcon,
+    DeliveryPickupIcon,
+    MoneyIcon,
+    StarIcon,
 } from "@/lib/icons"
+import { getDeliveryStatusLabel, getFulfillmentModeLabel } from "@/lib/orders/status"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
     EMPTY_DATE_PERIOD,
@@ -30,6 +35,10 @@ import {
 interface FilterState {
     status: string[]
     channel: string[]
+    deliveryStatus: string[]
+    deliveryType: string[]
+    paymentMethod: string[]
+    totalRange: { min: string; max: string }
     datePeriod: DatePeriodFilterValue
 }
 
@@ -47,6 +56,7 @@ interface OrderPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     tabCounts?: { Todos: number; Pendente: number; Pago: number; Enviado: number; Cancelado: number }
+    onOpenSuggestions?: () => void
 }
 
 const OrderPageControls: React.FC<OrderPageControlsProps> = ({
@@ -63,6 +73,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     tabCounts,
+    onOpenSuggestions,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -98,6 +109,40 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                     value={filters.channel.join(", ")}
                     icon={<StoreIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, channel: [] }))}
+                />
+            )}
+            {filters.deliveryStatus.length > 0 && (
+                <FilterChip
+                    label="Entrega"
+                    value={filters.deliveryStatus.map((s) => getDeliveryStatusLabel(s)).join(", ")}
+                    icon={<TruckIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, deliveryStatus: [] }))}
+                />
+            )}
+            {filters.paymentMethod.length > 0 && (
+                <FilterChip
+                    label="Pagamento"
+                    value={filters.paymentMethod.join(", ")}
+                    icon={<CreditCardIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, paymentMethod: [] }))}
+                />
+            )}
+            {filters.deliveryType.length > 0 && (
+                <FilterChip
+                    label="Tipo"
+                    value={filters.deliveryType.map((t) => getFulfillmentModeLabel(t)).join(", ")}
+                    icon={<DeliveryPickupIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, deliveryType: [] }))}
+                />
+            )}
+            {(filters.totalRange.min || filters.totalRange.max) && (
+                <FilterChip
+                    label="Valor"
+                    value={`${filters.totalRange.min ? `R$ ${filters.totalRange.min}` : "R$ 0"} - ${
+                        filters.totalRange.max ? `R$ ${filters.totalRange.max}` : "∞"
+                    }`}
+                    icon={<MoneyIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, totalRange: { min: "", max: "" } }))}
                 />
             )}
             {isDatePeriodFilterActive(filters.datePeriod) && (
@@ -166,6 +211,15 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
+                        {onOpenSuggestions && (
+                            <Button
+                                variant="outlineorange"
+                                onClick={onOpenSuggestions}
+                                className="w-[42px] h-[42px] p-0"
+                            >
+                                <StarIcon className="w-4 h-4" />
+                            </Button>
+                        )}
                         {onAddOrder && (
                             <Button
                                 onClick={onAddOrder}

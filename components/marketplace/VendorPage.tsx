@@ -20,9 +20,9 @@ import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabe
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard, RadioButton } from "@/components/reusable"
+import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard, RadioButton, FormDropdown } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
-import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
@@ -752,9 +752,11 @@ function pickBestSection(sections: any[], seed: string | number): any | null {
 function VendorListItem({ item, partner }: { item: any; partner: any }) {
     const normalized = normalizeItemForCard(item, partner)
     const imageUrl = normalized.images?.[0] || null
-    const itemUrl = item.duration_minutes !== undefined
-        ? getServiceUrl(normalized, normalized.partners)
-        : getProductUrl(normalized, normalized.partners)
+    const itemUrl = normalized.itemType === "plano"
+        ? getPlanUrl(normalized, normalized.partners)
+        : (normalized.itemType === "servico" || item.duration_minutes !== undefined
+            ? getServiceUrl(normalized, normalized.partners)
+            : getProductUrl(normalized, normalized.partners))
     return (
         <a
             href={itemUrl}
@@ -1519,17 +1521,17 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </div>
                                 <Separator className="my-0" />
                                 <section>
-                                    <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Ordenar</h3>
-                                    <select
+                                    <FormDropdown
+                                        label="Ordenar"
+                                        options={[
+                                            { value: "relevancia", label: "Relevância" },
+                                            { value: "preco_menor", label: "Menor Preço" },
+                                            { value: "preco_maior", label: "Maior Preço" },
+                                            { value: "recentes", label: "Mais Recentes" },
+                                        ]}
                                         value={categorySortBy}
-                                        onChange={(e) => setCategorySortBy(e.target.value as any)}
-                                        className="w-full rounded-lg border border-gray-200 dark:border-dark-border px-3 py-2.5 text-sm font-semibold text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green"
-                                    >
-                                        <option value="relevancia">Relevância</option>
-                                        <option value="preco_menor">Menor Preço</option>
-                                        <option value="preco_maior">Maior Preço</option>
-                                        <option value="recentes">Mais Recentes</option>
-                                    </select>
+                                        setValue={(v) => setCategorySortBy(v as any)}
+                                    />
                                 </section>
                                 <section>
                                     <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h3>
@@ -1657,12 +1659,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
-                            viewMode === "list" ? (
-                                <div className="flex flex-col mt-4">
-                                    {categoryFilteredItems.map((item: any) => (
-                                        <VendorListItem key={item.id} item={item} partner={partner} />
-                                    ))}
-                                </div>
+                                        viewMode === "list" ? (
+                                            <div className="flex flex-col mt-4">
+                                                {categoryFilteredItems.map((item: any) => (
+                                                    <VendorListItem key={item.id} item={item} partner={partner} />
+                                                ))}
+                                            </div>
                                         ) : (
                                             <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
                                                 {categoryFilteredItems.map((item: any) => (
@@ -1834,7 +1836,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     ].map((opt, i, arr) => (
                         <div key={opt.value} onClick={() => { setActiveContext(opt.value as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                             <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
-                            <RadioButton name="activeContext" value={opt.value} checked={activeContext === opt.value} onChange={() => {}} />
+                            <RadioButton name="activeContext" value={opt.value} checked={activeContext === opt.value} onChange={() => { }} />
                         </div>
                     ))}
                 </div>

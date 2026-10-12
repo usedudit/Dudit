@@ -822,14 +822,31 @@ export async function processPreapprovalPaymentWebhook(params: {
     const orderId = createdOrder.id
 
     // Update payment method & breakdown references
+    // Rótulo derivado do pagamento real (Pix, boleto, débito...) — não fixo em
+    // "Cartão de Crédito", senão cobranças via Pix sairiam rotuladas como cartão.
+    const mpPaymentMethodId = String(params.paymentInfo?.payment_method_id || "").toLowerCase()
+    const mpPaymentTypeId = String(
+      params.paymentInfo?.payment_type_id || params.paymentInfo?.payment_method?.type || ""
+    ).toLowerCase()
+    let paymentMethodLabel = "Cartão de Crédito"
+    if (mpPaymentMethodId === "pix" || mpPaymentTypeId === "pix") {
+      paymentMethodLabel = "Pix"
+    } else if (mpPaymentTypeId === "ticket") {
+      paymentMethodLabel = "Boleto"
+    } else if (mpPaymentTypeId === "debit_card") {
+      paymentMethodLabel = "Cartão de Débito"
+    } else if (mpPaymentTypeId === "account_money") {
+      paymentMethodLabel = "Saldo Mercado Pago"
+    }
+
     await supabase
       .from("orders")
       .update({
         mp_payment_id: params.paymentId,
-        payment_method: "Cartão de Crédito",
+        payment_method: paymentMethodLabel,
         payment_provider: "Mercado Pago",
         payment_breakdown: [{
-          method: "Cartão de Crédito",
+          method: paymentMethodLabel,
           amount: Number(params.paymentInfo.transaction_amount || 0),
           provider: "Mercado Pago",
           paymentStatus: "approved",

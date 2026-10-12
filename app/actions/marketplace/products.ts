@@ -161,31 +161,52 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
 }
 
 async function _getMarketplaceProduct(id: string, storeId?: string | null) {
-  const data = await _getMarketplaceProductBase(id, storeId)
-  if (!data) return null
-
-  return data
+  const storeKey = storeId || "none"
+  return unstable_cache(
+    async () => {
+      const data = await _getMarketplaceProductBase(id, storeId)
+      if (!data) return null
+      return data
+    },
+    ["marketplace-product-detail", id, storeKey],
+    {
+      tags: ["marketplace-product", "products", `product-${id}`],
+      revalidate: 300,
+    }
+  )()
 }
 
 // --- VARIANTES (DIRECT - NO CACHE) ---
 async function _getProductVariants(productId: string) {
-  const supabase = getAdminClient()
-  let resolvedId = productId
-  if (!isUuid(productId)) {
-    const { data: prod } = await supabase.from("products").select("id").eq("short_id", productId).maybeSingle()
-    if (prod?.id) resolvedId = prod.id
-  }
-  const { data } = await supabase
-    .from("product_variants")
-    .select("*")
-    .eq("product_id", resolvedId)
-    .eq("is_active", true)
-    .order("price_adjustment", { ascending: true })
-  return data || []
+  return unstable_cache(
+    async () => {
+      const supabase = getAdminClient()
+      let resolvedId = productId
+      if (!isUuid(productId)) {
+        const { data: prod } = await supabase.from("products").select("id").eq("short_id", productId).maybeSingle()
+        if (prod?.id) resolvedId = prod.id
+      }
+      const { data } = await supabase
+        .from("product_variants")
+        .select("*")
+        .eq("product_id", resolvedId)
+        .eq("is_active", true)
+        .order("price_adjustment", { ascending: true })
+      return data || []
+    },
+    ["marketplace-product-variants", productId],
+    {
+      tags: ["marketplace-variants", `product-${productId}`],
+      revalidate: 300,
+    }
+  )()
 }
 
 // --- REVIEWS (DIRECT - NO CACHE) ---
 async function _getProductReviews(productId: string, storeId?: string | null) {
+  const storeKey = storeId || "none"
+  return unstable_cache(
+    async () => {
   const supabase = getAdminClient()
   let resolvedId = productId
   if (!isUuid(productId)) {
@@ -267,6 +288,13 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
       profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
     }
   })
+    },
+    ["marketplace-product-reviews", productId, storeKey],
+    {
+      tags: ["marketplace-reviews", `product-${productId}`],
+      revalidate: 300,
+    }
+  )()
 }
 
 // React cache() wrappers - deduplicate within SSR request
@@ -277,17 +305,26 @@ export const getProductReviews = cache(_getProductReviews) as unknown as typeof 
 
 // --- SOLD COUNT ---
 async function _getProductSoldCount(productId: string): Promise<number> {
-  const supabase = getAdminClient()
-  const { data, error } = await supabase
-    .from("order_items")
-    .select("quantity, orders!inner(situation)")
-    .eq("product_id", productId)
+  return unstable_cache(
+    async () => {
+      const supabase = getAdminClient()
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("quantity, orders!inner(situation)")
+        .eq("product_id", productId)
 
-  if (error || !data) return 0
+      if (error || !data) return 0
 
-  return data
-    .filter((item: any) => item.orders?.situation === "paid")
-    .reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+      return data
+        .filter((item: any) => item.orders?.situation === "paid")
+        .reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+    },
+    ["marketplace-product-sold-count", productId],
+    {
+      tags: ["marketplace-sold-count", `product-${productId}`],
+      revalidate: 300,
+    }
+  )()
 }
 
 export const getProductSoldCount = cache(_getProductSoldCount)

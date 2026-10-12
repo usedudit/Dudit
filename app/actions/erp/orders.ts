@@ -6,6 +6,7 @@ import { revalidateOrders } from "@/lib/utils/revalidation";
 import { formatDateTime } from "@/lib/utils/formatters";
 import { formatCurrency } from "@/lib/utils";
 import { requireUser } from "@/lib/auth/authorization";
+import { requireStorePermission } from "@/lib/auth/authorization";
 import { requirePermission } from "@/lib/permissions/access";
 import { can } from "@/lib/permissions/can";
 import type { RbacUserLike } from "@/lib/permissions/rbac-types";
@@ -64,6 +65,13 @@ import {
   type SalesSettings,
 } from "@/lib/sales/sales-settings-types";
 import { normalizeBusinessInfo } from "@/lib/business-info";
+import {
+  evaluatePaymentAlerts,
+  evaluateDeliveryAlerts,
+  evaluateStagnantOrders,
+  evaluateReturnAlerts,
+  type OrdersInsightsResult,
+} from "@/lib/erp/order-insights";
 
 export type ERPItemPayload = {
   productId?: string | null;
@@ -1351,6 +1359,7 @@ export async function createFinancialTransactionsForReceivedAmount(
         finance_account_id: params.financeAccountId || null,
         order_source: params.orderSource || "manual",
         reference_note: `sale-tx:${params.orderNumber}:fallback`,
+        order_id: params.orderId || null,
       });
       return;
     }
@@ -1432,6 +1441,7 @@ export async function createFinancialTransactionsForReceivedAmount(
           finance_account_id: legAccountId,
           order_source: params.orderSource || "manual",
           reference_note: refNote,
+          order_id: params.orderId || null,
         });
       }
     });
@@ -6989,5 +6999,129 @@ export async function getOrderAttachmentsAction(
     return { success: true, data: data || [] };
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao listar anexos" };
+  }
+}
+
+// ============================================================================
+// SUGESTÕES & OPORTUNIDADES — ALERTAS INFORMATIVOS DE PEDIDOS
+// ============================================================================
+
+const PENDING_RETURN_INSIGHT_STATUSES = [
+  "PENDING_REVIEW",
+  "UNDER_ANALYSIS",
+  "ESCALATED",
+  "WAITING_ITEM_RETURN",
+];
+
+function latestIso(a?: string | null, b?: string | null): string | null {
+  if (!a) return b || null;
+  if (!b) return a;
+  return String(a) >= String(b) ? String(a) : String(b);
+}
+
+export async function getOrdersInsightsAction(
+  partnerId: string,
+  periodDays: number = 30,
+  storeId?: string
+): Promise<{ error: string } | OrdersInsightsResult> {
+  try {
+    await requireUser();
+    await requirePermission(partnerId, "orders", "view");
+    if (storeId) {
+      await requireStorePermission(storeId, partnerId, "orders", "view");
+    }
+    const admin = createAdminClient();
+
+    const days = Math.max(1, Math.min(365, Number(periodDays) || 30));
+    const now = new Date();
+    const staleCutoffIso = new Date(now.getTime() - days * 86400000).toISOString();
+
+    const ORDER_COLUMNS =
+      "id, order_number, customer_name, total_amount, paid_amount, situation, delivery_status, delivery_type, payment_expires_at, created_at, updated_at, store_id";
+
+    let recentQuery = admin
+      .from("orders")
+      .select(ORDER_COLUMNS)
+      .eq("partner_id", partnerId)
+      .neq("situation", "cancelled");
+
+    let staleQuery = admin
+      .from("orders")
+      .select(ORDER_COLUMNS)
+      .eq("partner_id", partnerId)
+      .lt("updated_at", staleCutoffIso)
+      .neq("situation", "cancelled")
+      .neq("situation", "refunded")
+      .or("situation.neq.paid,delivery_status.neq.delivered");
+
+    let returnsQuery = admin
+      .from("return_requests")
+      .select(
+        "id, order_id, status, order_number_snapshot, customer_name_snapshot, order_total_snapshot, refund_amount, reason, created_at, updated_at, sla_due_at, store_id"
+      )
+      .eq("partner_id", partnerId)
+      .is("deleted_at", null)
+      .in("status", PENDING_RETURN_INSIGHT_STATUSES);
+
+    const historyQuery = admin
+      .from("orders_history")
+      .select("order_id, created_at")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false })
+      .limit(3000);
+
+    if (storeId) {
+      recentQuery = recentQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+      staleQuery = staleQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+      returnsQuery = returnsQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+    }
+
+    const [
+      { data: recent, error },
+      { data: stale, error: staleError },
+      { data: history, error: historyError },
+      { data: returnRequests, error: returnsError },
+    ] = await Promise.all([
+      recentQuery.order("created_at", { ascending: false }).limit(300),
+      staleQuery.order("updated_at", { ascending: true }).limit(200),
+      historyQuery,
+      returnsQuery.order("created_at", { ascending: true }).limit(100),
+    ]);
+
+    if (error) return { error: error.message };
+    if (staleError) return { error: staleError.message };
+    if (historyError) return { error: historyError.message };
+    if (returnsError) return { error: returnsError.message };
+
+    const movementByOrder = new Map<string, string>();
+    for (const row of history || []) {
+      if (!row?.order_id || !row?.created_at) continue;
+      const current = movementByOrder.get(String(row.order_id));
+      if (!current || String(row.created_at) > current) {
+        movementByOrder.set(String(row.order_id), String(row.created_at));
+      }
+    }
+
+    const ordersById = new Map<string, any>();
+    for (const row of [...(recent || []), ...(stale || [])]) {
+      if (row?.id) ordersById.set(String(row.id), row);
+    }
+
+    const allOrders = Array.from(ordersById.values()).map((row) => ({
+      ...row,
+      last_movement_at: latestIso(row.updated_at, movementByOrder.get(String(row.id))),
+    }));
+
+    const staleIds = new Set((stale || []).map((row: any) => String(row.id)));
+    const staleOrders = allOrders.filter((row) => staleIds.has(String(row.id)));
+
+    return {
+      payments: evaluatePaymentAlerts(allOrders, { now }),
+      deliveries: evaluateDeliveryAlerts(allOrders, { now }),
+      stagnant: evaluateStagnantOrders(staleOrders, { periodDays: days, now }),
+      returns: evaluateReturnAlerts(returnRequests || [], { now }),
+    };
+  } catch (error: any) {
+    return { error: error.message };
   }
 }

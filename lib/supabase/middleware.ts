@@ -62,6 +62,9 @@ const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/webhooks/supabase",
   "/api/whatsapp/webhook",
   "/api/mercadopago/subscription-payment",
+  "/api/marketplace/view",
+  "/api/system/announcement",
+  "/api/system/maintenance",
 ]
 
 function isPublicPath(pathname: string): boolean {

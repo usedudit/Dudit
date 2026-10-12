@@ -586,9 +586,9 @@ function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
 // ─── Shared Request-Scoped Product, Service and Store Pools ───────────────
 
 const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string[]): Promise<RawProduct[]> => {
-    if (allIds.length === 0) return []
+    if (allIdsKey !== "all" && allIds.length === 0) return []
     const supabase = getAdminClient()
-    const { data, error } = await supabase
+    let query = supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, marketplace_score, condition, created_at, category_id, ${PARTNER_JOIN}`)
         // Products can use either the legacy Portuguese status or the newer
@@ -597,7 +597,12 @@ const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string
         .in("status", ["ativo", "active"])
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
+
+    if (allIdsKey !== "all") {
+        query = query.in("partner_id", allIds)
+    }
+
+    const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(150)
 
@@ -606,15 +611,20 @@ const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string
 })
 
 const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string[]): Promise<any[]> => {
-    if (allIds.length === 0) return []
+    if (allIdsKey !== "all" && allIds.length === 0) return []
     const supabase = getAdminClient()
-    const { data, error } = await supabase
+    let query = supabase
         .from("services")
         .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
         .in("status", ["ativo", "active"])
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
-        .in("partner_id", allIds)
+
+    if (allIdsKey !== "all") {
+        query = query.in("partner_id", allIds)
+    }
+
+    const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(60)
 

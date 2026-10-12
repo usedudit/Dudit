@@ -632,8 +632,62 @@ export async function createTransactionFromOrder(
                 }
             }
         }
+
+        // Dedupe com o trigger create_order_transaction_on_paid (F108): o UPDATE do
+        // pedido para "paid" dispara o trigger ANTES daqui, e ele insere uma segunda
+        // transação de receita (reference_note = order.id, kind nulo, sem saldo) além
+        // do ledger criado acima — o Dashboard Financeiro somaria as duas. Removemos a
+        // linha do trigger somente quando o ledger do pedido existe (receita registrada).
+        await removeTriggerOrderTransaction(supabase, orderData)
     } catch (err: any) {
         console.error("[TRANSACTION] Erro inesperado ao criar transaction:", err.message)
+    }
+}
+
+/**
+ * Remove a transação de receita duplicada criada pelo trigger
+ * create_order_transaction_on_paid (reference_note = id do pedido, kind nulo)
+ * quando o ledger (settlement) do mesmo pedido existe. Não toca em linhas com
+ * kind (ex.: refunds, que também usam reference_note = order.id).
+ */
+async function removeTriggerOrderTransaction(
+    supabase: SupabaseClient,
+    orderData: OrderDataForTransaction,
+): Promise<void> {
+    const orderId = String(orderData.order_id || "")
+    if (!orderId) return
+
+    try {
+        const { data: triggerTx } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("partner_id", orderData.partner_id)
+            .eq("reference_note", orderId)
+            .eq("transaction_type", "income")
+            .eq("origin", "system")
+            .is("kind", null)
+            .limit(1)
+            .maybeSingle()
+        if (!triggerTx) return
+
+        const { data: ledgerTx } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("partner_id", orderData.partner_id)
+            .like("reference_note", `sale-tx:${orderData.order_number}:%`)
+            .limit(1)
+            .maybeSingle()
+        if (!ledgerTx) return
+
+        const { error: delError } = await supabase
+            .from("transactions")
+            .delete()
+            .eq("id", triggerTx.id)
+        if (delError) {
+            console.error("[TRANSACTION] Erro ao remover transação duplicada do trigger:", delError.message)
+        }
+    } catch (err: any) {
+        console.error("[TRANSACTION] Falha ao remover transação duplicada do trigger:", err?.message)
     }
 }
 

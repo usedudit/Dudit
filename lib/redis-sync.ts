@@ -82,29 +82,27 @@ export async function syncToExploreRedis({
 
   try {
     if (removeFromRedis) {
-      // Remove de todos os índices e do cache de objeto
-      const removePromises: Promise<any>[] = [
-        redis.zrem(typeIndexKey, memberId),
-        redis.zrem(globalIndexKey, memberId),
-        redis.del(dataKey)
-      ]
-
-      // Remove também do índice por cidade se tiver informação de endereço no objeto
+      let citySlug: string | null = null
       try {
         const existingRaw = await redis.get<string | Record<string, any>>(dataKey)
         const existing = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw
         const partnerCity = existing?.partners?.city
         const partnerState = existing?.partners?.state
         if (partnerCity && partnerState) {
-          const citySlug = normalizeCityToSlug(partnerCity, partnerState)
-          removePromises.push(
-            redis.zrem(`explore:index:cidade:${citySlug}`, memberId),
-            redis.zrem(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, memberId)
-          )
+          citySlug = normalizeCityToSlug(partnerCity, partnerState)
         }
       } catch { }
 
-      await Promise.all(removePromises)
+      const p = redis.pipeline()
+      p.zrem(typeIndexKey, memberId)
+      p.zrem(globalIndexKey, memberId)
+      p.del(dataKey)
+      if (citySlug) {
+        p.zrem(`explore:index:cidade:${citySlug}`, memberId)
+        p.zrem(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, memberId)
+      }
+      await p.exec()
+
       // Invalidate Next.js cache so home/explore reflect the removal immediately
       await revalidateExploreSearch({ silent })
       console.log(`[RedisSync] Removido: ${memberId} silent:${silent}`)
@@ -288,28 +286,26 @@ export async function syncToExploreRedis({
     // 2. Atualiza o Índice Específico (zset)
     // 3. Atualiza o Índice Global (zset)
     // 4. Atualiza o Índice da Cidade (zset) se houver endereço
-    const syncPromises: Promise<any>[] = [
-      redis.set(dataKey, JSON.stringify(publicData), { ex: 604800 }),
-      redis.zadd(typeIndexKey, { score: finalScore, member: memberId }),
-      redis.zadd(globalIndexKey, { score: finalScore, member: memberId })
-    ]
+    // PIPELINE ATÔMICO: 1 única requisição HTTP para o Upstash ao invés de 3 a 5
+    const p = redis.pipeline()
+    p.set(dataKey, JSON.stringify(publicData), { ex: 604800 })
+    p.zadd(typeIndexKey, { score: finalScore, member: memberId })
+    p.zadd(globalIndexKey, { score: finalScore, member: memberId })
 
     const partnerCity = (publicData as any)?.partners?.city || (finalData as any)?.partners?.city
     const partnerState = (publicData as any)?.partners?.state || (finalData as any)?.partners?.state
     if (partnerCity && partnerState) {
       const citySlug = normalizeCityToSlug(partnerCity, partnerState)
-      syncPromises.push(
-        redis.zadd(`explore:index:cidade:${citySlug}`, { score: finalScore, member: memberId }),
-        redis.zadd(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, { score: finalScore, member: memberId })
-      )
+      p.zadd(`explore:index:cidade:${citySlug}`, { score: finalScore, member: memberId })
+      p.zadd(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, { score: finalScore, member: memberId })
     }
 
-    await Promise.all(syncPromises)
+    await p.exec()
 
     // 4. Invalidate Next.js cache tags so home/explore reflect changes immediately
     await revalidateExploreSearch({ silent })
 
-    console.log(`[RedisSync] Sincronizado com sucesso: ${memberId}`)
+    console.log(`[RedisSync] Sincronizado com sucesso via pipeline: ${memberId}`)
     return true
   } catch (error) {
     console.error(`[RedisSync] Erro ao sincronizar ${memberId}:`, error)
@@ -329,50 +325,158 @@ export async function removeFromExploreRedis(id: string, type: ItemType, silent:
 /**
  * Atualiza todos os produtos e serviços de um parceiro no Redis.
  * Útil quando o parceiro altera o nome da loja ou endereço, o que afeta a URL dos itens.
+ *
+ * OTIMIZADO: Executa apenas 2 queries no Supabase em lote e 1 único pipeline HTTP no Upstash Redis
+ * (ao invés de N queries sequenciais e N*5 chamadas HTTP separadas).
  */
 export async function syncPartnerItemsToExploreRedis(partnerId: string, options: { throwOnError?: boolean } = {}): Promise<void> {
   const admin = getAdminClient()
 
-  // Buscar produtos ativos
-  const { data: products, error: productsError } = await admin
-    .from("products")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("status", "ativo")
-    .eq("show_in_marketplace", true)
+  // Buscar produtos e serviços com todos os dados necessários em uma única consulta paralela
+  const [productsRes, servicesRes] = await Promise.all([
+    admin
+      .from("products")
+      .select(`
+        id, name, description, price, promotional_price, images, video_thumbnail, rating,
+        marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
+        stock_quantity, stock_available,
+        category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
+        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
+        partners(id),
+        stores(id, name, logo_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
+        product_variants(variant_options, price_adjustment, is_active),
+        show_price_in_store
+      `)
+      .eq("partner_id", partnerId)
+      .eq("status", "ativo")
+      .eq("show_in_marketplace", true),
+    admin
+      .from("services")
+      .select(`
+        id, name, price, promotional_price, images, rating, marketplace_score, bookings_last_30_days, favorites_count, views_count,
+        category_id, duration_minutes, created_at, updated_at, is_active, status, moderation_status, deleted_at, show_in_marketplace,
+        marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
+        partners(id),
+        stores(id, name, logo_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
+        show_price_in_store
+      `)
+      .eq("partner_id", partnerId)
+      .in("status", ["ativo", "active"])
+      .is("deleted_at", null)
+      .eq("show_in_marketplace", true)
+  ])
 
-  // Buscar serviços ativos
-  const { data: services, error: servicesError } = await admin
-    .from("services")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("status", "ativo")
-    .eq("show_in_marketplace", true)
-
-  if (options.throwOnError && (productsError || servicesError)) {
-    throw productsError || servicesError
+  if (options.throwOnError && (productsRes.error || servicesRes.error)) {
+    throw productsRes.error || servicesRes.error
   }
 
-  const promises: Promise<boolean>[] = []
+  const products = productsRes.data || []
+  const services = servicesRes.data || []
 
-  if (products && products.length > 0) {
-    for (const prod of products) {
-      promises.push(syncToExploreRedis({ id: prod.id, type: "produto", data: {}, silent: true, throwOnError: options.throwOnError }))
+  if (products.length === 0 && services.length === 0) {
+    return
+  }
+
+  const p = redis.pipeline()
+  let hasOps = false
+
+  for (const dbData of products) {
+    if (!isExploreProductPublic(dbData)) continue
+
+    const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+    const rawStore = Array.isArray(dbData.stores) ? dbData.stores[0] : dbData.stores
+    const partner = rawPartner ? {
+      ...rawPartner,
+      store_name: rawStore?.name,
+      store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawStore?.addresses?.[0]?.latitude,
+      longitude: rawStore?.addresses?.[0]?.longitude,
+      city: rawStore?.addresses?.[0]?.city || null,
+      state: rawStore?.addresses?.[0]?.state || null,
+      neighborhood: rawStore?.addresses?.[0]?.neighborhood || null
+    } : null
+
+    const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
+    const categoryName = dbData.marketplace_category?.parent?.name || dbData.marketplace_category?.name || (dbData.category as any)?.name || null
+    const subcategoryName = dbData.marketplace_category?.parent ? dbData.marketplace_category.name : null
+
+    const finalData = {
+      ...dbData,
+      category: categoryName,
+      subcategoryName,
+      partners: partner,
+      ...variantFallback
     }
-  }
+    delete (finalData as any).product_variants
 
-  if (services && services.length > 0) {
-    for (const serv of services) {
-      promises.push(syncToExploreRedis({ id: serv.id, type: "servico", data: {}, silent: true, throwOnError: options.throwOnError }))
+    const publicData = { ...serializeExploreItem({ ...finalData, itemType: "produto" }, "produto"), itemType: "produto" }
+    const finalScore = computeExploreRedisScore((publicData as any), undefined)
+    const memberId = `produto:${dbData.id}`
+    const dataKey = getExploreRedisDataKey("produto", dbData.id)
+
+    p.set(dataKey, JSON.stringify(publicData), { ex: 604800 })
+    p.zadd("explore:index:produtos", { score: finalScore, member: memberId })
+    p.zadd("explore:index:all", { score: finalScore, member: memberId })
+
+    const partnerCity = partner?.city
+    const partnerState = partner?.state
+    if (partnerCity && partnerState) {
+      const citySlug = normalizeCityToSlug(partnerCity, partnerState)
+      p.zadd(`explore:index:cidade:${citySlug}`, { score: finalScore, member: memberId })
+      p.zadd(`explore:index:cidade:${citySlug}:produtos`, { score: finalScore, member: memberId })
     }
+    hasOps = true
   }
 
-  if (promises.length > 0) {
-    await Promise.all(promises)
-    // Forçar uma revalidação não-silenciosa ao final
-    await revalidateExploreSearch({ silent: false })
-    console.log(`[RedisSync] Sincronizados ${products?.length || 0} produtos e ${services?.length || 0} serviços para o parceiro ${partnerId}`)
+  for (const dbData of services) {
+    if (!isExploreServicePublic(dbData)) continue
+
+    const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+    const rawStore = Array.isArray(dbData.stores) ? dbData.stores[0] : dbData.stores
+    const partner = rawPartner ? {
+      ...rawPartner,
+      store_name: rawStore?.name,
+      store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawStore?.addresses?.[0]?.latitude,
+      longitude: rawStore?.addresses?.[0]?.longitude,
+      city: rawStore?.addresses?.[0]?.city || null,
+      state: rawStore?.addresses?.[0]?.state || null,
+      neighborhood: rawStore?.addresses?.[0]?.neighborhood || null
+    } : null
+    const catName = dbData.marketplace_category?.parent?.name || dbData.marketplace_category?.name || null
+
+    const finalData = {
+      ...dbData,
+      category: catName,
+      partners: partner,
+      subcategoryName: dbData.marketplace_category?.parent ? dbData.marketplace_category.name : null
+    }
+
+    const publicData = { ...serializeExploreItem({ ...finalData, itemType: "servico" }, "servico"), itemType: "servico" }
+    const finalScore = computeExploreRedisScore((publicData as any), undefined)
+    const memberId = `servico:${dbData.id}`
+    const dataKey = getExploreRedisDataKey("servico", dbData.id)
+
+    p.set(dataKey, JSON.stringify(publicData), { ex: 604800 })
+    p.zadd("explore:index:servicos", { score: finalScore, member: memberId })
+    p.zadd("explore:index:all", { score: finalScore, member: memberId })
+
+    const partnerCity = partner?.city
+    const partnerState = partner?.state
+    if (partnerCity && partnerState) {
+      const citySlug = normalizeCityToSlug(partnerCity, partnerState)
+      p.zadd(`explore:index:cidade:${citySlug}`, { score: finalScore, member: memberId })
+      p.zadd(`explore:index:cidade:${citySlug}:servicos`, { score: finalScore, member: memberId })
+    }
+    hasOps = true
   }
+
+  if (hasOps) {
+    await p.exec()
+  }
+
+  await revalidateExploreSearch({ silent: false })
+  console.log(`[RedisSync] Sincronizados em lote pipeline ${products.length} produtos e ${services.length} serviços para o parceiro ${partnerId}`)
 }
 
 

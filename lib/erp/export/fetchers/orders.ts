@@ -10,13 +10,15 @@ import {
   ORDER_EXPORT_ALL_COLUMNS,
   ORDER_EXPORT_COLUMNS,
 } from "../mappers"
+import { canonicalDeliveryStatus } from "@/lib/orders/status"
+import { normalizeOrderSource, resolveOrderPaymentMethodLabel } from "@/lib/orders/order-utils"
 import type { ExportResult, OrdersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const ORDER_SELECT = `
   id, order_number, customer_name, buyer_id, created_by, created_at,
-  situation, payment_method, payment_breakdown, delivery_status, order_source,
-  discount_value, discount_amount, payment_method_discount_amount,
+  situation, payment_method, payment_breakdown, delivery_status, delivery_type,
+  order_source, discount_value, discount_amount, payment_method_discount_amount,
   delivery_fee, additional_costs, total_amount,
   order_items(product_name, quantity, product_price, subtotal),
   customers:customers(name, email)
@@ -79,22 +81,48 @@ function applyOrderFilters(query: any, filters: OrdersExportFilters, partnerId: 
 
   if (filters.customerId) query = query.eq("buyer_id", filters.customerId)
 
-  const channels = (filters.channels || []).filter(Boolean)
-  if (channels.length > 0) query = query.in("order_source", channels)
-
-  if (filters.paymentMethods?.length) {
-    const methods = filters.paymentMethods.map((m) => m.trim()).filter(Boolean)
-    if (methods.length === 1) {
-      query = query.ilike("payment_method", `%${methods[0]}%`)
-    }
-  }
-
   const search = sanitizeSearchTerm(filters.search)
   if (search) {
     query = query.or(`order_number.ilike.%${search}%,customer_name.ilike.%${search}%`)
   }
 
   return query
+}
+
+/**
+ * Row-level filters shared with the orders list screen. Applied after fetching
+ * so label-based filters (origem, método de pagamento, status de entrega) match
+ * exactly what the user sees on the page.
+ */
+function applyOrderRowFilters(rows: any[], filters: OrdersExportFilters): any[] {
+  const channels = (filters.channels || []).map((c) => normalizeOrderSource(c)).filter(Boolean)
+  const deliveryStatuses = (filters.deliveryStatus || []).map((s) => canonicalDeliveryStatus(s)).filter(Boolean)
+  const deliveryTypes = (filters.deliveryType || []).filter(Boolean)
+  const paymentMethods = (filters.paymentMethods || []).map((m) => m.trim()).filter(Boolean)
+  const minTotal = filters.totalMin ? Number.parseFloat(filters.totalMin) : 0
+  const maxTotal = filters.totalMax ? Number.parseFloat(filters.totalMax) : Number.POSITIVE_INFINITY
+
+  const hasFilters =
+    channels.length > 0 ||
+    deliveryStatuses.length > 0 ||
+    deliveryTypes.length > 0 ||
+    paymentMethods.length > 0 ||
+    minTotal > 0 ||
+    Number.isFinite(maxTotal)
+
+  if (!hasFilters) return rows
+
+  return rows.filter((row) => {
+    if (channels.length && !channels.includes(normalizeOrderSource(row.order_source))) return false
+    if (deliveryStatuses.length && !deliveryStatuses.includes(canonicalDeliveryStatus(row.delivery_status))) return false
+    if (deliveryTypes.length && !deliveryTypes.includes(row.delivery_type || "delivery")) return false
+    if (paymentMethods.length && !paymentMethods.includes(resolveOrderPaymentMethodLabel(row))) return false
+
+    const total = Number(row.total_amount || 0)
+    if (Number.isNaN(total) || total < minTotal || total > maxTotal) return false
+
+    return true
+  })
 }
 
 function applySaleFilters(query: any, filters: OrdersExportFilters, partnerId: string) {
@@ -193,8 +221,11 @@ export async function fetchOrdersExport(
     })
   }
 
-  const merged = [...orderRows, ...saleRows].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  const merged = applyOrderRowFilters(
+    [...orderRows, ...saleRows].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ),
+    filters,
   )
 
   const sellerIds = merged.map((r) => String(r.created_by || r.finalized_by_user_id || ""))
@@ -249,7 +280,8 @@ export async function fetchSalesExport(
 
   const sellerIds = saleRows.map((r) => String(r.finalized_by_user_id || ""))
   const sellerNames = await resolveSellerNames(supabase, partnerId, sellerIds)
-  const rows = saleRows.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
+  const filteredRows = applyOrderRowFilters(saleRows, filters)
+  const rows = filteredRows.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
   const columns = includeAllColumns ? ORDER_EXPORT_ALL_COLUMNS : ORDER_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }
 }

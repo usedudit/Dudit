@@ -508,18 +508,24 @@ export async function sweepExpiredPriceChangeWindowsAction(limit = 100) {
   }
 }
 
-export async function getSubscriptionBillingPanelAction(partnerId: string) {
+export async function getSubscriptionBillingPanelAction(
+  partnerId: string,
+  options?: { storeId?: string | null },
+) {
   try {
     await requirePermission(partnerId, "recurring_subscriptions", "view")
     const supabase = await getSupabaseServerClient()
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
-      .select("id, order_number, customer_name, total_amount, situation, created_at, payment_method, recurring_subscription_id, recurring_execution_id")
+      .select("id, order_number, customer_name, total_amount, paid_amount, situation, created_at, payment_method, recurring_subscription_id, recurring_execution_id, store_id")
       .eq("partner_id", partnerId)
       .not("recurring_subscription_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(500)
+    if (options?.storeId) query = query.eq("store_id", options.storeId)
+
+    const { data, error } = await query
 
     if (error) throw error
     return { success: true, data: data || [] }
@@ -528,23 +534,33 @@ export async function getSubscriptionBillingPanelAction(partnerId: string) {
   }
 }
 
-export async function getSubscriptionForecastAction(partnerId: string) {
+export async function getSubscriptionForecastAction(
+  partnerId: string,
+  options?: { storeId?: string | null },
+) {
   try {
     const access = await requireAuthorizedPartnerContext(partnerId, "recurring_subscriptions", "view")
     partnerId = access.partnerId
     const supabase = access.admin
 
     // Get active subscriptions and calculate their upcoming executions in the next 30 days
-    const { data: subs, error } = await supabase
+    let query = supabase
       .from("recurring_subscriptions")
       .select(`
         id, customer_id, next_execution_at, status, delivery_type, delivery_address,
-        shipping_amount, contracted_amount, billing_mode, mp_preapproval_id,
+        shipping_amount, contracted_amount, billing_mode, mp_preapproval_id, store_id,
         customers:customer_id(id, name, email, image_url),
-        recurring_plans(id, name, price, frequency_type, frequency_interval)
+        recurring_plans(id, name, price, frequency_type, frequency_interval),
+        recurring_subscription_items(
+          id, item_type, product_id, variant_id, quantity,
+          products:product_id(id, name, unit, stock_available, min_stock)
+        )
       `)
       .eq("partner_id", partnerId)
       .eq("status", "active")
+    if (options?.storeId) query = query.eq("store_id", options.storeId)
+
+    const { data: subs, error } = await query
 
     if (error) throw error
 
@@ -577,59 +593,24 @@ export async function getSubscriptionForecastAction(partnerId: string) {
             ? Number(sub.contracted_amount)
             : Number(sub.recurring_plans?.price || 0) + Number(sub.shipping_amount || 0),
         scheduledFor: sub.next_execution_at,
+        // Itens do snapshot para a previsão de demanda (próximo ciclo)
+        items: ((sub.recurring_subscription_items || []) as any[])
+          .filter((item: any) => item.item_type === "product" && item.product_id)
+          .map((item: any) => ({
+            productId: item.product_id as string,
+            variantId: item.variant_id || null,
+            quantity: Number(item.quantity || 1),
+            name: item.products?.name || "Produto",
+            unit: item.products?.unit || null,
+            stockAvailable: Number(item.products?.stock_available ?? 0),
+            minStock: Number(item.products?.min_stock ?? 0),
+          })),
       }))
       .sort((a: any, b: any) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
 
     return { success: true, data: forecast }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar previsão de ciclos" }
-  }
-}
-
-export async function getSubscriptionCreditsAction(partnerId: string, search: string = "") {
-  try {
-    const access = await requireAuthorizedPartnerContext(partnerId, "recurring_subscriptions", "view")
-    partnerId = access.partnerId
-    const supabase = access.admin
-
-    let query = supabase
-      .from("subscription_item_credits")
-      .select(`
-        id, customer_id, service_id, product_id, quantity, consumed, expires_at, created_at,
-        customers(name),
-        services(name),
-        products(name)
-      `)
-      .eq("partner_id", partnerId)
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    // Filter by customer name in memory if search is present
-    let filtered = ((data || []) as any[]).map(row => ({
-      id: row.id,
-      customerId: row.customer_id,
-      customerName: row.customers?.name || "Cliente",
-      serviceName: row.services?.name || row.products?.name || "Item",
-      itemType: row.service_id ? "service" : "product",
-      serviceId: row.service_id ?? null,
-      productId: row.product_id ?? null,
-      quantity: row.quantity,
-      consumed: row.consumed,
-      remaining: row.quantity - row.consumed,
-      expiresAt: row.expires_at,
-      createdAt: row.created_at
-    }))
-
-    if (search.trim()) {
-      const term = search.toLowerCase()
-      filtered = filtered.filter((f: any) => f.customerName.toLowerCase().includes(term))
-    }
-
-    return { success: true, data: filtered }
-  } catch (e: unknown) {
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar créditos" }
   }
 }
 

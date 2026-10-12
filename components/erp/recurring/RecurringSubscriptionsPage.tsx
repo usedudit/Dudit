@@ -13,6 +13,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 // Reusable Components
 import {
   AlertModal,
+  Badge,
   IconPlaceholder,
   Pagination,
   Tabs,
@@ -20,6 +21,7 @@ import {
   ThreeDotsLoader,
 } from "@/components/reusable"
 import { ReportTableCard } from "@/components/erp/reports/widgets"
+import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 
 // Specific components
 import SubscriptionPageControls from "./SubscriptionPageControls"
@@ -43,7 +45,6 @@ import {
   updateSubscriptionStockShortageResolvedAction,
   getSubscriptionBillingPanelAction,
   getSubscriptionForecastAction,
-  getSubscriptionCreditsAction,
   syncSubscriptionWithMpErpAction,
   getRecurringSubscriptionDetailAction,
 } from "@/app/actions/erp/recurring-subscriptions"
@@ -56,13 +57,15 @@ import {
   CalendarIcon,
   MoneyIcon,
   ListIcon,
-  CreditCardIcon,
+  ClockIcon,
+  CancelCircleIcon,
+  AlertTriangleIcon,
   ChevronLeftIcon,
 } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 import { Button, ListItem } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FilterChip from "@/components/reusable/FilterChip"
-import { SectionFilterBar } from "./SectionFilterBar"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
   EMPTY_DATE_PERIOD,
@@ -111,7 +114,7 @@ type ConfirmDialog = {
   onConfirm: () => void | Promise<void>
 }
 
-type SectionKey = "home" | "list" | "billing" | "forecast" | "credits"
+type SectionKey = "home" | "list" | "billing" | "forecast"
 
 const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
   home: {
@@ -127,12 +130,8 @@ const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
     subtitle: "Pedidos gerados por assinaturas e situação dos pagamentos.",
   },
   forecast: {
-    title: "Calendário & Demanda",
-    subtitle: "Execuções e entregas previstas para os próximos 30 dias.",
-  },
-  credits: {
-    title: "Saldos de Créditos",
-    subtitle: "Saldo de serviços disponíveis em cada cliente.",
+    title: "Demanda & Execuções",
+    subtitle: "Previsão de itens, estoque e execuções para os próximos 30 dias.",
   },
 }
 
@@ -140,7 +139,6 @@ const SECTION_SLUGS: Record<Exclude<SectionKey, "home">, string> = {
   list: "assinaturas",
   billing: "faturamento",
   forecast: "calendario",
-  credits: "creditos",
 }
 
 const SLUG_TO_SECTION: Record<string, SectionKey> = Object.entries(SECTION_SLUGS).reduce(
@@ -165,33 +163,35 @@ const SECTIONS: { key: Exclude<SectionKey, "home">; title: string; description: 
   },
   {
     key: "forecast",
-    title: "Calendário & Demanda",
-    description: "Execuções e entregas previstas nos próximos 30 dias.",
+    title: "Demanda & Execuções",
+    description: "Itens necessários, estoque e próximas execuções.",
     icon: CalendarIcon,
-  },
-  {
-    key: "credits",
-    title: "Saldos de Créditos",
-    description: "Saldo de serviços disponível em cada cliente.",
-    icon: CreditCardIcon,
   },
 ]
 
 // ── Filtros por seção ─────────────────────────────────────────────────────────
 type ListFilters = { delivery: string[]; billing: string[]; horizon: string[] }
-type BillingFilters = { payment: string[]; datePeriod: DatePeriodFilterValue }
+type BillingFilters = { payment: string[]; origin: string[]; datePeriod: DatePeriodFilterValue }
 type ForecastFilters = { horizon: string[] }
-type CreditsFilters = { balance: string[] }
 
 const EMPTY_LIST_FILTERS: ListFilters = { delivery: [], billing: [], horizon: [] }
-const EMPTY_BILLING_FILTERS: BillingFilters = { payment: [], datePeriod: { ...EMPTY_DATE_PERIOD } }
+const EMPTY_BILLING_FILTERS: BillingFilters = {
+  payment: [],
+  origin: ["cycle"],
+  datePeriod: { ...EMPTY_DATE_PERIOD },
+}
 const EMPTY_FORECAST_FILTERS: ForecastFilters = { horizon: [] }
-const EMPTY_CREDITS_FILTERS: CreditsFilters = { balance: [] }
+
+/** Pedidos pagos com créditos da assinatura (R$0) — não precisam de cobrança. */
+const CREDIT_PAYMENT_METHODS = ["Assinatura (Créditos)", "subscription_credits"]
+const isCreditOrder = (row: any) => CREDIT_PAYMENT_METHODS.includes(String(row?.payment_method || ""))
+/** Estado padrão da origem: só cobranças de ciclo (créditos ocultos). */
+const isDefaultBillingOrigin = (origin: string[]) => origin.length === 1 && origin[0] === "cycle"
 
 const DELIVERY_LABELS: Record<string, string> = { delivery: "Entrega", pickup: "Retirada no local" }
 const BILLING_LABELS: Record<string, string> = { auto_mercado_pago: "Mercado Pago", manual: "Manual" }
 const PAYMENT_LABELS: Record<string, string> = { paid: "Pago", pending: "Pendente", cancelled: "Cancelado" }
-const BALANCE_LABELS: Record<string, string> = { available: "Com saldo", empty: "Saldo zerado" }
+const ORIGIN_LABELS: Record<string, string> = { cycle: "Cobrança de ciclo", credits: "Pagos com créditos" }
 const HORIZON_LABELS: Record<string, string> = {
   overdue: "Atrasadas",
   today: "Hoje",
@@ -232,6 +232,13 @@ const BILLING_FILTER_SECTIONS: FilterSectionConfig[] = [
     options: ["paid", "pending", "cancelled"],
     optionLabels: PAYMENT_LABELS,
   },
+  {
+    id: "origin",
+    title: "Origem do Pedido",
+    type: "checkbox-list",
+    options: ["cycle", "credits"],
+    optionLabels: ORIGIN_LABELS,
+  },
   { id: "datePeriod", title: "Período", type: "date-period" },
 ]
 
@@ -242,16 +249,6 @@ const FORECAST_FILTER_SECTIONS: FilterSectionConfig[] = [
     type: "checkbox-list",
     options: ["today", "7", "15", "30"],
     optionLabels: HORIZON_LABELS,
-  },
-]
-
-const CREDITS_FILTER_SECTIONS: FilterSectionConfig[] = [
-  {
-    id: "balance",
-    title: "Saldo",
-    type: "checkbox-list",
-    options: ["available", "empty"],
-    optionLabels: BALANCE_LABELS,
   },
 ]
 
@@ -315,7 +312,7 @@ const BillingFilterChips = ({
   onClear,
 }: {
   filters: BillingFilters
-  onClear: (key: "payment" | "datePeriod") => void
+  onClear: (key: "payment" | "origin" | "datePeriod") => void
 }) => (
   <AnimatePresence>
     {filters.payment.length > 0 && (
@@ -325,6 +322,19 @@ const BillingFilterChips = ({
         value={filters.payment.map((v) => PAYMENT_LABELS[v] || v).join(", ")}
         icon={<CalendarIcon size={12} />}
         onRemove={() => onClear("payment")}
+      />
+    )}
+    {!isDefaultBillingOrigin(filters.origin) && (
+      <FilterChip
+        key="origin"
+        label="Origem"
+        value={
+          filters.origin.length === 0
+            ? "Nenhuma"
+            : filters.origin.map((v) => ORIGIN_LABELS[v] || v).join(", ")
+        }
+        icon={<CalendarIcon size={12} />}
+        onRemove={() => onClear("origin")}
       />
     )}
     {isDatePeriodFilterActive(filters.datePeriod) && (
@@ -354,26 +364,6 @@ const ForecastFilterChips = ({
         value={filters.horizon.map((v) => HORIZON_LABELS[v] || v).join(", ")}
         icon={<CalendarIcon size={12} />}
         onRemove={() => onClear("horizon")}
-      />
-    )}
-  </AnimatePresence>
-)
-
-const CreditsFilterChips = ({
-  filters,
-  onClear,
-}: {
-  filters: CreditsFilters
-  onClear: (key: keyof CreditsFilters) => void
-}) => (
-  <AnimatePresence>
-    {filters.balance.length > 0 && (
-      <FilterChip
-        key="balance"
-        label="Saldo"
-        value={filters.balance.map((v) => BALANCE_LABELS[v] || v).join(", ")}
-        icon={<CalendarIcon size={12} />}
-        onRemove={() => onClear("balance")}
       />
     )}
   </AnimatePresence>
@@ -412,14 +402,14 @@ export default function RecurringSubscriptionsPage({
   const [listFilters, setListFilters] = useState<ListFilters>(EMPTY_LIST_FILTERS)
   const [billingFilters, setBillingFilters] = useState<BillingFilters>(EMPTY_BILLING_FILTERS)
   const [forecastFilters, setForecastFilters] = useState<ForecastFilters>(EMPTY_FORECAST_FILTERS)
-  const [creditsFilters, setCreditsFilters] = useState<CreditsFilters>(EMPTY_CREDITS_FILTERS)
 
   const hasListFilters =
     listFilters.delivery.length > 0 || listFilters.billing.length > 0 || listFilters.horizon.length > 0
   const hasBillingFilters =
-    billingFilters.payment.length > 0 || isDatePeriodFilterActive(billingFilters.datePeriod)
+    billingFilters.payment.length > 0 ||
+    isDatePeriodFilterActive(billingFilters.datePeriod) ||
+    !isDefaultBillingOrigin(billingFilters.origin)
   const hasForecastFilters = forecastFilters.horizon.length > 0
-  const hasCreditsFilters = creditsFilters.balance.length > 0
 
   const queryKey = useMemo(
     () => ["erp", "recurring_subscriptions", partnerId, selectedStore?.id] as const,
@@ -562,30 +552,24 @@ export default function RecurringSubscriptionsPage({
   const [forecastSearch, setForecastSearch] = useState("")
   const [forecastPage, setForecastPage] = useState(1)
 
-  // Credits States
-  const [creditsData, setCreditsData] = useState<any[]>([])
-  const [loadingCredits, setLoadingCredits] = useState(false)
-  const [creditsSearch, setCreditsSearch] = useState("")
-  const [debouncedCreditsSearch, setDebouncedCreditsSearch] = useState("")
-
   const billingLoadedRef = useRef(false)
   const forecastLoadedRef = useRef(false)
-  const creditsTermRef = useRef<string | null>(null)
 
   const observerTarget = useRef<HTMLDivElement>(null)
   const itemsPerPage = 8
 
+  // Recarrega as seções quando a loja selecionada muda
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedCreditsSearch(creditsSearch), 300)
-    return () => clearTimeout(timer)
-  }, [creditsSearch])
+    billingLoadedRef.current = false
+    forecastLoadedRef.current = false
+  }, [selectedStore?.id])
 
   // Carrega os dados das seções uma única vez (sem refetch ao voltar para a seção)
   const loadTabDetails = useCallback(async () => {
     if (currentTab === "billing") {
       if (billingLoadedRef.current) return
       setLoadingBilling(true)
-      const res = await getSubscriptionBillingPanelAction(partnerId)
+      const res = await getSubscriptionBillingPanelAction(partnerId, { storeId: selectedStore?.id || null })
       setLoadingBilling(false)
       if (res.success && res.data) {
         setBillingData(res.data)
@@ -594,23 +578,14 @@ export default function RecurringSubscriptionsPage({
     } else if (currentTab === "forecast") {
       if (forecastLoadedRef.current) return
       setLoadingForecast(true)
-      const res = await getSubscriptionForecastAction(partnerId)
+      const res = await getSubscriptionForecastAction(partnerId, { storeId: selectedStore?.id || null })
       setLoadingForecast(false)
       if (res.success && res.data) {
         setForecastData(res.data)
         forecastLoadedRef.current = true
       }
-    } else if (currentTab === "credits") {
-      if (creditsTermRef.current === debouncedCreditsSearch) return
-      setLoadingCredits(true)
-      const res = await getSubscriptionCreditsAction(partnerId, debouncedCreditsSearch)
-      setLoadingCredits(false)
-      if (res.success && res.data) {
-        setCreditsData(res.data)
-        creditsTermRef.current = debouncedCreditsSearch
-      }
     }
-  }, [currentTab, partnerId, debouncedCreditsSearch])
+  }, [currentTab, partnerId, selectedStore?.id])
 
   useEffect(() => {
     void loadTabDetails()
@@ -745,7 +720,7 @@ export default function RecurringSubscriptionsPage({
     afterMutation(subscriptionId)
   }
 
-  // Ações disparadas pela seção Calendário & Demanda: além da mutação,
+  // Ações disparadas pela seção Demanda & Execuções: além da mutação,
   // recarregam a previsão (uma assinatura pausada/cancelada sai da lista).
   const runForecastAction = async (
     action: "pause" | "resume" | "cancel" | "resolve_stock" | "sync",
@@ -834,48 +809,15 @@ export default function RecurringSubscriptionsPage({
     })
   }, [exportData, partnerId, selectedStore?.id, statusFilter, debouncedSearch])
 
-  const creditColumns = useMemo(
-    () => [
-      { key: "customerName", header: "Cliente" },
-      { key: "serviceName", header: "Serviço do Plano" },
-      { key: "quantity", header: "Concedido", align: "center" as const },
-      {
-        key: "consumed",
-        header: "Consumido",
-        align: "center" as const,
-        render: (value: any) => <span className="text-brand-inactive-text">{value}</span>,
-      },
-      {
-        key: "remaining",
-        header: "Saldo Restante",
-        align: "center" as const,
-        render: (value: any) => (
-          <span
-            className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${value > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
-          >
-            {value}
-          </span>
-        ),
-      },
-      {
-        key: "expiresAt",
-        header: "Validade",
-        render: (value: any) =>
-          value ? (
-            <span className="font-semibold text-brand-orange">{new Date(value).toLocaleDateString("pt-BR")}</span>
-          ) : (
-            <span className="text-brand-inactive-text font-medium">Não expira</span>
-          ),
-      },
-    ],
-    [],
-  )
-
   const filteredBillingData = useMemo(() => {
     const active = isDatePeriodFilterActive(billingFilters.datePeriod)
     const { startYmd, endYmd } = resolveDatePeriodBounds(billingFilters.datePeriod)
     const term = billingSearch.trim().toLowerCase()
+    const includeCycle = billingFilters.origin.includes("cycle")
+    const includeCredits = billingFilters.origin.includes("credits")
     return billingData.filter((row: any) => {
+      // Origem: pedidos por créditos ficam ocultos por padrão
+      if (isCreditOrder(row) ? !includeCredits : !includeCycle) return false
       if (
         billingFilters.payment.length > 0 &&
         !billingFilters.payment.includes(paymentBucket(row.situation || ""))
@@ -902,6 +844,45 @@ export default function RecurringSubscriptionsPage({
     setBillingPage(1)
   }, [billingSearch, billingFilters, currentTab])
 
+  // KPIs calculados sobre as linhas visíveis (respeitam busca/filtros ativos)
+  const billingKpis = useMemo(() => {
+    let faturado = 0
+    let aCobrar = 0
+    let cancelado = 0
+    let pagos = 0
+    for (const row of filteredBillingData) {
+      const total = Number(row.total_amount || 0)
+      const situation = row.situation || ""
+      if (situation === "paid" || situation === "partially_paid") {
+        faturado += Number(row.paid_amount || total)
+        pagos++
+      } else if (situation === "cancelled") {
+        cancelado += total
+      } else {
+        aCobrar += total
+      }
+    }
+    return [
+      { title: "Faturado", value: formatCurrency(faturado), icon: MoneyIcon },
+      {
+        title: "A cobrar",
+        value: formatCurrency(aCobrar),
+        icon: ClockIcon,
+        iconBg: "bg-orange-100 dark:bg-orange-500/15",
+        iconColor: "text-brand-orange",
+      },
+      {
+        title: "Cancelado",
+        value: formatCurrency(cancelado),
+        icon: CancelCircleIcon,
+        iconBg: "bg-[#fce6e5] dark:bg-red-500/15",
+        iconColor: "text-[#cc4745]",
+      },
+      { title: "Ticket médio", value: formatCurrency(pagos > 0 ? faturado / pagos : 0) },
+      { title: "Pedidos", value: String(filteredBillingData.length) },
+    ]
+  }, [filteredBillingData])
+
   const filteredForecastData = useMemo(() => {
     const term = forecastSearch.trim().toLowerCase()
     return forecastData.filter((row: any) => {
@@ -926,14 +907,74 @@ export default function RecurringSubscriptionsPage({
     setForecastPage(1)
   }, [forecastSearch, forecastFilters, currentTab])
 
-  const filteredCreditsData = useMemo(
-    () =>
-      creditsData.filter((row: any) => {
-        if (creditsFilters.balance.length === 0) return true
-        const available = Number(row.remaining || 0) > 0
-        return creditsFilters.balance.includes(available ? "available" : "empty")
-      }),
-    [creditsData, creditsFilters],
+  // Demanda agregada por produto (próximo ciclo) das assinaturas visíveis
+  const demandRows = useMemo(() => {
+    const byProduct = new Map<
+      string,
+      {
+        id: string
+        name: string
+        unit: string | null
+        quantity: number
+        stockAvailable: number
+        minStock: number
+      }
+    >()
+    for (const row of filteredForecastData) {
+      for (const item of row.items || []) {
+        if (!item.productId) continue
+        const existing = byProduct.get(item.productId)
+        if (existing) {
+          existing.quantity += item.quantity
+        } else {
+          byProduct.set(item.productId, {
+            id: item.productId,
+            name: item.name,
+            unit: item.unit ?? null,
+            quantity: item.quantity,
+            stockAvailable: item.stockAvailable,
+            minStock: item.minStock,
+          })
+        }
+      }
+    }
+    return [...byProduct.values()].sort((a, b) => b.quantity - a.quantity)
+  }, [filteredForecastData])
+
+  const demandShortages = useMemo(
+    () => demandRows.filter((row) => row.quantity > row.stockAvailable),
+    [demandRows],
+  )
+
+  const demandColumns = useMemo(
+    () => [
+      { key: "name", header: "Produto" },
+      {
+        key: "quantity",
+        header: "Qtd. Prevista",
+        align: "center" as const,
+        render: (value: number, row: any) => (
+          <span className="font-bold">
+            {value}
+            {row.unit ? ` ${row.unit}` : ""}
+          </span>
+        ),
+      },
+      { key: "stockAvailable", header: "Estoque Atual", align: "center" as const },
+      {
+        key: "id",
+        header: "Status",
+        align: "center" as const,
+        render: (_value: any, row: any) => {
+          const missing = row.quantity - row.stockAvailable
+          const isLow = row.minStock > 0 && row.stockAvailable <= row.minStock
+          if (missing > 0) return <Badge variant="red">{`Falta ${missing}`}</Badge>
+          if (isLow) return <Badge variant="orange">Baixo</Badge>
+          return <Badge variant="green">Normal</Badge>
+        },
+      },
+    ],
+    [],
   )
 
   return (
@@ -1000,7 +1041,7 @@ export default function RecurringSubscriptionsPage({
               {/* Landing: secoes no estilo configuracoes */}
               {currentTab === "home" && (
                 <FadeIn key="home-sections" className="w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {SECTIONS.map((section) => (
                       <ListItem
                         key={section.key}
@@ -1158,12 +1199,23 @@ export default function RecurringSubscriptionsPage({
                         onClear={(key) =>
                           setBillingFilters((prev) => ({
                             ...prev,
-                            [key]: key === "datePeriod" ? { ...EMPTY_DATE_PERIOD } : [],
+                            [key]:
+                              key === "datePeriod"
+                                ? { ...EMPTY_DATE_PERIOD }
+                                : key === "origin"
+                                  ? ["cycle"]
+                                  : [],
                           }))
                         }
                       />
                     }
                   />
+
+                  {!loadingBilling && filteredBillingData.length > 0 && (
+                    <div className="mt-4">
+                      <HorizontalKPICard items={billingKpis} />
+                    </div>
+                  )}
 
                   <AnimatePresence mode="wait">
                     {loadingBilling ? (
@@ -1264,7 +1316,7 @@ export default function RecurringSubscriptionsPage({
                   )}
                 </TabsContent>
 
-                {/* Tab 3: Forecast / Calendário & Demanda */}
+                {/* Tab 3: Forecast / Demanda & Execuções */}
                 <TabsContent value="forecast">
                   <ForecastPageControls
                     search={forecastSearch}
@@ -1280,6 +1332,35 @@ export default function RecurringSubscriptionsPage({
                       />
                     }
                   />
+
+                  {!loadingForecast && demandRows.length > 0 && (
+                    <div className="mt-4 space-y-4">
+                      {demandShortages.length > 0 && (
+                        <div className="flex items-center gap-3 rounded-xl border border-brand-orange/40 bg-brand-orange/10 px-4 py-3">
+                          <AlertTriangleIcon size={20} className="text-brand-orange shrink-0" />
+                          <p className="text-sm font-bold text-brand-orange">
+                            {demandShortages.length === 1
+                              ? "1 produto com estoque insuficiente"
+                              : `${demandShortages.length} produtos com estoque insuficiente`}{" "}
+                            para as próximas execuções:{" "}
+                            {demandShortages
+                              .slice(0, 5)
+                              .map((r) => r.name)
+                              .join(", ")}
+                            {demandShortages.length > 5 ? ` e outros ${demandShortages.length - 5}` : ""}.
+                          </p>
+                        </div>
+                      )}
+                      <ReportTableCard
+                        title="Demanda Prevista de Produtos"
+                        icon={CalendarIcon}
+                        columns={demandColumns}
+                        data={demandRows}
+                        pageSize={6}
+                        emptyMessage="Nenhum produto previsto para o período selecionado."
+                      />
+                    </div>
+                  )}
 
                   <AnimatePresence mode="wait">
                     {loadingForecast ? (
@@ -1381,70 +1462,6 @@ export default function RecurringSubscriptionsPage({
                     />
                   )}
                 </TabsContent>
-
-                {/* Tab 4: Saldos de Créditos de Clientes */}
-                <TabsContent value="credits">
-                  <SectionFilterBar
-                    onOpenFilter={() => setFilterTarget("credits")}
-                    hasActiveFilters={hasCreditsFilters}
-                    chips={
-                      <CreditsFilterChips
-                        filters={creditsFilters}
-                        onClear={(key) => setCreditsFilters((prev) => ({ ...prev, [key]: [] }))}
-                      />
-                    }
-                    search={{
-                      value: creditsSearch,
-                      onChange: setCreditsSearch,
-                      placeholder: "Buscar por cliente...",
-                    }}
-                  />
-
-                  {loadingCredits ? (
-                    <div className="flex items-center justify-center py-20">
-                      <ThreeDotsLoader />
-                    </div>
-                  ) : (
-                    <ReportTableCard
-                      columns={creditColumns}
-                      data={filteredCreditsData}
-                      pageSize={8}
-                      emptyMessage={
-                        <IconPlaceholder
-                          placeholderType="image"
-                          imageSrc={
-                            hasCreditsFilters || debouncedCreditsSearch
-                              ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                              : "https://img.dudit.com.br/static/mascots/ValesCompra.png"
-                          }
-                          imageAlt="Nenhum crédito"
-                          title={
-                            hasCreditsFilters || debouncedCreditsSearch
-                              ? "Nenhum crédito encontrado"
-                              : "Nenhum saldo de crédito de serviço encontrado."
-                          }
-                          subtitle={
-                            hasCreditsFilters || debouncedCreditsSearch
-                              ? "Ajuste a busca ou os filtros para encontrar saldos."
-                              : "Créditos liberados para seus clientes aparecerão aqui."
-                          }
-                          itemButton={
-                            hasCreditsFilters || debouncedCreditsSearch
-                              ? {
-                                text: "Limpar filtros",
-                                action: () => {
-                                  setCreditsSearch("")
-                                  setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
-                                },
-                                variant: "outline",
-                              }
-                              : undefined
-                          }
-                        />
-                      }
-                    />
-                  )}
-                </TabsContent>
               </Tabs>
             </div>
           </FadeIn>
@@ -1459,32 +1476,25 @@ export default function RecurringSubscriptionsPage({
             ? BILLING_FILTER_SECTIONS
             : filterTarget === "forecast"
               ? FORECAST_FILTER_SECTIONS
-              : filterTarget === "credits"
-                ? CREDITS_FILTER_SECTIONS
-                : LIST_FILTER_SECTIONS
+              : LIST_FILTER_SECTIONS
         }
         filters={
           filterTarget === "billing"
             ? billingFilters
             : filterTarget === "forecast"
               ? forecastFilters
-              : filterTarget === "credits"
-                ? creditsFilters
-                : listFilters
+              : listFilters
         }
         setFilters={
           filterTarget === "billing"
             ? setBillingFilters
             : filterTarget === "forecast"
               ? setForecastFilters
-              : filterTarget === "credits"
-                ? setCreditsFilters
-                : setListFilters
+              : setListFilters
         }
         onClear={() => {
           if (filterTarget === "billing") setBillingFilters({ ...EMPTY_BILLING_FILTERS })
           else if (filterTarget === "forecast") setForecastFilters({ ...EMPTY_FORECAST_FILTERS })
-          else if (filterTarget === "credits") setCreditsFilters({ ...EMPTY_CREDITS_FILTERS })
           else setListFilters({ ...EMPTY_LIST_FILTERS })
         }}
       />

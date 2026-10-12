@@ -240,10 +240,10 @@ export async function POST(request: NextRequest) {
 
             if (newOrderStatus === "paid") {
               try {
-                const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+                const { createTransactionFromOrder, syncReceivableForOrder } = await import("@/lib/services/transaction.service")
                 const { data: fullOrder } = await supabaseAdmin
                   .from("orders")
-                  .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, mp_payment_id")
+                  .select("order_number, situation, partner_id, store_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source, mp_payment_id")
                   .eq("id", order.id)
                   .single()
 
@@ -252,6 +252,7 @@ export async function POST(request: NextRequest) {
                     order_id: order.id,
                     order_number: fullOrder.order_number,
                     partner_id: fullOrder.partner_id,
+                    store_id: fullOrder.store_id || null,
                     total_amount: fullOrder.total_amount,
                     payment_method: fullOrder.payment_method,
                     payment_provider: fullOrder.payment_provider,
@@ -259,7 +260,26 @@ export async function POST(request: NextRequest) {
                     payment_date: paymentData.date_approved || new Date().toISOString(),
                     customer_id: fullOrder.customer_id,
                     customer_name: fullOrder.customer_name,
+                    finance_account_id: fullOrder.finance_account_id || null,
+                    order_source: fullOrder.order_source || "manual",
                     mp_payment_id: fullOrder.mp_payment_id || null,
+                  })
+
+                  // Recebível pendente criado na abertura do pedido (ex.: cobrança de
+                  // assinatura manual): sem isto, a transação "A receber" ficaria órfã
+                  // depois que o pagamento é confirmado fora do modal.
+                  await syncReceivableForOrder(supabaseAdmin, {
+                    order_number: fullOrder.order_number,
+                    partner_id: fullOrder.partner_id,
+                    store_id: fullOrder.store_id || null,
+                    total_amount: Number(fullOrder.total_amount || 0),
+                    paid_amount: Number(fullOrder.total_amount || 0),
+                    situation: fullOrder.situation,
+                    payment_method: fullOrder.payment_method || null,
+                    customer_id: fullOrder.customer_id || fullOrder.buyer_id || null,
+                    customer_name: fullOrder.customer_name || null,
+                    finance_account_id: fullOrder.finance_account_id || null,
+                    order_source: fullOrder.order_source || "manual",
                   })
 
                   const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

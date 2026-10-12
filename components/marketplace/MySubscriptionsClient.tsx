@@ -369,7 +369,6 @@ export function MySubscriptionsClient({
                                     variant="outline"
                                     className="w-auto shrink-0"
                                     onClick={() => handleOpenDetails(sub.id)}
-                                    rightIcon={<ChevronRightIcon size={16} />}
                                   >
                                     Ver detalhes
                                   </Button>

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
 import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile, revalidateServices } from '@/lib/utils/revalidation'
-import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
-import { RateLimitCategory } from '@/lib/rate-limiter'
 
 // Secret header to prevent unauthorized access
 const WEBHOOK_SECRET = process.env.SUPABASE_WEBHOOK_SECRET
@@ -48,16 +46,37 @@ async function debouncedRevalidate() {
   }, REVALIDATION_DEBOUNCE_MS)
 }
 
+function hasMeaningfulProductChanges(record: any, oldRecord: any): boolean {
+  if (!oldRecord) return true
+  const criticalFields = [
+    'name', 'description', 'price', 'promotional_price', 'images', 'video_thumbnail',
+    'status', 'is_active', 'moderation_status', 'deleted_at', 'show_in_marketplace',
+    'category_id', 'marketplace_category_id', 'show_price_in_store', 'stock_available', 'stock_quantity'
+  ]
+  return criticalFields.some(field => JSON.stringify(record?.[field]) !== JSON.stringify(oldRecord?.[field]))
+}
+
+function hasMeaningfulServiceChanges(record: any, oldRecord: any): boolean {
+  if (!oldRecord) return true
+  const criticalFields = [
+    'name', 'description', 'price', 'promotional_price', 'images',
+    'status', 'is_active', 'moderation_status', 'deleted_at', 'show_in_marketplace',
+    'category_id', 'marketplace_category_id', 'show_price_in_store', 'duration_minutes'
+  ]
+  return criticalFields.some(field => JSON.stringify(record?.[field]) !== JSON.stringify(oldRecord?.[field]))
+}
+
+function hasMeaningfulPartnerChanges(record: any, oldRecord: any): boolean {
+  if (!oldRecord) return true
+  const criticalFields = ['name', 'is_active', 'logo_url', 'banner_url', 'description', 'category_id']
+  return criticalFields.some(field => JSON.stringify(record?.[field]) !== JSON.stringify(oldRecord?.[field]))
+}
+
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization')
     if (!WEBHOOK_SECRET || authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const rateLimitResult = await checkRateLimitForAPI(RateLimitCategory.WEBHOOK, 'supabase-webhook')
-    if (rateLimitResult.limited) {
-      return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
     }
 
     const body = await req.json()
@@ -72,21 +91,42 @@ export async function POST(req: Request) {
         if (table === 'products') {
           if (type === 'DELETE') {
             await retryRedisSync(`products:${id}:remove`, () => removeFromExploreRedis(id, 'produto', true, true))
-          } else if (type === 'INSERT' || type === 'UPDATE') {
+          } else if (type === 'INSERT') {
+            await retryRedisSync(`products:${id}:sync`, () => syncToExploreRedis({ id, type: 'produto', data: {}, silent: true, throwOnError: true }))
+          } else if (type === 'UPDATE') {
+            // Se apenas métricas como views_count ou sales mudaram, ignora para poupar comandos no Redis
+            if (!hasMeaningfulProductChanges(record, old_record)) {
+              console.log(`[Webhook] Produto ${id} ignorado: apenas métricas/views mudaram.`)
+              return
+            }
             await retryRedisSync(`products:${id}:sync`, () => syncToExploreRedis({ id, type: 'produto', data: {}, silent: true, throwOnError: true }))
           }
         }
         else if (table === 'services') {
           if (type === 'DELETE') {
             await retryRedisSync(`services:${id}:remove`, () => removeFromExploreRedis(id, 'servico', true, true))
-          } else if (type === 'INSERT' || type === 'UPDATE') {
+          } else if (type === 'INSERT') {
+            await retryRedisSync(`services:${id}:sync`, () => syncToExploreRedis({ id, type: 'servico', data: {}, silent: true, throwOnError: true }))
+          } else if (type === 'UPDATE') {
+            // Se apenas métricas como views_count mudaram, ignora para poupar comandos no Redis
+            if (!hasMeaningfulServiceChanges(record, old_record)) {
+              console.log(`[Webhook] Serviço ${id} ignorado: apenas métricas/views mudaram.`)
+              return
+            }
             await retryRedisSync(`services:${id}:sync`, () => syncToExploreRedis({ id, type: 'servico', data: {}, silent: true, throwOnError: true }))
           }
         }
         else if (table === 'partners') {
           if (type === 'DELETE') {
             await retryRedisSync(`partners:${id}:remove`, () => removeFromExploreRedis(id, 'loja', true, true))
-          } else if (type === 'INSERT' || type === 'UPDATE') {
+          } else if (type === 'INSERT') {
+            await retryRedisSync(`partners:${id}:sync`, () => syncToExploreRedis({ id: id, type: 'loja', data: {}, silent: true, throwOnError: true }))
+            await retryRedisSync(`partners:${id}:items`, () => syncPartnerItemsToExploreRedis(id, { throwOnError: true }))
+          } else if (type === 'UPDATE') {
+            if (!hasMeaningfulPartnerChanges(record, old_record)) {
+              console.log(`[Webhook] Loja ${id} ignorada: apenas métricas mudaram.`)
+              return
+            }
             await retryRedisSync(`partners:${id}:sync`, () => syncToExploreRedis({ id: id, type: 'loja', data: {}, silent: true, throwOnError: true }))
             await retryRedisSync(`partners:${id}:items`, () => syncPartnerItemsToExploreRedis(id, { throwOnError: true }))
           }

@@ -187,3 +187,22 @@ export const MIXED_STATUS_OPTIONS = [
   { value: "delivered", label: "Entregue/Retirado" },
   { value: "delivery_failed", label: "Falha na entrega/Não retirado" },
 ]
+
+/**
+ * Canonical delivery status used for filtering/grouping.
+ * Maps legacy "pending" and empty values to "not_sent".
+ */
+export function canonicalDeliveryStatus(status?: string | null): string {
+  const value = String(status || "").trim() || "not_sent"
+  return value === "pending" ? "not_sent" : value
+}
+
+/** Delivery status options offered by the orders filter. */
+export const DELIVERY_STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "not_sent", label: "Não enviado" },
+  { value: "preparing", label: "Em preparação" },
+  { value: "sent", label: "Enviado" },
+  { value: "pickup_available", label: "Pronto para retirada" },
+  { value: "delivered", label: "Entregue" },
+  { value: "delivery_failed", label: "Falha na entrega" },
+]

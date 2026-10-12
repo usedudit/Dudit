@@ -303,17 +303,7 @@ export async function revalidateTeamMembers(partnerId: string) {
  * Revalida o Cache O(1) do Redis/Explore/Home no Next.js App Router
  */
 export async function revalidateExploreSearch(options?: { silent?: boolean }) {
-    // 1. Increment global Redis version to invalidate all cached query results (O(1) invalidation)
-    // Only done for non-silent updates to avoid "thundering herd" re-renders of the home page
-    if (!options?.silent) {
-        try {
-            await redis.incr(GLOBAL_VERSION_KEY)
-        } catch (err) {
-            console.error("[Redis] Failed to incr cache version:", err)
-        }
-    }
-
-    // Always clear the in-memory version cache on the Next.js server instance
+    // Clear the in-memory version cache on the Next.js server instance
     try {
         const { invalidateInMemoryVersionCache } = await import("@/app/actions/marketplace/search")
         invalidateInMemoryVersionCache()

@@ -19,6 +19,7 @@ import {
   IconPlaceholder,
   InfoCard,
   Input,
+  ListItem,
   Pagination,
   SidebarCard,
   Tabs,
@@ -56,6 +57,7 @@ import { ExecutionListRow } from "./ExecutionListRow"
 import {
   BlockedIcon,
   ChevronLeftIcon,
+  GiftIcon,
   PlayIcon,
   RepeatIcon,
   SearchIcon,
@@ -208,7 +210,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   }, [partnerId, subscriptionId])
 
   // Itens do plano unidos às linhas de crédito: todo item contratado aparece
-  // sempre (mesmo sem crédito liberado ainda — saldo 0).
+  // sempre (mesmo sem crédito liberado ainda - saldo 0).
   const mergedCredits = useMemo(() => {
     type MergedCredit = {
       id: string
@@ -222,6 +224,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
       expiresAt: string | null
       staffPartnerUserId: string | null
       durationMinutes: number | null
+      image: string | null
     }
 
     const rows: MergedCredit[] = []
@@ -231,6 +234,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
       const isProduct = item.itemType === "product"
       const serviceId = isProduct ? null : item.service?.id || null
       const productId = isProduct ? item.product?.id || null : null
+      const details = (isProduct ? item.product : item.service) as { images?: string[] | null } | null
       const row: MergedCredit = {
         id: `item-${item.id}`,
         itemName: item.product?.name || item.service?.name || "Item",
@@ -243,6 +247,10 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         expiresAt: null,
         staffPartnerUserId: null,
         durationMinutes: item.durationMinutes ?? null,
+        image:
+          Array.isArray(details?.images) && details.images.length
+            ? getR2ImageUrl(details.images[0], "thumbnail")
+            : null,
       }
       rows.push(row)
       if (serviceId) indexByKey.set(`s:${serviceId}`, row)
@@ -268,6 +276,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
         expiresAt: null,
         staffPartnerUserId: null,
         durationMinutes: credit.durationMinutes ?? null,
+        image: null,
       }
       if (!target) rows.push(row)
       row.quantity += credit.quantity
@@ -969,57 +978,72 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
                         title="Créditos da Assinatura"
                         description="Itens do plano e saldo de créditos. Serviços podem ser agendados e produtos entregues usando créditos."
                       >
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {mergedCredits.map((credit) => (
-                            <div
+                            <ListItem
                               key={credit.id}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-brand-border dark:border-dark-border rounded-xl p-4"
-                            >
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    {credit.itemName}
-                                  </p>
+                              icon={
+                                credit.image ? (
+                                  <img
+                                    src={credit.image}
+                                    alt={credit.itemName}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover rounded-full"
+                                    onError={(e) => {
+                                      e.currentTarget.src = PLACEHOLDER_IMAGE
+                                    }}
+                                  />
+                                ) : (
+                                  GiftIcon
+                                )
+                              }
+                              title={
+                                <span className="inline-flex items-center gap-2 min-w-0">
+                                  <span className="truncate">{credit.itemName}</span>
                                   <Badge variant={credit.itemType === "service" ? "blue" : "purple"}>
                                     {credit.itemType === "service" ? "Serviço" : "Produto"}
                                   </Badge>
-                                </div>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                  {credit.quantity > 0 ? (
-                                    <>
-                                      {credit.expiresAt
-                                        ? `Válido até ${formatFullDate(credit.expiresAt)}`
-                                        : "Sem validade"}
-                                      {` • ${credit.consumed} consumidos`}
-                                    </>
-                                  ) : (
-                                    "Libera no próximo ciclo"
-                                  )}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span
-                                  className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${credit.remaining > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
-                                >
-                                  {credit.remaining}/{credit.quantity}
                                 </span>
-                                {canManage && credit.remaining > 0 && credit.itemType === "service" && (
-                                  <Button size="sm" onClick={() => openScheduleModal(credit)}>
-                                    Agendar
-                                  </Button>
-                                )}
-                                {canManage && credit.remaining > 0 && credit.itemType === "product" && (
-                                  <Button size="sm" onClick={openDeliveryModal}>
-                                    Registrar entrega
-                                  </Button>
-                                )}
-                                {credit.remaining <= 0 && (
-                                  <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Sem saldo — libera no próximo ciclo
+                              }
+                              description={
+                                credit.quantity > 0 ? (
+                                  <>
+                                    {credit.expiresAt
+                                      ? `Válido até ${formatFullDate(credit.expiresAt)}`
+                                      : "Sem validade"}
+                                    {` • ${credit.consumed} consumidos`}
+                                  </>
+                                ) : (
+                                  "Libera no próximo ciclo"
+                                )
+                              }
+                              className="p-4"
+                              right={
+                                <div className="flex items-center justify-end gap-3 shrink-0 flex-wrap">
+                                  <span
+                                    className={`inline-block px-2.5 py-1 rounded-full font-bold text-xs ${credit.remaining > 0 ? "bg-brand-green/10 text-brand-green" : "bg-brand-gray/40 text-brand-inactive-text"}`}
+                                  >
+                                    {credit.remaining}/{credit.quantity}
                                   </span>
-                                )}
-                              </div>
-                            </div>
+                                  {canManage && credit.remaining > 0 && credit.itemType === "service" && (
+                                    <Button size="sm" onClick={() => openScheduleModal(credit)}>
+                                      Agendar
+                                    </Button>
+                                  )}
+                                  {canManage && credit.remaining > 0 && credit.itemType === "product" && (
+                                    <Button size="sm" onClick={openDeliveryModal}>
+                                      Registrar entrega
+                                    </Button>
+                                  )}
+                                  {credit.remaining <= 0 && (
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                      Sem saldo - libera no próximo ciclo
+                                    </span>
+                                  )}
+                                </div>
+                              }
+                            />
                           ))}
                         </div>
                       </FormSection>

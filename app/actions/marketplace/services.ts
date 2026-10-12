@@ -1,5 +1,7 @@
 "use server"
 
+import { unstable_cache } from "next/cache"
+
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { cache } from "react"
@@ -22,7 +24,7 @@ const SLOT_INCREMENT_MINUTES = 15
  * Includes partner info (store name, address, avatar, payment methods).
  * No auth required - public data only.
  */
-async function _getMarketplaceService(serviceId: string, storeId?: string | null) {
+async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | null) {
   if (!serviceId) return null
 
   const supabase = getAdminClient()
@@ -134,12 +136,29 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
   return data
 }
 
+async function _getMarketplaceService(serviceId: string, storeId?: string | null) {
+  if (!serviceId) return null
+  const storeKey = storeId || "none"
+  return unstable_cache(
+    async () => _getMarketplaceServiceBase(serviceId, storeId),
+    ["marketplace-service-detail", serviceId, storeKey],
+    {
+      tags: ["marketplace-services", "services", `service-${serviceId}`],
+      revalidate: 300,
+    }
+  )()
+}
+
 export const getMarketplaceService = cache(_getMarketplaceService)
 
 /**
  * Fetch the reviews for a specific service.
  */
 export async function getServiceReviews(serviceId: string, storeId?: string | null) {
+  if (!serviceId) return []
+  const storeKey = storeId || "none"
+  return unstable_cache(
+    async () => {
   const supabase = getAdminClient()
   let resolvedId = serviceId
   if (!isUuid(serviceId)) {
@@ -226,6 +245,13 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
       profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
     }
   })
+    },
+    ["marketplace-service-reviews", serviceId, storeKey],
+    {
+      tags: ["marketplace-reviews", `service-${serviceId}`],
+      revalidate: 300,
+    }
+  )()
 }
 
 /**

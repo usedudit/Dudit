@@ -33,7 +33,7 @@ export const SERVICE_LABELS: Record<number, string> = {
 
 // Link de rastreio nativo da transportadora (fallback: rastreio agregado da
 // SuperFrete). Correios aceita ?objeto= (URL de integração oficial);
-// Jadlog, Loggi e J&T não expõem GET com o código — levam à página oficial.
+// Jadlog, Loggi e J&T não expõem GET com o código - levam à página oficial.
 export function buildCarrierTrackingUrl(
   serviceId: number | null | undefined,
   tracking: string | null | undefined,

@@ -40,6 +40,10 @@ export type OrdersExportFilters = BaseExportFilters & {
   paymentStatus?: string[]
   paymentMethods?: string[]
   channels?: string[]
+  deliveryStatus?: string[]
+  deliveryType?: string[]
+  totalMin?: string
+  totalMax?: string
   customerId?: string | null
   datePeriod?: DatePeriodFilterValue
 }

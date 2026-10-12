@@ -59,6 +59,7 @@ import {
   EditIcon,
   RepeatIcon,
   MoneyIcon,
+  GiftIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   MapPinIcon,
@@ -225,7 +226,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
   }, [activeTab])
 
   // Itens do plano unidos às linhas de crédito: todo item contratado aparece
-  // sempre (mesmo sem crédito liberado ainda — saldo 0).
+  // sempre (mesmo sem crédito liberado ainda - saldo 0).
   const mergedCredits = useMemo(() => {
     type MergedCredit = {
       key: string
@@ -239,6 +240,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
       expiresAt: string | null
       staffPartnerUserId: string | null
       durationMinutes: number | null
+      image: string | null
     }
 
     const rows: MergedCredit[] = []
@@ -248,6 +250,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
       const isProduct = item.itemType === "product"
       const serviceId = isProduct ? null : item.service?.id || null
       const productId = isProduct ? item.product?.id || null : null
+      const details = (isProduct ? item.product : item.service) as { images?: string[] | null } | null
       const row: MergedCredit = {
         key: `item-${item.id}`,
         itemName: item.product?.name || item.service?.name || (isProduct ? "Produto" : "Serviço"),
@@ -260,6 +263,10 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
         expiresAt: null,
         staffPartnerUserId: null,
         durationMinutes: item.durationMinutes ?? null,
+        image:
+          Array.isArray(details?.images) && details.images.length
+            ? getPrimaryProductDisplayImage({ images: details.images }, "thumbnail")
+            : null,
       }
       rows.push(row)
       if (serviceId) indexByKey.set(`s:${serviceId}`, row)
@@ -285,6 +292,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
         expiresAt: null,
         staffPartnerUserId: null,
         durationMinutes: credit.durationMinutes ?? null,
+        image: null,
       }
       if (!target) rows.push(row)
       row.quantity += Number(credit.totalCredits || 0)
@@ -1002,7 +1010,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                 <div className="text-center py-10 space-y-3">
                   <IconPlaceholder
                     placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Assinaturas.png"
                     imageAlt="Nenhum crédito"
                     title="Nenhum crédito disponível"
                     subtitle="Os créditos são liberados a cada ciclo da assinatura."
@@ -1014,48 +1022,63 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                     const isService = credit.itemType === "service"
                     const expiryDate = credit.expiresAt ? String(credit.expiresAt).slice(0, 10) : null
                     return (
-                      <div
+                      <ListItem
                         key={credit.key}
-                        className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border border-brand-border/60 dark:border-dark-border/60 bg-white dark:bg-dark-card"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
-                              {credit.itemName}
-                            </span>
+                        icon={
+                          credit.image ? (
+                            <img
+                              src={credit.image}
+                              alt={credit.itemName}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover rounded-full"
+                              onError={(e) => {
+                                e.currentTarget.src = PLACEHOLDER_STORE_IMAGE
+                              }}
+                            />
+                          ) : (
+                            GiftIcon
+                          )
+                        }
+                        title={
+                          <span className="inline-flex items-center gap-2 min-w-0">
+                            <span className="truncate">{credit.itemName}</span>
                             <Badge variant={isService ? "blue" : "purple"}>
                               {isService ? "Serviço" : "Produto"}
                             </Badge>
-                          </div>
-                          <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                            {credit.quantity > 0 ? (
-                              <>
-                                {credit.remaining} de {credit.quantity} créditos disponíveis
-                                {expiryDate ? ` • Válidos até ${expiryDate.split("-").reverse().join("/")}` : " • Sem validade"}
-                              </>
-                            ) : (
-                              "Sem saldo — libera no próximo ciclo"
-                            )}
-                          </p>
-                        </div>
-                        <div className="shrink-0">
-                          {isService ? (
-                            credit.remaining > 0 ? (
-                              <Button size="sm" onClick={() => openBookingModal(credit)}>
-                                Agendar
-                              </Button>
+                          </span>
+                        }
+                        description={
+                          credit.quantity > 0 ? (
+                            <>
+                              {credit.remaining} de {credit.quantity} créditos disponíveis
+                              {expiryDate ? ` • Válidos até ${expiryDate.split("-").reverse().join("/")}` : " • Sem validade"}
+                            </>
+                          ) : (
+                            "Sem saldo - libera no próximo ciclo"
+                          )
+                        }
+                        className="px-4 py-3"
+                        right={
+                          <div className="flex items-center justify-end gap-3 shrink-0 flex-wrap">
+                            {isService ? (
+                              credit.remaining > 0 ? (
+                                <Button size="sm" onClick={() => openBookingModal(credit)}>
+                                  Agendar
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                  Sem saldo - libera no próximo ciclo
+                                </span>
+                              )
                             ) : (
                               <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Sem saldo — libera no próximo ciclo
+                                A loja registra a entrega
                               </span>
-                            )
-                          ) : (
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                              A loja registra a entrega
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                            )}
+                          </div>
+                        }
+                      />
                     )
                   })}
                 </div>

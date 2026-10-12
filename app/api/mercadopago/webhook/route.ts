@@ -1112,10 +1112,10 @@ async function processWebhookWithRetry(
     // ── Create revenue transaction when payment approved ──
     if (paymentInfo.status === "approved") {
       try {
-        const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+        const { createTransactionFromOrder, syncReceivableForOrder } = await import("@/lib/services/transaction.service")
         const { data: fullOrder } = await supabase
           .from("orders")
-          .select("order_number, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+          .select("order_number, situation, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
           .eq("id", orderId)
           .single()
 
@@ -1136,11 +1136,28 @@ async function processWebhookWithRetry(
             order_source: fullOrder.order_source || "manual",
             mp_payment_id: paymentId.toString(),
           })
-        }
 
-        if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
-          const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
-          await fulfillMarketplaceOrder(supabase, orderId)
+          // Recebível pendente criado na abertura do pedido (ex.: cobrança de
+          // assinatura manual): sem isto, a transação "A receber" ficaria órfã
+          // depois que o pagamento entra pelo webhook.
+          await syncReceivableForOrder(supabase, {
+            order_number: fullOrder.order_number,
+            partner_id: fullOrder.partner_id,
+            store_id: fullOrder.store_id || null,
+            total_amount: Number(fullOrder.total_amount || 0),
+            paid_amount: Number(fullOrder.paid_amount || 0),
+            situation: fullOrder.situation,
+            payment_method: fullOrder.payment_method || null,
+            customer_id: fullOrder.customer_id || fullOrder.buyer_id || null,
+            customer_name: fullOrder.customer_name || null,
+            finance_account_id: fullOrder.finance_account_id || null,
+            order_source: fullOrder.order_source || "manual",
+          })
+
+          if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
+            const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+            await fulfillMarketplaceOrder(supabase, orderId)
+          }
         }
       } catch (txErr: any) {
         console.error("[WEBHOOK] Error creating transaction:", txErr.message)

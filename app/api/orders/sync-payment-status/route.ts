@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
 
           const { data: fullOrder } = await supabaseAdmin
             .from("orders")
-            .select("order_number, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+            .select("order_number, situation, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
             .eq("id", orderId)
             .single()
 
@@ -360,6 +360,24 @@ export async function POST(request: NextRequest) {
               financeAccountId: fullOrder.finance_account_id || null,
               orderSource: fullOrder.order_source || "manual",
               paymentMethod: fullOrder.payment_method || "Método não definido",
+            })
+
+            // Recebível pendente criado na abertura do pedido (ex.: cobrança de
+            // assinatura manual): sem isto, a transação "A receber" ficaria órfã
+            // depois que o pagamento é confirmado fora do modal.
+            const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+            await syncReceivableForOrder(supabaseAdmin, {
+              order_number: fullOrder.order_number,
+              partner_id: fullOrder.partner_id,
+              store_id: fullOrder.store_id || resolvedStoreId || null,
+              total_amount: Number(fullOrder.total_amount || 0),
+              paid_amount: Number(fullOrder.paid_amount || 0),
+              situation: fullOrder.situation,
+              payment_method: fullOrder.payment_method || null,
+              customer_id: fullOrder.customer_id || fullOrder.buyer_id || null,
+              customer_name: fullOrder.customer_name || null,
+              finance_account_id: fullOrder.finance_account_id || null,
+              order_source: fullOrder.order_source || "manual",
             })
 
             const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")

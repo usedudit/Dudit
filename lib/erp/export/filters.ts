@@ -3,11 +3,12 @@ import type { OrdersExportFilters } from "./types"
 
 const ORDER_STATUS_LABELS: Record<string, string[]> = {
   Pago: ["paid", "delivered"],
-  Pendente: ["pending"],
+  Pendente: ["pending", "unpaid"],
   Enviado: ["shipped"],
   Cancelado: ["cancelled"],
   "Em análise": ["in_process"],
   "Parcialmente Pago": ["partially_paid"],
+  Entregue: ["delivered"],
 }
 
 const ORDER_TAB_SITUATIONS: Record<string, string[]> = {

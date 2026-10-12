@@ -51,6 +51,8 @@ export const getBillingStatusConfig = (situation?: string | null): { label: stri
 
 export const BillingListRow: React.FC<BillingListRowProps> = ({ row, columns, onOpen, onOpenSubscription }) => {
   const status = getBillingStatusConfig(row.situation)
+  const isCreditOrder = row.payment_method === "Assinatura (Créditos)" || row.payment_method === "subscription_credits"
+  const isManualCharge = row.situation === "pending" && row.payment_method === "A combinar"
 
   const getJustifyClass = (align?: string) => {
     if (align === "center") return "justify-center"
@@ -73,7 +75,7 @@ export const BillingListRow: React.FC<BillingListRowProps> = ({ row, columns, on
               #{row.order_number || row.id.slice(0, 8)}
             </span>
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-              Cobrança de assinatura
+              {isCreditOrder ? "Pedido por créditos" : "Cobrança de assinatura"}
             </span>
           </div>
         )
@@ -103,7 +105,11 @@ export const BillingListRow: React.FC<BillingListRowProps> = ({ row, columns, on
       case "value":
         return <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(Number(row.total_amount || 0))}</span>
       case "status":
-        return <Badge variant={status.variant}>{status.label}</Badge>
+        return (
+          <Badge variant={isManualCharge ? "orange" : status.variant}>
+            {isManualCharge ? "Cobrança manual" : status.label}
+          </Badge>
+        )
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>

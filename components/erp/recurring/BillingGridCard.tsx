@@ -16,6 +16,8 @@ interface BillingGridCardProps {
 
 export const BillingGridCard: React.FC<BillingGridCardProps> = ({ row, onOpen, onOpenSubscription }) => {
   const status = getBillingStatusConfig(row.situation)
+  const isManualCharge = row.situation === "pending" && row.payment_method === "A combinar"
+  const statusLabel = isManualCharge ? "Cobrança manual" : status.label
   const customerLabel = row.customer_name || "Cliente"
 
   return (
@@ -40,7 +42,7 @@ export const BillingGridCard: React.FC<BillingGridCardProps> = ({ row, onOpen, o
                 <span className="truncate">#{row.order_number || row.id.slice(0, 8)}</span>
               </h3>
               <Badge variant={status.variant} className="whitespace-nowrap scale-90 shrink-0">
-                {status.label}
+                {statusLabel}
               </Badge>
             </div>
           </div>
@@ -73,7 +75,7 @@ export const BillingGridCard: React.FC<BillingGridCardProps> = ({ row, onOpen, o
         <div className="flex items-end justify-between mt-1">
           <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Situação</span>
-            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{status.label}</span>
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{statusLabel}</span>
           </div>
 
           <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
