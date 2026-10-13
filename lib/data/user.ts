@@ -24,7 +24,11 @@ async function getMarketplaceSessionCore(userId: string, logLabel: string): Prom
             .eq("user_id", userId)
             .eq("is_default", true)
             .maybeSingle(),
-        supabase.from("cart_items").select("quantity").eq("user_id", userId),
+        // Linhas de assinatura são artefato do checkout direto da página do
+        // plano e não contam como itens da sacola.
+        supabase.from("cart_items").select("quantity")
+            .eq("user_id", userId)
+            .or("item_type.is.null,item_type.neq.subscription"),
     ])
 
     if (profileRes.error) console.error("[SessionData] Profile fetch error:", profileRes.error)

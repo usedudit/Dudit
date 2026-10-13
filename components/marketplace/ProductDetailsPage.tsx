@@ -1914,10 +1914,6 @@ export function ProductDetailsPageClient({
                                             deliveryBreakdown?.source === "superfrete") &&
                                         (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
                                             <div className="pt-3 space-y-2">
-                                                <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
-                                                    <TruckIcon size={14} />
-                                                    Entrega por transportadora (SuperFrete)
-                                                </p>
                                                 {carrierOptions.map((opt) => (
                                                     <div
                                                         key={opt.serviceId}

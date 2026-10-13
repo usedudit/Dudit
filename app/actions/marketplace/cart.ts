@@ -163,8 +163,12 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
   const { data: cartItems, error } = cartResult
   const userAddresses = addressesResult.data || []
   const defaultAddress = userAddresses.find((address: any) => address.is_default) || userAddresses[0]
+  // Linhas de assinatura são artefato do checkout direto da página do plano
+  // (criadas ali e consumidas no /checkout): nunca aparecem na sacola nem
+  // contam no badge.
+  const visibleItems = (cartItems || []).filter((item: any) => (item.item_type || "product") !== "subscription")
   const pageData = {
-    cartCount: (cartItems || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0),
+    cartCount: visibleItems.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0),
     userProfile: profileResult.data
       ? {
         full_name: profileResult.data.full_name || null,
@@ -182,11 +186,11 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
     return { ...pageData, itemsByPartner: {} }
   }
 
-  if (!cartItems || cartItems.length === 0) return { ...pageData, itemsByPartner: {} }
+  if (visibleItems.length === 0) return { ...pageData, itemsByPartner: {} }
 
   // 2. Busca Métodos de Pagamento, Endereços, Configurações de Entrega, Promoções e Lojas em Paralelo (Batching)
-  const partnerIds = [...new Set(cartItems.map((item: any) => item.partner_id))] as string[]
-  const storeIds = [...new Set(cartItems.map((item: any) => item.store_id).filter(Boolean))] as string[]
+  const partnerIds = [...new Set(visibleItems.map((item: any) => item.partner_id))] as string[]
+  const storeIds = [...new Set(visibleItems.map((item: any) => item.store_id).filter(Boolean))] as string[]
 
   let paymentMethods: any[] | null = null
   let partnerAddresses: Record<string, any[]> = {}
@@ -267,7 +271,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
   }
 
   // 3. Agrupa os itens por Loja (store_id com fallback para partner_id)
-  const itemsByPartner = cartItems.reduce((acc: any, item: any) => {
+  const itemsByPartner = visibleItems.reduce((acc: any, item: any) => {
     const partnerId = item.partner_id
     if (typeof partnerId !== "string" || partnerId === "__proto__" || partnerId === "constructor" || partnerId === "prototype") return acc
     const storeId = item.store_id || null
@@ -934,6 +938,14 @@ export async function checkoutCartAction(
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  // Assinatura é comprada direto da página do plano (checkout dedicado) e
+  // nunca na mesma finalização que produtos/serviços da sacola.
+  const hasSubscriptionLine = resolvedLines.some((l: any) => l.itemType === "subscription")
+  const hasRegularLine = resolvedLines.some((l: any) => l.itemType !== "subscription")
+  if (hasSubscriptionLine && hasRegularLine) {
+    return { error: "Assinaturas devem ser finalizadas separadamente dos outros itens. Finalize a assinatura primeiro e depois os demais itens." }
+  }
 
   const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
   const checkoutStoreId = storeId || resolvedLines.find((l: any) => l.storeId)?.storeId || null

@@ -831,10 +831,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (!cq || (!cq.loading && cq.options.length === 0 && !cq.error)) return null
         return (
             <div className="space-y-2">
-                <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
-                    <TruckIcon size={14} />
-                    Entrega por transportadora (SuperFrete)
-                </p>
                 {cq.options.map(opt => (
                     <button
                         key={opt.serviceId}

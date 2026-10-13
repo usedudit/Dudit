@@ -436,13 +436,15 @@ export async function addSubscriptionToCartAction(
     return { error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
   }
 
-  const { data: existing } = await supabase
+  // A assinatura não fica na sacola: a linha criada aqui é só o suporte do
+  // checkout direto (página do plano → /checkout) e some quando o pedido é
+  // criado. Remove resíduos de checkouts abandonados (inclusive de outros
+  // planos) para não acumular linhas invisíveis.
+  await supabase
     .from("cart_items")
-    .select("id")
+    .delete()
     .eq("user_id", user.id)
     .eq("item_type", "subscription")
-    .eq("recurring_plan_id", plan.id)
-    .maybeSingle()
 
   // Modo de recebimento escolhido na página do plano - só persiste se o plano aceitar.
   const planAllowedModes: string[] = Array.isArray(plan.fulfillment_modes)
@@ -452,19 +454,6 @@ export async function addSubscriptionToCartAction(
     ? input.fulfillmentMode
     : null
   const fulfillmentMode = requestedMode && planAllowedModes.includes(requestedMode) ? requestedMode : null
-
-  if (existing?.id) {
-    await supabase
-      .from("cart_items")
-      .update({
-        selected: true,
-        ...(fulfillmentMode ? { fulfillment_mode: fulfillmentMode } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id)
-    await revalidateCart(user.id)
-    return { success: true, cartItemId: existing.id }
-  }
 
   const { data, error } = await supabase
     .from("cart_items")

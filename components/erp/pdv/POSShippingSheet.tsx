@@ -342,19 +342,13 @@ export default function POSShippingSheet({
 
                 {carrierSectionVisible && (
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <TruckIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                Entrega por transportadora (SuperFrete)
-                            </p>
-                        </div>
                         {carrierLoading && (
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                                 Calculando opções de transporte...
                             </p>
                         )}
                         {!carrierLoading && carrierError && (
-                            <p className="text-xs text-red-500">{carrierError}</p>
+                            <p className="text-xs text-brand-red">{carrierError}</p>
                         )}
                         {!carrierLoading && !carrierError && carrierOptions.map((opt) => {
                             const isSelected = !isCustomShipping && (effectiveCarrierOption?.serviceId === opt.serviceId)
