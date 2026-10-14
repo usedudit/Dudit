@@ -23,6 +23,7 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 
 // Specific Page components
 import NewRecurringPlanPage from "./NewRecurringPlanPage"
+import PlanDetailPage from "./PlanDetailPage"
 import PlanPageControls from "./PlanPageControls"
 import PlanGridCard from "./PlanGridCard"
 import PlanListRow from "./PlanListRow"
@@ -482,8 +483,34 @@ export default function RecurringPlansPage({
             <AnimatePresence mode="wait">
                 {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
                     <FadeIn key="form" className="w-full h-full">
-                        {!isCreating && !selectedPlan && isListLoading ? (
-                            <ERPDetailLoading />
+                        {!isCreating && !selectedPlan ? (
+                            isListLoading ? (
+                                <ERPDetailLoading />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-65px)] bg-white dark:bg-dark-background">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                        imageAlt="Plano não encontrado"
+                                        title="Plano não encontrado"
+                                        subtitle="Este plano não está disponível na sua lista atual."
+                                    />
+                                    <Button variant="outline" onClick={() => closeEntity()}>
+                                        Voltar para a lista
+                                    </Button>
+                                </div>
+                            )
+                        ) : isViewing && selectedPlan ? (
+                            <PlanDetailPage
+                                key={`plan-detail-${selectedPlan.id}`}
+                                partnerId={partnerId}
+                                plan={selectedPlan}
+                                onBack={() => closeEntity()}
+                                canManage={canManage}
+                                onEdit={(plan) => openEntity("edit", plan.id)}
+                                onShare={handleSharePlan}
+                                onDelete={handleDeleteTrigger}
+                            />
                         ) : (
                             <NewRecurringPlanPage
                                 partnerId={partnerId}

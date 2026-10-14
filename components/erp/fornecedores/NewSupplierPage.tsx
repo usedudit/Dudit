@@ -350,8 +350,12 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             if (res.error) {
                 notifyError("Erro ao salvar: " + res.error)
             } else {
-                notifySuccess(supplierId ? "Fornecedor atualizado!" : "Fornecedor cadastrado com sucesso!")
-                onBack()
+                // onSuccess (não onBack): o host (SuppliersPage) faz o toast,
+                // invalida o cache e fecha a entidade com limpeza segura da URL.
+                // Chamar onBack aqui pulava afterMutation e deixava a URL com
+                // ?edit=*id* sendo re-aplicada pelo router do Next após o
+                // revalidatePath da server action.
+                onSuccess?.(supplierId ? "Fornecedor atualizado!" : "Fornecedor cadastrado com sucesso!")
             }
         } catch (e) {
             console.error(e)

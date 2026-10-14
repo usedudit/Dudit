@@ -4,7 +4,7 @@ import React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
+import { Navbar, Footer, GridLines, CTA, ToolPageHero } from "@/components/InstitucionalShared"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
     Calculator,
@@ -78,36 +78,20 @@ export default function FerramentasHubPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center">
+                <ToolPageHero
+                    title={
+                        <>
+                            Calculadoras e ferramentas para{" "}
+                            <span className="text-brand-green">fazer seu negócio lucrar mais</span>
+                        </>
+                    }
+                    description="Simuladores práticos e diretos ao ponto para comerciantes, autônomos e prestadores de serviços. Gratuitos e sem cadastro."
+                />
+
+                <section className="py-24 bg-white relative border-t border-brand-border">
                     <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
-                                <Link href="/" prefetch={false} className="hover:text-brand-green transition-colors">Início</Link>
-                                <span>/</span>
-                                <span className="text-brand-dark font-semibold">Ferramentas</span>
-                            </nav>
-
-                            <h1 className="text-4xl md:text-5xl font-bold text-brand-dark mb-4 leading-tight">
-                                Calculadoras e ferramentas para{" "}
-                                <span className="text-brand-green">fazer seu negócio lucrar mais</span>
-                            </h1>
-
-                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
-                                Simuladores práticos e diretos ao ponto para comerciantes, autônomos e prestadores de serviços. Gratuitos e sem cadastro.
-                            </p>
-                        </motion.div>
-                    </div>
-                </section>
-
-                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {tools.map((tool, idx) => {
                                 const IconComponent = tool.icon
                                 return (
@@ -120,10 +104,10 @@ export default function FerramentasHubPage() {
                                     >
                                         <Link
                                             href={tool.href}
-                                            className="group h-full bg-white rounded-2xl p-6 sm:p-8 border border-brand-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
+                                            className="group h-full bg-white rounded-3xl p-8 border border-brand-border hover:border-brand-green/40 transition-colors flex flex-col justify-between"
                                         >
                                             <div>
-                                                <div className="w-11 h-11 rounded-xl bg-brand-dark flex items-center justify-center mb-5">
+                                                <div className="w-10 h-10 rounded-xl bg-brand-dark flex items-center justify-center mb-5">
                                                     <IconComponent className="w-5 h-5 text-white" />
                                                 </div>
 

@@ -95,14 +95,14 @@ export default function CalculadoraTaxasMarketplacePage() {
 
             <main>
                 <ToolPageHero
-                    current="Calculadora de Taxas"
+                    badge="Calculadora de Taxas"
                     title="Calculadora de Taxas de Marketplace e Delivery"
                     description="Veja quanto dinheiro você está deixando na mesa com comissões de 12% a 27% e descubra quanto economizaria vendendo direto."
                 />
 
-                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
+                <section className="py-24 bg-white relative border-t border-brand-border">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -111,7 +111,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
                                             <h2 className="text-xl font-bold text-brand-dark">Dados da sua operação</h2>
@@ -180,7 +180,7 @@ export default function CalculadoraTaxasMarketplacePage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-5"
                             >
-                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                <Card className="bg-brand-dark border-brand-dark rounded-3xl shadow-none py-0 text-white">
                                     <CardContent className="px-6 py-6">
                                         <p className="text-sm font-medium text-gray-300">
                                             Você paga em taxas todo mês

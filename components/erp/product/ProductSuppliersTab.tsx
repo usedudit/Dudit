@@ -523,7 +523,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
 
             {isLoadingList && activeSuppliers.length === 0 ? (
                 /* Skeleton while the suppliers list loads */
-                <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                <div className="w-full overflow-hidden bg-white dark:bg-dark-surface">
                     {Array.from({ length: 4 }).map((_, idx) => (
                         <div
                             key={idx}

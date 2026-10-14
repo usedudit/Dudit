@@ -222,7 +222,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 ))
                             ) : (
                                 <div className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden">
-                                    Sem imagens
+                                    <img
+                                        src="https://img.dudit.com.br/static/Placeholder.png"
+                                        alt={productData.name || "Produto"}
+                                        className="w-full h-full object-contain"
+                                    />
                                 </div>
                             )}
                         </div>

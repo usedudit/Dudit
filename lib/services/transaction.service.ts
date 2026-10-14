@@ -648,7 +648,7 @@ export async function createTransactionFromOrder(
         // Dedupe com o trigger create_order_transaction_on_paid (F108): o UPDATE do
         // pedido para "paid" dispara o trigger ANTES daqui, e ele insere uma segunda
         // transação de receita (reference_note = order.id, kind nulo, sem saldo) além
-        // do ledger criado acima — o Dashboard Financeiro somaria as duas. Removemos a
+        // do ledger criado acima - o Dashboard Financeiro somaria as duas. Removemos a
         // linha do trigger somente quando o ledger do pedido existe (receita registrada).
         await removeTriggerOrderTransaction(supabase, orderData)
     } catch (err: any) {

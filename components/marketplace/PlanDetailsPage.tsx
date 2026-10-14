@@ -1295,7 +1295,7 @@ export function PlanDetailsPageClient({
                                         </div>
 
                                         {/* Desktop Actions Column (top) + Next Button */}
-                                        <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
+                                        <div className="hidden lg:flex flex-col items-center gap-3 shrink-0 self-stretch">
                                             {/* Action buttons at top */}
                                             <div className="flex flex-col items-center gap-2">
                                                 <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
@@ -1303,15 +1303,14 @@ export function PlanDetailsPageClient({
                                                 </Button>
                                             </div>
 
-                                            {/* Spacer to push Next button to middle */}
-                                            <div className="flex-1" />
-
-                                            {/* Next Button centered */}
-                                            {galleryItems.length > 1 && (
-                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                                </Button>
-                                            )}
+                                            {/* Next Button centered vertically in remaining space */}
+                                            <div className="flex-1 flex items-center">
+                                                {galleryItems.length > 1 && (
+                                                    <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                        <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

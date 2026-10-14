@@ -855,7 +855,7 @@ async function handler(request: NextRequest) {
       const rawName = String(item.product_name || item.name || "Item").trim()
       const rawDesc = String(item.description || item.product_description || "").trim()
       // Mercado Pago exige items.description descritivo para antifraude e aprovação
-      const description = rawDesc.length >= 3 ? rawDesc : (rawName.length >= 3 ? `Produto: ${rawName}` : "Produto adquirido no Dudit")
+      const description = rawDesc.length >= 3 ? rawDesc : (rawName.length >= 3 ? `Produto: ${rawName}` : "Produto adquirido na Dudit")
 
       return {
         id: String(item.product_id || item.service_id || item.id || "item").slice(0, 64),
@@ -873,7 +873,7 @@ async function handler(request: NextRequest) {
       : [{
         id: String(targetOrderId).slice(0, 32),
         title: `Pedido ${existingOrder?.order_number ? '#' + existingOrder.order_number : 'Dudit'}`.slice(0, 256),
-        description: `Compra realizada no Dudit - ${customerName}`.slice(0, 256),
+        description: `Compra realizada na Dudit - ${customerName}`.slice(0, 256),
         category_id: "others",
         quantity: 1,
         unit_price: chargeAmount,

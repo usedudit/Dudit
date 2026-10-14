@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { getERPSuppliersPageAction, getSupplierByIdAction, type ERPSupplierListCursor } from "@/app/actions/erp/suppliers"
@@ -87,6 +88,7 @@ export default function SuppliersPage({
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
     const { toast } = useToast()
+    const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
     const { planSlug } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -128,6 +130,22 @@ export default function SuppliersPage({
         window.addEventListener("erp-sidebar-reset", handleReset)
         return () => window.removeEventListener("erp-sidebar-reset", handleReset)
     }, [closeEntity])
+
+    // Fecha a entidade e garante que a URL fique limpa. O closeEntity() usa
+    // window.history.replaceState, que o Next.js router não observa; quando a
+    // server action chama revalidatePath, o refresh RSC re-aplica a URL
+    // canônica antiga (?edit=*id*) e o formulário reabria sozinho. O
+    // router.replace (mesmo padrão do OrdersPage) sincroniza o router com a
+    // URL limpa.
+    const closeEntitySafely = useCallback(() => {
+        closeEntity()
+        if (typeof window !== "undefined") {
+            const hasStaleParams = /[?&](edit|view|create|duplicate|payment|type)=/.test(window.location.search)
+            if (hasStaleParams) {
+                router.replace("/erp/fornecedores", { scroll: false })
+            }
+        }
+    }, [closeEntity, router])
 
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
@@ -411,11 +429,11 @@ export default function SuppliersPage({
                         <NewSupplierPage
                             partnerId={partnerId}
                             supplierId={entityState.entityId || undefined}
-                            onBack={() => closeEntity()}
+                            onBack={() => closeEntitySafely()}
                             onSuccess={(msg) => {
                                 toast({ title: "Sucesso", description: msg })
                                 afterMutation()
-                                closeEntity()
+                                closeEntitySafely()
                             }}
                             onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
                         />

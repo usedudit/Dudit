@@ -474,7 +474,7 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
     // For auto_mercado_pago WITH preapproval, we do NOT execute and create orders in
     // the background. Instead, we wait for the webhook, so we transition the execution
     // to awaiting_payment. Sem preapproval (plano gratis ou falha ao criar o preapproval)
-    // o ciclo cai na execucao direta, igual a cobranca manual — senao ficaria preso em
+    // o ciclo cai na execucao direta, igual a cobranca manual - senao ficaria preso em
     // awaiting_payment para sempre esperando um webhook que nunca chega.
     await supabase
       .from("recurring_executions")
@@ -825,7 +825,7 @@ export async function processPreapprovalPaymentWebhook(params: {
     const orderId = createdOrder.id
 
     // Update payment method & breakdown references
-    // Rótulo derivado do pagamento real (Pix, boleto, débito...) — não fixo em
+    // Rótulo derivado do pagamento real (Pix, boleto, débito...) - não fixo em
     // "Cartão de Crédito", senão cobranças via Pix sairiam rotuladas como cartão.
     const mpPaymentMethodId = String(params.paymentInfo?.payment_method_id || "").toLowerCase()
     const mpPaymentTypeId = String(

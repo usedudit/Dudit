@@ -144,8 +144,12 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     </div>
                                 ))
                             ) : (
-                                <div className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hiddent">
-                                    Sem imagens
+                                <div className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden">
+                                    <img
+                                        src="https://img.dudit.com.br/static/Placeholder.png"
+                                        alt={serviceData.name || "Serviço"}
+                                        className="w-full h-full object-contain"
+                                    />
                                 </div>
                             )}
                         </div>

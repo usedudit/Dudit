@@ -64,9 +64,9 @@ const PERIOD_OPTIONS = ORDER_STAGNANT_PERIOD_OPTIONS.map((days) => ({
 }))
 
 const formatDateBr = (iso: string | null | undefined) => {
-    if (!iso) return "—"
+    if (!iso) return "-"
     const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number)
-    if (!y || !m || !d) return "—"
+    if (!y || !m || !d) return "-"
     return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`
 }
 
@@ -251,7 +251,7 @@ export function OrdersSuggestionsSheet({
             {renderSummary(
                 payments,
                 "Pagamentos",
-                `${payments?.count} pedido(s) com pendência — ${formatCurrency(payments?.total_value || 0)} no total. ${payments?.critical_count} exigem atenção imediata.`
+                `${payments?.count} pedido(s) com pendência - ${formatCurrency(payments?.total_value || 0)} no total. ${payments?.critical_count} exigem atenção imediata.`
             )}
             {filteredPayments.length === 0 ? (
                 <div className="py-12">
@@ -287,7 +287,7 @@ export function OrdersSuggestionsSheet({
             {renderSummary(
                 deliveries,
                 "Entregas",
-                `${deliveries?.count} pedido(s) com problema de entrega — ${formatCurrency(deliveries?.total_value || 0)} em risco. ${deliveries?.critical_count} com falha de entrega.`
+                `${deliveries?.count} pedido(s) com problema de entrega - ${formatCurrency(deliveries?.total_value || 0)} em risco. ${deliveries?.critical_count} com falha de entrega.`
             )}
             {filteredDeliveries.length === 0 ? (
                 <div className="py-12">
@@ -338,7 +338,7 @@ export function OrdersSuggestionsSheet({
                 <InfoCard
                     title="Pedidos parados"
                     color={stagnant.critical_count > 0 ? "red" : "orange"}
-                    message={`${stagnant.count} pedido(s) sem movimentação há pelo menos ${stagnant.periodDays} dias — ${formatCurrency(stagnant.total_value)} parados.`}
+                    message={`${stagnant.count} pedido(s) sem movimentação há pelo menos ${stagnant.periodDays} dias - ${formatCurrency(stagnant.total_value)} parados.`}
                 />
             )}
             {filteredStagnant.length === 0 ? (
@@ -370,7 +370,7 @@ export function OrdersSuggestionsSheet({
             {renderSummary(
                 returns,
                 "Devoluções",
-                `${returns?.count} solicitação(ões) aguardando ação — ${formatCurrency(returns?.total_value || 0)} em devoluções. ${returns?.critical_count} com SLA vencido ou escalada.`
+                `${returns?.count} solicitação(ões) aguardando ação - ${formatCurrency(returns?.total_value || 0)} em devoluções. ${returns?.critical_count} com SLA vencido ou escalada.`
             )}
             {filteredReturns.length === 0 ? (
                 <div className="py-12">

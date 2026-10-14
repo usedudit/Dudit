@@ -1843,7 +1843,12 @@ export async function getProductSuppliersOverviewAction(
 export async function getProductSupplierDetailsAction(
     productId: string,
     supplierId: string,
-    options?: { purchasesPage?: number; purchasesLimit?: number }
+    options?: {
+        purchasesPage?: number
+        purchasesLimit?: number
+        costHistoryPage?: number
+        costHistoryLimit?: number
+    }
 ) {
     try {
         if (!productId || !supplierId) return { error: "Produto ou fornecedor inválido" }
@@ -1853,7 +1858,11 @@ export async function getProductSupplierDetailsAction(
 
         const purchasesLimit = options?.purchasesLimit || 5
         const purchasesPage = options?.purchasesPage || 1
-        const offset = (purchasesPage - 1) * purchasesLimit
+        const purchasesOffset = (purchasesPage - 1) * purchasesLimit
+
+        const costHistoryLimit = options?.costHistoryLimit || 3
+        const costHistoryPage = options?.costHistoryPage || 1
+        const costHistoryOffset = (costHistoryPage - 1) * costHistoryLimit
 
         const [purchasesRes, costHistoryRes] = await Promise.all([
             admin
@@ -1866,14 +1875,14 @@ export async function getProductSupplierDetailsAction(
                 .or(`matched_product_id.eq.${productId},created_product_id.eq.${productId}`)
                 .eq("xml_import.supplier_id", supplierId)
                 .order("created_at", { ascending: false })
-                .range(offset, offset + purchasesLimit - 1),
+                .range(purchasesOffset, purchasesOffset + purchasesLimit - 1),
             admin
                 .from("purchase_cost_history")
-                .select(`id, previous_cost, new_cost, unit_cost_from_xml, changed_at, invoice_key, supplier_id`)
+                .select(`id, previous_cost, new_cost, unit_cost_from_xml, changed_at, invoice_key, supplier_id`, { count: "exact" })
                 .eq("product_id", productId)
                 .eq("supplier_id", supplierId)
                 .order("changed_at", { ascending: false })
-                .limit(20)
+                .range(costHistoryOffset, costHistoryOffset + costHistoryLimit - 1)
         ])
 
         if (purchasesRes.error) return { error: purchasesRes.error.message }
@@ -1905,6 +1914,7 @@ export async function getProductSupplierDetailsAction(
             purchases,
             purchasesTotal: purchasesRes.count || 0,
             costHistory,
+            costHistoryTotal: costHistoryRes.count || 0,
         }
     } catch (error: any) {
         return { error: error.message }

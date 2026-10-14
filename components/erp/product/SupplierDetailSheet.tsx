@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
-import { Accordion, Button, IconPlaceholder, Pagination, Spinner } from "@/components/reusable"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import { Accordion, Button, IconPlaceholder, Spinner } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useERPData, useMediaQuery } from "@/components/erp/hooks"
@@ -12,7 +12,10 @@ import { ClockIcon, Package, TagIcon, XIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import type { ProductSupplierWithDetails } from "@/lib/types/product"
 
-const PURCHASES_PER_PAGE = 5
+const PREVIEW_LIMIT = 3
+const SEE_ALL_PAGE_SIZE = 20
+
+type SeeAllKind = "costHistory" | "purchases"
 
 const TimelineItem = React.memo(({
     icon: Icon,
@@ -44,6 +47,16 @@ const TimelineItem = React.memo(({
 ))
 TimelineItem.displayName = "TimelineItem"
 
+const RowSkeleton = () => (
+    <div className="flex animate-pulse items-center gap-4 py-2">
+        <div className="h-8 w-8 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
+        <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-1/3 rounded bg-gray-100 dark:bg-dark-border" />
+            <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
+        </div>
+    </div>
+)
+
 interface SupplierDetailSheetProps {
     isOpen: boolean
     onClose: () => void
@@ -61,22 +74,23 @@ export const SupplierDetailSheet: React.FC<SupplierDetailSheetProps> = ({
 }) => {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const zIndex = useModalLayer(isOpen)
-    const [purchasesPage, setPurchasesPage] = useState(1)
+    const [seeAllKind, setSeeAllKind] = useState<SeeAllKind | null>(null)
 
     const supplierId = supplier?.supplier_id || null
 
     useEffect(() => {
-        if (isOpen) setPurchasesPage(1)
-    }, [isOpen, supplierId])
+        if (!isOpen) setSeeAllKind(null)
+    }, [isOpen])
 
-    // Detalhes carregados sob demanda e cacheados pelo react-query:
-    // reabrir a sheet do mesmo fornecedor é instantâneo.
+    // Preview leve: só 3 itens por seção. Os demais carregam na sheet "Ver tudo".
     const detailsQuery = useERPData(
-        ["erp", "product-supplier-details", productId, supplierId, purchasesPage],
+        ["erp", "product-supplier-details", productId, supplierId],
         () =>
             getProductSupplierDetailsAction(productId as string, supplierId as string, {
-                purchasesPage,
-                purchasesLimit: PURCHASES_PER_PAGE,
+                purchasesPage: 1,
+                purchasesLimit: PREVIEW_LIMIT,
+                costHistoryPage: 1,
+                costHistoryLimit: PREVIEW_LIMIT,
             }),
         { enabled: isOpen && Boolean(productId && supplierId), priority: "normal" }
     )
@@ -88,7 +102,10 @@ export const SupplierDetailSheet: React.FC<SupplierDetailSheetProps> = ({
 
     const purchases: any[] = data?.purchases || []
     const costHistory: any[] = data?.costHistory || []
-    const purchasesTotalPages = Math.ceil((data?.purchasesTotal || 0) / PURCHASES_PER_PAGE)
+    const purchasesTotal: number = data?.purchasesTotal || 0
+    const costHistoryTotal: number = data?.costHistoryTotal || 0
+
+    const supplierName = supplier?.supplier_name || "Fornecedor"
 
     const content = supplier ? (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
@@ -189,24 +206,35 @@ export const SupplierDetailSheet: React.FC<SupplierDetailSheetProps> = ({
                             />
                         </div>
                     ) : (
-                        <div className="space-y-6 relative">
-                            {costHistory.length > 1 && (
-                                <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                        <>
+                            <div className="space-y-6 relative">
+                                {costHistory.length > 1 && (
+                                    <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                                )}
+                                {costHistory.map((h: any) => (
+                                    <TimelineItem
+                                        key={h.id}
+                                        icon={TagIcon}
+                                        time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
+                                        title={formatCurrency(h.new_cost)}
+                                        subtitle={
+                                            h.previous_cost != null
+                                                ? `Anterior: ${formatCurrency(h.previous_cost)}`
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            </div>
+                            {costHistoryTotal > PREVIEW_LIMIT && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSeeAllKind("costHistory")}
+                                    className="mt-4 w-full text-center text-sm font-bold text-brand-green hover:underline"
+                                >
+                                    Ver tudo ({costHistoryTotal})
+                                </button>
                             )}
-                            {costHistory.map((h: any) => (
-                                <TimelineItem
-                                    key={h.id}
-                                    icon={TagIcon}
-                                    time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
-                                    title={formatCurrency(h.new_cost)}
-                                    subtitle={
-                                        h.previous_cost != null
-                                            ? `Anterior: ${formatCurrency(h.previous_cost)}`
-                                            : undefined
-                                    }
-                                />
-                            ))}
-                        </div>
+                        </>
                     )}
                 </Accordion>
 
@@ -223,34 +251,47 @@ export const SupplierDetailSheet: React.FC<SupplierDetailSheetProps> = ({
                             Nenhuma compra encontrada
                         </p>
                     ) : (
-                        <div className="space-y-6 relative">
-                            {purchases.length > 1 && (
-                                <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                        <>
+                            <div className="space-y-6 relative">
+                                {purchases.length > 1 && (
+                                    <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                                )}
+                                {purchases.map((p: any) => (
+                                    <TimelineItem
+                                        key={p.id}
+                                        icon={Package}
+                                        time={new Date(p.date).toLocaleDateString("pt-BR")}
+                                        title={p.invoice_number || supplier.supplier_name || "Compra"}
+                                        subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
+                                            productUnit
+                                        )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
+                                    />
+                                ))}
+                            </div>
+                            {purchasesTotal > PREVIEW_LIMIT && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSeeAllKind("purchases")}
+                                    className="mt-4 w-full text-center text-sm font-bold text-brand-green hover:underline"
+                                >
+                                    Ver tudo ({purchasesTotal})
+                                </button>
                             )}
-                            {purchases.map((p: any) => (
-                                <TimelineItem
-                                    key={p.id}
-                                    icon={Package}
-                                    time={new Date(p.date).toLocaleDateString("pt-BR")}
-                                    title={p.invoice_number || supplier.supplier_name || "Compra"}
-                                    subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
-                                        productUnit
-                                    )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
-                                />
-                            ))}
-                        </div>
-                    )}
-                    {purchasesTotalPages > 1 && (
-                        <div className="mt-4">
-                            <Pagination
-                                currentPage={purchasesPage}
-                                totalPages={purchasesTotalPages}
-                                onPageChange={setPurchasesPage}
-                            />
-                        </div>
+                        </>
                     )}
                 </Accordion>
             </div>
+
+            {/* Sheet "Ver tudo" - lista completa com infinite scroll */}
+            <SeeAllSheet
+                isOpen={seeAllKind !== null}
+                kind={seeAllKind}
+                onClose={() => setSeeAllKind(null)}
+                productId={productId}
+                supplierId={supplierId}
+                supplierName={supplierName}
+                productUnit={productUnit}
+            />
         </div>
     ) : null
 
@@ -272,6 +313,248 @@ export const SupplierDetailSheet: React.FC<SupplierDetailSheetProps> = ({
             >
                 <div
                     className={`fixed right-4 top-4 bottom-4 w-96 bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"
+                        }`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
+        </Portal>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sheet "Ver tudo": lista completa (custos ou compras) com infinite scroll
+// (sentinel + IntersectionObserver), no mesmo padrão da SelectSupplierSheet.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SeeAllSheetProps {
+    isOpen: boolean
+    kind: SeeAllKind | null
+    onClose: () => void
+    productId?: string
+    supplierId?: string | null
+    supplierName: string
+    productUnit?: string
+}
+
+const SeeAllSheet: React.FC<SeeAllSheetProps> = ({
+    isOpen,
+    kind,
+    onClose,
+    productId,
+    supplierId,
+    supplierName,
+    productUnit,
+}) => {
+    const isMobile = useMediaQuery("(max-width: 1023px)")
+    const zIndex = useModalLayer(isOpen)
+
+    const [items, setItems] = useState<any[]>([])
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    const listScrollRef = useRef<HTMLDivElement>(null)
+    const sentinelRef = useRef<HTMLDivElement>(null)
+    const loadMoreLock = useRef(false)
+    const requestIdRef = useRef(0)
+
+    const title = kind === "costHistory" ? "Histórico de Custos" : "Compras Recentes"
+
+    const loadPage = useCallback(
+        async (pageToLoad: number, append: boolean) => {
+            if (!productId || !supplierId || !kind) return
+
+            const requestId = ++requestIdRef.current
+            setIsLoading(true)
+            setError(null)
+
+            try {
+                const options =
+                    kind === "costHistory"
+                        ? {
+                            purchasesPage: 1,
+                            purchasesLimit: 1,
+                            costHistoryPage: pageToLoad,
+                            costHistoryLimit: SEE_ALL_PAGE_SIZE,
+                        }
+                        : {
+                            purchasesPage: pageToLoad,
+                            purchasesLimit: SEE_ALL_PAGE_SIZE,
+                            costHistoryPage: 1,
+                            costHistoryLimit: 1,
+                        }
+
+                const res = await getProductSupplierDetailsAction(productId, supplierId, options)
+                if (requestId !== requestIdRef.current) return
+
+                if (res.error) {
+                    setError(res.error)
+                    return
+                }
+
+                const fetched = (kind === "costHistory" ? res.costHistory : res.purchases) || []
+                const total = (kind === "costHistory" ? res.costHistoryTotal : res.purchasesTotal) || 0
+
+                setItems((prev) => (append ? [...prev, ...fetched] : fetched))
+                setPage(pageToLoad)
+                setHasMore(pageToLoad * SEE_ALL_PAGE_SIZE < total)
+            } catch (e: any) {
+                if (requestId === requestIdRef.current) {
+                    setError(e?.message || "Não foi possível carregar os dados.")
+                }
+            } finally {
+                if (requestId === requestIdRef.current) setIsLoading(false)
+            }
+        },
+        [productId, supplierId, kind]
+    )
+
+    // Reset ao abrir / trocar de seção
+    useEffect(() => {
+        if (!isOpen) return
+        requestIdRef.current++
+        setItems([])
+        setPage(1)
+        setHasMore(false)
+        setError(null)
+        setIsLoading(false)
+        loadMoreLock.current = false
+        if (listScrollRef.current) listScrollRef.current.scrollTop = 0
+        void loadPage(1, false)
+    }, [isOpen, kind, loadPage])
+
+    // Infinite scroll: sentinel no fim do container de scroll
+    useEffect(() => {
+        const root = listScrollRef.current
+        const target = sentinelRef.current
+        if (!isOpen || !root || !target || !hasMore || isLoading) return
+
+        const obs = new IntersectionObserver(
+            (entries) => {
+                if (!entries[0]?.isIntersecting || loadMoreLock.current) return
+                loadMoreLock.current = true
+                void loadPage(page + 1, true).finally(() => {
+                    window.setTimeout(() => {
+                        loadMoreLock.current = false
+                    }, 120)
+                })
+            },
+            { root, rootMargin: "100px", threshold: 0 }
+        )
+        obs.observe(target)
+        return () => obs.disconnect()
+    }, [isOpen, hasMore, isLoading, page, loadPage])
+
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            <header className="shrink-0 border-b border-brand-border dark:border-dark-border p-5 lg:p-6 flex justify-between items-center gap-4">
+                <div className="min-w-0">
+                    <h2 className="text-lg lg:text-xl font-bold text-brand-dark dark:text-dark-heading truncate">
+                        {title}
+                    </h2>
+                    <p className="text-sm text-brand-inactive-text truncate">{supplierName}</p>
+                </div>
+                <Button
+                    variant="filled"
+                    size="icon"
+                    onClick={onClose}
+                    className="hidden lg:flex shrink-0"
+                    title="Fechar"
+                    aria-label="Fechar"
+                >
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            <div ref={listScrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
+                {items.length === 0 && isLoading ? (
+                    <div className="p-4 space-y-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <RowSkeleton key={i} />
+                        ))}
+                    </div>
+                ) : error ? (
+                    <p className="text-sm text-brand-red text-center py-6">{error}</p>
+                ) : items.length === 0 ? (
+                    <div className="px-4 py-12">
+                        <IconPlaceholder
+                            icon={kind === "costHistory" ? ClockIcon : Package}
+                            title="Nenhum registro encontrado"
+                            subtitle={
+                                kind === "costHistory"
+                                    ? "Não foram encontrados eventos de custo para este fornecedor."
+                                    : "Nenhuma compra registrada para este fornecedor."
+                            }
+                        />
+                    </div>
+                ) : (
+                    <div className="p-4 lg:p-6">
+                        <div className="space-y-6 relative">
+                            {items.length > 1 && (
+                                <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                            )}
+                            {kind === "costHistory"
+                                ? items.map((h: any) => (
+                                    <TimelineItem
+                                        key={h.id}
+                                        icon={TagIcon}
+                                        time={new Date(h.changed_at).toLocaleDateString("pt-BR")}
+                                        title={formatCurrency(h.new_cost)}
+                                        subtitle={
+                                            h.previous_cost != null
+                                                ? `Anterior: ${formatCurrency(h.previous_cost)}`
+                                                : undefined
+                                        }
+                                    />
+                                ))
+                                : items.map((p: any) => (
+                                    <TimelineItem
+                                        key={p.id}
+                                        icon={Package}
+                                        time={new Date(p.date).toLocaleDateString("pt-BR")}
+                                        title={p.invoice_number || supplierName || "Compra"}
+                                        subtitle={`${Number(p.quantity).toFixed(2)} ${formatUnit(
+                                            productUnit
+                                        )} x ${formatCurrency(p.unit_cost)} · ${formatCurrency(p.total_cost)}`}
+                                    />
+                                ))}
+                        </div>
+
+                        {isLoading && (
+                            <div className="mt-4 space-y-2">
+                                <RowSkeleton />
+                                <RowSkeleton />
+                            </div>
+                        )}
+
+                        {hasMore && <div ref={sentinelRef} className="h-3 w-full shrink-0" aria-hidden />}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        )
+    }
+
+    return (
+        <Portal>
+            <div
+                className={`fixed inset-0 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                    }`}
+                style={{ zIndex }}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"
                         }`}
                     onClick={(e) => e.stopPropagation()}
                 >

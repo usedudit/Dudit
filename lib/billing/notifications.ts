@@ -140,7 +140,7 @@ export async function sendBillingNotification(
         const notifType = mapBillingTypeToNotificationType(type)
         const idempotencyKey = `billing:${type}:${metadata.refundRequestId || metadata.purchaseId || partnerId}:${userId}:${Date.now()}`
 
-        // 1. Notificação In-App no Dudit
+        // 1. Notificação In-App na Dudit
         const { notification } = await createNotification({
             userId,
             type: notifType,
@@ -225,7 +225,7 @@ export async function notifyPartnerTeam(
             userIds.map(async (userId) => {
                 const idempotencyKey = `billing:${type}:${metadata.refundRequestId || metadata.purchaseId || partnerId}:${userId}:${Date.now()}`
 
-                // 1. Notificação In-App no Dudit
+                // 1. Notificação In-App na Dudit
                 const { notification } = await createNotification({
                     userId,
                     type: notifType,

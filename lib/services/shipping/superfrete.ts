@@ -234,7 +234,7 @@ export class SuperFreteClient {
     private token: string,
     private userEmail?: string,
     private environment?: SuperFreteEnvironment,
-  ) {}
+  ) { }
 
   private get userAgent(): string {
     return USER_AGENT_TEMPLATE(this.userEmail)
@@ -351,7 +351,7 @@ export class SuperFreteClient {
       let errorDetail: any = text
       try {
         errorDetail = JSON.parse(text)
-      } catch {}
+      } catch { }
       const err = new Error(
         `SuperFrete API ${res.status}: ${SuperFreteClient.extractErrorText(errorDetail)}`,
       ) as any
@@ -541,7 +541,7 @@ export const SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS: Record<string, string> 
 
 // Status crus enviados no payload do webhook SuperFrete → status
 // persistidos em order_shipments (constraint da tabela). "generated"
-// = etiqueta pronta após o pagamento; no Dudit corresponde a "released".
+// = etiqueta pronta após o pagamento; na Dudit corresponde a "released".
 export const SUPERFRETE_WEBHOOK_STATUS_TO_SHIPMENT_STATUS: Record<string, string> = {
   pending: "pending",
   released: "released",

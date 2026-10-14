@@ -108,10 +108,7 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
     if (!isEditing) {
         if (!addonGroups || addonGroups.length === 0) {
             return (
-                <IconPlaceholder
-                    icon={PlusIcon}
-                    title="Nenhum complemento adicionado"
-                />
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum complemento adicionado</p>
             )
         }
 

@@ -89,14 +89,14 @@ export default function CalculadoraPontoEquilibrioPage() {
 
             <main>
                 <ToolPageHero
-                    current="Ponto de Equilíbrio"
+                    badge="Ponto de Equilíbrio"
                     title="Calculadora de Ponto de Equilíbrio"
                     description="Descubra quantas vendas você precisa fazer por mês para cobrir seus custos fixos e começar a ter lucro."
                 />
 
-                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
+                <section className="py-24 bg-white relative border-t border-brand-border">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -105,7 +105,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
                                             <h2 className="text-xl font-bold text-brand-dark">Entradas financeiras</h2>
@@ -160,7 +160,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-5"
                             >
-                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                <Card className="bg-brand-dark border-brand-dark rounded-3xl shadow-none py-0 text-white">
                                     <CardContent className="px-6 py-6">
                                         <div className="rounded-xl bg-brand-green/10 border border-brand-green/20 p-5 text-center">
                                             <p className="text-sm font-medium text-brand-green">
@@ -194,7 +194,7 @@ export default function CalculadoraPontoEquilibrioPage() {
                                         <div className="mt-6">
                                             <Button asChild size="lg" className="w-full">
                                                 <Link href="/auth/login?mode=partner">
-                                                    <span>Controlar minhas finanças no Dudit</span>
+                                                    <span>Controlar minhas finanças na Dudit</span>
                                                     <ArrowRight className="w-4 h-4" />
                                                 </Link>
                                             </Button>

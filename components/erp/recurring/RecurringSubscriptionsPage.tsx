@@ -182,7 +182,7 @@ const EMPTY_BILLING_FILTERS: BillingFilters = {
 }
 const EMPTY_FORECAST_FILTERS: ForecastFilters = { horizon: [] }
 
-/** Pedidos pagos com créditos da assinatura (R$0) — não precisam de cobrança. */
+/** Pedidos pagos com créditos da assinatura (R$0) - não precisam de cobrança. */
 const CREDIT_PAYMENT_METHODS = ["Assinatura (Créditos)", "subscription_credits"]
 const isCreditOrder = (row: any) => CREDIT_PAYMENT_METHODS.includes(String(row?.payment_method || ""))
 /** Estado padrão da origem: só cobranças de ciclo (créditos ocultos). */

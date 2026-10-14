@@ -1073,6 +1073,10 @@ export function ExplorarPageClient({
         return `Itens${citySuffix}`
     }, [query, currentType, selectedCategories, selectedCitySlug, selectedSection, resolveCategoryName, rawItems.length, type, cidade])
 
+    useEffect(() => {
+        document.title = `${pageTitle} | Dudit`
+    }, [pageTitle])
+
     const emptySubtitle = useMemo(() => {
         const cityNameOnly = selectedCitySlug
             ? formatCitySlug(selectedCitySlug).split(" - ")[0]

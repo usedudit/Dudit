@@ -344,7 +344,7 @@ export function ExplorarFiltersBottomSheet({
                             />
                             <motion.div
                                 className="fixed bottom-0 left-0 right-0 z-[101] bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden rounded-t-3xl max-h-[85vh]"
-                                style={{ y }}
+                                style={{ y, zIndex: zIndex ? zIndex + 1 : undefined }}
                                 initial={{ y: initialY }}
                                 animate={{ y: 0 }}
                                 exit={{ y: initialY }}

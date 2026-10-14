@@ -1,21 +1,15 @@
 "use client"
 
 import React from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { motion } from "framer-motion"
-import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
-import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { Users, Sparkles, CalendarDays } from "lucide-react"
+import SegmentLanding from "@/components/segmentos/SegmentLanding"
 import {
-    Scissors,
-    Calendar,
-    ShoppingBag,
-    Users,
-    Clock,
-    Sparkles,
-    ArrowRight,
-    CheckCircle2
-} from "lucide-react"
+    CalendarIcon,
+    ClockIcon,
+    ShoppingBagIcon,
+    SparklesIcon,
+    MoneyIcon,
+} from "@/lib/icons"
 
 const softwareSchema = {
     "@context": "https://schema.org",
@@ -31,178 +25,204 @@ const softwareSchema = {
     description: "Sistema completo de agendamento online 24h, comissões de profissionais, PDV e controle de estoque de produtos para salões e barbearias.",
 }
 
+const faqs = [
+    {
+        question: "O cliente precisa criar conta para agendar?",
+        answer: "Não. Ele abre o link da sua agenda, escolhe o profissional, o serviço e o horário disponível, e confirma. O agendamento entra na sua agenda na hora.",
+    },
+    {
+        question: "Consigo bloquear horários e pausas?",
+        answer: "Sim. Você marca almoço, dias de folga, férias e horários bloqueados. Eles simplesmente deixam de aparecer como disponíveis para o cliente.",
+    },
+    {
+        question: "Funciona para manicures, esteticistas e depilação?",
+        answer: "Funciona. Você cadastra seus serviços, a duração de cada um e os profissionais da equipe. A agenda se ajusta ao tempo real de cada atendimento.",
+    },
+]
+
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+        "@type": "Question",
+        name: f.question,
+        acceptedAnswer: {
+            "@type": "Answer",
+            text: f.answer,
+        },
+    })),
+}
+
+const schema = {
+    "@context": "https://schema.org",
+    "@graph": [softwareSchema, faqLd],
+}
+
 export default function SaloesEBarbeariasSegmentPage() {
-    const router = useRouter()
-
-    const onNavigate = (page: string) => {
-        if (page === 'home') router.push('/institucional/inicio')
-        else if (page === 'start-selling') router.push('/auth/login?mode=partner')
-        else if (page === 'explore') router.push('/')
-        else if (page === 'segments') router.push('/institucional/segmentos')
-        else if (page === 'pricing') router.push('/institucional/planos')
-        else if (page === 'about') router.push('/institucional/sobre')
-        else router.push('/')
-    }
-
     return (
-        <div className="min-h-screen bg-white">
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(softwareSchema) }}
-            />
+        <SegmentLanding
+            schema={schema}
+            badge={{ text: "Especial para Barbearias, Salões e Estética", icon: <SparklesIcon /> }}
+            title={
+                <>
+                    Seus clientes agendam 24h{" "}
+                    <span className="text-brand-green">sem você parar para atender.</span>
+                </>
+            }
+            description="Coloque o link da sua agenda no Instagram e WhatsApp. Os clientes escolhem o profissional e o horário disponível sozinhos, sem confusão de horários ou ligações."
+            heroMockup={
+                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative w-full max-w-[380px]">
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                                <CalendarIcon size={16} className="text-brand-green" />
+                                <span className="font-bold text-brand-dark text-sm">Agenda de Hoje</span>
+                            </div>
+                            <span className="text-xs text-gray-400 font-medium">14:00 - 18:00</span>
+                        </div>
 
-            <Navbar onNavigate={onNavigate} />
-
-            <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-                    <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
-                        <div className="grid lg:grid-cols-2 gap-12 items-center">
-                            <motion.div
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6 }}
-                            >
-                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 text-purple-700 text-xs font-bold uppercase tracking-wider mb-6 border border-purple-100">
-                                    <Scissors className="w-3.5 h-3.5" />
-                                    Especial para Barbearias, Salões e Estética
+                        <div className="space-y-2.5">
+                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
+                                <div>
+                                    <strong className="text-blue-900 block font-bold">14:00 - Corte + Barba</strong>
+                                    <span className="text-blue-600">Cliente: Rodrigo Alves</span>
                                 </div>
+                                <span className="font-bold text-blue-900">R$ 75,00</span>
+                            </div>
 
-                                <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-6 leading-tight">
-                                    Seus clientes agendam 24h <br />
-                                    <span className="text-brand-green">sem você parar para atender.</span>
-                                </h1>
-
-                                <p className="text-lg text-brand-inactive-text leading-relaxed mb-8 max-w-xl">
-                                    Coloque o link da sua agenda no Instagram e WhatsApp. Os clientes escolhem o profissional e o horário disponível sozinhos, sem confusão de horários ou ligações.
-                                </p>
-
-                                <div className="flex flex-wrap gap-4">
-                                    <Link
-                                        href="/auth/login?mode=partner"
-                                        className="px-8 py-4 rounded-xl bg-brand-green text-white font-bold hover:bg-brand-green/90 transition-all shadow-lg hover:scale-105 inline-flex items-center gap-2"
-                                    >
-                                        <span>Criar Minha Agenda Grátis</span>
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Link>
-
-                                    <Link
-                                        href="/institucional/planos"
-                                        className="px-8 py-4 rounded-xl border border-gray-200 text-brand-dark font-bold hover:bg-gray-50 transition-all inline-flex items-center"
-                                    >
-                                        Ver Planos
-                                    </Link>
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs opacity-75">
+                                <div>
+                                    <strong className="text-gray-800 block font-bold">15:30 - Barboterapia</strong>
+                                    <span className="text-gray-500">Cliente: Felipe Santos</span>
                                 </div>
-                            </motion.div>
+                                <span className="font-bold text-gray-800">R$ 50,00</span>
+                            </div>
+                        </div>
 
-                            <motion.div
-                                initial={{ opacity: 0, x: 50 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.8, delay: 0.2 }}
-                                className="relative"
-                            >
-                                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative">
-                                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar className="w-4 h-4 text-brand-green" />
-                                                <span className="font-bold text-brand-dark text-sm">Agenda de Hoje</span>
-                                            </div>
-                                            <span className="text-xs text-gray-400 font-medium">14:00 - 18:00</span>
+                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Venda de Pomada no Caixa:</span>
+                            <strong className="text-brand-green font-bold">+ R$ 45,00</strong>
+                        </div>
+                    </div>
+                </div>
+            }
+            features={{
+                subtitle: "RECURSOS NATIVOS",
+                title: "Mais agendamentos, zero dor de cabeça",
+                lead: "Sua agenda trabalha por você enquanto você atende. O cliente marca sozinho e você só precisa aparecer no horário.",
+                items: [
+                    {
+                        label: "AGENDA ONLINE",
+                        title: "Agenda no Instagram e WhatsApp",
+                        description:
+                            "Seu link exclusivo deixa os horários livres visíveis 24h. O cliente marca o serviço em segundos, sem ligação.",
+                        mockup: (
+                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Agenda Hoje</span>
+                                    <ClockIcon size={12} className="text-brand-inactive-text" />
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
+                                        <div className="text-[10px] font-bold text-blue-700">14:00</div>
+                                        <div className="flex-1">
+                                            <div className="text-[10px] font-bold text-gray-900">Corte Masculino</div>
+                                            <div className="text-[8px] text-gray-500">Cliente: Marcos</div>
                                         </div>
-
-                                        <div className="space-y-2.5">
-                                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
-                                                <div>
-                                                    <strong className="text-blue-900 block font-bold">14:00 - Corte + Barba</strong>
-                                                    <span className="text-blue-600">Cliente: Rodrigo Alves</span>
-                                                </div>
-                                                <span className="font-bold text-blue-900">R$ 75,00</span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs opacity-75">
-                                                <div>
-                                                    <strong className="text-gray-800 block font-bold">15:30 - Barboterapia</strong>
-                                                    <span className="text-gray-500">Cliente: Felipe Santos</span>
-                                                </div>
-                                                <span className="font-bold text-gray-800">R$ 50,00</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
-                                            <span className="text-gray-500">Venda de Pomada no Caixa:</span>
-                                            <strong className="text-brand-green font-bold">+ R$ 45,00</strong>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-lg border border-brand-border">
+                                        <div className="text-[10px] font-bold text-brand-inactive-text">15:00</div>
+                                        <div className="flex-1">
+                                            <div className="text-[10px] font-bold text-brand-dark">Barba</div>
+                                            <div className="text-[8px] text-brand-green font-bold">Agendado</div>
                                         </div>
                                     </div>
                                 </div>
-                            </motion.div>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <div className="text-center max-w-2xl mx-auto mb-16">
-                            <span className="text-xs font-bold uppercase tracking-widest text-brand-green mb-2 block">RECURSOS NATIVOS</span>
-                            <h2 className="text-4xl font-bold text-brand-dark tracking-tight">Mais agendamentos, zero dor de cabeça</h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0 }}
-                                viewport={{ once: true }}
-                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
-                            >
-                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-6">
-                                    <Calendar className="w-6 h-6" />
+                            </div>
+                        ),
+                    },
+                    {
+                        label: "CAIXA & ESTOQUE",
+                        title: "Venda de produtos no mesmo atendimento",
+                        description:
+                            "Venda pomadas, shampoos e cosméticos no caixa, com baixa automática no estoque e tudo no fechamento do dia.",
+                        mockup: (
+                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase">PDV</span>
+                                    <ShoppingBagIcon size={12} className="text-brand-inactive-text" />
                                 </div>
-                                <h3 className="text-xl font-bold text-brand-dark mb-3">Agenda Online no Instagram</h3>
-                                <p className="text-sm text-brand-inactive-text leading-relaxed">
-                                    Seu link exclusivo permite que o cliente veja seus horários livres e marque o serviço em segundos, 24 horas por dia.
-                                </p>
-                            </motion.div>
-
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 }}
-                                viewport={{ once: true }}
-                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
-                            >
-                                <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center mb-6">
-                                    <ShoppingBag className="w-6 h-6" />
+                                <div className="flex gap-3 mb-3">
+                                    <div className="w-10 h-10 bg-brand-gray rounded-lg"></div>
+                                    <div className="flex-1">
+                                        <div className="text-[10px] font-bold text-brand-dark">Pomada Modeladora</div>
+                                        <div className="text-[12px] font-bold text-brand-green">R$ 45,00</div>
+                                    </div>
                                 </div>
-                                <h3 className="text-xl font-bold text-brand-dark mb-3">Venda de Produtos & PDV</h3>
-                                <p className="text-sm text-brand-inactive-text leading-relaxed">
-                                    Venda pomadas, shampoos, cosméticos e tratamentos no mesmo atendimento do serviço com baixa automática no estoque.
-                                </p>
-                            </motion.div>
-
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
-                                viewport={{ once: true }}
-                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
-                            >
-                                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
-                                    <Users className="w-6 h-6" />
+                                <div className="bg-brand-green text-white text-[9px] font-bold py-1.5 rounded text-center">
+                                    Venda registrada
                                 </div>
-                                <h3 className="text-xl font-bold text-brand-dark mb-3">Comissão de Barbeiros & Manicures</h3>
-                                <p className="text-sm text-brand-inactive-text leading-relaxed">
-                                    Configure comissões diferentes por profissional ou por serviço. O fechamento financeiro do mês fica pronto com 1 clique.
-                                </p>
-                            </motion.div>
-                        </div>
-                    </div>
-                </section>
-            </main>
-
-            <CTA onNavigate={onNavigate} />
-            <Footer onNavigate={onNavigate} />
-        </div>
+                            </div>
+                        ),
+                    },
+                    {
+                        label: "EQUIPE",
+                        title: "Comissão por profissional",
+                        description:
+                            "Configure comissões diferentes por profissional ou por serviço. O fechamento financeiro do mês sai com 1 clique.",
+                        mockup: (
+                            <div className="bg-white p-4 w-full max-w-[240px] rounded-xl border border-brand-border text-xs">
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-brand-gray">
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Comissões</span>
+                                    <MoneyIcon size={12} className="text-brand-inactive-text" />
+                                </div>
+                                <div className="space-y-1.5 mb-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-brand-dark">João (barbeiro)</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">R$ 890,00</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-brand-dark">Ana (manicure)</span>
+                                        <span className="text-[10px] font-bold text-brand-dark">R$ 540,00</span>
+                                    </div>
+                                </div>
+                                <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
+                                    Fechamento pronto
+                                </div>
+                            </div>
+                        ),
+                    },
+                ],
+            }}
+            benefits={{
+                subtitle: "PARA QUEM ATENDE",
+                title: "Agenda cheia, cabeça leve",
+                items: [
+                    {
+                        icon: <CalendarDays className="w-5 h-5 text-white" />,
+                        title: "Menos faltas",
+                        description:
+                            "Lembrete automático de agendamento no WhatsApp faz o cliente lembrar do horário e desmarcar com antecedência.",
+                    },
+                    {
+                        icon: <Sparkles className="w-5 h-5 text-white" />,
+                        title: "Cliente fiel",
+                        description:
+                            "Cada visita fica no histórico. Você sabe o que o cliente fez, o que costuma comprar e quando voltará.",
+                    },
+                    {
+                        icon: <Users className="w-5 h-5 text-white" />,
+                        title: "Equipe organizada",
+                        description:
+                            "Cada profissional vê apenas a própria agenda, com as próprias comissões e o próprio desempenho no mês.",
+                    },
+                ],
+            }}
+            faq={{
+                title: "Dúvidas sobre a agenda da Dudit",
+                description: "Tudo o que você precisa saber para colocar sua barbearia ou salão para agendar sozinho.",
+                items: faqs,
+            }}
+        />
     )
 }

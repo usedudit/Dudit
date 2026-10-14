@@ -505,8 +505,8 @@ async function handler(request: NextRequest) {
       if (totalAmount > 0 && Math.abs(prefSum - totalAmount) > 0.01) {
         preferenceItems.length = 0
         preferenceItems.push({
-          title: "Compra no Dudit",
-          description: "Pedido no Marketplace Dudit",
+          title: "Compra na Dudit",
+          description: "Pedido feito na Dudit",
           unit_price: totalAmount,
           quantity: 1,
           currency_id: "BRL",
@@ -584,16 +584,16 @@ async function handler(request: NextRequest) {
     const finalPreferenceItems = (!existingOrder && validItems.length > 0 && Math.abs(itemsSum - cleanTotalAmount) <= 0.01)
       ? validItems
       : [
-          {
-            title: existingOrder?.order_number
-              ? `Pedido #${existingOrder.order_number}`
-              : (existingOrder ? `Pedido ${existingOrder.id.slice(0, 8)}` : "Compra no Dudit"),
-            description: "Pagamento do pedido",
-            unit_price: cleanTotalAmount,
-            quantity: 1,
-            currency_id: "BRL",
-          },
-        ]
+        {
+          title: existingOrder?.order_number
+            ? `Pedido #${existingOrder.order_number}`
+            : (existingOrder ? `Pedido ${existingOrder.id.slice(0, 8)}` : "Compra na Dudit"),
+          description: "Pagamento do pedido",
+          unit_price: cleanTotalAmount,
+          quantity: 1,
+          currency_id: "BRL",
+        },
+      ]
 
     // Criar preferência no Mercado Pago
     const preferencePayload: Record<string, any> = {

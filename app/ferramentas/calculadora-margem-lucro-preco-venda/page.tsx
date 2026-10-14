@@ -95,14 +95,14 @@ export default function CalculadoraMargemLucroPage() {
 
             <main>
                 <ToolPageHero
-                    current="Preço de Venda e Markup"
+                    badge="Preço de Venda e Markup"
                     title="Calculadora de Margem de Lucro e Preço de Venda"
                     description="Calcule o preço de venda ideal pelo markup divisor para nunca mais ter prejuízo nas suas vendas."
                 />
 
-                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
+                <section className="py-24 bg-white relative border-t border-brand-border">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -111,7 +111,7 @@ export default function CalculadoraMargemLucroPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-7"
                             >
-                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                <Card className="bg-white border-brand-border rounded-3xl shadow-none py-0">
                                     <CardContent className="px-6 py-6 space-y-5">
                                         <div>
                                             <h2 className="text-xl font-bold text-brand-dark">Custos e despesas</h2>
@@ -178,7 +178,7 @@ export default function CalculadoraMargemLucroPage() {
                                 viewport={{ once: true }}
                                 className="lg:col-span-5"
                             >
-                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                <Card className="bg-brand-dark border-brand-dark rounded-3xl shadow-none py-0 text-white">
                                     <CardContent className="px-6 py-6">
                                         <div className="rounded-xl bg-brand-green/10 border border-brand-green/20 p-5 text-center">
                                             <p className="text-sm font-medium text-brand-green">

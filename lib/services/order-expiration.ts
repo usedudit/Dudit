@@ -70,7 +70,7 @@ export async function checkAndExpireOrder(
   }
 
   const now = new Date().toISOString()
-  
+
   // Format localized datetime using the partner's timezone
   const formatDateTime = async (date: Date) => {
     const { getPartnerTimezone } = await import("@/lib/date/server")
@@ -78,7 +78,7 @@ export async function checkAndExpireOrder(
     return date.toLocaleString("pt-BR", { timeZone: tz })
   }
   const baseNotes = (order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
-  const cancelLine = `Pedido cancelado por: Sistema as ${await formatDateTime(new Date())} - O tempo limite de pagamento expirou.`
+  const cancelLine = `Pedido cancelado por: Sistema às ${await formatDateTime(new Date())} - O tempo limite de pagamento expirou.`
   const nextNotes = [baseNotes, cancelLine].filter(Boolean).join("\n")
 
   const { error: updateError } = await client
@@ -132,7 +132,7 @@ export async function checkAndExpireOrder(
   try {
     const { revalidateMarketplace } = await import("@/lib/utils/revalidation")
     await revalidateMarketplace()
-  } catch {}
+  } catch { }
 
   // Log audit event for timeline/history
   try {

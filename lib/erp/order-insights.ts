@@ -220,7 +220,7 @@ export function evaluatePaymentAlerts(
                 buildOrderAlert(order, {
                     kind: "payment_expired",
                     severity: "critical",
-                    message: "Prazo de pagamento expirou — pedido pode ser cancelado em breve.",
+                    message: "Prazo de pagamento expirou - pedido pode ser cancelado em breve.",
                     created_at: order.created_at || null,
                     days,
                 })
@@ -235,7 +235,7 @@ export function evaluatePaymentAlerts(
                     buildOrderAlert(order, {
                         kind: "payment_expiring",
                         severity: "warning",
-                        message: `Pagamento expira em ${hoursLeft}h — cliente pode perder o prazo.`,
+                        message: `Pagamento expira em ${hoursLeft}h - cliente pode perder o prazo.`,
                         created_at: order.created_at || null,
                         days,
                         hours_to_expire: hoursLeft,
@@ -289,7 +289,7 @@ export function evaluateDeliveryAlerts(
                 buildOrderAlert(order, {
                     kind: "delivery_failed",
                     severity: "critical",
-                    message: "Falha na entrega — é preciso nova tentativa ou contato com o cliente.",
+                    message: "Falha na entrega - é preciso nova tentativa ou contato com o cliente.",
                     created_at: order.created_at || null,
                     days,
                 })
@@ -389,7 +389,7 @@ export function evaluateReturnAlerts(
 
         const label = RETURN_STATUS_LABELS[status] || status
         const message = slaOverdue
-            ? `${label} — SLA vencido há ${daysSince(request.sla_due_at, now)} dia(s).`
+            ? `${label} - SLA vencido há ${daysSince(request.sla_due_at, now)} dia(s).`
             : `${label} há ${days} dia(s).`
 
         alerts.push({

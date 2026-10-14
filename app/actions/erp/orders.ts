@@ -100,12 +100,12 @@ export type ERPOrderPayload = {
   financeAccountId?: string | null;
   paymentStatus: "paid" | "partially_paid" | "unpaid";
   deliveryStatus:
-    | "not_sent"
-    | "preparing"
-    | "sent"
-    | "delivered"
-    | "pickup_available"
-    | "delivery_failed";
+  | "not_sent"
+  | "preparing"
+  | "sent"
+  | "delivered"
+  | "pickup_available"
+  | "delivery_failed";
   items: ERPItemPayload[];
   subtotal: number;
   discountValue: number;
@@ -400,8 +400,8 @@ function sanitizePaymentBreakdown(
       0,
       Number(
         entry?.paymentMethodDiscountAmount ||
-          (adjType === "discount" ? entry?.adjustmentAmount : 0) ||
-          0,
+        (adjType === "discount" ? entry?.adjustmentAmount : 0) ||
+        0,
       ),
     );
     return {
@@ -445,13 +445,13 @@ function sanitizePaymentBreakdown(
 
 type ApplyPaymentMethodPricingResult =
   | {
-      ok: true;
-      finalTotal: number;
-      feeAmount: number;
-      interestAmount: number;
-      paymentMethodDiscountAmount: number;
-      adjustedBreakdown: PaymentBreakdownEntry[];
-    }
+    ok: true;
+    finalTotal: number;
+    feeAmount: number;
+    interestAmount: number;
+    paymentMethodDiscountAmount: number;
+    adjustedBreakdown: PaymentBreakdownEntry[];
+  }
   | { ok: false; error: string };
 
 async function applyPaymentMethodPricingToTotal(
@@ -490,19 +490,19 @@ async function applyPaymentMethodPricingToTotal(
   const [{ data: methods }, { data: fees }] = await Promise.all([
     methodIds.length > 0
       ? supabase
-          .from("payment_methods")
-          .select(
-            "id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments",
-          )
-          .eq("partner_id", partnerId)
-          .eq("is_active", true)
-          .in("id", methodIds)
+        .from("payment_methods")
+        .select(
+          "id, fee_percent, fee_fixed, fee_bearer, installment_fee_bearer, discount_percent, max_installments",
+        )
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .in("id", methodIds)
       : Promise.resolve({ data: [] as any[] }),
     methodIds.length > 0
       ? supabase
-          .from("payment_method_installment_fees")
-          .select("payment_method_id, installment_number, fee_percent")
-          .in("payment_method_id", methodIds)
+        .from("payment_method_installment_fees")
+        .select("payment_method_id, installment_number, fee_percent")
+        .in("payment_method_id", methodIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
 
@@ -573,15 +573,15 @@ async function applyPaymentMethodPricingToTotal(
   const isPartial = sumBase < safeBase - 0.005;
   const finalTotal = isPartial
     ? Math.max(
-        0,
-        Math.round(
-          (safeBase +
-            recalculated.feeAmount +
-            recalculated.interestAmount -
-            recalculated.paymentMethodDiscountAmount) *
-            100,
-        ) / 100,
-      )
+      0,
+      Math.round(
+        (safeBase +
+          recalculated.feeAmount +
+          recalculated.interestAmount -
+          recalculated.paymentMethodDiscountAmount) *
+        100,
+      ) / 100,
+    )
     : recalculated.finalTotal;
 
   return {
@@ -789,7 +789,7 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
   if (
     Math.abs(
       Number(currentOrder.discount_value || 0) -
-        Number(payload.discountValue || 0),
+      Number(payload.discountValue || 0),
     ) > 0.009
   ) {
     lines.push(
@@ -800,7 +800,7 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
   if (
     Math.abs(
       Number(currentOrder.delivery_fee || 0) -
-        Number(payload.shippingCost || 0),
+      Number(payload.shippingCost || 0),
     ) > 0.009
   ) {
     lines.push(
@@ -811,7 +811,7 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
   if (
     Math.abs(
       Number(currentOrder.additional_costs || 0) -
-        Number(payload.additionalCosts || 0),
+      Number(payload.additionalCosts || 0),
     ) > 0.009
   ) {
     lines.push(
@@ -832,7 +832,7 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
   if (
     Math.abs(
       Number(currentOrder.paid_amount || 0) -
-        Number(paymentState.paidAmount || 0),
+      Number(paymentState.paidAmount || 0),
     ) > 0.009
   ) {
     lines.push(
@@ -1369,9 +1369,9 @@ export async function createFinancialTransactionsForReceivedAmount(
 
       const newReceived = Number(
         newEntry.amount ??
-          newEntry.amountReceived ??
-          newEntry.effectiveAmount ??
-          0,
+        newEntry.amountReceived ??
+        newEntry.effectiveAmount ??
+        0,
       );
 
       const oldEntry =
@@ -1383,11 +1383,11 @@ export async function createFinancialTransactionsForReceivedAmount(
 
       const oldReceived = oldEntry
         ? Number(
-            oldEntry.amount ??
-              oldEntry.amountReceived ??
-              oldEntry.effectiveAmount ??
-              0,
-          )
+          oldEntry.amount ??
+          oldEntry.amountReceived ??
+          oldEntry.effectiveAmount ??
+          0,
+        )
         : 0;
       const delta = newReceived - oldReceived;
 
@@ -1421,7 +1421,7 @@ export async function createFinancialTransactionsForReceivedAmount(
           payment_method: newEntry.method,
           payment_provider:
             params.orderSource === "Marketplace" ||
-            String(newEntry.method).toLowerCase().includes("mercado pago")
+              String(newEntry.method).toLowerCase().includes("mercado pago")
               ? "Mercado Pago"
               : null,
           payment_breakdown: [
@@ -1799,12 +1799,12 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
       const share = isLast
         ? remaining
         : Math.min(
-            round2(
-              (Math.max(0, Number(entry?.amount || 0)) / breakdownTotal) *
-                refundableAmount,
-            ),
-            remaining,
-          );
+          round2(
+            (Math.max(0, Number(entry?.amount || 0)) / breakdownTotal) *
+            refundableAmount,
+          ),
+          remaining,
+        );
       const legAmount = round2(share);
       remaining = round2(remaining - legAmount);
       if (legAmount <= 0.009) continue;
@@ -2169,12 +2169,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   const financeAccountPromise =
     capabilities.hasFinancial && data.financeAccountId
       ? supabase
-          .from("finance_accounts")
-          .select("id")
-          .eq("id", data.financeAccountId)
-          .eq("partner_id", partnerId)
-          .limit(1)
-          .maybeSingle()
+        .from("finance_accounts")
+        .select("id")
+        .eq("id", data.financeAccountId)
+        .eq("partner_id", partnerId)
+        .limit(1)
+        .maybeSingle()
       : Promise.resolve({ data: null });
 
   const partnerRowPromise = supabase
@@ -2208,23 +2208,23 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   const itemCostPromise = Promise.all([
     productIds.length > 0
       ? supabase
-          .from("products")
-          .select("id, cost_price")
-          .eq("partner_id", partnerId)
-          .in("id", productIds)
+        .from("products")
+        .select("id, cost_price")
+        .eq("partner_id", partnerId)
+        .in("id", productIds)
       : Promise.resolve({ data: [] as any[] }),
     variantIds.length > 0
       ? supabase
-          .from("product_variants")
-          .select("id, product_id")
-          .in("id", variantIds)
+        .from("product_variants")
+        .select("id, product_id")
+        .in("id", variantIds)
       : Promise.resolve({ data: [] as any[] }),
     serviceIds.length > 0
       ? supabase
-          .from("services")
-          .select("id, cost_price")
-          .eq("partner_id", partnerId)
-          .in("id", serviceIds)
+        .from("services")
+        .select("id, cost_price")
+        .eq("partner_id", partnerId)
+        .in("id", serviceIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
 
@@ -2429,9 +2429,9 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     manualDiscount:
       data.discountValue > 0 && data.discountType !== "coupon"
         ? {
-            type: data.discountType as "fixed" | "percentage",
-            value: data.discountValue,
-          }
+          type: data.discountType as "fixed" | "percentage",
+          value: data.discountValue,
+        }
         : null,
     coupon: couponPricingData,
     promotions: filteredPromotions,
@@ -2504,8 +2504,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       0,
       Number(
         entry.paymentMethodDiscountAmount ||
-          (adjType === "discount" ? entry.adjustmentAmount : 0) ||
-          0,
+        (adjType === "discount" ? entry.adjustmentAmount : 0) ||
+        0,
       ),
     );
 
@@ -2563,8 +2563,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       customerExtraFees = Math.max(
         0,
         customerExtraFees +
-          Number(entry.feeAmount || 0) +
-          Number(entry.fixedFeeAmount || 0),
+        Number(entry.feeAmount || 0) +
+        Number(entry.fixedFeeAmount || 0),
       );
     }
     if (
@@ -2577,7 +2577,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       paymentMethodStoreCreditAmount = Math.max(
         0,
         paymentMethodStoreCreditAmount +
-          Number(entry.amount || entry.effectiveAmount || 0),
+        Number(entry.amount || entry.effectiveAmount || 0),
       );
     }
   }
@@ -2587,8 +2587,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   const serverTotalAmount = Math.max(
     0,
     serverComputedTotal -
-      paymentMethodDiscountAmount +
-      paymentMethodExtraAmount,
+    paymentMethodDiscountAmount +
+    paymentMethodExtraAmount,
   );
   const adjustedPaymentBreakdown = sanitizedPaymentBreakdown;
   const paymentMethodSummary = buildPaymentMethodSummary(
@@ -2881,17 +2881,17 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0
         ? adjustedPaymentBreakdown
         : [
-            {
-              method:
-                data.paymentMethod &&
+          {
+            method:
+              data.paymentMethod &&
                 data.paymentMethod !== "Método não definido"
-                  ? data.paymentMethod
-                  : "Dinheiro",
-              amount: paymentState.paidAmount,
-              amountReceived: paymentState.paidAmount,
-              effectiveAmount: paymentState.paidAmount,
-            },
-          ];
+                ? data.paymentMethod
+                : "Dinheiro",
+            amount: paymentState.paidAmount,
+            amountReceived: paymentState.paidAmount,
+            effectiveAmount: paymentState.paidAmount,
+          },
+        ];
 
     postOrderPromises.push(
       createFinancialTransactionsForReceivedAmount(supabase, {
@@ -3343,7 +3343,7 @@ export async function getOrderDetailsAction(
           acc +
           Number(
             item?.subtotal ??
-              Number(item?.quantity || 0) * Number(item?.product_price || 0),
+            Number(item?.quantity || 0) * Number(item?.product_price || 0),
           )
         );
       }, 0),
@@ -3367,26 +3367,26 @@ export async function getOrderDetailsAction(
     const baseBeforePaymentMethod = Math.max(
       0,
       subtotalValue -
-        manualDiscount -
-        couponDiscount +
-        shippingCost +
-        additionalCosts,
+      manualDiscount -
+      couponDiscount +
+      shippingCost +
+      additionalCosts,
     );
     const finalTotal = Math.max(0, Number((data as any).total_amount || 0));
     const paymentMethodDiscountAmount =
       (data as any).payment_method_discount_amount != null
         ? Number((data as any).payment_method_discount_amount)
         : Math.max(
-            0,
-            Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100,
-          );
+          0,
+          Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100,
+        );
     const paymentMethodExtraAmount =
       (data as any).payment_method_extra_amount != null
         ? Number((data as any).payment_method_extra_amount)
         : Math.max(
-            0,
-            Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100,
-          );
+          0,
+          Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100,
+        );
 
     const isRefunded =
       Array.isArray(data.return_requests) &&
@@ -3402,18 +3402,18 @@ export async function getOrderDetailsAction(
       });
     const refundedAmount = Array.isArray(data.return_requests)
       ? data.return_requests.reduce((sum: number, req: any) => {
-          const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(
-            req.status,
-          );
-          const isRefundResolution =
-            req.approved_resolution === "refund" ||
-            (!req.approved_resolution && req.desired_resolution === "refund");
-          const hasRefundValue = Number(req.refund_amount || 0) > 0;
-          if (isApprovedOrResolved && (isRefundResolution || hasRefundValue)) {
-            return sum + Number(req.refund_amount || 0);
-          }
-          return sum;
-        }, 0)
+        const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(
+          req.status,
+        );
+        const isRefundResolution =
+          req.approved_resolution === "refund" ||
+          (!req.approved_resolution && req.desired_resolution === "refund");
+        const hasRefundValue = Number(req.refund_amount || 0) > 0;
+        if (isApprovedOrResolved && (isRefundResolution || hasRefundValue)) {
+          return sum + Number(req.refund_amount || 0);
+        }
+        return sum;
+      }, 0)
       : 0;
 
     return {
@@ -3460,20 +3460,20 @@ export async function getOrderDetailsAction(
     await Promise.all([
       sale.customer_id
         ? supabase
-            .from("customers")
-            .select("id, name, email, phone, image_url, addresses(*)")
-            .eq("id", sale.customer_id)
-            .eq("partner_id", partnerId)
-            .single()
-            .then((res: any) => res.data)
+          .from("customers")
+          .select("id, name, email, phone, image_url, addresses(*)")
+          .eq("id", sale.customer_id)
+          .eq("partner_id", partnerId)
+          .single()
+          .then((res: any) => res.data)
         : Promise.resolve(null),
       (sale as any).finalized_by_user_id
         ? supabase
-            .from("user_profiles")
-            .select("full_name")
-            .eq("user_id", (sale as any).finalized_by_user_id)
-            .single()
-            .then((res: any) => res.data?.full_name || null)
+          .from("user_profiles")
+          .select("full_name")
+          .eq("user_id", (sale as any).finalized_by_user_id)
+          .single()
+          .then((res: any) => res.data?.full_name || null)
         : Promise.resolve(null),
       supabase
         .from("pre_sales")
@@ -3487,11 +3487,11 @@ export async function getOrderDetailsAction(
         .then((res: any) => res.data),
       sale.origin_type === "service_order" && sale.origin_id
         ? supabase
-            .from("service_orders")
-            .select("id, order_number, title, status")
-            .eq("id", sale.origin_id)
-            .maybeSingle()
-            .then((res: any) => res.data)
+          .from("service_orders")
+          .select("id, order_number, title, status")
+          .eq("id", sale.origin_id)
+          .maybeSingle()
+          .then((res: any) => res.data)
         : Promise.resolve(null),
     ]);
 
@@ -3509,7 +3509,7 @@ export async function getOrderDetailsAction(
         acc +
         Number(
           it?.subtotal ??
-            Number(it?.quantity || 0) * Number(it?.unit_price || 0),
+          Number(it?.quantity || 0) * Number(it?.unit_price || 0),
         )
       );
     }, 0),
@@ -3517,26 +3517,26 @@ export async function getOrderDetailsAction(
   const baseBeforePaymentMethod = Math.max(
     0,
     subtotalValue -
-      Math.max(0, manualDiscount) -
-      Math.max(0, couponDiscount) +
-      Math.max(0, shippingCost) +
-      Math.max(0, otherCosts),
+    Math.max(0, manualDiscount) -
+    Math.max(0, couponDiscount) +
+    Math.max(0, shippingCost) +
+    Math.max(0, otherCosts),
   );
   const finalTotal = Math.max(0, Number(sale.final_amount || 0));
   const paymentMethodDiscountAmount =
     sale.payment_method_discount_amount != null
       ? Number(sale.payment_method_discount_amount)
       : Math.max(
-          0,
-          Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100,
-        );
+        0,
+        Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100,
+      );
   const paymentMethodExtraAmount =
     sale.payment_method_extra_amount != null
       ? Number(sale.payment_method_extra_amount)
       : Math.max(
-          0,
-          Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100,
-        );
+        0,
+        Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100,
+      );
   const ref =
     (sale.sale_number && String(sale.sale_number).trim()) ||
     String(sale.id || "")
@@ -3713,12 +3713,12 @@ export async function updateERPOrderAction(
 
   const financeAccountPromise = data.financeAccountId
     ? supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("id", data.financeAccountId)
-        .eq("partner_id", data.partnerId)
-        .limit(1)
-        .maybeSingle()
+      .from("finance_accounts")
+      .select("id")
+      .eq("id", data.financeAccountId)
+      .eq("partner_id", data.partnerId)
+      .limit(1)
+      .maybeSingle()
     : Promise.resolve({ data: null });
 
   const preparationEstimatePromise = resolveOrderPreparationEstimate({
@@ -3848,7 +3848,7 @@ export async function updateERPOrderAction(
   if (
     currentOrder.exchange_return_request_id &&
     Number(data.totalAmount || 0) <
-      Number(currentOrder.paid_amount || 0) - 0.009
+    Number(currentOrder.paid_amount || 0) - 0.009
   ) {
     return {
       error: `O total do pedido (R$ ${Number(data.totalAmount || 0).toFixed(2)}) não pode ser menor que o crédito de troca aplicado (R$ ${Number(currentOrder.paid_amount || 0).toFixed(2)}).`,
@@ -3905,14 +3905,14 @@ export async function updateERPOrderAction(
     ) > 0.009 ||
     Math.abs(
       Number(currentOrder.discount_value || 0) -
-        Number(data.discountValue || 0),
+      Number(data.discountValue || 0),
     ) > 0.009 ||
     Math.abs(
       Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0),
     ) > 0.009 ||
     Math.abs(
       Number(currentOrder.additional_costs || 0) -
-        Number(data.additionalCosts || 0),
+      Number(data.additionalCosts || 0),
     ) > 0.009 ||
     data.financeAccountId !== currentOrder.finance_account_id ||
     data.salesChannel !== currentOrder.order_source ||
@@ -3966,14 +3966,14 @@ export async function updateERPOrderAction(
       ) > 0.009 ||
       Math.abs(
         Number(currentOrder.discount_value || 0) -
-          Number(data.discountValue || 0),
+        Number(data.discountValue || 0),
       ) > 0.009 ||
       Math.abs(
         Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0),
       ) > 0.009 ||
       Math.abs(
         Number(currentOrder.additional_costs || 0) -
-          Number(data.additionalCosts || 0),
+        Number(data.additionalCosts || 0),
       ) > 0.009;
     if (hasPricingChanged) {
       return {
@@ -4010,9 +4010,9 @@ export async function updateERPOrderAction(
     manualDiscount:
       data.discountValue > 0 && data.discountType !== "coupon"
         ? {
-            type: data.discountType as "fixed" | "percentage",
-            value: data.discountValue,
-          }
+          type: data.discountType as "fixed" | "percentage",
+          value: data.discountValue,
+        }
         : null,
     coupon: couponPricingData,
     promotions: filteredPromotions,
@@ -4084,12 +4084,12 @@ export async function updateERPOrderAction(
   }
   const stockValidationError = capabilities.hasStockMovements
     ? await validateERPItemsStock({
-        supabase,
-        partnerId: data.partnerId,
-        items: nextItemsForDelta,
-        salesSettings,
-        baselineQuantities,
-      })
+      supabase,
+      partnerId: data.partnerId,
+      items: nextItemsForDelta,
+      salesSettings,
+      baselineQuantities,
+    })
     : null;
   if (stockValidationError) return { error: stockValidationError };
   if (
@@ -4191,8 +4191,8 @@ export async function updateERPOrderAction(
       0,
       Number(
         entry.paymentMethodDiscountAmount ||
-          (adjType === "discount" ? entry.adjustmentAmount : 0) ||
-          0,
+        (adjType === "discount" ? entry.adjustmentAmount : 0) ||
+        0,
       ),
     );
 
@@ -4253,8 +4253,8 @@ export async function updateERPOrderAction(
       updateCustomerExtraFees = Math.max(
         0,
         updateCustomerExtraFees +
-          Number(entry.feeAmount || 0) +
-          Number(entry.fixedFeeAmount || 0),
+        Number(entry.feeAmount || 0) +
+        Number(entry.fixedFeeAmount || 0),
       );
     }
   }
@@ -4265,8 +4265,8 @@ export async function updateERPOrderAction(
   updateServerTotal = Math.max(
     0,
     updateServerTotal -
-      updatePaymentMethodDiscountAmount +
-      updatePaymentMethodExtraAmount,
+    updatePaymentMethodDiscountAmount +
+    updatePaymentMethodExtraAmount,
   );
   const paymentMethodSummary = buildPaymentMethodSummary(
     adjustedPaymentBreakdown,
@@ -4368,17 +4368,17 @@ export async function updateERPOrderAction(
       adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0
         ? adjustedPaymentBreakdown
         : [
-            {
-              method:
-                data.paymentMethod &&
+          {
+            method:
+              data.paymentMethod &&
                 data.paymentMethod !== "Método não definido"
-                  ? data.paymentMethod
-                  : currentOrder.payment_method || "Dinheiro",
-              amount: paymentState.paidAmount,
-              amountReceived: paymentState.paidAmount,
-              effectiveAmount: paymentState.paidAmount,
-            },
-          ];
+                ? data.paymentMethod
+                : currentOrder.payment_method || "Dinheiro",
+            amount: paymentState.paidAmount,
+            amountReceived: paymentState.paidAmount,
+            effectiveAmount: paymentState.paidAmount,
+          },
+        ];
 
     await createFinancialTransactionsForReceivedAmount(supabase, {
       orderId: orderId,
@@ -4700,16 +4700,16 @@ export async function updateERPOrderAction(
     metadata: {
       ...(currentOrder.situation !== paymentState.situation
         ? {
-            oldStatus: getPaymentStatusLabel(currentOrder.situation),
-            newStatus: getPaymentStatusLabel(paymentState.situation),
-            statusScope: "payment",
-          }
+          oldStatus: getPaymentStatusLabel(currentOrder.situation),
+          newStatus: getPaymentStatusLabel(paymentState.situation),
+          statusScope: "payment",
+        }
         : currentOrder.delivery_status !== data.deliveryStatus
           ? {
-              oldStatus: getDeliveryStatusLabel(currentOrder.delivery_status),
-              newStatus: getDeliveryStatusLabel(data.deliveryStatus),
-              statusScope: "delivery",
-            }
+            oldStatus: getDeliveryStatusLabel(currentOrder.delivery_status),
+            newStatus: getDeliveryStatusLabel(data.deliveryStatus),
+            statusScope: "delivery",
+          }
           : {}),
     },
     source: "manual",
@@ -5004,10 +5004,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .single(),
       capabilities.hasProductivity && creatorUserIds.length > 0
         ? supabase
-            .from("partner_users")
-            .select("id, user_id")
-            .eq("partner_id", payload.partnerId)
-            .in("user_id", creatorUserIds)
+          .from("partner_users")
+          .select("id, user_id")
+          .eq("partner_id", payload.partnerId)
+          .in("user_id", creatorUserIds)
         : Promise.resolve({ data: null }),
     ]);
 
@@ -5468,22 +5468,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
       const validMethodLabels = payload.paymentBreakdown
         ? Array.from(
-            new Set(
-              payload.paymentBreakdown
-                .map((entry: any) => normalizePaymentMethodLabel(entry.method))
-                .filter((label?: string): label is string => {
-                  if (!label) return false;
-                  const norm = label.toLowerCase();
-                  return (
-                    !norm.includes("não definido") &&
-                    !norm.includes("metodo nao definido") &&
-                    !norm.includes("pendente") &&
-                    !norm.includes("não informado") &&
-                    !norm.includes("nao informado")
-                  );
-                }),
-            ),
-          )
+          new Set(
+            payload.paymentBreakdown
+              .map((entry: any) => normalizePaymentMethodLabel(entry.method))
+              .filter((label?: string): label is string => {
+                if (!label) return false;
+                const norm = label.toLowerCase();
+                return (
+                  !norm.includes("não definido") &&
+                  !norm.includes("metodo nao definido") &&
+                  !norm.includes("pendente") &&
+                  !norm.includes("não informado") &&
+                  !norm.includes("nao informado")
+                );
+              }),
+          ),
+        )
         : [];
 
       const nextPaymentMethod =
@@ -5537,19 +5537,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
           payload.paymentBreakdown ||
           (paymentState.situation === "paid"
             ? [
-                {
-                  method: order.payment_method || "Dinheiro",
-                  amount: order.total_amount,
-                  amountReceived: order.total_amount,
-                },
-              ]
+              {
+                method: order.payment_method || "Dinheiro",
+                amount: order.total_amount,
+                amountReceived: order.total_amount,
+              },
+            ]
             : [
-                {
-                  method: order.payment_method || "Dinheiro",
-                  amount: order.total_amount,
-                  amountReceived: paymentState.paidAmount,
-                },
-              ]);
+              {
+                method: order.payment_method || "Dinheiro",
+                amount: order.total_amount,
+                amountReceived: paymentState.paidAmount,
+              },
+            ]);
         await createFinancialTransactionsForReceivedAmount(supabase, {
           orderId: order.id,
           orderNumber: order.order_number || order.id,
@@ -5637,10 +5637,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const finalizeDeliveryOrders = capabilities.hasStockMovements
       ? eligibleDeliveryOrders.filter(
-          (order) =>
-            !order.inventory_deducted &&
-            shouldDeductInventory(payload.statusValue),
-        )
+        (order) =>
+          !order.inventory_deducted &&
+          shouldDeductInventory(payload.statusValue),
+      )
       : [];
     const simpleDeliveryOrders = eligibleDeliveryOrders.filter(
       (order) =>
@@ -5810,35 +5810,35 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const metadata =
           payload.actionType === "payment_status" && lines.length > 0
             ? (() => {
-                const requestedStatus =
-                  paymentStatusMap[payload.statusValue || ""];
-                if (!requestedStatus) return null;
-                const nextPaymentState = resolvePaymentState({
-                  requestedStatus,
-                  totalAmount: Number(order.total_amount || 0),
-                  paidAmount:
-                    payload.paidAmount !== undefined
-                      ? payload.paidAmount
-                      : undefined,
-                  fallbackPaidAmount:
-                    requestedStatus === "paid"
-                      ? Number(order.total_amount || 0)
-                      : requestedStatus === "partially_paid"
-                        ? Number(order.paid_amount || 0)
-                        : 0,
-                });
-                return {
-                  oldStatus: getPaymentStatusLabel(order.situation),
-                  newStatus: getPaymentStatusLabel(nextPaymentState.situation),
-                  statusScope: "payment",
-                };
-              })()
+              const requestedStatus =
+                paymentStatusMap[payload.statusValue || ""];
+              if (!requestedStatus) return null;
+              const nextPaymentState = resolvePaymentState({
+                requestedStatus,
+                totalAmount: Number(order.total_amount || 0),
+                paidAmount:
+                  payload.paidAmount !== undefined
+                    ? payload.paidAmount
+                    : undefined,
+                fallbackPaidAmount:
+                  requestedStatus === "paid"
+                    ? Number(order.total_amount || 0)
+                    : requestedStatus === "partially_paid"
+                      ? Number(order.paid_amount || 0)
+                      : 0,
+              });
+              return {
+                oldStatus: getPaymentStatusLabel(order.situation),
+                newStatus: getPaymentStatusLabel(nextPaymentState.situation),
+                statusScope: "payment",
+              };
+            })()
             : payload.actionType === "delivery_status" && payload.statusValue
               ? {
-                  oldStatus: getDeliveryStatusLabel(order.delivery_status),
-                  newStatus: getDeliveryStatusLabel(payload.statusValue),
-                  statusScope: "delivery",
-                }
+                oldStatus: getDeliveryStatusLabel(order.delivery_status),
+                newStatus: getDeliveryStatusLabel(payload.statusValue),
+                statusScope: "delivery",
+              }
               : null;
 
         return logAuditEvent({
@@ -6086,11 +6086,11 @@ export async function getERPOrdersPageAction(
   },
 ): Promise<
   | {
-      success: true;
-      items: any[];
-      nextCursor: ERPOrderListCursor | null;
-      hasMore: boolean;
-    }
+    success: true;
+    items: any[];
+    nextCursor: ERPOrderListCursor | null;
+    hasMore: boolean;
+  }
   | { success: false; error: string }
 > {
   try {
@@ -6245,11 +6245,11 @@ export async function getERPOrdersPageAction(
             row?.customer_name && row.customer_name !== "Consumidor final"
               ? row.customer_name
               : cust?.name ||
-                cust?.email ||
-                fallbackInfo?.name ||
-                fallbackInfo?.email ||
-                row?.customer_name ||
-                null;
+              cust?.email ||
+              fallbackInfo?.name ||
+              fallbackInfo?.email ||
+              row?.customer_name ||
+              null;
 
           return {
             ...row,
@@ -6299,9 +6299,9 @@ export async function getERPOrdersPageAction(
           Number(row?.quantity || 0) ||
           (Array.isArray(row?.order_items)
             ? row.order_items.reduce(
-                (sum: number, item: any) => sum + Number(item?.quantity || 0),
-                0,
-              )
+              (sum: number, item: any) => sum + Number(item?.quantity || 0),
+              0,
+            )
             : 0),
         return_count: reqs.length,
         is_refunded: reqs.some((req: any) => {
@@ -7003,7 +7003,7 @@ export async function getOrderAttachmentsAction(
 }
 
 // ============================================================================
-// SUGESTÕES & OPORTUNIDADES — ALERTAS INFORMATIVOS DE PEDIDOS
+// SUGESTÕES & OPORTUNIDADES - ALERTAS INFORMATIVOS DE PEDIDOS
 // ============================================================================
 
 const PENDING_RETURN_INSIGHT_STATUSES = [

@@ -137,7 +137,7 @@ function calcVerticalPercent(amount: number, grossRevenue: number): number {
 }
 
 /**
- * Motor central de cálculo do DRE no Dudit.
+ * Motor central de cálculo do DRE na Dudit.
  * Executa todas as consultas em paralelo com proteção de volume e precisão contábil.
  */
 async function computeDrePeriod(
@@ -689,8 +689,8 @@ async function computeDrePeriod(
       storeName: storeId
         ? (selectedStore?.name || "Loja Selecionada")
         : (allowedStoreIds && allowedStoreIds.length === 1
-            ? (stores.find((s: any) => s.id === allowedStoreIds[0])?.name || "Loja Selecionada")
-            : "Todas as Lojas (Consolidado)"),
+          ? (stores.find((s: any) => s.id === allowedStoreIds[0])?.name || "Loja Selecionada")
+          : "Todas as Lojas (Consolidado)"),
       taxRegimeLabel: (selectedStore?.person_type || hqStore?.person_type) === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
       generatedAt: new Date().toLocaleString("pt-BR"),
     },
