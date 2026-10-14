@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Button } from "@/components/reusable"
+import { Button, Dropdown, DropdownItem } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -15,6 +15,10 @@ import {
   StoreIcon,
   MoneyIcon,
   ArrowLeftRightIcon,
+  Settings2Icon,
+  StarIcon,
+  ExportFileIcon,
+  PrinterIcon,
 } from "@/lib/icons"
 import type { DreRegime } from "@/lib/services/dre.service"
 import {
@@ -54,6 +58,9 @@ interface DrePageControlsProps {
   setFilters: React.Dispatch<React.SetStateAction<DreFilterState>>
   isAllExpanded: boolean
   onToggleExpandAll: () => void
+  onOpenInsights: () => void
+  onExportExcel: () => void
+  onPrintPdf: () => void
 }
 
 const PERIOD_PRESET_LABELS: Record<string, string> = {
@@ -73,6 +80,9 @@ export function DrePageControls({
   setFilters,
   isAllExpanded,
   onToggleExpandAll,
+  onOpenInsights,
+  onExportExcel,
+  onPrintPdf,
 }: DrePageControlsProps) {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
   const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -109,6 +119,7 @@ export function DrePageControls({
         title: "Período",
         type: "date-period",
         datePresetOptions: ["current_month", "last_month", "last_30_days", "current_quarter", "current_year", "custom"],
+        presetLabels: PERIOD_PRESET_LABELS,
       },
       {
         id: "stores",
@@ -231,10 +242,30 @@ export function DrePageControls({
             variant="outline"
             size="sm"
             onClick={onToggleExpandAll}
-            className="h-[42px] px-3"
+            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
           >
             <ArrowUpDownIcon size={16} />
           </Button>
+          <Dropdown
+            trigger={
+              <Button variant="outline" className="w-[42px] h-[42px] p-0 flex items-center justify-center">
+                <Settings2Icon className="w-4 h-4" />
+              </Button>
+            }
+            align="right"
+            showChevron={false}
+            className="w-fit"
+          >
+            <DropdownItem onClick={onOpenInsights}>
+              <StarIcon size={14} /> Alertas & Insights
+            </DropdownItem>
+            <DropdownItem onClick={onExportExcel}>
+              <ExportFileIcon size={14} /> Exportar Excel
+            </DropdownItem>
+            <DropdownItem onClick={onPrintPdf}>
+              <PrinterIcon size={14} /> Imprimir / PDF
+            </DropdownItem>
+          </Dropdown>
         </div>
 
         {/* DESKTOP CONTROLS */}

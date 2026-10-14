@@ -122,6 +122,10 @@ interface AddProductPageProps {
     onSave?: (data: any, isDraft?: boolean) => Promise<{ success: boolean; error?: string } | void>
     onDuplicate?: (product: Product) => void
     onDelete?: () => void
+    /** Painel admin: exclusão via action admin (com audit log) em vez da action do ERP. */
+    onDeleteConfirm?: () => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: arquivar/desarquivar via action admin em vez das actions do ERP. */
+    onArchiveToggle?: (isCurrentlyArchived: boolean) => Promise<{ success?: boolean; error?: string } | void>
     partner?: any
 }
 
@@ -130,6 +134,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     isSaving = false, productId, initialData, onClose, unidadesMedida = [],
     partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
     onSave,
+    onDeleteConfirm,
+    onArchiveToggle,
     partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
@@ -623,12 +629,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const handleDeleteProduct = useCallback(async () => {
         if (!initialProduct?.id && !productId) return
         try {
-            const result = await deleteProductAction(initialProduct?.id || productId!)
-            if (result.success) { notifySuccess("Sucesso", "Produto excluído"); setTimeout(() => onBack(), 300) }
-            else notifyError("Erro", result.error)
+            if (onDeleteConfirm) {
+                const res = await onDeleteConfirm()
+                if (res && res.success === false) notifyError("Erro", res.error || "Erro ao excluir produto")
+                else { notifySuccess("Sucesso", "Produto excluído"); setTimeout(() => onBack(), 300) }
+            } else {
+                const result = await deleteProductAction(initialProduct?.id || productId!)
+                if (result.success) { notifySuccess("Sucesso", "Produto excluído"); setTimeout(() => onBack(), 300) }
+                else notifyError("Erro", result.error)
+            }
         } catch { notifyError("Erro", "Ocorreu um erro") }
         finally { setShowDeleteModal(false) }
-    }, [initialProduct, productId, onBack, notifyError, notifySuccess])
+    }, [initialProduct, productId, onBack, notifyError, notifySuccess, onDeleteConfirm])
 
     const handleSaveProduct = useCallback(async () => {
         if (isSubmittingRef.current) return
@@ -908,19 +920,29 @@ const AddProductPage: FC<AddProductPageProps> = ({
         const isCurrentlyArchived = productData.status === "arquivado" || productData.status === "archived"
         setIsArchivingProduct(true)
         try {
-            const res = isCurrentlyArchived
-                ? await unarchiveProductAction(productData.id)
-                : await archiveProductAction(productData.id)
-            if (res.error) {
-                if (isCurrentlyArchived && isPlanLimitReachedError(res.error)) {
-                    const target = getNextPlanTarget(planSlug)
-                    if (target) openPlanUpgrade(target)
+            if (onArchiveToggle) {
+                const res = await onArchiveToggle(isCurrentlyArchived)
+                if (res && res.success === false) {
+                    notifyError(res.error || "Erro ao alterar status do produto")
                 } else {
-                    notifyError(res.error)
+                    notifySuccess(isCurrentlyArchived ? "Produto desarquivado e reativado." : "Produto arquivado com sucesso.")
+                    onClose?.()
                 }
             } else {
-                notifySuccess(isCurrentlyArchived ? "Produto desarquivado e reativado." : "Produto arquivado com sucesso.")
-                onClose?.()
+                const res = isCurrentlyArchived
+                    ? await unarchiveProductAction(productData.id)
+                    : await archiveProductAction(productData.id)
+                if (res.error) {
+                    if (isCurrentlyArchived && isPlanLimitReachedError(res.error)) {
+                        const target = getNextPlanTarget(planSlug)
+                        if (target) openPlanUpgrade(target)
+                    } else {
+                        notifyError(res.error)
+                    }
+                } else {
+                    notifySuccess(isCurrentlyArchived ? "Produto desarquivado e reativado." : "Produto arquivado com sucesso.")
+                    onClose?.()
+                }
             }
         } catch (e: any) {
             notifyError(e.message || "Erro ao arquivar produto")
@@ -928,7 +950,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setIsArchivingProduct(false)
             setShowArchiveModal(false)
         }
-    }, [productData.id, productData.status, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose])
+    }, [productData.id, productData.status, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose, onArchiveToggle])
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"

@@ -41,6 +41,10 @@ interface PlanDetailPageProps {
   onEdit: (plan: RecurringPlan) => void
   onShare?: (plan: RecurringPlan) => void
   onDelete?: (plan: RecurringPlan) => void
+  /** Painel admin: carrega staff via action admin (service role). */
+  loadFormData?: (
+    partnerId: string,
+  ) => Promise<{ success?: boolean; data?: { staff?: Array<{ id: string; display_name: string }> }; error?: string }>
 }
 
 const SidebarRow = ({
@@ -93,6 +97,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
   onEdit,
   onShare,
   onDelete,
+  loadFormData,
 }) => {
   const { setHeaderOverride } = useSidebar()
   const [activeTab, setActiveTab] = useState<DetailTab>("general")
@@ -108,7 +113,8 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
   // Nomes dos profissionais para os itens de serviço
   useEffect(() => {
     let cancelled = false
-    getRecurringPlanFormDataAction(partnerId)
+    const loader = loadFormData ?? getRecurringPlanFormDataAction
+    loader(partnerId)
       .then((res) => {
         if (!cancelled && res.success && res.data) {
           setStaff(((res.data as any).staff || []) as Array<{ id: string; display_name: string }>)
@@ -118,7 +124,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
     return () => {
       cancelled = true
     }
-  }, [partnerId])
+  }, [partnerId, loadFormData])
 
   const pageTitle = plan.name || "Plano"
 

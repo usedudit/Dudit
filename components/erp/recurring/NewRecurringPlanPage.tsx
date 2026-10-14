@@ -54,6 +54,14 @@ interface NewRecurringPlanPageProps {
     plan?: any | null
     onSuccess?: (msg: string) => void
     onError?: (msg: string) => void
+    /** Painel admin: cria/atualização via action admin (com audit log). */
+    onSave?: (payload: any) => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: leitura de produtos/serviços/staff via action admin. */
+    loadFormData?: (partnerId: string) => Promise<{
+        success?: boolean
+        data?: { products?: any[]; services?: any[]; staff?: any[] }
+        error?: string
+    }>
 }
 
 type FormData = {
@@ -73,7 +81,9 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     partnerId,
     plan,
     onSuccess,
-    onError
+    onError,
+    onSave,
+    loadFormData,
 }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { setHeaderOverride } = useSidebar()
@@ -129,7 +139,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     // Load select options
     useEffect(() => {
         setIsLoadingData(true)
-        getRecurringPlanFormDataAction(partnerId)
+        const loader = loadFormData ?? getRecurringPlanFormDataAction
+        loader(partnerId)
             .then((res) => {
                 if (res.success && res.data) {
                     setFormData(res.data as FormData)
@@ -138,7 +149,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             .finally(() => {
                 setIsLoadingData(false)
             })
-    }, [partnerId])
+    }, [partnerId, loadFormData])
 
     // Debounce search input
     useEffect(() => {
@@ -437,17 +448,19 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 images: cleanedFinalImages,
             }
 
-            const res = plan?.id
-                ? await updateRecurringPlanAction({ ...payload, planId: plan.id })
-                : await createRecurringPlanAction(payload)
+            const res = onSave
+                ? await onSave(payload)
+                : plan?.id
+                    ? await updateRecurringPlanAction({ ...payload, planId: plan.id })
+                    : await createRecurringPlanAction(payload)
 
-            if (res.success) {
+            if (res && (res as any).success === false) {
+                notifyError((res as any).error || "Erro ao salvar o plano.")
+                if (onError) onError((res as any).error || "Erro ao salvar")
+            } else {
                 notifySuccess(plan?.id ? "Plano atualizado com sucesso!" : "Plano criado com sucesso!")
                 if (onSuccess) onSuccess(plan?.id ? "Plano atualizado" : "Plano criado")
                 onBack()
-            } else {
-                notifyError(res.error || "Erro ao salvar o plano.")
-                if (onError) onError(res.error || "Erro ao salvar")
             }
         } catch (e) {
             console.error(e)

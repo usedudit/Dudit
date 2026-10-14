@@ -33,6 +33,8 @@ export interface FilterSectionConfig {
     switchLabel?: string
     /** Presets do período; default = DATE_PERIOD_PRESETS (type: date-period) */
     datePresetOptions?: string[]
+    /** Mapeamento de valor do preset -> rótulo legível (type: date-period) */
+    presetLabels?: Record<string, string>
 }
 
 interface FilterSheetProps {
@@ -157,7 +159,9 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                                                     })
                                                 }
                                             />
-                                            <span className="text-sm dark:text-dark-heading">{opt}</span>
+                                            <span className="text-sm dark:text-dark-heading">
+                                                {section.presetLabels?.[opt] || opt}
+                                            </span>
                                         </label>
                                     )
                                 })}

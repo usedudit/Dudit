@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon, AnalyticsIcon, SettingsConfigIcon } from "@/lib/icons"
+import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon, AnalyticsIcon, SettingsConfigIcon, BoxIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -75,6 +75,15 @@ const navItems: NavItem[] = [
         icon: BriefcaseIcon,
         label: "Parceiros",
         href: "/ddt-admin/partners",
+    },
+    {
+        icon: BoxIcon,
+        label: "Catálogo",
+        submenu: [
+            { label: "Produtos", href: "/ddt-admin/catalog/products" },
+            { label: "Serviços", href: "/ddt-admin/catalog/services" },
+            { label: "Planos recorrentes", href: "/ddt-admin/catalog/plans" },
+        ],
     },
     {
         icon: MotorbikeIcon,

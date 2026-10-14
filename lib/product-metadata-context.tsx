@@ -29,7 +29,13 @@ const MetadataContext = createContext<MetadataContextValue>({
 
 export const useProductMetadata = () => useContext(MetadataContext)
 
-export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children }) => {
+interface ProductMetadataProviderProps {
+    children: ReactNode
+    /** Override da action de leitura (ex.: ação admin com service role). */
+    loadAction?: (partnerId: string) => Promise<{ success?: boolean; data?: MetadataState; error?: string }>
+}
+
+export const ProductMetadataProvider: FC<ProductMetadataProviderProps> = ({ children, loadAction }) => {
     const [metadata, setMetadata] = useState<MetadataState>(EMPTY_METADATA)
     const [isLoading, setIsLoading] = useState(false)
     const loadedForPartnerRef = useRef<string | null>(null)
@@ -38,7 +44,7 @@ export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children 
     const fetchMetadata = useCallback(async (partnerId: string) => {
         setIsLoading(true)
         try {
-            const result = await getProductMetadataAction(partnerId)
+            const result = loadAction ? await loadAction(partnerId) : await getProductMetadataAction(partnerId)
             if (result.success && result.data) {
                 setMetadata(result.data)
                 loadedForPartnerRef.current = partnerId
@@ -49,7 +55,7 @@ export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children 
         } finally {
             setIsLoading(false)
         }
-    }, [])
+    }, [loadAction])
 
     const loadMetadata = useCallback(async (partnerId: string, force = false) => {
         // Skip if already loaded for this partner (quasi-static data)

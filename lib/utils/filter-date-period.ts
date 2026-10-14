@@ -1,5 +1,15 @@
 export const DATE_PERIOD_PRESETS = ["Últimos 3 dias", "Últimos 7 dias", "Últimos 30 dias", "Mês atual", "Ano atual"] as const
 
+/** Rótulos pt-BR para presets internos (snake_case e legíveis) */
+export const DATE_PERIOD_PRESET_LABELS: Record<string, string> = {
+  current_month: "Mês atual",
+  last_month: "Mês anterior",
+  last_30_days: "Últimos 30 dias",
+  current_quarter: "Trimestre atual",
+  current_year: "Ano atual",
+  custom: "Personalizado",
+}
+
 export type DatePeriodFilterValue = {
   presets: string[]
   from: string
@@ -44,15 +54,33 @@ export function resolveDatePeriodBounds(period: DatePeriodFilterValue): {
 
   if (p === "Últimos 3 dias") return { startYmd: addCalendarDaysYmd(today, -2), endYmd: today }
   if (p === "Últimos 7 dias") return { startYmd: addCalendarDaysYmd(today, -6), endYmd: today }
-  if (p === "Últimos 30 dias") return { startYmd: addCalendarDaysYmd(today, -29), endYmd: today }
-  if (p === "Mês atual") {
+  if (p === "Últimos 30 dias" || p === "last_30_days") return { startYmd: addCalendarDaysYmd(today, -29), endYmd: today }
+  if (p === "Mês atual" || p === "current_month") {
     const [y, m] = today.split("-").map(Number)
     const start = `${y}-${String(m).padStart(2, "0")}-01`
     const lastD = new Date(y, m, 0).getDate()
     const end = `${y}-${String(m).padStart(2, "0")}-${String(lastD).padStart(2, "0")}`
     return { startYmd: start, endYmd: end }
   }
-  if (p === "Ano atual") {
+  if (p === "last_month") {
+    const [y, m] = today.split("-").map(Number)
+    const prev = m === 12 ? 12 : m - 1
+    const year = m === 12 ? y - 1 : y
+    const start = `${year}-${String(prev).padStart(2, "0")}-01`
+    const lastD = new Date(year, prev, 0).getDate()
+    const end = `${year}-${String(prev).padStart(2, "0")}-${String(lastD).padStart(2, "0")}`
+    return { startYmd: start, endYmd: end }
+  }
+  if (p === "current_quarter") {
+    const [y, m] = today.split("-").map(Number)
+    const quarterStartMonth = Math.floor((m - 1) / 3) * 3 + 1
+    const start = `${y}-${String(quarterStartMonth).padStart(2, "0")}-01`
+    const endMonth = quarterStartMonth + 2
+    const lastD = new Date(y, endMonth, 0).getDate()
+    const end = `${y}-${String(endMonth).padStart(2, "0")}-${String(lastD).padStart(2, "0")}`
+    return { startYmd: start, endYmd: end }
+  }
+  if (p === "Ano atual" || p === "current_year") {
     const y = today.slice(0, 4)
     return { startYmd: `${y}-01-01`, endYmd: `${y}-12-31` }
   }
@@ -81,7 +109,9 @@ export function formatYmdToDmy(ymd: string): string {
 
 /** Texto curto para chip de filtro ativo */
 export function summarizeDatePeriodFilter(period: DatePeriodFilterValue): string | null {
-  if (period.presets.length > 0) return period.presets.join(", ")
+  if (period.presets.length > 0) {
+    return period.presets.map((p) => DATE_PERIOD_PRESET_LABELS[p] || p).join(", ")
+  }
   if (period.from && period.to) return `${formatYmdToDmy(period.from)} - ${formatYmdToDmy(period.to)}`
   if (period.from) return `A partir de ${formatYmdToDmy(period.from)}`
   if (period.to) return `Até ${formatYmdToDmy(period.to)}`

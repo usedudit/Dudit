@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Button, ThreeDotsLoader, InfoCard } from "@/components/reusable"
+import { Button, ThreeDotsLoader, Dropdown, DropdownItem } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -17,6 +17,8 @@ import {
   ExportFileIcon,
   PrinterIcon,
   AnalyticsIcon,
+  Settings2Icon,
+  StarIcon,
 } from "@/lib/icons"
 import { getDreReportAction } from "@/app/actions/erp/dre"
 import type { DreReportData, DreRegime, DreNode } from "@/lib/services/dre.service"
@@ -29,6 +31,7 @@ import {
 
 import { exportDreToXLSX } from "@/lib/utils/export-dre-excel"
 import { DrePrintModal } from "./receipt/DrePrintModal"
+import { DreInsightsSheet } from "./DreInsightsSheet"
 
 interface StoreOption {
   id: string
@@ -69,7 +72,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
 
   const [activeTab, setActiveTab] = useState<DreViewTab>("structure")
   const [filters, setFilters] = useState<DreFilterState>({
-    datePeriod: { presets: ["Mês atual"], from: "", to: "" },
+    datePeriod: { presets: ["current_month"], from: "", to: "" },
     stores: [],
     regime: [],
     comparePrevious: true,
@@ -92,6 +95,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
   const [loading, setLoading] = useState<boolean>(true)
   const [report, setReport] = useState<DreReportData | null>(null)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false)
+  const [isInsightsSheetOpen, setIsInsightsSheetOpen] = useState<boolean>(false)
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     "1_receita_bruta": true,
     "2_deducoes": true,
@@ -238,20 +242,26 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            leftIcon={<ExportFileIcon size={16} />}
+          <Dropdown
+            trigger={
+              <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                Ações
+              </Button>
+            }
+            align="right"
+            showChevron={false}
+            fullWidth={false}
           >
-            Exportar Excel
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            leftIcon={<PrinterIcon size={16} />}
-          >
-            Imprimir / PDF
-          </Button>
+            <DropdownItem onClick={() => setIsInsightsSheetOpen(true)}>
+              <StarIcon size={18} /> Alertas & Insights
+            </DropdownItem>
+            <DropdownItem onClick={handleExportExcel}>
+              <ExportFileIcon size={18} /> Exportar Excel
+            </DropdownItem>
+            <DropdownItem onClick={handleExportPdf}>
+              <PrinterIcon size={18} /> Imprimir / PDF
+            </DropdownItem>
+          </Dropdown>
         </div>
       </div>
 
@@ -286,28 +296,10 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
         setFilters={setFilters}
         isAllExpanded={isAllExpanded}
         onToggleExpandAll={toggleExpandAll}
+        onOpenInsights={() => setIsInsightsSheetOpen(true)}
+        onExportExcel={handleExportExcel}
+        onPrintPdf={handleExportPdf}
       />
-
-      {/* ── InfoCards Padrão do ERP para Avisos Contábeis ─────────────────────── */}
-      {report?.alerts && (
-        <div className="space-y-3 px-4 md:px-8 mb-6 print:hidden">
-          {report.alerts.zeroCostItemsCount > 0 && (
-            <InfoCard
-              title="Aviso de Custo"
-              message={`Foram identificados ${report.alerts.zeroCostItemsCount} itens vendidos sem preço de custo unitário cadastrado. Cadastre o custo nos produtos para que o CMV e a Margem Bruta tenham 100% de exatidão contábil.`}
-              color="orange"
-            />
-          )}
-
-          {report.alerts.unclassifiedTransactionsCount > 0 && (
-            <InfoCard
-              title="Movimentações Sem Classificação"
-              message={`Existem ${report.alerts.unclassifiedTransactionsCount} movimentações financeiras sem classificação contábil vinculada (${formatCurrency(report.alerts.unclassifiedTransactionsAmount)}). Foram atribuídas provisoriamente em Despesas Gerais.`}
-              color="blue"
-            />
-          )}
-        </div>
-      )}
 
       {loading ? (
         <div className="py-24 mx-4 md:px-8 flex flex-col items-center justify-center space-y-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px]">
@@ -485,6 +477,13 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
           )}
         </>
       ) : null}
+
+      {/* ── Sheet de Alertas & Insights Contábeis ────────────────────────────── */}
+      <DreInsightsSheet
+        isOpen={isInsightsSheetOpen}
+        onClose={() => setIsInsightsSheetOpen(false)}
+        alerts={report?.alerts}
+      />
 
       {/* ── Modal de Impressão e Pré-visualização A4 / PDF ───────────────────── */}
       <DrePrintModal

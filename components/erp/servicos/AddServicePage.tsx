@@ -65,7 +65,13 @@ interface AddServicePageProps {
     partnerId?: string
     storeId?: string
     isLoadingDetails?: boolean
-    onSave?: (data: any, isDraft?: boolean) => Promise<void>
+    onSave?: (data: any, isDraft?: boolean) => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: leitura das categorias via action admin (service role). */
+    metadataLoader?: (partnerId: string) => Promise<{ success?: boolean; data?: { categories: any[] }; error?: string }>
+    /** Painel admin: exclusão via action admin (com audit log). */
+    onDeleteConfirm?: () => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: arquivar/desarquivar via action admin. */
+    onArchiveToggle?: (isCurrentlyArchived: boolean) => Promise<{ success?: boolean; error?: string } | void>
     partner?: any
 }
 
@@ -74,6 +80,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     isSaving = false, serviceId, initialData, onClose,
     partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
     onSave,
+    metadataLoader,
+    onDeleteConfirm,
+    onArchiveToggle,
     partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
@@ -152,11 +161,13 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
     const loadCategories = useCallback(async () => {
         if (!partnerId) return
-        const res = await getServiceMetadataAction(partnerId)
+        const res = metadataLoader
+            ? await metadataLoader(partnerId)
+            : await getServiceMetadataAction(partnerId)
         if (res.success && res.data) {
             setCategories(res.data.categories)
         }
-    }, [partnerId])
+    }, [partnerId, metadataLoader])
 
     useEffect(() => {
         loadCategories()
@@ -379,12 +390,18 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const handleDeleteService = useCallback(async () => {
         if (!initialService?.id && !serviceId) return
         try {
-            const result = await deleteServiceAction(initialService?.id || serviceId!)
-            if (result.success) { toast({ title: "Sucesso", description: "Serviço excluído" }); setTimeout(() => onBack(), 300) }
-            else toast({ title: "Erro", description: result.error, variant: "destructive" })
+            if (onDeleteConfirm) {
+                const res = await onDeleteConfirm()
+                if (res && res.success === false) toast({ title: "Erro", description: res.error, variant: "destructive" })
+                else { toast({ title: "Sucesso", description: "Serviço excluído" }); setTimeout(() => onBack(), 300) }
+            } else {
+                const result = await deleteServiceAction(initialService?.id || serviceId!)
+                if (result.success) { toast({ title: "Sucesso", description: "Serviço excluído" }); setTimeout(() => onBack(), 300) }
+                else toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
         } catch { toast({ title: "Erro", variant: "destructive" }) }
         finally { setShowDeleteModal(false) }
-    }, [initialService, serviceId, onBack, toast])
+    }, [initialService, serviceId, onBack, toast, onDeleteConfirm])
 
     const handleSaveService = useCallback(async () => {
         if (isSubmittingRef.current) return
@@ -491,25 +508,25 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 isDuplicate: internalMode === "duplicate",
             }
 
-            const dbPromise = internalMode === "edit" && (initialService?.id || serviceId)
-                ? updateServiceAction({ ...payload, id: initialService?.id || serviceId! })
-                : createServiceAction(payload)
+            const result = onSave
+                ? await onSave(payload)
+                : internalMode === "edit" && (initialService?.id || serviceId)
+                    ? await updateServiceAction({ ...payload, id: initialService?.id || serviceId! })
+                    : await createServiceAction(payload)
 
-            const result = await dbPromise
-
-            if (result.success) {
+            if (result && (result as any).success === false) {
+                notifyError((result as any).error || "Erro ao salvar")
+            } else {
                 notifySuccess(internalMode === "edit" ? "Serviço atualizado!" : "Serviço criado!")
                 onClose?.()
                 if (!onClose) onBack()
-            } else {
-                notifyError(result.error || "Erro ao salvar")
             }
         } catch (err) { console.error(err); notifyError("Erro ao salvar serviço") }
         finally {
             setIsSavingService(false)
             isSubmittingRef.current = false
         }
-    }, [validateServiceData, serviceData, partnerId, storeId, internalMode, initialService, serviceId, notifySuccess, notifyError, onClose, onBack, blockedImages])
+    }, [validateServiceData, serviceData, partnerId, storeId, internalMode, initialService, serviceId, notifySuccess, notifyError, onClose, onBack, blockedImages, onSave])
 
     const handleGenerateRandomCode = useCallback(() => {
         const randomCode = generateSKUBase(serviceData.name)
@@ -533,14 +550,24 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         const isCurrentlyArchived = serviceData.status === "arquivado" || serviceData.status === "archived"
         setIsArchivingService(true)
         try {
-            const res = isCurrentlyArchived
-                ? await unarchiveServiceAction(serviceData.id)
-                : await archiveServiceAction(serviceData.id)
-            if (!res.success) {
-                toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
+            if (onArchiveToggle) {
+                const res = await onArchiveToggle(isCurrentlyArchived)
+                if (res && res.success === false) {
+                    toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: res.error, variant: "destructive" })
+                } else {
+                    toast({ title: isCurrentlyArchived ? "Serviço desarquivado e reativado." : "Serviço arquivado com sucesso." })
+                    onClose?.()
+                }
             } else {
-                toast({ title: isCurrentlyArchived ? "Serviço desarquivado e reativado." : "Serviço arquivado com sucesso." })
-                onClose?.()
+                const res = isCurrentlyArchived
+                    ? await unarchiveServiceAction(serviceData.id)
+                    : await archiveServiceAction(serviceData.id)
+                if (!res.success) {
+                    toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
+                } else {
+                    toast({ title: isCurrentlyArchived ? "Serviço desarquivado e reativado." : "Serviço arquivado com sucesso." })
+                    onClose?.()
+                }
             }
         } catch (e: any) {
             toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
@@ -548,7 +575,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             setIsArchivingService(false)
             setShowArchiveModal(false)
         }
-    }, [serviceData.id, serviceData.status, toast, onClose])
+    }, [serviceData.id, serviceData.status, toast, onClose, onArchiveToggle])
 
     const dateCreated = serviceData.created_at ? new Date(serviceData.created_at).toLocaleDateString("pt-BR") : "N/A"
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])

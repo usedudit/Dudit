@@ -63,6 +63,14 @@ export enum AdminActionType {
     PRODUCT_SOFT_DELETE = "product.soft_delete",
     SERVICE_SOFT_DELETE = "service.soft_delete",
 
+    // Catalog admin editing (admin acting on seller catalog)
+    CATALOG_PRODUCT_UPDATE = "catalog.product_update",
+    CATALOG_PRODUCT_CREATE = "catalog.product_create",
+    CATALOG_SERVICE_UPDATE = "catalog.service_update",
+    CATALOG_SERVICE_CREATE = "catalog.service_create",
+    CATALOG_PLAN_UPDATE = "catalog.plan_update",
+    CATALOG_PLAN_CREATE = "catalog.plan_create",
+
     // Deletions
     RECURRING_PLAN_DELETE = "recurring_plan.delete",
     REVIEW_DELETE = "review.delete",
