@@ -14,7 +14,7 @@ export default async function AdminCatalogServiceDetailPage({
     const res = await getAdminCatalogServiceDetail(id)
     if (!res.success || !res.data) notFound()
 
-    const { service, store, partner } = res.data
+    const { service, store, partner, auditEvents } = res.data
 
     return (
         <>
@@ -24,6 +24,8 @@ export default async function AdminCatalogServiceDetailPage({
                 partnerId={service.partner_id}
                 businessInfo={partner?.business_info}
                 store={store}
+                partnerName={partner?.name}
+                auditEvents={auditEvents}
             />
         </>
     )

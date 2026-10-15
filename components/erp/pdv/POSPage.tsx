@@ -1915,7 +1915,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                         exit={{ opacity: 0 }}
                                         className="mt-auto border-t border-brand-border pt-6"
                                     >
-                                        <h4 className="mb-4 text-xl font-bold text-brand-dark dark:text-dark-heading">Pedidos em pré-venda</h4>
+                                        <h4 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Pedidos em pré-venda</h4>
                                         <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
                                             {preSales.slice(0, preSaleLimit).map((preSale, index) => (
                                                 <div key={preSale.id} className="relative group">
@@ -2040,7 +2040,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 ].map((opt, i, arr) => (
                                     <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                                         <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
-                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
+                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => { }} />
                                     </div>
                                 ))}
                             </div>
@@ -2058,7 +2058,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 ].map((opt, i, arr) => (
                                     <div key={opt.value} onClick={() => { handleItemTypeTabChange(opt.value); setIsTypeFilterModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                                         <span className={`text-[16px] ${itemTypeTab === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
-                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => {}} />
+                                        <RadioButton name="itemType" value={opt.value} checked={itemTypeTab === opt.value} onChange={() => { }} />
                                     </div>
                                 ))}
                             </div>

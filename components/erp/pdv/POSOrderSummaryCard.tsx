@@ -168,12 +168,12 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
                 {hasDelivery && (
                     <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-1.5">
-                            Taxa de entrega
+                            <span className="font-medium">Taxa de entrega</span>
                             {onRemoveShipping && (
                                 <button
                                     type="button"
                                     onClick={onRemoveShipping}
-                                    className="rounded p-0.5 text-brand-red hover:bg-brand-red/10 transition-colors"
+                                    className="rounded-full p-0.5 text-brand-red hover:bg-brand-red/10 transition-colors"
                                     title="Remover entrega"
                                 >
                                     <TrashIcon className="h-3.5 w-3.5" />

@@ -62,6 +62,8 @@ interface NewRecurringPlanPageProps {
         data?: { products?: any[]; services?: any[]; staff?: any[] }
         error?: string
     }>
+    /** Painel admin: abas extras na TabsList do header (ex.: Comprador e Loja, Histórico & Auditoria). */
+    extraTabs?: Array<{ value: string; label: React.ReactNode; content: React.ReactNode }>
 }
 
 type FormData = {
@@ -84,6 +86,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     onError,
     onSave,
     loadFormData,
+    extraTabs,
 }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { setHeaderOverride } = useSidebar()
@@ -624,6 +627,11 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                 <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />
                                             )}
                                         </TabsTrigger>
+                                        {extraTabs?.map((tab) => (
+                                            <TabsTrigger key={tab.value} value={tab.value}>
+                                                {tab.label}
+                                            </TabsTrigger>
+                                        ))}
                                     </TabsList>
                                 </div>
                             </div>
@@ -1073,6 +1081,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                     )}
                                 </FadeIn>
                             </TabsContent>
+
+                            {extraTabs?.map((tab) => (
+                                <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                                    <FadeIn key={tab.value}>{tab.content}</FadeIn>
+                                </TabsContent>
+                            ))}
 
                         </div>
 

@@ -319,7 +319,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
             ...logistics,
         }
 
-        const [suppliersRes, store, partnerRes] = await Promise.all([
+        const [suppliersRes, store, partnerRes, auditRes] = await Promise.all([
             admin
                 .from("suppliers")
                 .select("id, name, email, phone, cnpj, cpf, status")
@@ -327,6 +327,12 @@ export async function getAdminCatalogProductDetail(productId: string) {
                 .order("name"),
             fetchHeadStore(admin, raw.partner_id),
             admin.from("partners").select("id, name, business_info").eq("id", raw.partner_id).maybeSingle(),
+            admin
+                .from("admin_audit_logs")
+                .select("*")
+                .eq("target_id", id)
+                .order("created_at", { ascending: false })
+                .limit(100),
         ])
 
         return successResponse({
@@ -334,6 +340,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
             suppliers: suppliersRes.data || [],
             store,
             partner: partnerRes.data || null,
+            auditEvents: (auditRes.data as any[]) || [],
         })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao carregar produto")
@@ -355,19 +362,26 @@ export async function getAdminCatalogServiceDetail(serviceId: string) {
         if (error) return errorResponse(error.message)
         if (!service) return errorResponse("Serviço não encontrado")
 
-        const [store, partnerRes] = await Promise.all([
+        const [store, partnerRes, auditRes] = await Promise.all([
             fetchHeadStore(admin, (service as any).partner_id),
             admin
                 .from("partners")
                 .select("id, name, business_info")
                 .eq("id", (service as any).partner_id)
                 .maybeSingle(),
+            admin
+                .from("admin_audit_logs")
+                .select("*")
+                .eq("target_id", id)
+                .order("created_at", { ascending: false })
+                .limit(100),
         ])
 
         return successResponse({
             service,
             store,
             partner: partnerRes.data || null,
+            auditEvents: (auditRes.data as any[]) || [],
         })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao carregar serviço")
@@ -417,16 +431,27 @@ export async function getAdminCatalogPlanDetail(planId: string) {
             })),
         }
 
-        const [store, partnerRes] = await Promise.all([
+        const [store, partnerRes, auditRes] = await Promise.all([
             fetchHeadStore(admin, (row as any).partner_id),
             admin
                 .from("partners")
                 .select("id, name, business_info")
                 .eq("id", (row as any).partner_id)
                 .maybeSingle(),
+            admin
+                .from("admin_audit_logs")
+                .select("*")
+                .eq("target_id", id)
+                .order("created_at", { ascending: false })
+                .limit(100),
         ])
 
-        return successResponse({ plan, store, partner: partnerRes.data || null })
+        return successResponse({
+            plan,
+            store,
+            partner: partnerRes.data || null,
+            auditEvents: (auditRes.data as any[]) || [],
+        })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao carregar plano")
     }

@@ -1,6 +1,6 @@
 import { AdminHeader } from "@/components/admin/admin-header"
 import { getModerationItemDetail } from "@/app/actions/admin/moderation"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import AdminModerationDetailClientWrapper from "./AdminModerationDetailClientWrapper"
 
 export const dynamic = "force-dynamic"
@@ -16,6 +16,10 @@ export default async function AdminModerationDetailPage({
 
     const item = result.data
     const typeLabel = item.type === "product" ? "Produto" : item.type === "service" ? "Serviço" : "Item"
+
+    // Produto/serviço abrem a tela de detalhe do catálogo (form ERP + abas).
+    if (item.type === "product") redirect(`/ddt-admin/catalog/products/${id}`)
+    if (item.type === "service") redirect(`/ddt-admin/catalog/services/${id}`)
 
     return (
         <>

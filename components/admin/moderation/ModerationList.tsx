@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
 import ModerationListRow from "./ModerationListRow"
 import ModerationPageControls from "./ModerationPageControls"
@@ -22,6 +23,7 @@ interface ModerationListProps {
 
 const ModerationList = ({ initialData }: ModerationListProps) => {
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+    const router = useRouter()
     const [statusFilter, setStatusFilter] = useState("all")
     const [isPending, startTransition] = useTransition()
     const [items, setItems] = useState<ModerationItem[]>(initialData?.data || [])
@@ -42,6 +44,22 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 toast.error(result.error || `Erro ao aprovar ${label}`)
             }
         })
+    }
+
+    // ─── Detail Handler ─────────────────────────────────────────────────────────
+    // Produto/serviço abrem a tela de detalhe do catálogo (form ERP + abas de
+    // Comprador e Loja / Histórico & Auditoria). Demais tipos seguem no detalhe
+    // inline da moderação.
+    const handleDetail = (item: ModerationItem) => {
+        if (item.type === "product") {
+            router.push(`/ddt-admin/catalog/products/${item.id}`)
+            return
+        }
+        if (item.type === "service") {
+            router.push(`/ddt-admin/catalog/services/${item.id}`)
+            return
+        }
+        openEntity("view", item.id)
     }
 
     // ─── Refresh Handler ──────────────────────────────────────────────────────
@@ -204,7 +222,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                         <div
                                             key={item.id}
                                             className="py-4 flex items-start gap-3 cursor-pointer"
-                                            onClick={() => openEntity("view", item.id)}
+                                            onClick={() => handleDetail(item)}
                                         >
                                             <div className="w-14 h-14 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                 {item.images?.[0] ? (
@@ -273,7 +291,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                                         key={item.id}
                                                         item={item}
                                                         isPending={isPending}
-                                                        onDetail={() => openEntity("view", item.id)}
+                                                        onDetail={handleDetail}
                                                         onApprove={handleApprove}
                                                     />
                                                 ))}

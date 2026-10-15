@@ -72,6 +72,10 @@ interface AddServicePageProps {
     onDeleteConfirm?: () => Promise<{ success?: boolean; error?: string } | void>
     /** Painel admin: arquivar/desarquivar via action admin. */
     onArchiveToggle?: (isCurrentlyArchived: boolean) => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: abas extras na TabsList do header (ex.: Comprador e Loja, Histórico & Auditoria). */
+    extraTabs?: Array<{ value: string; label: React.ReactNode; content: React.ReactNode }>
+    /** Painel admin: itens extras (ações de admin) no ActionsDropdown (desktop e mobile). */
+    extraDropdownItems?: React.ReactNode
     partner?: any
 }
 
@@ -83,6 +87,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     metadataLoader,
     onDeleteConfirm,
     onArchiveToggle,
+    extraTabs,
+    extraDropdownItems,
     partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
@@ -646,7 +652,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                             onArchive={!isArchived ? handleArchiveService : undefined}
                                                             onUnarchive={isArchived ? handleUnarchiveService : undefined}
                                                             onDelete={() => setShowDeleteModal(true)}
-                                                        />
+                                                        >
+                                                            {extraDropdownItems}
+                                                        </ActionsDropdown>
                                                     )
                                                 })()}
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails} leftIcon={<EditIcon size={18} />}>
@@ -687,6 +695,11 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                 </span>
                                             </TabsTrigger>
                                         )}
+                                        {extraTabs?.map((tab) => (
+                                            <TabsTrigger key={tab.value} value={tab.value} disabled={isLoadingDetails}>
+                                                {tab.label}
+                                            </TabsTrigger>
+                                        ))}
                                     </TabsList>
                                 )}
                                 </div>
@@ -769,6 +782,13 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                         )}
                                     </FadeIn>
                                 )}
+                                {extraTabs?.map((tab) =>
+                                    activeTab === tab.value ? (
+                                        <FadeIn key={tab.value} className="block">
+                                            {tab.content}
+                                        </FadeIn>
+                                    ) : null
+                                )}
                             </AnimatePresence>
                         </div>
                     </div>
@@ -810,7 +830,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             Opções
                                         </Button>
                                     }
-                                />
+                                >
+                                    {extraDropdownItems}
+                                </ActionsDropdown>
                                 <Button
                                     onClick={enterEditMode}
                                     className="flex-1 whitespace-nowrap"

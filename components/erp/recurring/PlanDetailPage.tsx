@@ -45,6 +45,10 @@ interface PlanDetailPageProps {
   loadFormData?: (
     partnerId: string,
   ) => Promise<{ success?: boolean; data?: { staff?: Array<{ id: string; display_name: string }> }; error?: string }>
+  /** Painel admin: abas extras na TabsList do header (ex.: Comprador e Loja, Histórico & Auditoria). */
+  extraTabs?: Array<{ value: string; label: React.ReactNode; content: React.ReactNode }>
+  /** Painel admin: itens extras (ações de admin) no ActionsDropdown (desktop e mobile). */
+  extraDropdownItems?: React.ReactNode
 }
 
 const SidebarRow = ({
@@ -98,9 +102,11 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
   onShare,
   onDelete,
   loadFormData,
+  extraTabs,
+  extraDropdownItems,
 }) => {
   const { setHeaderOverride } = useSidebar()
-  const [activeTab, setActiveTab] = useState<DetailTab>("general")
+  const [activeTab, setActiveTab] = useState<string>("general")
   const [isScrolled, setIsScrolled] = useState(false)
   const [staff, setStaff] = useState<Array<{ id: string; display_name: string }>>([])
 
@@ -158,12 +164,15 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
     [items],
   )
 
-  const hasDropdownContent = Boolean(onShare) || (canManage && Boolean(onDelete))
+  const hasDropdownContent =
+    Boolean(onShare) || (canManage && Boolean(onDelete)) || Boolean(extraDropdownItems)
   const dropdown = hasDropdownContent ? (
     <ActionsDropdown
       onShare={onShare ? () => onShare(plan) : undefined}
       onDelete={canManage && onDelete ? () => onDelete(plan) : undefined}
-    />
+    >
+      {extraDropdownItems}
+    </ActionsDropdown>
   ) : null
 
   if (!plan) return <ERPDetailLoading />
@@ -171,7 +180,7 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
   return (
     <FadeIn>
       <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DetailTab)} className="flex flex-col h-full w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -229,6 +238,11 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
                   <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                     <TabsTrigger value="general">Dados gerais</TabsTrigger>
                     <TabsTrigger value="items">Itens do plano</TabsTrigger>
+                    {extraTabs?.map((tab) => (
+                      <TabsTrigger key={tab.value} value={tab.value}>
+                        {tab.label}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
                 </div>
               </div>
@@ -504,6 +518,14 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
                     )}
                   </FadeIn>
                 )}
+
+                {extraTabs?.map((tab) =>
+                  activeTab === tab.value ? (
+                    <FadeIn key={tab.value} className="block">
+                      {tab.content}
+                    </FadeIn>
+                  ) : null,
+                )}
               </AnimatePresence>
             </div>
           </div>
@@ -524,7 +546,9 @@ export const PlanDetailPage: React.FC<PlanDetailPageProps> = ({
                   }
                   onShare={onShare ? () => onShare(plan) : undefined}
                   onDelete={canManage && onDelete ? () => onDelete(plan) : undefined}
-                />
+                >
+                  {extraDropdownItems}
+                </ActionsDropdown>
               )}
               <Button
                 className="flex-1 whitespace-nowrap"

@@ -126,6 +126,10 @@ interface AddProductPageProps {
     onDeleteConfirm?: () => Promise<{ success?: boolean; error?: string } | void>
     /** Painel admin: arquivar/desarquivar via action admin em vez das actions do ERP. */
     onArchiveToggle?: (isCurrentlyArchived: boolean) => Promise<{ success?: boolean; error?: string } | void>
+    /** Painel admin: abas extras na TabsList do header (ex.: Comprador e Loja, Histórico & Auditoria). */
+    extraTabs?: Array<{ value: string; label: React.ReactNode; content: React.ReactNode }>
+    /** Painel admin: itens extras (ações de admin) no ActionsDropdown (desktop e mobile). */
+    extraDropdownItems?: React.ReactNode
     partner?: any
 }
 
@@ -136,6 +140,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     onSave,
     onDeleteConfirm,
     onArchiveToggle,
+    extraTabs,
+    extraDropdownItems,
     partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
@@ -1047,7 +1053,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                             onArchive={!isArchived ? handleArchiveProduct : undefined}
                                                             onUnarchive={isArchived ? handleUnarchiveProduct : undefined}
                                                             onDelete={() => setShowDeleteModal(true)}
-                                                        />
+                                                        >
+                                                            {extraDropdownItems}
+                                                        </ActionsDropdown>
                                                     )
                                                 })()}
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />} disabled={isLoadingDetails}>
@@ -1099,9 +1107,15 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                         {metricsPlanBlocked ? (
                                                             <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
                                                         ) : null}
+                                                        {getTabErrorCount("metrics") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                     </span>
                                                 </TabsTrigger>
                                             )}
+                                            {extraTabs?.map((tab) => (
+                                                <TabsTrigger key={tab.value} value={tab.value} disabled={isLoadingDetails}>
+                                                    {tab.label}
+                                                </TabsTrigger>
+                                            ))}
                                         </TabsList>
                                     </div>
                                 )}
@@ -1201,6 +1215,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                         )}
                                     </FadeIn>
                                 )}
+                                {extraTabs?.map((tab) =>
+                                    activeTab === tab.value ? (
+                                        <FadeIn key={tab.value} className="block">
+                                            {tab.content}
+                                        </FadeIn>
+                                    ) : null
+                                )}
                             </AnimatePresence>
                         </div>
                     </div>
@@ -1250,7 +1271,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             Opções
                                         </Button>
                                     }
-                                />
+                                >
+                                    {extraDropdownItems}
+                                </ActionsDropdown>
                                 <Button
                                     onClick={enterEditMode}
                                     className="flex-1 h-12"

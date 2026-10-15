@@ -115,7 +115,7 @@ export default async function AdminCatalogProductDetailPage({
     const res = await getAdminCatalogProductDetail(id)
     if (!res.success || !res.data) notFound()
 
-    const { product, suppliers, store, partner } = res.data
+    const { product, suppliers, store, partner, auditEvents } = res.data
     const formattedProduct = formatProductForForm(product)
 
     return (
@@ -127,6 +127,8 @@ export default async function AdminCatalogProductDetailPage({
                 partnerId={product.partner_id}
                 businessInfo={partner?.business_info}
                 store={store}
+                partnerName={partner?.name}
+                auditEvents={auditEvents}
             />
         </>
     )

@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import React, { useState, useTransition, useRef, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon } from "@/lib/icons"
 import { Button, Input, Badge, FormDropdown, AlertModal, FormSection, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, IconPlaceholder, SidebarCard } from "@/components/reusable"
 import { FormTextarea } from "@/components/reusable"
@@ -183,6 +184,14 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
     const rtype = result?.type as SearchType | undefined
     const hasVariants = rtype === "product" && ((data as FetchedProduct)?.variants?.length ?? 0) > 0
     const isPartner = rtype === "partner"
+    const detailHref =
+        rtype === "product" && data?.id
+            ? `/ddt-admin/catalog/products/${data.id}`
+            : rtype === "service" && data?.id
+                ? `/ddt-admin/catalog/services/${data.id}`
+                : rtype === "recurring_plan" && data?.id
+                    ? `/ddt-admin/catalog/plans/${data.id}`
+                    : null
 
     return (
         <FadeIn>
@@ -333,7 +342,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
 
                             {/* Manual Result Tabs */}
                             {result && (
-                                <div className="px-0 md:px-0 mb-6">
+                                <div className="px-0 md:px-0 mb-6 flex items-center justify-between gap-3 flex-wrap">
                                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                                         <TabsList className="px-0">
                                             <TabsTrigger value="general">Dados gerais</TabsTrigger>
@@ -341,6 +350,14 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                             {isPartner && <TabsTrigger value="gallery">Galeria</TabsTrigger>}
                                         </TabsList>
                                     </Tabs>
+                                    {detailHref && (
+                                        <Link
+                                            href={detailHref}
+                                            className="text-sm font-bold text-brand-green hover:underline"
+                                        >
+                                            Ver tela de detalhes →
+                                        </Link>
+                                    )}
                                 </div>
                             )}
 

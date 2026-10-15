@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 import { AdminCatalogProviders } from "./AdminCatalogProviders"
 import PlanDetailPage from "@/components/erp/recurring/PlanDetailPage"
 import NewRecurringPlanPage from "@/components/erp/recurring/NewRecurringPlanPage"
@@ -11,6 +10,7 @@ import {
     deleteAdminRecurringPlan,
     getAdminPlanFormData,
 } from "@/app/actions/admin/catalog"
+import { CatalogPartiesTab, CatalogTimelineTab } from "./AdminCatalogDetailTabs"
 import { useNotification } from "@/hooks/use-notification"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -21,6 +21,8 @@ interface AdminPlanDetailClientProps {
     partnerId: string
     businessInfo?: unknown
     store?: any
+    partnerName?: string | null
+    auditEvents?: any[]
 }
 
 export default function AdminPlanDetailClient({
@@ -28,12 +30,16 @@ export default function AdminPlanDetailClient({
     partnerId,
     businessInfo,
     store,
+    partnerName,
+    auditEvents,
 }: AdminPlanDetailClientProps) {
     const router = useRouter()
     const [view, setView] = useState<"detail" | "edit">("detail")
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const { success: notifySuccess, error: notifyError } = useNotification()
+
+    const handleBack = () => router.push("/ddt-admin/moderation")
 
     const handleSave = async (payload: any): Promise<{ success?: boolean; error?: string } | void> => {
         const res: any = await updateAdminRecurringPlan({ ...payload, planId: plan.id })
@@ -50,7 +56,7 @@ export default function AdminPlanDetailClient({
             const res: any = await deleteAdminRecurringPlan(plan.id)
             if (res?.success) {
                 notifySuccess("Plano excluído", res.message || "Plano removido do catálogo.")
-                router.push("/ddt-admin/catalog/plans")
+                router.push("/ddt-admin/moderation")
             } else {
                 notifyError("Erro", res?.error || "Erro ao excluir plano")
             }
@@ -62,6 +68,26 @@ export default function AdminPlanDetailClient({
         }
     }
 
+    const extraTabs = [
+        {
+            value: "parties",
+            label: "Comprador e Loja",
+            content: (
+                <CatalogPartiesTab
+                    store={store}
+                    partnerName={partnerName}
+                    partnerId={partnerId}
+                    itemId={plan.id}
+                />
+            ),
+        },
+        {
+            value: "timeline",
+            label: "Histórico & Auditoria",
+            content: <CatalogTimelineTab events={auditEvents} createdAt={plan.createdAt || plan.created_at} />,
+        },
+    ]
+
     return (
         <AdminCatalogProviders
             partnerId={partnerId}
@@ -69,17 +95,17 @@ export default function AdminPlanDetailClient({
             initialStores={store ? [store] : []}
         >
             <div className="px-4 md:px-8 pt-4 pb-8">
-                {store && <AdminStoreCard store={store} />}
                 {view === "detail" ? (
                     <PlanDetailPage
                         key={`plan-detail-${plan.id}`}
                         partnerId={partnerId}
                         plan={plan}
-                        onBack={() => router.push("/ddt-admin/catalog/plans")}
+                        onBack={handleBack}
                         canManage
                         onEdit={() => setView("edit")}
                         onDelete={() => setShowDeleteModal(true)}
                         loadFormData={getAdminPlanFormData}
+                        extraTabs={extraTabs}
                     />
                 ) : (
                     <NewRecurringPlanPage
@@ -89,6 +115,7 @@ export default function AdminPlanDetailClient({
                         onBack={() => setView("detail")}
                         onSave={handleSave}
                         loadFormData={getAdminPlanFormData}
+                        extraTabs={extraTabs}
                     />
                 )}
             </div>

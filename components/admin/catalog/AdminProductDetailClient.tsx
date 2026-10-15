@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 import { AdminCatalogProviders } from "./AdminCatalogProviders"
 import AddProductPage from "@/components/erp/product/AddProductPage"
 import {
@@ -10,6 +9,11 @@ import {
     deleteAdminCatalogProduct,
     setAdminCatalogProductArchived,
 } from "@/app/actions/admin/catalog"
+import {
+    CatalogPartiesTab,
+    CatalogTimelineTab,
+    useCatalogModeration,
+} from "./AdminCatalogDetailTabs"
 import { useNotification } from "@/hooks/use-notification"
 import { UNITS } from "@/lib/constants/product-constants"
 
@@ -19,6 +23,8 @@ interface AdminProductDetailClientProps {
     partnerId: string
     businessInfo?: unknown
     store?: any
+    partnerName?: string | null
+    auditEvents?: any[]
 }
 
 export default function AdminProductDetailClient({
@@ -27,12 +33,23 @@ export default function AdminProductDetailClient({
     partnerId,
     businessInfo,
     store,
+    partnerName,
+    auditEvents,
 }: AdminProductDetailClientProps) {
     const router = useRouter()
     const [mode, setMode] = useState<"add" | "details" | "edit" | "duplicate">("details")
     const [isSaving, setIsSaving] = useState(false)
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [unidadesMedida] = useState(() => UNITS.map((unit) => ({ codigo: unit, descricao: unit })))
+
+    const handleBack = () => router.push("/ddt-admin/moderation")
+
+    const moderation = useCatalogModeration({
+        itemId: product.id,
+        type: "product",
+        moderationStatus: product.moderation_status,
+        onDone: () => router.refresh(),
+    })
 
     const handleSave = async (payload: any): Promise<{ success: boolean; error?: string }> => {
         setIsSaving(true)
@@ -80,6 +97,26 @@ export default function AdminProductDetailClient({
         return { success: false, error: result.error }
     }
 
+    const extraTabs = [
+        {
+            value: "parties",
+            label: "Comprador e Loja",
+            content: (
+                <CatalogPartiesTab
+                    store={store}
+                    partnerName={partnerName}
+                    partnerId={partnerId}
+                    itemId={product.id}
+                />
+            ),
+        },
+        {
+            value: "timeline",
+            label: "Histórico & Auditoria",
+            content: <CatalogTimelineTab events={auditEvents} createdAt={product.created_at} />,
+        },
+    ]
+
     return (
         <AdminCatalogProviders
             partnerId={partnerId}
@@ -87,9 +124,8 @@ export default function AdminProductDetailClient({
             initialStores={store ? [store] : []}
         >
             <div className="px-4 md:px-8 pt-4 pb-8">
-                {store && <AdminStoreCard store={store} />}
                 <AddProductPage
-                    onBack={() => router.push("/ddt-admin/catalog/products")}
+                    onBack={handleBack}
                     product={product}
                     mode={mode}
                     setMode={setMode}
@@ -101,8 +137,12 @@ export default function AdminProductDetailClient({
                     unidadesMedida={unidadesMedida}
                     partnerId={partnerId}
                     onClose={() => router.refresh()}
+                    extraTabs={extraTabs}
+                    extraDropdownItems={moderation.dropdownItems}
                 />
             </div>
+
+            {moderation.modals}
         </AdminCatalogProviders>
     )
 }
