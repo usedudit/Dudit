@@ -75,6 +75,11 @@ export async function syncToExploreRedis({
   silent = false,
   throwOnError = false
 }: SyncItemOptions): Promise<boolean> {
+  // Silent updates (e.g. stock decrements, inventory ticks, views) do not touch Redis
+  if (silent && !removeFromRedis) {
+    return true
+  }
+
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
   const dataKey = getExploreRedisDataKey(type, id)

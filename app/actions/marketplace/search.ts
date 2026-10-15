@@ -3,7 +3,6 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
-import { redis } from "@/lib/redis"
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"

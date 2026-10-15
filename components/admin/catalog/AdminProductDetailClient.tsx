@@ -14,6 +14,8 @@ import {
     CatalogTimelineTab,
     useCatalogModeration,
 } from "./AdminCatalogDetailTabs"
+import { useAdminActionModal, type AdminActionResult } from "../AdminActionModal"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
 import { useNotification } from "@/hooks/use-notification"
 import { UNITS } from "@/lib/constants/product-constants"
 
@@ -40,6 +42,7 @@ export default function AdminProductDetailClient({
     const [mode, setMode] = useState<"add" | "details" | "edit" | "duplicate">("details")
     const [isSaving, setIsSaving] = useState(false)
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { modal: actionModal, runAction } = useAdminActionModal()
     const [unidadesMedida] = useState(() => UNITS.map((unit) => ({ codigo: unit, descricao: unit })))
 
     const handleBack = () => router.push("/ddt-admin/moderation")
@@ -51,7 +54,7 @@ export default function AdminProductDetailClient({
         onDone: () => router.refresh(),
     })
 
-    const handleSave = async (payload: any): Promise<{ success: boolean; error?: string }> => {
+    const handleSave = async (payload: any): Promise<{ success: boolean; error?: string; cancelled?: boolean }> => {
         setIsSaving(true)
         try {
             const {
@@ -63,7 +66,24 @@ export default function AdminProductDetailClient({
                 isDuplicate: _isDuplicate,
                 ...data
             } = payload
-            const result = await updateAdminProduct(product.id, data)
+            const changedFields = diffChangedFields(product, data)
+            const result = await runAction({
+                title: "Salvar alterações",
+                description: `Produto "${product.name}"`,
+                changedFields,
+                confirmLabel: "Salvar",
+                runner: async (actionPayload) => {
+                    const res = await updateAdminProduct(product.id, data, {
+                        reason: actionPayload.reason || null,
+                        riskScore: actionPayload.riskScore,
+                        notifySeller: actionPayload.notifySeller,
+                        changedFields,
+                    })
+                    if (res.success) return { success: true }
+                    return { success: false, error: res.error }
+                },
+            })
+            if (result.cancelled) return { success: false, cancelled: true }
             if (result.success) {
                 notifySuccess("Produto atualizado", "Produto atualizado com sucesso!")
                 setMode("details")
@@ -80,22 +100,41 @@ export default function AdminProductDetailClient({
         }
     }
 
-    const handleDeleteConfirm = async (): Promise<{ success: boolean; error?: string }> => {
-        const result = await deleteAdminCatalogProduct(product.id)
-        if (result.success) return { success: true }
-        return { success: false, error: result.error }
-    }
+    const handleDeleteConfirm = async (): Promise<AdminActionResult> =>
+        runAction({
+            title: "Excluir produto",
+            description: `Produto "${product.name}". O time do vendedor será notificado.`,
+            requireReason: true,
+            confirmLabel: "Excluir",
+            runner: async (actionPayload) => {
+                const res = await deleteAdminCatalogProduct(product.id, {
+                    reason: actionPayload.reason,
+                    riskScore: actionPayload.riskScore,
+                    notifySeller: actionPayload.notifySeller,
+                })
+                return res.success ? { success: true } : { success: false, error: res.error }
+            },
+        })
 
-    const handleArchiveToggle = async (
-        isCurrentlyArchived: boolean,
-    ): Promise<{ success: boolean; error?: string }> => {
-        const result = await setAdminCatalogProductArchived(product.id, !isCurrentlyArchived)
-        if (result.success) {
-            router.refresh()
-            return { success: true }
-        }
-        return { success: false, error: result.error }
-    }
+    const handleArchiveToggle = async (isCurrentlyArchived: boolean): Promise<AdminActionResult> =>
+        runAction({
+            title: isCurrentlyArchived ? "Desarquivar produto" : "Arquivar produto",
+            description: `Produto "${product.name}". O time do vendedor será notificado.`,
+            requireReason: true,
+            confirmLabel: isCurrentlyArchived ? "Desarquivar" : "Arquivar",
+            runner: async (actionPayload) => {
+                const res = await setAdminCatalogProductArchived(product.id, !isCurrentlyArchived, {
+                    reason: actionPayload.reason,
+                    riskScore: actionPayload.riskScore,
+                    notifySeller: actionPayload.notifySeller,
+                })
+                if (res.success) {
+                    router.refresh()
+                    return { success: true }
+                }
+                return { success: false, error: res.error }
+            },
+        })
 
     const extraTabs = [
         {
@@ -143,6 +182,7 @@ export default function AdminProductDetailClient({
             </div>
 
             {moderation.modals}
+            {actionModal}
         </AdminCatalogProviders>
     )
 }

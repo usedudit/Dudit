@@ -755,7 +755,8 @@ export function AdminPartnerDetailView({
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">SKU</th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Estoque</th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
-                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -787,6 +788,14 @@ export function AdminPartnerDetailView({
                                                                                 {p.is_active ? "Ativo" : "Inativo"}
                                                                             </Badge>
                                                                         </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Link
+                                                                                href={`/ddt-admin/catalog/products/${p.id}`}
+                                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                                            >
+                                                                                Ver Produto →
+                                                                            </Link>
+                                                                        </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
@@ -810,7 +819,10 @@ export function AdminPartnerDetailView({
                                                                         <span className="text-xs text-brand-inactive-text">Estoque: {p.stock_quantity ?? "-"}</span>
                                                                     </div>
                                                                 </div>
-                                                                <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(p.price || 0))}</span>
+                                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                    <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(p.price || 0))}</span>
+                                                                    <Link href={`/ddt-admin/catalog/products/${p.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -847,7 +859,8 @@ export function AdminPartnerDetailView({
                                                                     <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Serviço</th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
                                                                     <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</th>
-                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -867,6 +880,14 @@ export function AdminPartnerDetailView({
                                                                                 {s.is_active ? "Ativo" : "Inativo"}
                                                                             </Badge>
                                                                         </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Link
+                                                                                href={`/ddt-admin/catalog/services/${s.id}`}
+                                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                                            >
+                                                                                Ver Serviço →
+                                                                            </Link>
+                                                                        </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
@@ -876,11 +897,14 @@ export function AdminPartnerDetailView({
                                                     <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
                                                         {paginatedServices.map((s: any) => (
                                                             <div key={s.id} className="py-3 flex items-center justify-between gap-3">
-                                                                <div className="min-w-0 flex flex-col">
-                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
-                                                                    <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
-                                                                </div>
-                                                                <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(s.price || 0))}</span>
+                                                                    <div className="min-w-0 flex flex-col">
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
+                                                                        <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                        <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(s.price || 0))}</span>
+                                                                        <Link href={`/ddt-admin/catalog/services/${s.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                    </div>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -944,7 +968,7 @@ export function AdminPartnerDetailView({
                                                                         </td>
                                                                         <td className="py-3 px-3 pr-4 text-center">
                                                                             <Link
-                                                                                href={`/ddt-admin/orders?view=${o.id}`}
+                                                                                href={`/ddt-admin/orders/${o.id}`}
                                                                                 className="text-xs font-bold text-brand-green hover:underline"
                                                                             >
                                                                                 Ver Pedido →
@@ -965,7 +989,7 @@ export function AdminPartnerDetailView({
                                                                 </div>
                                                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                                                     <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(o.total_amount || 0))}</span>
-                                                                    <Link href={`/ddt-admin/orders?view=${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                    <Link href={`/ddt-admin/orders/${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
                                                                 </div>
                                                             </div>
                                                         ))}

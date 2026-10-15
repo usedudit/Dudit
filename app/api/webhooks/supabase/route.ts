@@ -51,7 +51,7 @@ function hasMeaningfulProductChanges(record: any, oldRecord: any): boolean {
   const criticalFields = [
     'name', 'description', 'price', 'promotional_price', 'images', 'video_thumbnail',
     'status', 'is_active', 'moderation_status', 'deleted_at', 'show_in_marketplace',
-    'category_id', 'marketplace_category_id', 'show_price_in_store', 'stock_available', 'stock_quantity'
+    'category_id', 'marketplace_category_id', 'show_price_in_store'
   ]
   return criticalFields.some(field => JSON.stringify(record?.[field]) !== JSON.stringify(oldRecord?.[field]))
 }
@@ -94,9 +94,12 @@ export async function POST(req: Request) {
           } else if (type === 'INSERT') {
             await retryRedisSync(`products:${id}:sync`, () => syncToExploreRedis({ id, type: 'produto', data: {}, silent: true, throwOnError: true }))
           } else if (type === 'UPDATE') {
-            // Se apenas métricas como views_count ou sales mudaram, ignora para poupar comandos no Redis
+            // Se apenas métricas como views_count, sales ou estoque mudaram, ignora Redis para poupar comandos
             if (!hasMeaningfulProductChanges(record, old_record)) {
-              console.log(`[Webhook] Produto ${id} ignorado: apenas métricas/views mudaram.`)
+              console.log(`[Webhook] Produto ${id} ignorado: apenas métricas/views/estoque mudaram.`)
+              if (id) {
+                await revalidateProducts(partnerId || '', id)
+              }
               return
             }
             await retryRedisSync(`products:${id}:sync`, () => syncToExploreRedis({ id, type: 'produto', data: {}, silent: true, throwOnError: true }))

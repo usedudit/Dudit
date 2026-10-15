@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useTransition, useMemo, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import OrderListRow from "./OrderListRow"
 import OrdersPageControls, { type OrderFilterState } from "./OrdersPageControls"
-import AdminOrderDetailView from "./AdminOrderDetailView"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { PackageIcon, StoreIcon, ExportFileIcon } from "@/lib/icons"
@@ -15,7 +15,6 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } from "@/lib/utils/filter-date-period"
 import { toast } from "@/hooks/use-notification"
-import { useEntityState } from "@/hooks/use-entity-state"
 
 type SortKey = "order_number" | "customer" | "store" | "date" | "total" | "status"
 type SortDirection = "asc" | "desc"
@@ -37,7 +36,11 @@ const INITIAL_FILTERS: OrderFilterState = {
 
 export default function OrdersList({ initialData, initialStats }: OrdersListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
+    const router = useRouter()
+    const openOrderDetail = useCallback(
+        (orderId: string) => router.push(`/ddt-admin/orders/${orderId}`),
+        [router],
+    )
 
     const [activeTab, setActiveTab] = useState<string>("all")
     const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
@@ -246,18 +249,6 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         setPage(1)
     }, [activeTab, search, filters])
 
-    // If viewing detail of a specific order via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentOrder = orders.find(o => o.id === entityState.entityId)
-        return (
-            <AdminOrderDetailView
-                orderId={entityState.entityId}
-                initialOrder={currentOrder}
-                onBack={closeEntity}
-            />
-        )
-    }
-
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
@@ -338,7 +329,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         <div
                                             key={order.id}
                                             className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
-                                            onClick={() => openEntity("view", order.id)}
+                                            onClick={() => openOrderDetail(order.id)}
                                         >
                                             <div className="flex justify-between items-start gap-2">
                                                 <div className="flex flex-col gap-0.5 min-w-0">
@@ -420,7 +411,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                             key={order.id}
                                                             order={order}
                                                             isPending={isPending}
-                                                            onDetail={() => openEntity("view", order.id)}
+                                                            onDetail={() => openOrderDetail(order.id)}
                                                         />
                                                     ))}
                                                 </tbody>
@@ -433,7 +424,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         {paginatedItems.map((order) => (
                                             <div
                                                 key={order.id}
-                                                onClick={() => openEntity("view", order.id)}
+                                                onClick={() => openOrderDetail(order.id)}
                                                 className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col justify-between gap-4"
                                             >
                                                 <div className="flex justify-between items-start">

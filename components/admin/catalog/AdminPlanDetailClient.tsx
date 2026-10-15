@@ -11,10 +11,10 @@ import {
     getAdminPlanFormData,
 } from "@/app/actions/admin/catalog"
 import { CatalogPartiesTab, CatalogTimelineTab } from "./AdminCatalogDetailTabs"
+import { useAdminActionModal, type AdminActionResult } from "../AdminActionModal"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
 import { useNotification } from "@/hooks/use-notification"
-import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
-import { TrashIcon } from "@/lib/icons"
 
 interface AdminPlanDetailClientProps {
     plan: any
@@ -35,38 +35,71 @@ export default function AdminPlanDetailClient({
 }: AdminPlanDetailClientProps) {
     const router = useRouter()
     const [view, setView] = useState<"detail" | "edit">("detail")
-    const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { modal: actionModal, runAction } = useAdminActionModal()
 
     const handleBack = () => router.push("/ddt-admin/moderation")
 
-    const handleSave = async (payload: any): Promise<{ success?: boolean; error?: string } | void> => {
-        const res: any = await updateAdminRecurringPlan({ ...payload, planId: plan.id })
-        if (res?.success) {
+    const handleSave = async (payload: any): Promise<{ success?: boolean; error?: string; cancelled?: boolean } | void> => {
+        const changedFields = diffChangedFields(plan, payload)
+        const result = await runAction({
+            title: "Salvar alterações",
+            description: `Plano "${plan.name}"`,
+            changedFields,
+            confirmLabel: "Salvar",
+            runner: async (actionPayload) => {
+                const res: any = await updateAdminRecurringPlan(
+                    { ...payload, planId: plan.id },
+                    {
+                        reason: actionPayload.reason || null,
+                        riskScore: actionPayload.riskScore,
+                        notifySeller: actionPayload.notifySeller,
+                        changedFields,
+                    },
+                )
+                if (res?.success) return { success: true }
+                return { success: false, error: res?.error || "Erro ao salvar o plano." }
+            },
+        })
+        if (result.cancelled) return { success: false, cancelled: true }
+        if (result.success) {
             router.refresh()
             return { success: true }
         }
-        return { success: false, error: res?.error || "Erro ao salvar o plano." }
+        return { success: false, error: result.error || "Erro ao salvar o plano." }
     }
 
-    const handleDelete = async () => {
-        setIsDeleting(true)
-        try {
-            const res: any = await deleteAdminRecurringPlan(plan.id)
-            if (res?.success) {
-                notifySuccess("Plano excluído", res.message || "Plano removido do catálogo.")
-                router.push("/ddt-admin/moderation")
-            } else {
-                notifyError("Erro", res?.error || "Erro ao excluir plano")
-            }
-        } catch {
-            notifyError("Erro", "Erro ao excluir plano")
-        } finally {
-            setIsDeleting(false)
-            setShowDeleteModal(false)
-        }
-    }
+    const handleDelete = async (): Promise<AdminActionResult> =>
+        runAction({
+            title: "Excluir plano recorrente",
+            description:
+                'Se o plano possuir itens vinculados a assinaturas ou pedidos, ele será arquivado em vez de excluído. O time do vendedor será notificado.',
+            requireReason: true,
+            confirmLabel: "Excluir",
+            runner: async (actionPayload) => {
+                setIsDeleting(true)
+                try {
+                    const res: any = await deleteAdminRecurringPlan(plan.id, {
+                        reason: actionPayload.reason,
+                        riskScore: actionPayload.riskScore,
+                        notifySeller: actionPayload.notifySeller,
+                    })
+                    if (res?.success) {
+                        notifySuccess("Plano excluído", res.message || "Plano removido do catálogo.")
+                        router.push("/ddt-admin/moderation")
+                        return { success: true }
+                    }
+                    notifyError("Erro", res?.error || "Erro ao excluir plano")
+                    return { success: false, error: res?.error || "Erro ao excluir plano" }
+                } catch {
+                    notifyError("Erro", "Erro ao excluir plano")
+                    return { success: false, error: "Erro ao excluir plano" }
+                } finally {
+                    setIsDeleting(false)
+                }
+            },
+        })
 
     const extraTabs = [
         {
@@ -103,7 +136,7 @@ export default function AdminPlanDetailClient({
                         onBack={handleBack}
                         canManage
                         onEdit={() => setView("edit")}
-                        onDelete={() => setShowDeleteModal(true)}
+                        onDelete={() => void handleDelete()}
                         loadFormData={getAdminPlanFormData}
                         extraTabs={extraTabs}
                     />
@@ -120,18 +153,7 @@ export default function AdminPlanDetailClient({
                 )}
             </div>
 
-            {showDeleteModal && (
-                <AlertModal
-                    onClose={() => setShowDeleteModal(false)}
-                    onConfirm={handleDelete}
-                    title="Excluir plano recorrente?"
-                    message="Se o plano possuir itens vinculados a assinaturas ou pedidos, ele será arquivado em vez de excluído."
-                    confirmText={isDeleting ? "Excluindo..." : "Excluir"}
-                    icon={<TrashIcon />}
-                    isDestructive
-                    disabled={isDeleting}
-                />
-            )}
+            {actionModal}
 
             <SavingStatusModal isOpen={isDeleting} text="Excluindo plano..." />
         </AdminCatalogProviders>

@@ -4,9 +4,6 @@ import { revalidateTag, revalidatePath } from "next/cache"
 import { TAGS } from "./revalidation-tags"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "@/lib/data/reports/cache"
-import { redis } from "@/lib/redis"
-
-const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
 export async function safeRevalidateTag(tag: string) {

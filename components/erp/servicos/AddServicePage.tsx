@@ -398,7 +398,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         try {
             if (onDeleteConfirm) {
                 const res = await onDeleteConfirm()
-                if (res && res.success === false) toast({ title: "Erro", description: res.error, variant: "destructive" })
+                if (res && res.success === false) {
+                    if ((res as { cancelled?: boolean }).cancelled) return
+                    toast({ title: "Erro", description: res.error, variant: "destructive" })
+                }
                 else { toast({ title: "Sucesso", description: "Serviço excluído" }); setTimeout(() => onBack(), 300) }
             } else {
                 const result = await deleteServiceAction(initialService?.id || serviceId!)
@@ -521,6 +524,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                     : await createServiceAction(payload)
 
             if (result && (result as any).success === false) {
+                if ((result as { cancelled?: boolean }).cancelled) return
                 notifyError((result as any).error || "Erro ao salvar")
             } else {
                 notifySuccess(internalMode === "edit" ? "Serviço atualizado!" : "Serviço criado!")
@@ -548,9 +552,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         toast({ title: "Duplicando serviço", description: "Edite e salve o novo serviço." })
     }, [serviceData, setMode, toast])
 
-    const handleArchiveService = useCallback(() => setShowArchiveModal(true), [])
-    const handleUnarchiveService = useCallback(() => setShowArchiveModal(true), [])
-
     const confirmArchiveService = useCallback(async () => {
         if (!serviceData.id) return
         const isCurrentlyArchived = serviceData.status === "arquivado" || serviceData.status === "archived"
@@ -559,6 +560,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             if (onArchiveToggle) {
                 const res = await onArchiveToggle(isCurrentlyArchived)
                 if (res && res.success === false) {
+                    if ((res as { cancelled?: boolean }).cancelled) return
                     toast({ title: isCurrentlyArchived ? "Erro ao desarquivar" : "Erro ao arquivar", description: res.error, variant: "destructive" })
                 } else {
                     toast({ title: isCurrentlyArchived ? "Serviço desarquivado e reativado." : "Serviço arquivado com sucesso." })
@@ -582,6 +584,15 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             setShowArchiveModal(false)
         }
     }, [serviceData.id, serviceData.status, toast, onClose, onArchiveToggle])
+
+    const handleArchiveService = useCallback(() => {
+        if (onArchiveToggle) {
+            void confirmArchiveService()
+        } else {
+            setShowArchiveModal(true)
+        }
+    }, [onArchiveToggle, confirmArchiveService])
+    const handleUnarchiveService = handleArchiveService
 
     const dateCreated = serviceData.created_at ? new Date(serviceData.created_at).toLocaleDateString("pt-BR") : "N/A"
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
@@ -651,7 +662,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                             onShare={() => setShowShareModal(true)}
                                                             onArchive={!isArchived ? handleArchiveService : undefined}
                                                             onUnarchive={isArchived ? handleUnarchiveService : undefined}
-                                                            onDelete={() => setShowDeleteModal(true)}
+                                                            onDelete={onDeleteConfirm ? () => void handleDeleteService() : () => setShowDeleteModal(true)}
                                                         >
                                                             {extraDropdownItems}
                                                         </ActionsDropdown>
@@ -819,7 +830,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                 <ActionsDropdown
                                     onDuplicate={handleDuplicateService}
                                     onShare={() => setShowShareModal(true)}
-                                    onDelete={() => setShowDeleteModal(true)}
+                                    onDelete={onDeleteConfirm ? () => void handleDeleteService() : () => setShowDeleteModal(true)}
                                     trigger={
                                         <Button
                                             variant="outline"

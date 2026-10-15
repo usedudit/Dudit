@@ -287,6 +287,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0)
     const [appliedCouponCustomerScope, setAppliedCouponCustomerScope] = useState<string>("all")
     const [preSaleSearch, setPreSaleSearch] = useState("")
+    const [preSaleToDeleteId, setPreSaleToDeleteId] = useState<string | null>(null)
 
     const [depositSettings, setDepositSettings] = useState<{ depositEnabled: boolean; depositPercentage: number }>({
         depositEnabled: false,
@@ -1774,9 +1775,23 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                             />
 
                             <AnimatePresence mode="wait">
+                                {filteredProducts.length === 0 ? (
+                                    <FadeIn
+                                        key={`empty-${selectedCategory}-${debouncedSearch}-${itemTypeTab}`}
+                                        className={`mt-2 flex min-h-[360px] flex-col items-center justify-center overflow-y-auto pr-1 pb-24 xl:pb-6 ${desktopScrollClass}`}
+                                    >
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                            imageAlt="Ops"
+                                            title="Ops! Nenhum produto encontrado"
+                                            subtitle="Tente ajustar a busca ou selecione outra categoria para encontrar o que procura."
+                                            containerSize="h-24 w-24 mb-2"
+                                        />
+                                    </FadeIn>
+                                ) : (
                                 <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
                                     {filteredProducts
-                                        .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
                                         .map((product) => {
                                             const pr = computeItemDisplayPrice(
                                                 Number(product.price || 0),
@@ -1905,6 +1920,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                             )
                                         })}
                                 </FadeIn>
+                                )}
                             </AnimatePresence>
 
                             <AnimatePresence>
@@ -1924,7 +1940,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                         index={index}
                                                         customers={customers}
                                                         onClick={() => loadPreSale(preSale)}
-                                                        onDelete={() => removeDraft(preSale.id)}
+                                                        onDelete={() => setPreSaleToDeleteId(preSale.id)}
                                                     />
                                                 </div>
                                             ))}
@@ -2144,7 +2160,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                         loadPreSale(preSale)
                                                         setIsPreSaleSheetOpen(false)
                                                     }}
-                                                    onDelete={() => removeDraft(preSale.id)}
+                                                    onDelete={() => setPreSaleToDeleteId(preSale.id)}
                                                 />
                                             </div>
                                         )
@@ -2179,7 +2195,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                         loadPreSale(preSale)
                                                         setIsPreSaleSheetOpen(false)
                                                     }}
-                                                    onDelete={() => removeDraft(preSale.id)}
+                                                    onDelete={() => setPreSaleToDeleteId(preSale.id)}
                                                 />
                                             </div>
                                         )
@@ -2596,6 +2612,23 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         title="Limpar pedido?"
                         description="Todos os itens adicionados serão removidos do pedido atual."
                         confirmText="Limpar"
+                        cancelText="Cancelar"
+                        variant="danger"
+                    />
+
+                    <AlertModal
+                        isOpen={!!preSaleToDeleteId}
+                        onClose={() => setPreSaleToDeleteId(null)}
+                        onConfirm={async () => {
+                            const preSaleId = preSaleToDeleteId
+                            setPreSaleToDeleteId(null)
+                            if (preSaleId) {
+                                await removeDraft(preSaleId)
+                            }
+                        }}
+                        title="Excluir pré-venda?"
+                        description="Esta pré-venda será removida permanentemente e os itens dela não poderão ser recuperados."
+                        confirmText="Excluir"
                         cancelText="Cancelar"
                         variant="danger"
                     />

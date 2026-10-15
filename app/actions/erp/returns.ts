@@ -686,7 +686,7 @@ export async function createReturnRequestAction(input: unknown) {
 }
 
 export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<typeof createReturnSchema>, "partnerId">) {
-    await requireRateLimit(RateLimitCategory.ORDER_CREATE)
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     let partnerId: string | undefined
     let orderId: string | undefined
     let userId: string | undefined
@@ -848,7 +848,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 }
 
 export async function createMarketplaceCancellationRequestAction(input: unknown) {
-    await requireRateLimit(RateLimitCategory.ORDER_CREATE)
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     try {
         const user = await requireUser()
         const data = createCancellationSchema.parse(input)

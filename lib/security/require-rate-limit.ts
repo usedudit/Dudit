@@ -138,8 +138,13 @@ export async function requireRateLimit(
         )
 
         // Authenticated ERP operators have valid session tokens & RBAC permissions.
-        // Bypassing remote Redis for ERP_GENERAL completely eliminates Redis spikes while browsing the ERP.
-        if (category === RateLimitCategory.ERP_GENERAL) {
+        // Bypassing remote Redis for ERP_GENERAL, PRODUCT_CREATE, PRODUCT_UPDATE and PRODUCT_DELETE completely eliminates Redis spikes while managing products & orders.
+        if (
+            category === RateLimitCategory.ERP_GENERAL ||
+            category === RateLimitCategory.PRODUCT_CREATE ||
+            category === RateLimitCategory.PRODUCT_UPDATE ||
+            category === RateLimitCategory.PRODUCT_DELETE
+        ) {
             return { success: true }
         }
 

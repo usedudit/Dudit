@@ -1,31 +1,18 @@
 import "server-only"
-import { redis } from "@/lib/redis"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { invalidateInMemoryVersionCache } from "@/app/actions/marketplace/search"
 
-const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
+let localCacheVersion = 1
 
 export async function getCacheVersion(): Promise<number> {
-  try {
-    const version = await redis.get<number>(GLOBAL_VERSION_KEY)
-    return version || 1
-  } catch (err) {
-    console.error(`[REDIS] Error reading cache version`, err)
-    return 1 // Fallback so searches still work
-  }
+  return localCacheVersion
 }
 
 export async function incrementCacheVersion(): Promise<number> {
-  try {
-    const newVersion = await redis.incr(GLOBAL_VERSION_KEY)
-    console.log(`[REDIS] CACHE VERSION BUMPED TO: v${newVersion}`)
-    invalidateInMemoryVersionCache()
-    return newVersion
-  } catch (err) {
-    console.error(`[REDIS] Error incrementing cache version`, err)
-    return 2
-  }
+  localCacheVersion++
+  invalidateInMemoryVersionCache()
+  return localCacheVersion
 }
 
 export async function invalidateProductCache(
@@ -36,21 +23,24 @@ export async function invalidateProductCache(
 ) {
   console.log(`[CACHE] INVALIDATING product:${productId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
   
-  // 1. Increment Global Redis Version (Orphans all dynamic query lists)
-  // Only done for non-silent updates to avoid "thundering herd" re-renders of the home page
-  if (!options?.silent) {
+  // If silent update (e.g. stock decrements/reservations from sales, orders, cart checkout),
+  // skip all remote Redis sync. Only purge local RAM version and revalidate Next.js cache layers.
+  if (options?.silent) {
+    // Silent updates don't touch Redis — they rely on Next.js tag revalidation below
+  } else {
+    // 1. Increment in-memory version (purges RAM search cache)
     await incrementCacheVersion()
-  }
 
-  // 2. Synchronize individual product cache (ZSETs and object cache) for direct requests/FTS
-  try {
-    if (action === 'delete') {
-      await removeFromExploreRedis(productId, "produto", true)
-    } else {
-      await syncToExploreRedis({ id: productId, type: "produto", data: {}, silent: true })
+    // 2. Synchronize individual product cache (ZSETs and object cache) for direct requests/FTS
+    try {
+      if (action === 'delete') {
+        await removeFromExploreRedis(productId, "produto", true)
+      } else {
+        await syncToExploreRedis({ id: productId, type: "produto", data: {}, silent: true })
+      }
+    } catch (error) {
+      console.error(`[CACHE] Erro ao sincronizar ZSETs do Redis:`, error)
     }
-  } catch (error) {
-    console.error(`[CACHE] Erro ao sincronizar ZSETs do Redis:`, error)
   }
 
   // 3. Purge Next.js Cache Layers
@@ -137,18 +127,20 @@ export async function invalidateServiceCache(
   options?: { silent?: boolean }
 ) {
   console.log(`[CACHE] INVALIDATING service:${serviceId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
-  if (!options?.silent) {
+  if (options?.silent) {
+    // Silent updates don't touch Redis — they rely on Next.js tag revalidation below
+  } else {
     await incrementCacheVersion()
-  }
 
-  try {
-    if (action === 'delete') {
-      await removeFromExploreRedis(serviceId, "servico", true)
-    } else {
-      await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+    try {
+      if (action === 'delete') {
+        await removeFromExploreRedis(serviceId, "servico", true)
+      } else {
+        await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+      }
+    } catch (error) {
+      console.error(`[CACHE] Erro ao sincronizar servico no Redis:`, error)
     }
-  } catch (error) {
-    console.error(`[CACHE] Erro ao sincronizar servico no Redis:`, error)
   }
 
   try {

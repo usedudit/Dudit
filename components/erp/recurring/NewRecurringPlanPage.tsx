@@ -458,6 +458,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                     : await createRecurringPlanAction(payload)
 
             if (res && (res as any).success === false) {
+                if ((res as { cancelled?: boolean }).cancelled) return
                 notifyError((res as any).error || "Erro ao salvar o plano.")
                 if (onError) onError((res as any).error || "Erro ao salvar")
             } else {

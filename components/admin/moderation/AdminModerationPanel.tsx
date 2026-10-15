@@ -1,8 +1,8 @@
 ﻿"use client"
 
 import React, { useState, useTransition, useRef, useEffect, useCallback } from "react"
-import Link from "next/link"
-import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon } from "@/lib/icons"
+import { useRouter } from "next/navigation"
+import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon, PackageIcon, BriefcaseIcon, StoreIcon } from "@/lib/icons"
 import { Button, Input, Badge, FormDropdown, AlertModal, FormSection, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, IconPlaceholder, SidebarCard } from "@/components/reusable"
 import { FormTextarea } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -19,7 +19,7 @@ import type {
     FetchedRecurringPlan, FetchedPartner, FetchedReview,
     CursorPaginatedResult, ModerationItem,
 } from "@/lib/admin/types"
-import { formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import Pagination from "@/components/reusable/Pagination"
 import { useModalLayer } from "@/lib/modal-stack"
 
@@ -45,11 +45,40 @@ const RISK_LEVELS = [
 
 type ModerationMode = "automatic" | "manual" | "videos"
 
+const MOD_STATUS_MAP: Record<string, { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string }> = {
+    pending_moderation: { variant: "orange", label: "Pendente" },
+    pending: { variant: "orange", label: "Pendente" },
+    flagged: { variant: "red", label: "Flagged" },
+    approved: { variant: "green", label: "Aprovado" },
+    rejected: { variant: "red", label: "Rejeitado" },
+    needs_images: { variant: "blue", label: "Sem imagens" },
+    in_review: { variant: "blue", label: "Em análise" },
+}
+
+const PLAN_STATUS_MAP: Record<string, { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string }> = {
+    active: { variant: "green", label: "Ativo" },
+    inactive: { variant: "gray", label: "Inativo" },
+    archived: { variant: "gray", label: "Arquivado" },
+    paused: { variant: "orange", label: "Pausado" },
+}
+
+const FREQUENCY_LABELS: Record<string, string> = {
+    daily: "Diário",
+    weekly: "Semanal",
+    biweekly: "Quinzenal",
+    monthly: "Mensal",
+    bimonthly: "Bimestral",
+    quarterly: "Trimestral",
+    yearly: "Anual",
+    custom: "Customizado",
+}
+
 interface AdminModerationPanelProps {
     initialData?: CursorPaginatedResult<ModerationItem>
 }
 
 export function AdminModerationPanel({ initialData }: AdminModerationPanelProps) {
+    const router = useRouter()
     const [mode, setMode] = useState<ModerationMode>("automatic")
     const [searchId, setSearchId] = useState("")
     const [searchType, setSearchType] = useState<SearchType>("product")
@@ -192,6 +221,20 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                 : rtype === "recurring_plan" && data?.id
                     ? `/ddt-admin/catalog/plans/${data.id}`
                     : null
+
+    // Produto/serviço/assinatura: o resultado é uma linha de lista (estilo ERP)
+    // que navega para a tela de detalhe. Parceiro/review seguem no form inline.
+    const isCatalogResult = Boolean(detailHref)
+    const rowImageUrl = (data as any)?.images?.[0] ? getR2ImageUrl((data as any).images[0]) : null
+    const RowIcon = rtype === "service" ? BriefcaseIcon : PackageIcon
+    const rowInfo =
+        rtype === "recurring_plan"
+            ? FREQUENCY_LABELS[(data as any)?.frequency_type] || (data as any)?.frequency_type || "—"
+            : formatCurrency(Number((data as any)?.price || 0))
+    const rowStatus: { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string } =
+        rtype === "recurring_plan"
+            ? PLAN_STATUS_MAP[(data as any)?.status] || { variant: "gray", label: (data as any)?.status || "—" }
+            : MOD_STATUS_MAP[(data as any)?.moderation_status] || { variant: "gray", label: (data as any)?.moderation_status || "—" }
 
     return (
         <FadeIn>
@@ -340,9 +383,63 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                 </div>
                             )}
 
-                            {/* Manual Result Tabs */}
-                            {result && (
-                                <div className="px-0 md:px-0 mb-6 flex items-center justify-between gap-3 flex-wrap">
+                            {/* Manual Result — produto/serviço/assinatura: linha estilo lista do ERP */}
+                            {result && isCatalogResult && detailHref && (
+                                <div className="mb-6 overflow-x-auto custom-scrollbar border border-brand-border dark:border-dark-border rounded-xl">
+                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[640px]">
+                                        <thead>
+                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                <th className="py-3 px-4 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Item</th>
+                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Loja</th>
+                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço / Info</th>
+                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                <th className="py-3 px-4 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                                                onClick={() => router.push(detailHref)}
+                                            >
+                                                <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-left">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                            {rowImageUrl ? (
+                                                                <img src={rowImageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                            ) : (
+                                                                <RowIcon className="w-5 h-5 text-brand-inactive-text" />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{data?.name}</span>
+                                                            <span className="text-[11px] text-brand-inactive-text font-mono truncate">{data?.id}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-left">
+                                                    <div className="flex items-center gap-1.5 text-sm text-brand-dark dark:text-dark-heading">
+                                                        <StoreIcon size={13} className="text-brand-inactive-text shrink-0" />
+                                                        <span className="truncate">{data?.store?.name || "—"}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-sm text-center font-bold text-brand-green">
+                                                    {rowInfo}
+                                                </td>
+                                                <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                    <Badge variant={rowStatus.variant}>{rowStatus.label}</Badge>
+                                                </td>
+                                                <td className="py-3 px-4 pr-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                    <span className="text-xs font-bold text-brand-green group-hover:underline">Ver detalhes →</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Manual Result Tabs (parceiro/review) */}
+                            {result && !isCatalogResult && (
+                                <div className="px-0 md:px-0 mb-6">
                                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                                         <TabsList className="px-0">
                                             <TabsTrigger value="general">Dados gerais</TabsTrigger>
@@ -350,19 +447,11 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                             {isPartner && <TabsTrigger value="gallery">Galeria</TabsTrigger>}
                                         </TabsList>
                                     </Tabs>
-                                    {detailHref && (
-                                        <Link
-                                            href={detailHref}
-                                            className="text-sm font-bold text-brand-green hover:underline"
-                                        >
-                                            Ver tela de detalhes →
-                                        </Link>
-                                    )}
                                 </div>
                             )}
 
-                            {/* Manual Result Tab Content */}
-                            {result && (
+                            {/* Manual Result Tab Content (parceiro/review) */}
+                            {result && !isCatalogResult && (
                                 <div className="min-h-[400px]">
                                     {activeTab === "general" && (
                                         <FadeIn key="general" className="block">
@@ -516,7 +605,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
             </div>
 
             {/* Mobile Bottom Action Bar */}
-            {result && mode === "manual" && (
+            {result && mode === "manual" && !isCatalogResult && (
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                     <Button variant="outline" onClick={handleRefresh} disabled={isPending} className="flex-1 h-12">
                         Atualizar

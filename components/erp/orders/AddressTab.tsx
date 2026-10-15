@@ -51,6 +51,8 @@ interface AddressTabProps {
     isMarketplaceLocked?: boolean
     isPaidOrder?: boolean
     role?: string
+    /** Painel admin: libera endereço/entrega mesmo após entrega/pagamento. */
+    adminContext?: boolean
 }
 
 export const AddressTab: React.FC<AddressTabProps> = ({
@@ -87,12 +89,14 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     isMarketplaceLocked = false,
     isPaidOrder = false,
     role = "OPERATOR",
+    adminContext = false,
 }) => {
     const { canRbac } = usePermissions()
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryStatus)
 
     const isAddressLocked = isPaidOrder || !canRbac("orders.edit")
-    const isDeliveryLocked = originalDeliveryStatus === 'delivered' || !canRbac("orders.edit")
+    const isDeliveryLocked =
+        (!adminContext && originalDeliveryStatus === 'delivered') || !canRbac("orders.edit")
 
     const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
         <div className="flex justify-between items-start text-[14px] gap-4">

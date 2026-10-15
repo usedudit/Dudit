@@ -483,7 +483,7 @@ export function AdminUserDetailView({
                                                                             {o.situation === "paid" ? "Pago" : o.situation === "cancelled" ? "Cancelado" : "Pendente"}
                                                                         </Badge>
                                                                         <Link
-                                                                            href={`/ddt-admin/orders?view=${o.id}`}
+                                                                            href={`/ddt-admin/orders/${o.id}`}
                                                                             className="text-xs font-bold text-brand-green hover:underline"
                                                                         >
                                                                             Ver Pedido →

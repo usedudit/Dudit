@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react"
+import { useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader, Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput } from "@/components/reusable"
@@ -56,11 +56,27 @@ import { formatCurrency } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
+
+type OrderAdminActionContext = {
+    reason?: string | null
+    riskScore?: number | null
+    notifySeller?: boolean
+    changedFields?: string[]
+}
 
 interface CreateOrderProps {
     onBack: () => void
     partnerId: string
     editOrderId?: string
+    /** Painel admin: destrava edição livre (pedido pago/cancelado/entregue). */
+    adminContext?: boolean
+    /** Abas extras no topo do form (ex.: Comprador e Loja / Histórico). */
+    extraTabs?: { value: string; label: string; content: ReactNode }[]
+    /** Modal de ação administrativa antes de salvar (motivo/risk/notificação). */
+    adminActionGate?: (
+        changedFields: string[],
+    ) => Promise<{ cancelled?: boolean; ctx?: OrderAdminActionContext }>
 }
 
 type FinanceAccountOption = {
@@ -245,7 +261,14 @@ function normalizeCustomerForCard(customer: any) {
     }
 }
 
-export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
+export default function CreateOrder({
+    onBack,
+    partnerId,
+    editOrderId,
+    adminContext,
+    extraTabs,
+    adminActionGate,
+}: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError, warning: notifyWarning } = useNotification()
     const { planSlug, role, hasSpecific, canRbac } = usePermissions()
@@ -496,10 +519,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [totalAmount, originalPaidAmount])
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
-    const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
+    const isPaidOrderLocked = !adminContext && Boolean(editOrderId && originalPaymentStatus === "paid")
     const isMarketplaceOrder = originalOrderSource === "Online Store"
 
-    const isAlreadyPaid = Boolean(
+    const isAlreadyPaid = !adminContext && Boolean(
         editOrderId && (
             originalPaymentStatus === "paid" ||
             remainingAmount <= 0.009 ||
@@ -507,7 +530,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         )
     )
 
-    const isPaidOrder = originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid'
+    const isPaidOrder = !adminContext && (originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid')
     const isDeliveredOrder = originalDeliveryStatus === 'delivered'
     const isMarketplaceLocked = isMarketplaceOrder && isPaidOrder
 
@@ -559,14 +582,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const { showConfirmDialog, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty && !isPaymentModalOpen && !isSaving)
 
     // --- Effects ---
+    const loadedOrderRef = useRef<any>(null)
     useEffect(() => {
         if (!editOrderId) return
         async function load() {
             setIsLoadingData(true)
-            const res = await getOrderDetailsAction(editOrderId!, partnerId)
+            const res = await getOrderDetailsAction(editOrderId!, partnerId, { adminBypass: adminContext })
             if (res.success && res.data) {
                 const order = res.data
-                if (order?.situation === "cancelled") {
+                loadedOrderRef.current = order
+                if (order?.situation === "cancelled" && !adminContext) {
                     notifyError("Edição bloqueada", "Vendas canceladas não podem ser editadas.")
                     onBack()
                     return
@@ -691,7 +716,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setIsLoadingData(false)
         }
         load()
-    }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
+    }, [editOrderId, partnerId, adminContext, notifyError, normalizeSalesChannel])
 
     const paymentParamConsumedRef = useRef(false)
     const clearPaymentParam = useCallback(() => {
@@ -1488,12 +1513,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         paymentProvider?: string
         mpPaymentId?: string
         checkoutFulfillment?: Record<string, unknown> | null
-    }) => {
+    }, io?: { adminActionCtx?: OrderAdminActionContext }) => {
         setIsSaving(true)
         try {
             const payload = buildOrderPayload(paymentOverrides)
             const result = editOrderId
-                ? await updateERPOrderAction(editOrderId, payload)
+                ? await updateERPOrderAction(editOrderId, payload, adminContext
+                    ? { adminBypass: true, actionCtx: io?.adminActionCtx || null }
+                    : undefined)
                 : await createERPOrderAction(payload)
 
             if (result.success) {
@@ -1609,10 +1636,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (!validateOrderBeforeSubmit()) {
             return
         }
+        let adminActionCtx: OrderAdminActionContext | undefined
+        if (adminContext && editOrderId && adminActionGate) {
+            const previewPayload = buildOrderPayload()
+            const changedFields = diffChangedFields(loadedOrderRef.current, previewPayload)
+            const gateResult = await adminActionGate(changedFields)
+            if (gateResult?.cancelled) return
+            adminActionCtx = gateResult?.ctx
+        }
         await submitOrder({
             paymentStatus,
             paidAmount: originalPaidAmount,
-        })
+        }, { adminActionCtx })
     }
 
     const handleOpenPaymentModal = async () => {
@@ -1783,6 +1818,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         <TabsTrigger value="attachments">
                                             Anexos
                                         </TabsTrigger>
+                                        {extraTabs?.map((tab) => (
+                                            <TabsTrigger key={tab.value} value={tab.value}>
+                                                {tab.label}
+                                            </TabsTrigger>
+                                        ))}
                                     </TabsList>
                                 </div>
                             </div>
@@ -2169,6 +2209,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             isMarketplaceLocked={isMarketplaceLocked}
                                             isPaidOrder={isPaidOrder}
                                             role={role}
+                                            adminContext={adminContext}
                                         />
                                     </div>
                                 </FadeIn>
@@ -2199,6 +2240,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     />
                                 </FadeIn>
                             </TabsContent>
+
+                            {extraTabs?.map((tab) => (
+                                <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                                    <FadeIn key={tab.value}>{tab.content}</FadeIn>
+                                </TabsContent>
+                            ))}
                         </div>
                     </div>
                 </Tabs>

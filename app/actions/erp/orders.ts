@@ -58,6 +58,10 @@ import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery";
 import { buildNotificationContent } from "@/lib/notifications/templates";
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities";
 import { getCachedErpPage } from "@/lib/data/erp-page-cache";
+import { requireAdminScope } from "@/lib/auth/admin-authorization";
+import { adminAuditLog } from "@/lib/admin/audit";
+import { AdminActionType } from "@/lib/admin/types";
+import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/action-context";
 import { TAGS } from "@/lib/utils/revalidation-tags";
 import { isUuid } from "@/lib/utils/short-id";
 import {
@@ -2115,7 +2119,7 @@ async function resolveOrderPreparationEstimate(params: {
 }
 
 export async function createERPOrderAction(data: ERPOrderPayload) {
-  await requireRateLimit(RateLimitCategory.ORDER_CREATE);
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL);
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
@@ -3049,11 +3053,16 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 export async function getOrderDetailsAction(
   orderId: string,
   partnerId: string,
+  opts?: { adminBypass?: boolean },
 ) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
-  await requirePermission(partnerId, "orders", "view");
+  if (opts?.adminBypass) {
+    await requireAdminScope("moderation");
+  } else {
+    await requirePermission(partnerId, "orders", "view");
+  }
   const supabase = createAdminClient();
   const isUuid =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -3625,13 +3634,23 @@ export async function getOrderHistoryAction(
 export async function updateERPOrderAction(
   orderId: string,
   data: ERPOrderPayload,
+  opts?: { adminBypass?: boolean; actionCtx?: AdminActionContext | null },
 ) {
-  await requireRateLimit(RateLimitCategory.ORDER_CREATE);
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL);
 
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
-  const orderAccess = await requirePermission(data.partnerId, "orders", "edit");
+  const adminBypass = Boolean(opts?.adminBypass);
+  let adminActorId: string | null = null;
+  if (adminBypass) {
+    const admin = await requireAdminScope("moderation");
+    adminActorId = admin.userId;
+  }
+
+  const orderAccess = adminBypass
+    ? null
+    : await requirePermission(data.partnerId, "orders", "edit");
 
   // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
   data.financeAccountId = data.financeAccountId?.trim()
@@ -3639,7 +3658,7 @@ export async function updateERPOrderAction(
     : null;
 
   // Validate discount permission if a discount is being applied
-  if (data.discountValue > 0 || data.couponCode) {
+  if (!adminBypass && (data.discountValue > 0 || data.couponCode)) {
     await requirePermission(data.partnerId, "orders", "can_apply_discount");
   }
 
@@ -3827,7 +3846,7 @@ export async function updateERPOrderAction(
   if (currentOrderError || !currentOrder)
     return { error: currentOrderError?.message || "Pedido não encontrado" };
 
-  if (currentOrder.situation === "cancelled") {
+  if (currentOrder.situation === "cancelled" && !adminBypass) {
     return { error: "Pedidos cancelados não podem ser editados." };
   }
 
@@ -3865,7 +3884,7 @@ export async function updateERPOrderAction(
     currentOrder.situation === "partially_paid" && !isOrderFullyPaid;
   const isDeliveredOrder = currentOrder.delivery_status === "delivered";
 
-  if (!can(orderAccess as RbacUserLike, "orders.edit")) {
+  if (!adminBypass && !can(orderAccess as RbacUserLike, "orders.edit")) {
     return { error: "Sem permissão para editar pedidos." };
   }
 
@@ -3927,7 +3946,8 @@ export async function updateERPOrderAction(
   const hasGeneralChanged =
     hasItemsChanged || hasAddressChanged || hasFinancialChanged;
 
-  if (isOrderFullyPaid) {
+  // Status-based editing locks (admin bypass = edição livre em qualquer status)
+  if (!adminBypass && isOrderFullyPaid) {
     if (
       data.paidAmount !== undefined &&
       Number(data.paidAmount) > Number(currentOrder.paid_amount || 0) + 0.009
@@ -3949,7 +3969,7 @@ export async function updateERPOrderAction(
         };
       }
     }
-  } else if (isOrderPartiallyPaid) {
+  } else if (!adminBypass && isOrderPartiallyPaid) {
     if (
       hasItemsChanged ||
       hasAddressChanged ||
@@ -4770,6 +4790,39 @@ export async function updateERPOrderAction(
       ),
     )
     .catch(console.error);
+
+  if (adminBypass && adminActorId) {
+    const actionCtx = opts?.actionCtx || null;
+    try {
+      await adminAuditLog({
+        adminUserId: adminActorId,
+        actionType: AdminActionType.ORDER_UPDATE,
+        targetType: "partner",
+        targetId: data.partnerId,
+        metadata: {
+          orderId,
+          orderNumber: currentOrder.order_number || null,
+          partnerId: data.partnerId,
+          fields: changeLines,
+          ...(actionCtx?.reason?.trim() ? { reason: actionCtx.reason.trim() } : {}),
+        },
+      });
+    } catch (e) {
+      console.error("[ADMIN_ORDER] audit log failed:", e);
+    }
+    await applyAdminActionContext({
+      adminUserId: adminActorId,
+      partnerId: data.partnerId,
+      storeId: (currentOrder as any).store_id || data.storeId || null,
+      targetType: "order",
+      targetId: orderId,
+      actionTitle: `Pedido #${currentOrder.order_number || orderId} alterado pela administração`,
+      entityLabel: "pedido",
+      entityName: `#${currentOrder.order_number || orderId}`,
+      sellerUrl: `/erp/pedidos?view=${orderId}`,
+      ctx: actionCtx,
+    });
+  }
 
   return { success: true, orderNumber: currentOrder.order_number };
 }

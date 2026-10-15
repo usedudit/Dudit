@@ -637,7 +637,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
         try {
             if (onDeleteConfirm) {
                 const res = await onDeleteConfirm()
-                if (res && res.success === false) notifyError("Erro", res.error || "Erro ao excluir produto")
+                if (res && res.success === false) {
+                    if ((res as { cancelled?: boolean }).cancelled) return
+                    notifyError("Erro", res.error || "Erro ao excluir produto")
+                }
                 else { notifySuccess("Sucesso", "Produto excluído"); setTimeout(() => onBack(), 300) }
             } else {
                 const result = await deleteProductAction(initialProduct?.id || productId!)
@@ -918,9 +921,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
         setShowShareModal(true)
     }, [])
 
-    const handleArchiveProduct = useCallback(() => setShowArchiveModal(true), [])
-    const handleUnarchiveProduct = useCallback(() => setShowArchiveModal(true), [])
-
     const confirmArchiveProduct = useCallback(async () => {
         if (!productData.id) return
         const isCurrentlyArchived = productData.status === "arquivado" || productData.status === "archived"
@@ -929,6 +929,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
             if (onArchiveToggle) {
                 const res = await onArchiveToggle(isCurrentlyArchived)
                 if (res && res.success === false) {
+                    if ((res as { cancelled?: boolean }).cancelled) return
                     notifyError(res.error || "Erro ao alterar status do produto")
                 } else {
                     notifySuccess(isCurrentlyArchived ? "Produto desarquivado e reativado." : "Produto arquivado com sucesso.")
@@ -957,6 +958,16 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setShowArchiveModal(false)
         }
     }, [productData.id, productData.status, planSlug, openPlanUpgrade, notifySuccess, notifyError, onClose, onArchiveToggle])
+
+    const handleArchiveProduct = useCallback(() => {
+        if (onArchiveToggle) {
+            void confirmArchiveProduct()
+        } else {
+            setShowArchiveModal(true)
+        }
+    }, [onArchiveToggle, confirmArchiveProduct])
+    const handleUnarchiveProduct = handleArchiveProduct
+
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"
@@ -1052,7 +1063,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                             onShare={handleShareProduct}
                                                             onArchive={!isArchived ? handleArchiveProduct : undefined}
                                                             onUnarchive={isArchived ? handleUnarchiveProduct : undefined}
-                                                            onDelete={() => setShowDeleteModal(true)}
+                                                            onDelete={onDeleteConfirm ? () => void handleDeleteProduct() : () => setShowDeleteModal(true)}
                                                         >
                                                             {extraDropdownItems}
                                                         </ActionsDropdown>
@@ -1260,7 +1271,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 <ActionsDropdown
                                     onDuplicate={handleDuplicateProduct}
                                     onShare={handleShareProduct}
-                                    onDelete={() => setShowDeleteModal(true)}
+                                    onDelete={onDeleteConfirm ? () => void handleDeleteProduct() : () => setShowDeleteModal(true)}
                                     trigger={
                                         <Button
                                             variant="outline"

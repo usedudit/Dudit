@@ -15,6 +15,8 @@ import {
     CatalogTimelineTab,
     useCatalogModeration,
 } from "./AdminCatalogDetailTabs"
+import { useAdminActionModal, type AdminActionResult } from "../AdminActionModal"
+import { diffChangedFields } from "@/lib/admin/changed-fields"
 
 interface AdminServiceDetailClientProps {
     service: any
@@ -35,6 +37,7 @@ export default function AdminServiceDetailClient({
 }: AdminServiceDetailClientProps) {
     const router = useRouter()
     const [mode, setMode] = useState<"add" | "details" | "edit" | "duplicate">("details")
+    const { modal: actionModal, runAction } = useAdminActionModal()
 
     const handleClose = () => {
         setMode("details")
@@ -50,25 +53,61 @@ export default function AdminServiceDetailClient({
         onDone: () => router.refresh(),
     })
 
-    const handleSave = async (payload: any): Promise<{ success: boolean; error?: string }> => {
-        const result = await updateAdminService(service.id, payload)
+    const handleSave = async (payload: any): Promise<{ success: boolean; error?: string; cancelled?: boolean }> => {
+        const changedFields = diffChangedFields(service, payload)
+        const result = await runAction({
+            title: "Salvar alterações",
+            description: `Serviço "${service.name}"`,
+            changedFields,
+            confirmLabel: "Salvar",
+            runner: async (actionPayload) => {
+                const res = await updateAdminService(service.id, payload, {
+                    reason: actionPayload.reason || null,
+                    riskScore: actionPayload.riskScore,
+                    notifySeller: actionPayload.notifySeller,
+                    changedFields,
+                })
+                if (res.success) return { success: true }
+                return { success: false, error: res.error }
+            },
+        })
+        if (result.cancelled) return { success: false, cancelled: true }
         if (result.success) return { success: true }
         return { success: false, error: result.error }
     }
 
-    const handleDeleteConfirm = async (): Promise<{ success: boolean; error?: string }> => {
-        const result = await deleteAdminCatalogService(service.id)
-        if (result.success) return { success: true }
-        return { success: false, error: result.error }
-    }
+    const handleDeleteConfirm = async (): Promise<AdminActionResult> =>
+        runAction({
+            title: "Excluir serviço",
+            description: `Serviço "${service.name}". O time do vendedor será notificado.`,
+            requireReason: true,
+            confirmLabel: "Excluir",
+            runner: async (actionPayload) => {
+                const res = await deleteAdminCatalogService(service.id, {
+                    reason: actionPayload.reason,
+                    riskScore: actionPayload.riskScore,
+                    notifySeller: actionPayload.notifySeller,
+                })
+                return res.success ? { success: true } : { success: false, error: res.error }
+            },
+        })
 
-    const handleArchiveToggle = async (
-        isCurrentlyArchived: boolean,
-    ): Promise<{ success: boolean; error?: string }> => {
-        const result = await setAdminCatalogServiceArchived(service.id, !isCurrentlyArchived)
-        if (result.success) return { success: true }
-        return { success: false, error: result.error }
-    }
+    const handleArchiveToggle = async (isCurrentlyArchived: boolean): Promise<AdminActionResult> =>
+        runAction({
+            title: isCurrentlyArchived ? "Desarquivar serviço" : "Arquivar serviço",
+            description: `Serviço "${service.name}". O time do vendedor será notificado.`,
+            requireReason: true,
+            confirmLabel: isCurrentlyArchived ? "Desarquivar" : "Arquivar",
+            runner: async (actionPayload) => {
+                const res = await setAdminCatalogServiceArchived(service.id, !isCurrentlyArchived, {
+                    reason: actionPayload.reason,
+                    riskScore: actionPayload.riskScore,
+                    notifySeller: actionPayload.notifySeller,
+                })
+                if (res.success) return { success: true }
+                return { success: false, error: res.error }
+            },
+        })
 
     const extraTabs = [
         {
@@ -114,6 +153,7 @@ export default function AdminServiceDetailClient({
             </div>
 
             {moderation.modals}
+            {actionModal}
         </AdminCatalogProviders>
     )
 }

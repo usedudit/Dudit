@@ -26,6 +26,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
+import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/action-context"
 import { sanitizeString, sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { sanitizeInput, sanitizeNotes } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
@@ -580,6 +581,7 @@ export async function getAdminPlanFormData(partnerId: string) {
 export async function updateAdminProduct(
     productId: string,
     data: Record<string, unknown>,
+    ctx?: AdminActionContext | null,
 ): Promise<ActionResponse<any>> {
     const adminUser = await adminWriteGate()
     const id = sanitizeUUID(productId)
@@ -590,7 +592,7 @@ export async function updateAdminProduct(
         const { data: product, error: fetchError } = await admin
             .from("products")
             .select(
-                "id, partner_id, images, sku, name, moderation_status, video_type, video_url, video_thumbnail",
+                "id, partner_id, store_id, images, sku, name, moderation_status, video_type, video_url, video_thumbnail",
             )
             .eq("id", id)
             .single()
@@ -801,6 +803,7 @@ export async function updateAdminProduct(
                 partnerId: product.partner_id,
                 name: payload.name ?? product.name,
                 fields,
+                ...(ctx?.reason?.trim() ? { reason: ctx.reason.trim() } : {}),
             },
         })
         await partnerTimeline({
@@ -810,6 +813,19 @@ export async function updateAdminProduct(
             entityId: id,
             actionType: "updated",
             changeLines: [`atualizou o produto "${payload.name || product.name}" via painel admin.`],
+        })
+
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: product.partner_id,
+            storeId: (product as any).store_id || null,
+            targetType: "product",
+            targetId: id,
+            actionTitle: `Produto "${payload.name || product.name}" alterado pela administração`,
+            entityLabel: "produto",
+            entityName: (payload.name as string) || product.name,
+            sellerUrl: `/erp/produtos?view=${id}`,
+            ctx,
         })
 
         return successResponse({ ...product, ...productPatch, ...fiscalPayload, ...logisticsPayload })
@@ -825,6 +841,7 @@ export async function updateAdminProduct(
 export async function updateAdminService(
     serviceId: string,
     data: Record<string, unknown>,
+    ctx?: AdminActionContext | null,
 ): Promise<ActionResponse<any>> {
     const adminUser = await adminWriteGate()
     const id = sanitizeUUID(serviceId)
@@ -834,7 +851,7 @@ export async function updateAdminService(
         const admin = getAdminClient()
         const { data: existing, error: fetchError } = await admin
             .from("services")
-            .select("partner_id, sku, name, images, video_type, video_url, video_thumbnail")
+            .select("partner_id, store_id, sku, name, images, video_type, video_url, video_thumbnail")
             .eq("id", id)
             .single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
@@ -970,6 +987,7 @@ export async function updateAdminService(
                 partnerId: existing.partner_id,
                 name: payload.name ?? existing.name,
                 fields: Object.keys(payload).filter((k) => k !== "updated_at"),
+                ...(ctx?.reason?.trim() ? { reason: ctx.reason.trim() } : {}),
             },
         })
         await partnerTimeline({
@@ -979,6 +997,19 @@ export async function updateAdminService(
             entityId: id,
             actionType: "updated",
             changeLines: [`atualizou o serviço "${payload.name || existing.name}" via painel admin.`],
+        })
+
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: existing.partner_id,
+            storeId: (existing as any).store_id || null,
+            targetType: "service",
+            targetId: id,
+            actionTitle: `Serviço "${payload.name || existing.name}" alterado pela administração`,
+            entityLabel: "serviço",
+            entityName: (payload.name as string) || existing.name,
+            sellerUrl: `/erp/servicos?view=${id}`,
+            ctx,
         })
 
         return successResponse(updated)
@@ -991,17 +1022,22 @@ export async function updateAdminService(
 // DELETE / ARCHIVE (produto e serviço)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function deleteAdminCatalogProduct(productId: string, reason?: string | null) {
+export async function deleteAdminCatalogProduct(
+    productId: string,
+    ctx?: AdminActionContext | string | null,
+) {
     const adminUser = await adminWriteGate()
     const id = sanitizeUUID(productId)
     if (!id) return errorResponse("ID de produto inválido")
+    const actionCtx: AdminActionContext | null =
+        typeof ctx === "string" ? { reason: ctx } : ctx || null
 
     try {
-        const cleanReason = sanitizeString(reason || "Remoção administrativa", MAX_REASON_LEN)
+        const cleanReason = sanitizeString(actionCtx?.reason || "Remoção administrativa", MAX_REASON_LEN)
         const admin = getAdminClient()
         const { data: product, error } = await admin
             .from("products")
-            .select("id, partner_id, sku, name")
+            .select("id, partner_id, store_id, sku, name")
             .eq("id", id)
             .single()
         if (error || !product) return errorResponse("Produto não encontrado")
@@ -1029,23 +1065,41 @@ export async function deleteAdminCatalogProduct(productId: string, reason?: stri
             metadata: { deleted_reason: cleanReason },
         })
 
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: product.partner_id,
+            storeId: (product as any).store_id || null,
+            targetType: "product",
+            targetId: id,
+            actionTitle: `Produto "${product.name}" excluído pela administração`,
+            entityLabel: "produto",
+            entityName: product.name,
+            sellerUrl: `/erp/produtos?view=${id}`,
+            ctx: actionCtx,
+        })
+
         return successResponse({ deleted: true })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao excluir produto")
     }
 }
 
-export async function deleteAdminCatalogService(serviceId: string, reason?: string | null) {
+export async function deleteAdminCatalogService(
+    serviceId: string,
+    ctx?: AdminActionContext | string | null,
+) {
     const adminUser = await adminWriteGate()
     const id = sanitizeUUID(serviceId)
     if (!id) return errorResponse("ID de serviço inválido")
+    const actionCtx: AdminActionContext | null =
+        typeof ctx === "string" ? { reason: ctx } : ctx || null
 
     try {
-        const cleanReason = sanitizeString(reason || "Remoção administrativa", MAX_REASON_LEN)
+        const cleanReason = sanitizeString(actionCtx?.reason || "Remoção administrativa", MAX_REASON_LEN)
         const admin = getAdminClient()
         const { data: existing, error } = await admin
             .from("services")
-            .select("id, partner_id, sku, name")
+            .select("id, partner_id, store_id, sku, name")
             .eq("id", id)
             .single()
         if (error || !existing) return errorResponse("Serviço não encontrado")
@@ -1075,6 +1129,19 @@ export async function deleteAdminCatalogService(serviceId: string, reason?: stri
             metadata: { deleted_reason: cleanReason },
         })
 
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: existing.partner_id,
+            storeId: (existing as any).store_id || null,
+            targetType: "service",
+            targetId: id,
+            actionTitle: `Serviço "${existing.name}" excluído pela administração`,
+            entityLabel: "serviço",
+            entityName: existing.name,
+            sellerUrl: `/erp/servicos?view=${id}`,
+            ctx: actionCtx,
+        })
+
         return successResponse({ deleted: true })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao excluir serviço")
@@ -1086,6 +1153,7 @@ async function setCatalogItemArchived(
     kind: "product" | "service",
     itemId: string,
     archived: boolean,
+    ctx?: AdminActionContext | null,
 ): Promise<ActionResponse<any>> {
     const id = sanitizeUUID(itemId)
     if (!id) return errorResponse("ID inválido")
@@ -1095,7 +1163,7 @@ async function setCatalogItemArchived(
         const table = kind === "product" ? "products" : "services"
         const { data: existing, error } = await admin
             .from(table)
-            .select("id, partner_id, sku, name")
+            .select("id, partner_id, store_id, sku, name")
             .eq("id", id)
             .single()
         if (error || !existing) return errorResponse(kind === "product" ? "Produto não encontrado" : "Serviço não encontrado")
@@ -1121,6 +1189,7 @@ async function setCatalogItemArchived(
                 partnerId: existing.partner_id,
                 name: existing.name,
                 action: archived ? "archived" : "unarchived",
+                ...(ctx?.reason?.trim() ? { reason: ctx.reason.trim() } : {}),
             },
         })
         await partnerTimeline({
@@ -1136,20 +1205,44 @@ async function setCatalogItemArchived(
             ],
         })
 
+        const entityLabel = kind === "product" ? "produto" : "serviço"
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: existing.partner_id,
+            storeId: (existing as any).store_id || null,
+            targetType: kind,
+            targetId: id,
+            actionTitle: `${entityLabel === "produto" ? "Produto" : "Serviço"} "${existing.name}" ${
+                archived ? "arquivado" : "desarquivado"
+            } pela administração`,
+            entityLabel,
+            entityName: existing.name,
+            sellerUrl: kind === "product" ? `/erp/produtos?view=${id}` : `/erp/servicos?view=${id}`,
+            ctx,
+        })
+
         return successResponse({ archived })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao alterar status")
     }
 }
 
-export async function setAdminCatalogProductArchived(productId: string, archived: boolean) {
+export async function setAdminCatalogProductArchived(
+    productId: string,
+    archived: boolean,
+    ctx?: AdminActionContext | null,
+) {
     const adminUser = await adminWriteGate()
-    return setCatalogItemArchived(adminUser, "product", productId, archived)
+    return setCatalogItemArchived(adminUser, "product", productId, archived, ctx)
 }
 
-export async function setAdminCatalogServiceArchived(serviceId: string, archived: boolean) {
+export async function setAdminCatalogServiceArchived(
+    serviceId: string,
+    archived: boolean,
+    ctx?: AdminActionContext | null,
+) {
     const adminUser = await adminWriteGate()
-    return setCatalogItemArchived(adminUser, "service", serviceId, archived)
+    return setCatalogItemArchived(adminUser, "service", serviceId, archived, ctx)
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1280,7 +1373,7 @@ export async function createAdminRecurringPlan(input: AdminPlanInput) {
     }
 }
 
-export async function updateAdminRecurringPlan(input: AdminPlanInput) {
+export async function updateAdminRecurringPlan(input: AdminPlanInput, ctx?: AdminActionContext | null) {
     const adminUser = await adminWriteGate()
     const partnerId = sanitizeUUID(input?.partnerId || "")
     const planId = sanitizeUUID(input?.planId || "")
@@ -1385,7 +1478,12 @@ export async function updateAdminRecurringPlan(input: AdminPlanInput) {
             actionType: AdminActionType.CATALOG_PLAN_UPDATE,
             targetType: "recurring_plan",
             targetId: planId,
-            metadata: { partnerId, name: plan.name, fields: Object.keys(updatePayload) },
+            metadata: {
+                partnerId,
+                name: plan.name,
+                fields: Object.keys(updatePayload),
+                ...(ctx?.reason?.trim() ? { reason: ctx.reason.trim() } : {}),
+            },
         })
         await partnerTimeline({
             partnerId,
@@ -1396,19 +1494,37 @@ export async function updateAdminRecurringPlan(input: AdminPlanInput) {
             changeLines: [`atualizou plano recorrente "${plan.name}" via painel admin.`],
         })
 
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId,
+            storeId: null,
+            targetType: "recurring_plan",
+            targetId: planId,
+            actionTitle: `Plano "${plan.name}" alterado pela administração`,
+            entityLabel: "plano",
+            entityName: plan.name,
+            sellerUrl: `/erp/recorrentes/planos?view=${planId}`,
+            ctx,
+        })
+
         return { success: true as const, data: mapPlanRow(plan as Record<string, unknown>) }
     } catch (e: unknown) {
         return { success: false as const, error: e instanceof Error ? e.message : "Erro ao atualizar plano" }
     }
 }
 
-export async function deleteAdminRecurringPlan(planId: string, reason?: string | null) {
+export async function deleteAdminRecurringPlan(
+    planId: string,
+    ctx?: AdminActionContext | string | null,
+) {
     const adminUser = await adminWriteGate()
     const id = sanitizeUUID(planId)
     if (!id) return { success: false as const, error: "ID de plano inválido" }
+    const actionCtx: AdminActionContext | null =
+        typeof ctx === "string" ? { reason: ctx } : ctx || null
 
     try {
-        const cleanReason = sanitizeString(reason || "Remoção administrativa", MAX_REASON_LEN)
+        const cleanReason = sanitizeString(actionCtx?.reason || "Remoção administrativa", MAX_REASON_LEN)
         const admin = getAdminClient()
 
         const { data: plan } = await admin
@@ -1466,6 +1582,19 @@ export async function deleteAdminRecurringPlan(planId: string, reason?: string |
                 changeLines: [`arquivou plano recorrente "${plan.name}" via painel admin (itens vinculados).`],
             })
 
+            await applyAdminActionContext({
+                adminUserId: adminUser.userId,
+                partnerId: plan.partner_id,
+                storeId: null,
+                targetType: "recurring_plan",
+                targetId: id,
+                actionTitle: `Plano "${plan.name}" arquivado pela administração`,
+                entityLabel: "plano",
+                entityName: plan.name,
+                sellerUrl: `/erp/recorrentes/planos?view=${id}`,
+                ctx: { ...actionCtx, reason: actionCtx?.reason?.trim() || cleanReason },
+            })
+
             return {
                 success: true as const,
                 archived: true,
@@ -1496,6 +1625,19 @@ export async function deleteAdminRecurringPlan(planId: string, reason?: string |
             actionType: "deleted",
             changeLines: [`excluiu plano recorrente "${plan.name}" via painel admin.`],
             metadata: { deleted_reason: cleanReason },
+        })
+
+        await applyAdminActionContext({
+            adminUserId: adminUser.userId,
+            partnerId: plan.partner_id,
+            storeId: null,
+            targetType: "recurring_plan",
+            targetId: id,
+            actionTitle: `Plano "${plan.name}" excluído pela administração`,
+            entityLabel: "plano",
+            entityName: plan.name,
+            sellerUrl: `/erp/recorrentes/planos?view=${id}`,
+            ctx: { ...actionCtx, reason: actionCtx?.reason?.trim() || cleanReason },
         })
 
         return { success: true as const, archived: false as const }
