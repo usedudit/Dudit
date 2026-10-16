@@ -139,7 +139,7 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
 
       const { data: rrPartner } = await admin
         .from("return_requests")
-        .select("partner_id, stores!left(name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name))")
+        .select("partner_id, stores!left(name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id)")
         .eq("id", parsed.returnRequestId)
         .maybeSingle()
 
@@ -149,14 +149,14 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
       const store = (rrPartner?.stores as any) || null
       if (store) {
         partnerUrl = getStoreUrl(store)
-        partnerName = store.partners?.name || store.name || null
+        partnerName = store.name || null
       } else if (partnerId) {
         const { data: part } = await admin
           .from("partners")
-          .select("name")
+          .select("id, stores(name)")
           .eq("id", partnerId)
           .maybeSingle()
-        partnerName = part?.name || null
+        partnerName = (part as any)?.stores?.[0]?.name || null
       }
 
       sendMarketplaceReport({

@@ -24,7 +24,7 @@ export default async function AdminCatalogPlanDetailPage({
                 partnerId={plan.partnerId}
                 businessInfo={partner?.business_info}
                 store={store}
-                partnerName={partner?.name}
+                partnerName={store?.name}
                 auditEvents={auditEvents}
             />
         </>

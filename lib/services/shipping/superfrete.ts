@@ -531,13 +531,32 @@ export const SUPERFRETE_LABEL_STATUS: Record<string, string> = {
   failed: "Falhou",
 }
 
+// Status do rótulo (order_shipments.status) → status de entrega do pedido.
+// "released" (etiqueta paga, ainda não postada) fica em "preparing": o pacote
+// só é considerado enviado ("sent") depois da postagem. Isso mantém o
+// cancelamento pelo cliente disponível enquanto a encomenda não foi postada
+// e o bloqueia a partir daí (regra: só esperar chegar p/ devolução/reembolso).
 export const SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS: Record<string, string> = {
   pending: "not_sent",
-  released: "sent",
+  released: "preparing",
   posted: "sent",
+  in_transit: "sent",
   delivered: "delivered",
   cancelled: "cancelled",
+  failed: "delivery_failed",
 }
+
+// Opções exibidas no controle manual de status de envio (ERP) para pedidos
+// que têm entrega por transportadora.
+export const CARRIER_SHIPMENT_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "pending", label: "Aguardando pagamento" },
+  { value: "released", label: "Aguardando postagem" },
+  { value: "posted", label: "Postado" },
+  { value: "in_transit", label: "Em trânsito" },
+  { value: "delivered", label: "Entregue" },
+  { value: "failed", label: "Falha no envio" },
+  { value: "cancelled", label: "Cancelado" },
+]
 
 // Status crus enviados no payload do webhook SuperFrete → status
 // persistidos em order_shipments (constraint da tabela). "generated"

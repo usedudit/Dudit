@@ -75,7 +75,7 @@ export async function fetchPartnerProductsBucket() {
 
   let query = supabase
     .from("products")
-    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, addon_groups, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
 
@@ -105,6 +105,11 @@ export async function fetchPartnerProductsBucket() {
     image: p.images && p.images.length > 0 ? p.images[0] : null,
     has_variants: p.product_variants && p.product_variants.length > 0,
     unit: p.unit || null,
+    addon_groups: (Array.isArray(p.addon_groups) && p.addon_groups.length > 0)
+      ? p.addon_groups
+      : (Array.isArray(p.technical_specs?.addon_groups) && p.technical_specs.addon_groups.length > 0)
+        ? p.technical_specs.addon_groups
+        : [],
     variants: (p.product_variants || []).map((variant: any) => ({
       id: variant.id,
       name: variant.variant_name,

@@ -2815,8 +2815,26 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   ];
 
   if (capabilities.hasStockMovements && stockItems.length > 0) {
+    // Always reserve first: finalize_order_inventory requires stock_reserved >=
+    // quantity, and variant reservations live in product_variants (products only
+    // worked by coincidence with leftover reservations). The reserve RPC already
+    // honours the per-item allow_sell_without_stock flag (stock bypass).
+    const reserveResult = await reserveOrderInventory({
+      client: supabase,
+      partnerId,
+      orderId: order.id,
+      items: stockItems,
+      storeId: data.storeId,
+    });
+
+    if ("error" in reserveResult) {
+      await supabase.from("order_items").delete().eq("order_id", order.id);
+      await supabase.from("orders").delete().eq("id", order.id);
+      return { error: reserveResult.error };
+    }
+
     if (isImmediateInventoryDeduction) {
-      // Direct finalization in 1 single RPC without redundant reservation
+      // Deduct right away, consuming the reservation created above.
       const finalizeResult = await finalizeOrderInventory({
         client: supabase,
         partnerId,
@@ -2832,20 +2850,6 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         await supabase.from("order_items").delete().eq("order_id", order.id);
         await supabase.from("orders").delete().eq("id", order.id);
         return { error: finalizeResult.error };
-      }
-    } else {
-      const reserveResult = await reserveOrderInventory({
-        client: supabase,
-        partnerId,
-        orderId: order.id,
-        items: stockItems,
-        storeId: data.storeId,
-      });
-
-      if ("error" in reserveResult) {
-        await supabase.from("order_items").delete().eq("order_id", order.id);
-        await supabase.from("orders").delete().eq("id", order.id);
-        return { error: reserveResult.error };
       }
     }
   }

@@ -144,9 +144,12 @@ async function fetchHeadStore(admin: AdminClient, partnerId: string | null | und
 async function fetchPartnerNames(admin: AdminClient, partnerIds: string[]) {
     const unique = [...new Set(partnerIds.filter(Boolean))]
     if (unique.length === 0) return {} as Record<string, string>
-    const { data } = await admin.from("partners").select("id, name").in("id", unique)
+    const { data } = await admin
+        .from("partners")
+        .select("id, stores(name)")
+        .in("id", unique)
     const map: Record<string, string> = {}
-    for (const p of data || []) map[p.id] = p.name || "Parceiro"
+    for (const p of data || []) map[p.id] = (p as any).stores?.[0]?.name || "Parceiro"
     return map
 }
 
@@ -327,7 +330,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
                 .eq("partner_id", raw.partner_id)
                 .order("name"),
             fetchHeadStore(admin, raw.partner_id),
-            admin.from("partners").select("id, name, business_info").eq("id", raw.partner_id).maybeSingle(),
+            admin.from("partners").select("id, business_info").eq("id", raw.partner_id).maybeSingle(),
             admin
                 .from("admin_audit_logs")
                 .select("*")
@@ -367,7 +370,7 @@ export async function getAdminCatalogServiceDetail(serviceId: string) {
             fetchHeadStore(admin, (service as any).partner_id),
             admin
                 .from("partners")
-                .select("id, name, business_info")
+                .select("id, business_info")
                 .eq("id", (service as any).partner_id)
                 .maybeSingle(),
             admin
@@ -436,7 +439,7 @@ export async function getAdminCatalogPlanDetail(planId: string) {
             fetchHeadStore(admin, (row as any).partner_id),
             admin
                 .from("partners")
-                .select("id, name, business_info")
+                .select("id, business_info")
                 .eq("id", (row as any).partner_id)
                 .maybeSingle(),
             admin

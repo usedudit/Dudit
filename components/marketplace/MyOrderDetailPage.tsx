@@ -1716,7 +1716,32 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 {/* Left Column (Sections 1, 2, 3, 4, 5) */}
                                 <div className="lg:col-span-8 space-y-8">
                                     {/* Mobile/Tablet Order Summary Card */}
-                                    <div className="block lg:hidden">
+                                    <div className="block lg:hidden space-y-8">
+                                        {order.order_source === "Assinatura" && (
+                                            <InfoCard
+                                                title="Pedido da assinatura"
+                                                message={
+                                                    order.payment_method === "Assinatura (Créditos)"
+                                                        ? "Este pedido foi criado usando créditos da sua assinatura - sem cobrança adicional."
+                                                        : "Este pedido foi gerado automaticamente pela sua assinatura recorrente."
+                                                }
+                                                color="blue"
+                                                rightElement={
+                                                    order.recurring_subscription_id ? (
+                                                        <Button
+                                                            variant="link"
+                                                            className="text-brand-blue hover:text-brand-blue/70"
+                                                            onClick={() =>
+                                                                window.open(`/assinaturas?view=${order.recurring_subscription_id}`)
+                                                            }
+                                                            type="button"
+                                                        >
+                                                            Ver assinatura
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
+                                        )}
                                         <FormSection title={
                                             <div className="flex items-center gap-2">
                                                 <span>Pedido #{orderNumber}</span>
@@ -1995,32 +2020,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                             {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : totalAmount)}
                                                         </span>
-                                                    }
-                                                />
-                                            )}
-
-                                            {order.order_source === "Assinatura" && (
-                                                <InfoCard
-                                                    title="Pedido da assinatura"
-                                                    message={
-                                                        order.payment_method === "Assinatura (Créditos)"
-                                                            ? "Este pedido foi criado usando créditos da sua assinatura - sem cobrança adicional."
-                                                            : "Este pedido foi gerado automaticamente pela sua assinatura recorrente."
-                                                    }
-                                                    color="blue"
-                                                    rightElement={
-                                                        order.recurring_subscription_id ? (
-                                                            <Button
-                                                                variant="link"
-                                                                className="text-brand-blue hover:text-brand-blue/70"
-                                                                onClick={() =>
-                                                                    window.open(`/assinaturas?view=${order.recurring_subscription_id}`)
-                                                                }
-                                                                type="button"
-                                                            >
-                                                                Ver assinatura
-                                                            </Button>
-                                                        ) : undefined
                                                     }
                                                 />
                                             )}

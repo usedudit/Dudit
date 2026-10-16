@@ -290,21 +290,21 @@ export async function createReviewAction(data: {
     if (data.partnerId) {
         const { data: st } = await adminSupabase
             .from("stores")
-            .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name)")
+            .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id")
             .eq("partner_id", data.partnerId)
             .order("is_headquarters", { ascending: false })
             .limit(1)
             .maybeSingle()
         if (st) {
-            partnerName = st.partners?.name || st.name || null
+            partnerName = st.name || null
             partnerUrl = getStoreUrl(st)
         } else {
             const { data: part } = await adminSupabase
                 .from("partners")
-                .select("name")
+                .select("id, stores(name)")
                 .eq("id", data.partnerId)
                 .maybeSingle()
-            partnerName = part?.name || null
+            partnerName = (part as any)?.stores?.[0]?.name || null
         }
     }
 

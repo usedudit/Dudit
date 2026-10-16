@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, IconPlaceholder, Input } from "@/components/reusable"
+import { Button, IconPlaceholder, Input, Badge, RadioButton, Checkbox } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
@@ -12,7 +12,7 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
-import { BoxIcon, XIcon, SearchIcon, FilterIcon, ArrowUpDownIcon, MoneyIcon, InfoIcon, ChevronDownIcon } from "@/lib/icons"
+import { BoxIcon, XIcon, SearchIcon, FilterIcon, ArrowUpDownIcon, MoneyIcon, InfoIcon, ChevronDownIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
@@ -208,6 +208,21 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
         return selectedAddonsList.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
     }, [selectedAddonsList])
 
+    // Faixa de preço das variações (igual ao card do PDV: "De: ... Até: ...")
+    const variantPriceRange = useMemo(() => {
+        if (!product || !hasVariants) return null
+        const prices = rawVariants
+            .map((v: any) => {
+                const vp = v.price !== undefined && v.price !== null
+                    ? Number(v.price)
+                    : Number(product.price || 0) + Number(v.price_adjustment || 0)
+                return vp
+            })
+            .filter((p: number) => !isNaN(p) && p > 0)
+        if (prices.length === 0) return null
+        return { min: Math.min(...prices), max: Math.max(...prices) }
+    }, [product, hasVariants, rawVariants])
+
     // Dynamic filter configuration for variants
     const filterConfig = useMemo<FilterSectionConfig[]>(() => {
         if (!product || !hasVariants) return []
@@ -237,8 +252,8 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
 
         return [
             { id: "status", title: "Status", type: "checkbox-list" as const, options: ["Ativo", "Inativo"] },
-            { id: "priceRange", title: "Preço", type: "range" as const, rangeConfig: { minKey: "minPrice", maxKey: "maxPrice", minPlaceholder: "R$ Min", maxPlaceholder: "R$ Max" } },
-            { id: "stockRange", title: "Estoque", type: "range" as const, rangeConfig: { minKey: "minStock", maxKey: "maxStock", minPlaceholder: "Qtd Min", maxPlaceholder: "Qtd Max" } },
+            { id: "priceRange", title: "Preço", type: "range" as const, rangeConfig: { minKey: "minPrice", maxKey: "maxPrice", minPlaceholder: "Mín", maxPlaceholder: "Máx", inputType: "money" as const } },
+            { id: "stockRange", title: "Estoque", type: "range" as const, rangeConfig: { minKey: "minStock", maxKey: "maxStock", minPlaceholder: "Qtd Min", maxPlaceholder: "Qtd Max", inputType: "number" as const } },
             ...dynamicSections,
         ]
     }, [product, hasVariants, rawVariants])
@@ -431,7 +446,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             <FilterChip
                 key={key}
                 label={label}
-                icon={<MoneyIcon size={12} />}
+                icon={key === "priceRange" ? <MoneyIcon size={12} /> : <PackageIcon size={12} />}
                 value={`${min ? `${prefix}${min}` : "0"} - ${max ? `${prefix}${max}` : "∞"}`}
                 onRemove={() => setFilters((p: any) => ({ ...p, [key]: { min: "", max: "" } }))}
             />
@@ -519,10 +534,27 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                     </div>
                     <div className="min-w-0 flex-1">
                         <h3 className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(product.price)}
-                            </span>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                            {hasVariants && variantPriceRange ? (
+                                variantPriceRange.min === variantPriceRange.max ? (
+                                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(variantPriceRange.min)}
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                            De: {formatCurrency(variantPriceRange.min)}
+                                        </span>
+                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                            Até: {formatCurrency(variantPriceRange.max)}
+                                        </span>
+                                    </>
+                                )
+                            ) : (
+                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(product.price)}
+                                </span>
+                            )}
                             {addonsUnitPrice > 0 && (
                                 <span className="text-xs font-bold text-brand-green">
                                     + {formatCurrency(addonsUnitPrice)} (adicionais)
@@ -671,18 +703,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
 
             {/* Addons / Complements Tab Content */}
             {activeTab === "addons" && hasAddons && (
-                <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-                            Grupos de complementos
-                        </span>
-                        {addonsUnitPrice > 0 && (
-                            <span className="text-xs font-bold text-brand-green">
-                                + {formatCurrency(addonsUnitPrice)}
-                            </span>
-                        )}
-                    </div>
-
+                <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-3">
                     {productAddons.map((grp: any) => {
                         const selectedIds = selectedAddonOptionIds[grp.id] || []
                         const maxQty = grp.max_quantity || grp.options?.length || 1
@@ -710,26 +731,21 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                                                 {grp.name || "Complementos"}
                                             </h4>
                                             {grp.required ? (
-                                                <span
-                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSatisfied
-                                                        ? "bg-brand-green/10 text-brand-green border border-brand-green/20"
-                                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-300 dark:border-amber-700/40"
-                                                        }`}
-                                                >
-                                                    {isSatisfied ? "✓ Selecionado" : "Obrigatório"}
-                                                </span>
+                                                <Badge variant={isSatisfied ? "green" : "red"} className="scale-90" icon={null}>
+                                                    {isSatisfied ? "Selecionado" : "Obrigatório"}
+                                                </Badge>
                                             ) : selectedIds.length > 0 ? (
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green border border-brand-green/20">
-                                                    {selectedIds.length} selecionado{selectedIds.length > 1 ? "s" : ""}
-                                                </span>
+                                                <Badge variant="green" className="scale-90">
+                                                    {selectedIds.length}
+                                                </Badge>
                                             ) : (
-                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-dark-border text-brand-inactive-text dark:text-dark-body">
+                                                <Badge variant="gray" className="scale-90" icon={null}>
                                                     Opcional
-                                                </span>
+                                                </Badge>
                                             )}
                                         </div>
                                         <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                            {grp.required ? `Escolha no mínimo ${grp.min_quantity || 1}` : "Opcional"} · {isRadio ? "1 opção" : `até ${maxQty} opções`}
+                                            {grp.required ? `Mínimo ${grp.min_quantity || 1}` : "Opcional"} · {isRadio ? "1 opção" : `até ${maxQty} opções`}
                                             {!isExpanded && selectedOptions.length > 0 && (
                                                 <span className="text-brand-dark dark:text-dark-heading font-medium ml-1.5">
                                                     ({selectedOptions.map((o: any) => o.name).join(", ")})
@@ -754,44 +770,37 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                                         >
                                             {(grp.options || []).filter((o: any) => o.available !== false).map((opt: any) => {
                                                 const isSelected = selectedIds.includes(opt.id)
+                                                const optionPrice = Number(opt.price) || 0
                                                 return (
-                                                    <button
+                                                    <div
                                                         key={opt.id}
-                                                        type="button"
-                                                        className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""
-                                                            }`}
-                                                        onClick={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                        className={`flex items-center justify-between px-4 py-2.5 transition-colors ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""}`}
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0 pr-2">
-                                                            <div
-                                                                className={`w-4 h-4 flex items-center justify-center shrink-0 border-2 transition-colors ${isRadio ? "rounded-full" : "rounded"
-                                                                    } ${isSelected
-                                                                        ? "border-brand-green bg-brand-green text-white"
-                                                                        : "border-brand-border dark:border-dark-border"
-                                                                    }`}
-                                                            >
-                                                                {isSelected && (
-                                                                    <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
-                                                                        <path
-                                                                            d="M2.5 6L5 8.5L9.5 3.5"
-                                                                            stroke="currentColor"
-                                                                            strokeWidth="2"
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                {opt.name}
-                                                            </span>
+                                                            {isRadio ? (
+                                                                <RadioButton
+                                                                    name={`addon_${grp.id}`}
+                                                                    value={opt.id}
+                                                                    checked={isSelected}
+                                                                    onChange={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                                    label={opt.name}
+                                                                />
+                                                            ) : (
+                                                                <Checkbox
+                                                                    id={`addon_${grp.id}_${opt.id}`}
+                                                                    name={`addon_${grp.id}_${opt.id}`}
+                                                                    checked={isSelected}
+                                                                    onChange={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                                    label={opt.name}
+                                                                />
+                                                            )}
                                                         </div>
-                                                        {(Number(opt.price) || 0) > 0 && (
-                                                            <span className="text-xs font-bold text-brand-green shrink-0 ml-2">
-                                                                + {formatCurrency(Number(opt.price))}
+                                                        {optionPrice > 0 && (
+                                                            <span className="text-sm font-bold text-brand-green shrink-0 ml-2">
+                                                                + {formatCurrency(optionPrice)}
                                                             </span>
                                                         )}
-                                                    </button>
+                                                    </div>
                                                 )
                                             })}
                                         </motion.div>

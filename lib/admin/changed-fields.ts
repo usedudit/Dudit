@@ -32,6 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
     location: "localização",
     // estoque
     stock_quantity: "estoque",
+    stock: "estoque",
     stockQuantity: "estoque",
     min_stock: "estoque mínimo",
     minStock: "estoque mínimo",
@@ -128,6 +129,7 @@ const SKIP_KEYS = new Set([
 
 function normalize(value: unknown): string {
     if (value === undefined || value === null) return ""
+    if (typeof value === "boolean") return value ? "true" : ""
     if (value instanceof File) return `file:${value.name}`
     if (typeof value === "object") {
         try {
@@ -156,13 +158,18 @@ export function diffChangedFields(
         const camelKey = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
         const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
         const origKey = key in original ? key : camelKey in original ? camelKey : snakeKey in original ? snakeKey : null
-        const hasOriginal = origKey !== null
-        const before = hasOriginal ? normalize(original[origKey as string]) : normalize(undefined)
+        // Campos que o form envia por padrão mas que não existem no registro
+        // original (internos do form) nunca são reportados como "alterados".
+        if (origKey === null) continue
+        // Só reporta campos com rótulo conhecido — evita poluir o resumo e a
+        // notificação com chaves internas do form.
+        const label = FIELD_LABELS[key]
+        if (!label) continue
+
+        const before = normalize(original[origKey as string])
         const after = normalize(value)
         if (before === after) continue
-        if (!hasOriginal && !after) continue
 
-        const label = FIELD_LABELS[key] || key
         if (seen.has(label)) continue
         seen.add(label)
         changed.push(label)

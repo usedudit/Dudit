@@ -25,6 +25,8 @@ import {
   SUPERFRETE_SERVICE_IDS,
   DEFAULT_SUPERFRETE_EVENTS,
   SERVICE_LABELS,
+  SUPERFRETE_LABEL_STATUS,
+  SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS,
   buildCarrierTrackingUrl,
 } from "@/lib/services/shipping/superfrete"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
@@ -1672,6 +1674,149 @@ export async function createOrderShippingLabelAction(payload: {
       partnerId: ctx.partnerId,
     })
     return { success: false, error: err?.message || "Erro ao criar etiqueta." }
+  }
+}
+
+// Status de envio por transportadora aceitos no controle manual do ERP.
+const CARRIER_SHIPMENT_STATUSES = new Set([
+  "pending",
+  "released",
+  "posted",
+  "in_transit",
+  "delivered",
+  "failed",
+  "cancelled",
+])
+
+// Alteração manual do status de envio de um pedido com transportadora:
+// grava em order_shipments.status e mantém orders.delivery_status em
+// sincronia usando o mesmo mapeamento do webhook da SuperFrete.
+export async function updateOrderCarrierStatusAction(payload: {
+  orderId: string
+  status: string
+}): Promise<{ success: true } | { success: false; error: string }> {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  const user = await requireUser()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "orders", "edit", user)
+
+  const nextStatus = String(payload.status || "").toLowerCase()
+  if (!CARRIER_SHIPMENT_STATUSES.has(nextStatus)) {
+    return { success: false, error: "Status de envio inválido." }
+  }
+
+  try {
+    const supabase = getAdminClient()
+    const { data: shipment } = await supabase
+      .from("order_shipments")
+      .select("id, status, paid_at")
+      .eq("order_id", payload.orderId)
+      .eq("partner_id", ctx.partnerId)
+      .neq("kind", "return")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!shipment) {
+      return { success: false, error: "Este pedido não possui envio por transportadora." }
+    }
+
+    const { data: order } = await supabase
+      .from("orders")
+      .select(
+        "id, situation, delivery_status, order_number, buyer_id, store_id, delivery_departure_at, delivery_arrived_at, delivery_completed_at",
+      )
+      .eq("id", payload.orderId)
+      .eq("partner_id", ctx.partnerId)
+      .maybeSingle()
+
+    if (!order) return { success: false, error: "Pedido não encontrado." }
+
+    const nowIso = new Date().toISOString()
+    const shipmentPatch: Record<string, unknown> = { status: nextStatus }
+    if (nextStatus === "released" && !shipment.paid_at) shipmentPatch.paid_at = nowIso
+    if (nextStatus === "delivered") shipmentPatch.delivered_at = nowIso
+    if (nextStatus === "cancelled") shipmentPatch.cancelled_at = nowIso
+
+    const { error: shipErr } = await supabase
+      .from("order_shipments")
+      .update(shipmentPatch)
+      .eq("id", shipment.id)
+      .eq("partner_id", ctx.partnerId)
+    if (shipErr) return { success: false, error: shipErr.message }
+
+    // Mantém o status de entrega do pedido em sincronia (mesmo mapa do webhook).
+    if (order.situation !== "cancelled") {
+      const mapped = SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS[nextStatus]
+      if (mapped) {
+        const orderPatch: Record<string, unknown> = { delivery_status: mapped }
+        if (nextStatus === "posted" && !order.delivery_departure_at) {
+          orderPatch.delivery_departure_at = nowIso
+        }
+        if (nextStatus === "delivered") {
+          if (!order.delivery_arrived_at) orderPatch.delivery_arrived_at = nowIso
+          if (!order.delivery_completed_at) orderPatch.delivery_completed_at = nowIso
+        }
+        const { error: orderErr } = await supabase
+          .from("orders")
+          .update(orderPatch)
+          .eq("id", order.id)
+          .eq("partner_id", ctx.partnerId)
+        if (orderErr) return { success: false, error: orderErr.message }
+      }
+    }
+
+    await logAuditEvent({
+      partnerId: ctx.partnerId,
+      actorUserId: user.id,
+      entityType: "order",
+      entityId: order.id,
+      actionType: "shipping_status_updated",
+      changeLines: [
+        `Status de envio (transportadora) alterado para "${SUPERFRETE_LABEL_STATUS[nextStatus] || nextStatus}".`,
+      ],
+      source: "user",
+      metadata: { from_status: shipment.status, to_status: nextStatus, shipment_id: shipment.id, manual: true },
+    })
+
+    // Avisa o cliente quando a encomenda é postada/entregue.
+    if (
+      order.situation !== "cancelled" &&
+      order.buyer_id &&
+      (nextStatus === "posted" || nextStatus === "delivered")
+    ) {
+      try {
+        const { createNotification } = await import("@/lib/services/notification.service")
+        const isDelivered = nextStatus === "delivered"
+        const orderRef = order.order_number || order.id.slice(0, 8).toUpperCase()
+        await createNotification({
+          userId: order.buyer_id,
+          type: isDelivered ? "order_delivered" : "order_shipped",
+          title: isDelivered ? "Pedido entregue" : "Pedido enviado",
+          message: isDelivered
+            ? `Seu pedido #${orderRef} foi entregue.`
+            : `Seu pedido #${orderRef} foi postado e está a caminho.`,
+          entityType: "order",
+          entityId: order.id,
+          data: { audience: "customer", partner_id: ctx.partnerId, store_id: order.store_id },
+          idempotencyKey: `carrier_status:${order.id}:${nextStatus}`,
+          origin: "manual",
+        })
+      } catch (notifyErr) {
+        console.error("[updateOrderCarrierStatusAction] notify failed:", notifyErr)
+      }
+    }
+
+    revalidateOrders(ctx.partnerId)
+    return { success: true }
+  } catch (err: any) {
+    captureError(err, {
+      module: "shipping",
+      action: "update_order_carrier_status",
+      partnerId: ctx.partnerId,
+    })
+    return { success: false, error: err?.message || "Erro ao atualizar status de envio." }
   }
 }
 

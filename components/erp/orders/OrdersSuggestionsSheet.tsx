@@ -12,7 +12,7 @@ import {
     TabsTrigger,
     ThreeDotsLoader,
     Input,
-    FormDropdown,
+    PeriodDropdown,
 } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
@@ -198,19 +198,18 @@ export function OrdersSuggestionsSheet({
         </div>
     )
 
-    const renderSearch = (placeholder: string) => (
-        <div className="mb-3 flex items-center justify-end">
-            <div className="w-64">
-                <Input
-                    name="search-suggestions"
-                    placeholder={placeholder}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    variant="full-rounded"
-                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                    label=""
-                />
-            </div>
+    const renderSearch = (placeholder: string, right?: React.ReactNode) => (
+        <div className="mb-3 flex items-center gap-2">
+            <Input
+                name="search-suggestions"
+                placeholder={placeholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                variant="full-rounded"
+                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                label=""
+            />
+            {right}
         </div>
     )
 
@@ -314,26 +313,15 @@ export function OrdersSuggestionsSheet({
         </div>
     ) : (
         <div className="space-y-3">
-            <div className="mb-3 flex items-center justify-between">
-                <FormDropdown
+            {renderSearch(
+                "Buscar pedido ou cliente...",
+                <PeriodDropdown
                     options={PERIOD_OPTIONS}
                     value={String(stagnant?.periodDays || stagnantPeriod)}
                     setValue={(v) => setStagnantPeriod(Number(v))}
                     placeholder="Período"
-                    width="w-40"
                 />
-                <div className="w-56">
-                    <Input
-                        name="search-stagnant-orders"
-                        placeholder="Buscar pedido ou cliente..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                        label=""
-                    />
-                </div>
-            </div>
+            )}
             {stagnant && stagnant.count > 0 && (
                 <InfoCard
                     title="Pedidos parados"

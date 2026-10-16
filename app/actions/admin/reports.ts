@@ -348,7 +348,7 @@ export async function createReport(data: {
         } else if (data.targetType === "partner") {
             const { data: st } = await adminClient
                 .from("stores")
-                .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name)")
+                .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id")
                 .eq("partner_id", finalTargetId)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)
@@ -356,14 +356,14 @@ export async function createReport(data: {
             entityName = st?.name || ""
             if (st) {
                 entityUrl = getStoreUrl(st)
-                partnerName = st.partners?.name || null
+                partnerName = st.name || null
                 partnerId = st.partner_id
                 partnerUrl = getStoreUrl(st)
             }
         } else if (data.targetType === "review") {
             const { data: r } = await adminClient
                 .from("reviews")
-                .select("comment, rating, product_id, service_id, partner_id, products(id, name, slug, short_id, partners!inner(*)), services(id, name, slug, short_id, partners!inner(*)), partners!inner(name)")
+                .select("comment, rating, product_id, service_id, partner_id, products(id, name, slug, short_id, partners!inner(*)), services(id, name, slug, short_id, partners!inner(*)), partners!inner(id, stores(name))")
                 .eq("id", finalTargetId)
                 .maybeSingle()
             entityName = r?.comment ? r.comment : ""
@@ -375,7 +375,7 @@ export async function createReport(data: {
             }
             if (r?.partner_id) {
                 partnerId = r.partner_id
-                partnerName = (r.partners as any)?.name || null
+                partnerName = ((r.partners as any)?.stores?.[0]?.name) || null
             }
         }
 
@@ -553,12 +553,12 @@ export async function getReports(
         fetches.push(
             adminClient
                 .from("partners")
-                .select("id, name")
+                .select("id, stores(name)")
                 .in("id", partnerIds)
                 .then(({ data }: any) => {
                     ;(data || []).forEach((p: any) => {
                         if (!targetNames.has(`partner:${p.id}`)) {
-                            targetNames.set(`partner:${p.id}`, p.name)
+                            targetNames.set(`partner:${p.id}`, p.stores?.[0]?.name || null)
                         }
                     })
                 })

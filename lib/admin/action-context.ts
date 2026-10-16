@@ -152,7 +152,6 @@ export async function applyAdminActionContext(p: ApplyAdminActionContextParams):
     if (p.partnerId && ctx.notifySeller && reason) {
         try {
             const lines: string[] = [reason]
-            if (ctx.changedFields?.length) lines.push(`Alterações: ${ctx.changedFields.join(", ")}.`)
             if (riskScore !== null) lines.push(`Risk score ajustado para ${riskScore} pontos.`)
 
             await notifySellerTeam({

@@ -12,7 +12,7 @@ import {
     TabsTrigger,
     ThreeDotsLoader,
     Input,
-    FormDropdown,
+    PeriodDropdown,
 } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Portal from "@/components/Portal"
@@ -216,25 +216,22 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         </div>
     ) : (
         <div className="space-y-3">
-            <div className="mb-3 flex items-center justify-between">
-                <FormDropdown
+            <div className="mb-3 flex items-center gap-2">
+                <Input
+                    name="search-no-show"
+                    placeholder="Buscar cliente..."
+                    value={noShowSearch}
+                    onChange={(e) => setNoShowSearch(e.target.value)}
+                    variant="full-rounded"
+                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                    label=""
+                />
+                <PeriodDropdown
                     options={PERIOD_OPTIONS}
                     value={String(noShowPeriod)}
                     setValue={(v) => setNoShowPeriod(Number(v))}
                     placeholder="Período"
-                    width="w-40"
                 />
-                <div className="w-56">
-                    <Input
-                        name="search-no-show"
-                        placeholder="Buscar cliente..."
-                        value={noShowSearch}
-                        onChange={(e) => setNoShowSearch(e.target.value)}
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                        label=""
-                    />
-                </div>
             </div>
 
             {noShowAlerts.length === 0 ? (
@@ -315,25 +312,22 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         </div>
     ) : (
         <div className="space-y-3">
-            <div className="mb-3 flex items-center justify-between">
-                <FormDropdown
+            <div className="mb-3 flex items-center gap-2">
+                <Input
+                    name="search-stagnant"
+                    placeholder="Buscar..."
+                    value={stagnantSearch}
+                    onChange={(e) => setStagnantSearch(e.target.value)}
+                    variant="full-rounded"
+                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                    label=""
+                />
+                <PeriodDropdown
                     options={PERIOD_OPTIONS}
                     value={String(stagnantPeriod)}
                     setValue={(v) => setStagnantPeriod(Number(v))}
                     placeholder="Período"
-                    width="w-40"
                 />
-                <div className="w-56">
-                    <Input
-                        name="search-stagnant"
-                        placeholder="Buscar..."
-                        value={stagnantSearch}
-                        onChange={(e) => setStagnantSearch(e.target.value)}
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                        label=""
-                    />
-                </div>
             </div>
 
             {stagnantServices.length === 0 ? (

@@ -115,6 +115,7 @@ export interface ProductBucketItem {
   allow_sell_without_stock?: boolean
   image: string | null
   has_variants: boolean
+  addon_groups?: any[]
   variants?: Array<{
     id: string
     name: string

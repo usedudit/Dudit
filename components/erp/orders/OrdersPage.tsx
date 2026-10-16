@@ -64,6 +64,8 @@ import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPa
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel, canonicalDeliveryStatus, DELIVERY_STATUS_FILTER_OPTIONS, getFulfillmentModeLabel } from "@/lib/orders/status"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
+import { CARRIER_SHIPMENT_STATUS_OPTIONS } from "@/lib/services/shipping/superfrete"
+import { updateOrderCarrierStatusAction } from "@/app/actions/shipping/superfrete"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -306,6 +308,7 @@ export default function OrdersPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
+    const [carrierStatusValue, setCarrierStatusValue] = useState("pending")
     const [paymentStatusModal, setPaymentStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
     const [sinalActionModal, setSinalActionModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
@@ -712,6 +715,11 @@ export default function OrdersPage({
 
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
+        const outboundShipment = order.order_shipments?.[0]
+        if (order.isCarrierDelivery && outboundShipment) {
+            setCarrierStatusValue(outboundShipment.status || "pending")
+            return
+        }
         const status = order.delivery_status
         const isPickup = order.delivery_type === "pickup"
         setDeliveryStatusValue(
@@ -764,6 +772,31 @@ export default function OrdersPage({
     const submitDeliveryStatusChange = async () => {
         const targetOrder = deliveryStatusModal.order
         if (!targetOrder) return
+
+        // Pedidos com entrega por transportadora usam os status da própria
+        // transportadora (postado/em trânsito/entregue...).
+        if (targetOrder.isCarrierDelivery) {
+            setDeliveryStatusModal({ open: false, order: null })
+            setActionModal({ open: true, text: "Atualizando status de envio..." })
+            try {
+                const result = await updateOrderCarrierStatusAction({
+                    orderId: targetOrder.originalId,
+                    status: carrierStatusValue,
+                })
+                if (result.success) {
+                    afterMutation(targetOrder.originalId)
+                    toast({ title: "Sucesso", description: "Status de envio atualizado." })
+                } else {
+                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                }
+            } catch (error) {
+                console.error(error)
+                toast({ title: "Erro", description: "Falha ao atualizar status de envio.", variant: "destructive" })
+            } finally {
+                setActionModal({ open: false, text: "" })
+            }
+            return
+        }
 
         const currentStatus = targetOrder.delivery_status || "not_sent"
         const nextStatus = deliveryStatusValue
@@ -1619,12 +1652,21 @@ export default function OrdersPage({
                         message={deliveryStatusModal.order?.displayId || "-"}
                         color="gray"
                     />
-                    <FormDropdown
-                        options={deliveryStatusModal.order?.delivery_type === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS}
-                        value={deliveryStatusValue}
-                        setValue={setDeliveryStatusValue}
-                        placeholder="Selecione o status"
-                    />
+                    {deliveryStatusModal.order?.isCarrierDelivery ? (
+                        <FormDropdown
+                            options={CARRIER_SHIPMENT_STATUS_OPTIONS}
+                            value={carrierStatusValue}
+                            setValue={setCarrierStatusValue}
+                            placeholder="Selecione o status"
+                        />
+                    ) : (
+                        <FormDropdown
+                            options={deliveryStatusModal.order?.delivery_type === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS}
+                            value={deliveryStatusValue}
+                            setValue={setDeliveryStatusValue}
+                            placeholder="Selecione o status"
+                        />
+                    )}
                 </div>
             </DefaultModal>
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon, SearchIcon, CheckCircleIcon, TrendingUpIcon } from "@/lib/icons"
-import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, Input, FormDropdown } from "@/components/reusable"
+import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, Input, PeriodDropdown } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
@@ -464,30 +464,27 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: Repl
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <div className="mb-3 flex items-center justify-between">
-                                <FormDropdown
+                            <div className="mb-3 flex items-center gap-2">
+                                <Input
+                                    name="search"
+                                    placeholder="Buscar..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    variant="full-rounded"
+                                    prefix={
+                                        <SearchIcon
+                                            size={18}
+                                            className="text-brand-inactive-text shrink-0"
+                                        />
+                                    }
+                                    label=""
+                                />
+                                <PeriodDropdown
                                     options={PERIOD_OPTIONS}
                                     value={String(selectedPeriod)}
                                     setValue={(v) => setSelectedPeriod(Number(v))}
                                     placeholder="Período"
-                                    width="w-40"
                                 />
-                                <div className="w-56">
-                                    <Input
-                                        name="search"
-                                        placeholder="Buscar..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        variant="full-rounded"
-                                        prefix={
-                                            <SearchIcon
-                                                size={18}
-                                                className="text-brand-inactive-text shrink-0"
-                                            />
-                                        }
-                                        label=""
-                                    />
-                                </div>
                             </div>
 
                             {stagnantProducts.length === 0 ? (

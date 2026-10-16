@@ -269,55 +269,53 @@ export function CheckoutFulfillmentPanel({
                 <AddressBlock {...addressProps} title="Endereço de entrega" />
               </motion.div>
             )}
-            </AnimatePresence>
+          </AnimatePresence>
 
-            {!isPickup && canShowProductDelivery && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
-                <div className="space-y-3">
-                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                        Entrega por transportadora
-                    </p>
-                    {carrierQuoteLoading && (
-                        <div className="flex items-center gap-2 text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
-                            <Spinner size={16} />
-                            <span>Calculando opções de entrega...</span>
-                        </div>
-                    )}
-                    {carrierOptions.map((opt) => (
-                        <ListItem
-                            key={opt.serviceId}
-                            icon={
-                                <img
-                                    src={getCarrierBrandIcon(opt.companyName, opt.serviceName)}
-                                    alt={opt.companyName || "Transportadora"}
-                                    className="w-6 h-6 object-contain"
-                                />
-                            }
-                            title={opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
-                            description={formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
-                            onClick={() => onSelectCarrier?.(opt)}
-                            className={selectedCarrierServiceId === opt.serviceId
-                                ? "!border-brand-green bg-green-50/40 dark:bg-green-900/10"
-                                : ""}
-                            right={
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {formatCurrency(Number(opt.price))}
-                                    </span>
-                                    <RadioButton
-                                        name="carrierFreightOption"
-                                        value={String(opt.serviceId)}
-                                        checked={selectedCarrierServiceId === opt.serviceId}
-                                        onChange={() => onSelectCarrier?.(opt)}
-                                    />
-                                </div>
-                            }
-                        />
-                    ))}
-                    {carrierError && !carrierQuoteLoading && (
-                        <p className="text-xs text-red-500">{carrierError}</p>
-                    )}
+          {!isPickup && canShowProductDelivery && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
+            <div className="space-y-3">
+              <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                Entrega por transportadora
+              </p>
+              {carrierQuoteLoading && (
+                <div className="flex items-center gap-2 text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
+                  <Spinner size={16} />
+                  <span>Calculando opções de entrega...</span>
                 </div>
-            )}
+              )}
+              {carrierOptions.map((opt) => (
+                <ListItem
+                  key={opt.serviceId}
+                  icon={
+                    <img
+                      src={getCarrierBrandIcon(opt.companyName, opt.serviceName)}
+                      alt={opt.companyName || "Transportadora"}
+                      className="w-6 h-6 object-contain"
+                    />
+                  }
+                  title={opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
+                  description={formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
+                  onClick={() => onSelectCarrier?.(opt)}
+                  className="px-4 py-3"
+                  right={
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                        {formatCurrency(Number(opt.price))}
+                      </span>
+                      <RadioButton
+                        name="carrierFreightOption"
+                        value={String(opt.serviceId)}
+                        checked={selectedCarrierServiceId === opt.serviceId}
+                        onChange={() => onSelectCarrier?.(opt)}
+                      />
+                    </div>
+                  }
+                />
+              ))}
+              {carrierError && !carrierQuoteLoading && (
+                <p className="text-xs text-red-500">{carrierError}</p>
+              )}
+            </div>
+          )}
         </div>
       </FormSection>
     )

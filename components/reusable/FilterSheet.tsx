@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { Button, Checkbox, Input } from "@/components/reusable"
+import { Button, Checkbox, Input, MoneyInput } from "@/components/reusable"
 import { DatePicker } from "@/components/reusable/DatePicker"
 import { Switch } from "@/components/reusable/Switch"
 import Portal from "@/components/Portal"
@@ -28,6 +28,8 @@ export interface FilterSectionConfig {
         maxKey: string
         minPlaceholder?: string
         maxPlaceholder?: string
+        /** "money" usa o MoneyInput (R$), "number" usa input numérico. Default: "number" */
+        inputType?: "money" | "number"
     }
     /** Rótulo ao lado do switch (type: switch) */
     switchLabel?: string
@@ -197,32 +199,58 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
 
                     // Renderização de Range (Min/Max)
                     if (section.type === "range" && section.rangeConfig) {
-                        const { minKey, maxKey } = section.rangeConfig
+                        const { minKey, maxKey, inputType = "number" } = section.rangeConfig
                         // O valor deve estar estruturado no objeto filters como { [id]: { min: "", max: "" } }
                         const rangeValue = localFilters[section.id] || { min: "", max: "" }
+                        const isMoney = inputType === "money"
+                        // Min e Max são independentes: o máximo pode ser maior que o mínimo.
+                        const minPlaceholder = section.rangeConfig.minPlaceholder || (isMoney ? "Mín" : "Min")
+                        const maxPlaceholder = section.rangeConfig.maxPlaceholder || (isMoney ? "Máx" : "Max")
 
                         return (
                             <Accordion key={section.id} title={section.title}>
                                 <div className="flex items-center gap-3">
-                                    <Input
-                                        name={minKey}
-                                        placeholder={section.rangeConfig.minPlaceholder || "Min"}
-                                        type="number"
-                                        value={rangeValue.min || ""}
-                                        onChange={(e) => updateRange(section.id, "min", e.target.value)}
-                                        className="h-9 text-sm"
-                                        label=""
-                                    />
+                                    {isMoney ? (
+                                        <MoneyInput
+                                            name={minKey}
+                                            placeholder={minPlaceholder}
+                                            value={rangeValue.min ? Number(rangeValue.min) : 0}
+                                            onChange={(v) => updateRange(section.id, "min", v ? String(v) : "")}
+                                            className="h-9 text-sm"
+                                            label=""
+                                        />
+                                    ) : (
+                                        <Input
+                                            name={minKey}
+                                            placeholder={minPlaceholder}
+                                            type="number"
+                                            value={rangeValue.min || ""}
+                                            onChange={(e) => updateRange(section.id, "min", e.target.value)}
+                                            className="h-9 text-sm"
+                                            label=""
+                                        />
+                                    )}
                                     <span className="text-gray-400">-</span>
-                                    <Input
-                                        name={maxKey}
-                                        placeholder={section.rangeConfig.maxPlaceholder || "Max"}
-                                        type="number"
-                                        value={rangeValue.max || ""}
-                                        onChange={(e) => updateRange(section.id, "max", e.target.value)}
-                                        className="h-9 text-sm"
-                                        label=""
-                                    />
+                                    {isMoney ? (
+                                        <MoneyInput
+                                            name={maxKey}
+                                            placeholder={maxPlaceholder}
+                                            value={rangeValue.max ? Number(rangeValue.max) : 0}
+                                            onChange={(v) => updateRange(section.id, "max", v ? String(v) : "")}
+                                            className="h-9 text-sm"
+                                            label=""
+                                        />
+                                    ) : (
+                                        <Input
+                                            name={maxKey}
+                                            placeholder={maxPlaceholder}
+                                            type="number"
+                                            value={rangeValue.max || ""}
+                                            onChange={(e) => updateRange(section.id, "max", e.target.value)}
+                                            className="h-9 text-sm"
+                                            label=""
+                                        />
+                                    )}
                                 </div>
                             </Accordion>
                         )

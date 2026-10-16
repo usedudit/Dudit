@@ -1005,55 +1005,137 @@ export default function CreateOrder({
         productBucket.setSearchQuery("")
     }
 
+    const getProductAddonGroups = (product: any): any[] => {
+        if (!product) return []
+        if (Array.isArray(product.addon_groups) && product.addon_groups.length > 0) return product.addon_groups
+        if (Array.isArray(product.technical_specs?.addon_groups) && product.technical_specs.addon_groups.length > 0) return product.technical_specs.addon_groups
+        return []
+    }
+
     const addProductToOrder = (product: any) => {
-        if (product.has_variants) {
+        const hasAddons = getProductAddonGroups(product).length > 0
+        if (product.has_variants || hasAddons) {
             setSelectedProductForVariant(product)
             setIsVariantSheetOpen(true)
-        } else {
-            if (!product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
+            return
+        }
+        if (!product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
+            if (salesSettings.allowNegativeStock === false) {
+                notifyError(`O produto "${product.name}" está sem estoque e as configurações da empresa não permitem vendas com estoque negativo.`)
+                return
+            }
+            setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
+            setShowZeroStockAlert(true)
+            return
+        }
+        proceedAddProduct(product, false)
+    }
+
+    const handleVariantsConfirm = (
+        selections: Array<{ variantId: string; qty: number }>,
+        selectedAddons: Array<{ groupId: string; groupName: string; optionId: string; optionName: string; price: number }> = [],
+        baseQuantity: number = 1
+    ) => {
+        const product = selectedProductForVariant
+        if (!product) return
+
+        const addonsUnitPrice = selectedAddons.reduce((sum, a) => sum + (Number(a.price) || 0), 0)
+        const addonText = selectedAddons.map(a => a.optionName).join(", ")
+        const addonSuffix = addonText ? ` (+ ${addonText})` : ""
+
+        const finish = () => {
+            setIsVariantSheetOpen(false)
+            setSelectedProductForVariant(null)
+            productBucket.setSearchQuery("")
+        }
+
+        const variantsList = product.variants || product.product_variants || []
+        const hasVariants = Array.isArray(variantsList) && variantsList.length > 0
+
+        const pushItem = (newItem: any) => {
+            setItems(prev => [...prev, newItem])
+            setFieldErrors(prev => {
+                const next = new Set(prev)
+                next.delete("productSearch")
+                return next
+            })
+        }
+
+        if (!hasVariants) {
+            // Produto sem variações, apenas complementos
+            const qty = Math.max(1, Number(baseQuantity || 1))
+            const pricing = computeItemDisplayPrice(
+                Number(product.price || 0),
+                product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null,
+                orderPromotions,
+                { productId: product.id, categoryId: product.category_id || undefined }
+            )
+            const cannotSell = !product.allow_sell_without_stock && qty > Number(product.stock || 0)
+
+            const add = (forceBypass?: boolean) => {
+                pushItem({
+                    id: Math.random().toString(36).substr(2, 9),
+                    productId: product.id,
+                    serviceId: null,
+                    lineType: 'product',
+                    name: `${product.name}${addonSuffix}`,
+                    unitPrice: pricing.bestPrice + addonsUnitPrice,
+                    originalPrice: Number(product.price || 0),
+                    hasDiscount: pricing.hasDiscount,
+                    quantity: qty,
+                    sortOrder: items.length,
+                    image: product.image,
+                    sku: product.sku,
+                    stock: Number(product.stock || 0),
+                    allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock),
+                    unit: product.unit || null,
+                    isEditing: false,
+                    isManual: false,
+                    isService: false,
+                    selectedAddons: selectedAddons.length > 0 ? selectedAddons : undefined,
+                })
+            }
+
+            if (cannotSell) {
                 if (salesSettings.allowNegativeStock === false) {
                     notifyError(`O produto "${product.name}" está sem estoque e as configurações da empresa não permitem vendas com estoque negativo.`)
                     return
                 }
-                setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
+                setPendingZeroStockItem({ product, callback: () => add(true) })
                 setShowZeroStockAlert(true)
-                return
+            } else {
+                add(false)
             }
-            proceedAddProduct(product, false)
+            finish()
+            return
         }
-    }
 
-    const handleVariantsConfirm = (selections: Array<{ variantId: string; qty: number }>) => {
         selections.forEach(sel => {
-            const variant = selectedProductForVariant?.variants?.find((v: any) => String(v.id) === String(sel.variantId))
+            const variant = variantsList.find((v: any) => String(v.id) === String(sel.variantId))
             if (!variant) return
             if (sel.qty > 0) {
-                const cannotSell = !selectedProductForVariant.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)
+                const cannotSell = !product.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)
+                const basePrice = Number(variant.price || product.price || 0)
 
                 const add = (forceBypass?: boolean) => {
-                    const newItem = {
+                    pushItem({
                         id: Math.random().toString(36).substr(2, 9),
-                        productId: selectedProductForVariant.id,
+                        productId: product.id,
                         variantId: variant.id,
-                        name: `${selectedProductForVariant.name} - ${variant.name}`,
-                        unitPrice: variant.price || selectedProductForVariant.price,
-                        originalPrice: variant.price || selectedProductForVariant.price,
+                        name: `${product.name} - ${variant.name}${addonSuffix}`,
+                        unitPrice: basePrice + addonsUnitPrice,
+                        originalPrice: basePrice,
                         hasDiscount: false,
                         quantity: sel.qty,
                         sortOrder: items.length,
-                        image: variant.image || selectedProductForVariant.image,
-                        sku: variant.sku || selectedProductForVariant.sku,
+                        image: variant.image || product.image,
+                        sku: variant.sku || product.sku,
                         stock: Number(variant.stock || 0),
-                        allowSellWithoutStock: forceBypass ? true : Boolean(selectedProductForVariant.allow_sell_without_stock),
-                        unit: selectedProductForVariant.unit || null,
+                        allowSellWithoutStock: forceBypass ? true : Boolean(product.allow_sell_without_stock),
+                        unit: product.unit || null,
                         isEditing: false,
-                        isManual: false
-                    }
-                    setItems(prev => [...prev, newItem])
-                    setFieldErrors(prev => {
-                        const next = new Set(prev)
-                        next.delete("productSearch")
-                        return next
+                        isManual: false,
+                        selectedAddons: selectedAddons.length > 0 ? selectedAddons : undefined,
                     })
                 }
 
@@ -1063,7 +1145,7 @@ export default function CreateOrder({
                         return
                     }
                     setPendingZeroStockItem({
-                        product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` },
+                        product: { ...product, name: `${product.name} - ${variant.name}` },
                         isVariant: true,
                         callback: () => add(true)
                     })
@@ -1073,9 +1155,7 @@ export default function CreateOrder({
                 }
             }
         })
-        setIsVariantSheetOpen(false)
-        setSelectedProductForVariant(null)
-        productBucket.setSearchQuery("")
+        finish()
     }
 
     const updateItemField = (index: number, field: string, value: any) => {

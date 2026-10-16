@@ -127,7 +127,7 @@ export default async function AdminCatalogProductDetailPage({
                 partnerId={product.partner_id}
                 businessInfo={partner?.business_info}
                 store={store}
-                partnerName={partner?.name}
+                partnerName={store?.name}
                 auditEvents={auditEvents}
             />
         </>
