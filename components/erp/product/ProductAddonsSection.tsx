@@ -2,10 +2,13 @@
 
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, MoneyInput, Button, Checkbox, Badge, IconPlaceholder } from "@/components/reusable"
+import { Input, MoneyInput, Button, Checkbox, Badge, IconPlaceholder, AlertModal } from "@/components/reusable"
 import { PlusIcon, TrashIcon, ChevronDownIcon } from "@/lib/icons"
 import type { ProductAddonGroup, ProductAddonOption } from "@/lib/types/product"
 import { formatCurrency } from "@/lib/utils"
+
+const MAX_OPTIONS_PER_GROUP = 20
+const MAX_NAME_LENGTH = 50
 
 interface ProductAddonsSectionProps {
     addonGroups: ProductAddonGroup[]
@@ -19,6 +22,7 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
     isEditing,
 }) => {
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+    const [groupToDelete, setGroupToDelete] = useState<ProductAddonGroup | null>(null)
 
     const toggleGroup = (groupId: string) => {
         setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -46,7 +50,14 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
     }
 
     const removeGroup = (groupId: string) => {
-        onChange((addonGroups || []).filter((g) => g.id !== groupId))
+        const group = (addonGroups || []).find((g) => g.id === groupId)
+        if (group) setGroupToDelete(group)
+    }
+
+    const confirmRemoveGroup = () => {
+        const group = groupToDelete
+        setGroupToDelete(null)
+        if (group) onChange((addonGroups || []).filter((g) => g.id !== group.id))
     }
 
     const updateGroup = (groupId: string, field: keyof ProductAddonGroup, value: any) => {
@@ -64,6 +75,8 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
     }
 
     const addOptionToGroup = (groupId: string) => {
+        const group = (addonGroups || []).find((g) => g.id === groupId)
+        if (!group || group.options.length >= MAX_OPTIONS_PER_GROUP) return
         const newOption: ProductAddonOption = {
             id: `opt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             name: "",
@@ -175,6 +188,20 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                 </div>
             ) : (
                 <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
+                            Grupos de Complementos
+                        </h3>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={addGroup}
+                            leftIcon={<PlusIcon className="w-4 h-4" />}
+                            className="text-xs h-8"
+                        >
+                            Adicionar grupo
+                        </Button>
+                    </div>
                     <AnimatePresence initial={false}>
                         {addonGroups.map((group) => {
                             const isExpanded = expandedGroups[group.id] ?? true
@@ -188,7 +215,7 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                     className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface shadow-2xs"
                                 >
                                     {/* Cabeçalho do Grupo */}
-                                    <div className="p-4 bg-brand-gray/40 dark:bg-dark-border/20 border-b border-brand-border dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div className="p-4 bg-brand-gray dark:bg-dark-border/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
                                         <div className="flex-1 flex items-center gap-3">
                                             <button
                                                 type="button"
@@ -206,8 +233,10 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                                     name={`grp-name-${group.id}`}
                                                     placeholder="Nome do grupo (ex: Escolha o Molho, Adicionais)"
                                                     value={group.name}
-                                                    onChange={(e) => updateGroup(group.id, "name", e.target.value)}
+                                                    onChange={(e) => updateGroup(group.id, "name", e.target.value.slice(0, MAX_NAME_LENGTH))}
                                                     className="mb-0 font-medium"
+                                                    maxLength={MAX_NAME_LENGTH}
+                                                    showCharacterCount
                                                 />
                                             </div>
                                         </div>
@@ -251,8 +280,11 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                     {/* Opções do Grupo */}
                                     {isExpanded && (
                                         <div className="p-4 space-y-3">
-                                            <div className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">
+                                            <div className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body mb-2">
                                                 Opções / Itens do Grupo
+                                                <span className={`ml-2 text-xs ${group.options.length >= MAX_OPTIONS_PER_GROUP ? "text-brand-red" : "text-brand-inactive-text"}`}>
+                                                    ({group.options.length}/{MAX_OPTIONS_PER_GROUP})
+                                                </span>
                                             </div>
 
                                             <AnimatePresence initial={false}>
@@ -262,7 +294,7 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                                         initial={{ opacity: 0 }}
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
-                                                        className="flex items-center gap-3 p-2 rounded-xl bg-brand-gray/20 dark:bg-dark-border/10 border border-brand-border/60 dark:border-dark-border/40"
+                                                        className="flex items-center gap-3"
                                                     >
                                                         <div className="flex-1">
                                                             <Input
@@ -271,9 +303,10 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                                                 placeholder="Nome da opção (ex: Molho Especial, Bacon Extra)"
                                                                 value={opt.name}
                                                                 onChange={(e) =>
-                                                                    updateOptionInGroup(group.id, opt.id, "name", e.target.value)
+                                                                    updateOptionInGroup(group.id, opt.id, "name", e.target.value.slice(0, MAX_NAME_LENGTH))
                                                                 }
-                                                                className="mb-0 text-sm"
+                                                                maxLength={MAX_NAME_LENGTH}
+                                                                showCharacterCount
                                                             />
                                                         </div>
 
@@ -285,8 +318,6 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                                                 onChange={(val) =>
                                                                     updateOptionInGroup(group.id, opt.id, "price", val || 0)
                                                                 }
-                                                                placeholder="R$ 0,00"
-                                                                className="mb-0 text-sm"
                                                             />
                                                         </div>
 
@@ -309,6 +340,7 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                                                 onClick={() => addOptionToGroup(group.id)}
                                                 leftIcon={<PlusIcon className="w-3.5 h-3.5" />}
                                                 className="text-xs mt-2"
+                                                disabled={group.options.length >= MAX_OPTIONS_PER_GROUP}
                                             >
                                                 Adicionar item a este grupo
                                             </Button>
@@ -319,6 +351,20 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                         })}
                     </AnimatePresence>
                 </div>
+            )}
+
+            {groupToDelete && (
+                <AlertModal
+                    title="Remover grupo?"
+                    message={`O grupo "${groupToDelete.name || "sem nome"}" será removido permanentemente, junto com todas as suas opções.`}
+                    isOpen={true}
+                    onClose={() => setGroupToDelete(null)}
+                    onConfirm={confirmRemoveGroup}
+                    confirmText="Remover"
+                    cancelText="Cancelar"
+                    variant="danger"
+                    isDestructive
+                />
             )}
         </div>
     )

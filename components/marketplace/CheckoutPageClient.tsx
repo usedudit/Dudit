@@ -41,6 +41,23 @@ import { extractPostalCodeFromAddress } from "@/lib/services/shipping/postal-cod
 import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
 import type { MarketplaceCheckoutAmounts } from "@/lib/services/marketplace-checkout-amounts"
 
+// Cache em memória (client) dos totais do checkout. Server Actions não são
+// deduplicadas pelo React, então alternar entrega/retirada ou voltar a um
+// estado anterior (mesmo endereço/cupom/carrier) disparava a mesma cotação de
+// novo. Guardar por assinatura de inputs torna essas repetições instantâneas.
+const CHECKOUT_AMOUNTS_CACHE_MAX = 12
+const checkoutAmountsCache = new Map<string, MarketplaceCheckoutAmounts>()
+
+function rememberCheckoutAmounts(key: string, value: MarketplaceCheckoutAmounts) {
+    checkoutAmountsCache.delete(key)
+    checkoutAmountsCache.set(key, value)
+    while (checkoutAmountsCache.size > CHECKOUT_AMOUNTS_CACHE_MAX) {
+        const oldest = checkoutAmountsCache.keys().next().value
+        if (oldest === undefined) break
+        checkoutAmountsCache.delete(oldest)
+    }
+}
+
 interface ProductItem {
     id: string
     name: string
@@ -433,6 +450,16 @@ export function CheckoutPageClient() {
     const [userAddresses, setUserAddresses] = useState<UserAddress[]>([])
     const [selectedAddressId, setSelectedAddressId] = useState<string>("")
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
+    // Chaves estáveis para as dependências dos efeitos de cotação - evitam
+    // recálculo quando só a identidade de objetos/arrays muda (contexto
+    // carregado de novo, lista de endereços reconstruída), não o conteúdo.
+    const activeCartItemIdsKey = useMemo(() => activeCartItemIds.join(","), [activeCartItemIds])
+    const selectedAddressKey = selectedAddress
+        ? `${selectedAddress.id}:${selectedAddress.latitude ?? ""}:${selectedAddress.longitude ?? ""}:${selectedAddress.zip_code ?? ""}`
+        : ""
+    const checkoutContextKey = checkoutContext
+        ? `${checkoutContext.store?.id || ""}:${checkoutContext.partner?.id || ""}:${checkoutContext.deposit?.percent ?? ""}:${checkoutContext.deposit?.available ? 1 : 0}:${checkoutContext.lines?.length ?? 0}`
+        : ""
     const [showAddressForm, setShowAddressForm] = useState(false)
     const [addressFormError, setAddressFormError] = useState<string | null>(null)
     const [loadingAddresses, setLoadingAddresses] = useState(false)
@@ -513,6 +540,7 @@ export function CheckoutPageClient() {
     const [deliveryEnabled, setDeliveryEnabled] = useState(true)
     const [deliveryPlanEnabled, setDeliveryPlanEnabled] = useState(true)
     const [pickupEnabled, setPickupEnabled] = useState(true)
+    const [shippingEnabled, setShippingEnabled] = useState(false)
     const [deliveryFee, setDeliveryFee] = useState(0)
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
@@ -525,6 +553,18 @@ export function CheckoutPageClient() {
     const carrierQuoteKeyRef = useRef<string | null>(null)
     const [carrierError, setCarrierError] = useState<string | null>(null)
     const [carrierReason, setCarrierReason] = useState<string | null>(null)
+
+    // Frete próprio não conseguiu cotar o endereço (fora do raio, entrega
+    // desativada, erro de cotação...). Estado persistente por endereço: quando a
+    // transportadora assume, o total passa a ter sucesso, então não dá para
+    // inferir "sem cobertura" pelo erro - guardamos o estado.
+    const [ownDeliveryBlocked, setOwnDeliveryBlocked] = useState(false)
+
+    const raioNoCoverage = Boolean(deliveryError && deliveryError.toLowerCase().includes("raio"))
+    // Envio nacional só entra quando a loja tem transportadora conectada e
+    // algum item do pedido aceita "shipping" (requirements.showShippingOption).
+    const carrierAllowed = shippingEnabled && Boolean(requirements?.showShippingOption)
+    const carrierSectionVisible = formData.deliveryType === "delivery" && carrierAllowed && (raioNoCoverage || ownDeliveryBlocked)
 
     const destinationCep = useMemo(() => {
         if (formData.deliveryType !== "delivery") return ""
@@ -550,7 +590,7 @@ export function CheckoutPageClient() {
     // re-runs on its own updates - otherwise the cleanup below would cancel
     // the in-flight request and discard its results.
     useEffect(() => {
-        if (formData.deliveryType !== "delivery" || !partnerId || !destinationCep || !partnerInfo.mpConnected) return
+        if (formData.deliveryType !== "delivery" || !carrierAllowed || !partnerId || !destinationCep || !partnerInfo.mpConnected) return
         const dedupeKey = `${partnerId}:${destinationCep}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
@@ -587,7 +627,7 @@ export function CheckoutPageClient() {
                 setCarrierQuoteLoading(false)
             }
         }
-    }, [destinationCep, partnerId, formData.deliveryType, partnerInfo.mpConnected])
+    }, [destinationCep, partnerId, formData.deliveryType, partnerInfo.mpConnected, carrierAllowed])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)
@@ -606,11 +646,11 @@ export function CheckoutPageClient() {
         setDeliveryError(null)
     }
 
-    // Apply carrier options once own delivery reports no coverage ("raio").
+    // Apply carrier options once own delivery reports no coverage.
     // Runs independently of the fetch effect so it works whether the options
-    // arrive before or after the "raio" error - no visible gap/flash.
+    // arrive before or after the failure - no visible gap/flash.
     useEffect(() => {
-        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
+        if (!carrierSectionVisible) return
         if (carrierQuoteLoading) return
         if (carrierOptions.length > 0) {
             if (selectedCarrierServiceId == null) {
@@ -718,14 +758,23 @@ export function CheckoutPageClient() {
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
     const isWhatsappFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
     const carrierDeliveryActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
-    // Modo carrier: frete próprio sem cobertura ("fora do raio") ou transportadora
-    // já selecionada. Enquanto isso, o checkout mostra apenas Mercado Pago.
-    const raioNoCoverage = Boolean(deliveryError && deliveryError.toLowerCase().includes("raio"))
-    const carrierCheckoutEngaged = carrierDeliveryActive || raioNoCoverage
-    // Enquanto "fora do raio" aguarda a cotação da transportadora, esconde o
-    // erro (sem flash) - a seção de transportadora mostra o estado de cálculo.
+    // Modo carrier: frete próprio sem cobertura ("fora do raio" ou erro) ou
+    // transportadora já selecionada. Enquanto isso, o checkout mostra apenas
+    // Mercado Pago.
+    const carrierCheckoutEngaged = carrierDeliveryActive || carrierSectionVisible
+    // Enquanto aguarda a cotação da transportadora, esconde o erro (sem flash)
+    // - a seção de transportadora mostra o estado de cálculo.
     const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
-    const displayDeliveryError = raioNoCoverage && carrierResolving ? null : deliveryError
+    const displayDeliveryError = carrierSectionVisible && carrierResolving ? null : deliveryError
+    // Frete próprio voltou a cobrir o endereço (ou nunca saiu dele) → desfaz a
+    // seleção de transportadora. Sem isso ela "grudava" após um momento de
+    // indisponibilidade e o pedido seguia por transportadora mesmo com entrega
+    // padrão disponível.
+    useEffect(() => {
+        if (carrierSectionVisible) return
+        if (selectedCarrierServiceId == null) return
+        setSelectedCarrierServiceId(null)
+    }, [carrierSectionVisible, selectedCarrierServiceId])
     useEffect(() => {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
             // Só força o modo manual quando nada foi escolhido ainda - nunca
@@ -795,8 +844,9 @@ export function CheckoutPageClient() {
         setDeliveryPlanEnabled(checkoutContext.delivery.planEnabled)
         setDeliveryEnabled(checkoutContext.delivery.partnerEnabled)
         setPickupEnabled(checkoutContext.delivery.pickupEnabled)
+        setShippingEnabled(Boolean(checkoutContext.delivery.shippingEnabled))
 
-        const canDel = checkoutContext.delivery.planEnabled && checkoutContext.delivery.partnerEnabled
+        const canDel = (checkoutContext.delivery.planEnabled && checkoutContext.delivery.partnerEnabled) || Boolean(checkoutContext.delivery.shippingEnabled)
         const canPick = checkoutContext.delivery.pickupEnabled
         if (!canDel && canPick) {
             setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
@@ -1041,6 +1091,15 @@ export function CheckoutPageClient() {
     // client-side não existe (a política vem do plano) - usa o total do servidor.
     const subscriptionOnlyCart = Boolean(requirements?.hasSubscriptionLines) && !requirements?.hasProductLines && !requirements?.hasServiceLines
     const summaryDeliveryFee = subscriptionOnlyCart ? (checkoutAmounts?.deliveryFee ?? deliveryFee) : deliveryFee
+    // Frete grátis (cupom, valor mínimo atingido ou loja que paga) - vale para o
+    // frete próprio e para a transportadora; usado para riscar o valor original
+    // e mostrar "Grátis".
+    const deliveryFree = summaryDeliveryFee === 0 && !isPickup && (
+        hasFreeDeliveryCoupon ||
+        Boolean((deliveryBreakdown as any)?.isFreeByThreshold) ||
+        (deliveryBreakdown as any)?.deliveryPayer === "seller" ||
+        deliverySettings?.deliveryPayer === "seller"
+    )
     // Carrinho com assinatura: assinaturas recorrentes só aceitam cartão de
     // crédito no Mercado Pago (Pix volta apenas no fallback payment_failed).
     const mpPaymentMethodsForCart: MpAcceptedPaymentMethods | undefined = useMemo(() => {
@@ -1302,12 +1361,38 @@ export function CheckoutPageClient() {
 
             // Checkout amounts (includes delivery fee calculation)
             if (activeCartItemIds.length && checkoutContext) {
+                const deliveryTypeForQuote = formData.deliveryType === "pickup" ? "pickup" : "delivery"
+                const amountsCacheKey = JSON.stringify([
+                    activeCartItemIds,
+                    deliveryTypeForQuote,
+                    formData.deliveryAddress || "",
+                    destinationCoords?.lat ?? null,
+                    destinationCoords?.lng ?? null,
+                    couponCode || null,
+                    payDepositOnly,
+                    checkoutContext.deposit?.percent ?? 50,
+                    depositAvailable,
+                    selectedCarrierServiceId || null,
+                    destinationCep || null,
+                ])
+                const cachedAmounts = checkoutAmountsCache.get(amountsCacheKey)
+                if (cachedAmounts) {
+                    setCheckoutAmounts(cachedAmounts)
+                    setDeliveryError(null)
+                    setDeliveryFee(Number(cachedAmounts.deliveryFee || 0))
+                    setDeliveryDistanceKm(cachedAmounts.distanceKm != null ? Number(cachedAmounts.distanceKm) : null)
+                    setDeliveryBreakdown((cachedAmounts.deliveryBreakdown as Record<string, any>) || null)
+                    if ((cachedAmounts.deliveryBreakdown as any)?.source !== "superfrete") setOwnDeliveryBlocked(false)
+                    setCheckoutAmountsLoading(false)
+                    setDeliveryQuoteLoading(false)
+                    return
+                }
                 setCheckoutAmountsLoading(true)
                 setDeliveryQuoteLoading(true)
                 try {
                     const result = await getMarketplaceCheckoutAmountsAction({
                         cartItemIds: activeCartItemIds,
-                        deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
+                        deliveryType: deliveryTypeForQuote,
                         deliveryAddress: formData.deliveryAddress || "",
                         destinationCoords,
                         couponCode: couponCode || null,
@@ -1319,14 +1404,17 @@ export function CheckoutPageClient() {
                     })
                     if (!active) return
                     if (result.success) {
+                        rememberCheckoutAmounts(amountsCacheKey, result.data)
                         setCheckoutAmounts(result.data)
                         setDeliveryError(null)
                         setDeliveryFee(Number(result.data.deliveryFee || 0))
                         setDeliveryDistanceKm(result.data.distanceKm != null ? Number(result.data.distanceKm) : null)
                         setDeliveryBreakdown((result.data.deliveryBreakdown as Record<string, any>) || null)
+                        if ((result.data.deliveryBreakdown as any)?.source !== "superfrete") setOwnDeliveryBlocked(false)
                     } else {
                         setCheckoutAmounts(null)
                         setDeliveryError(result.error)
+                        setOwnDeliveryBlocked(true)
                         if (result.error?.toLowerCase().includes("raio") && !destinationCep) {
                             setShowOutsideRadiusModal(true)
                         }
@@ -1338,6 +1426,7 @@ export function CheckoutPageClient() {
                     if (!active) return
                     setCheckoutAmounts(null)
                     setDeliveryError("Erro ao calcular valores do pedido.")
+                    setOwnDeliveryBlocked(true)
                 } finally {
                     if (active) {
                         setCheckoutAmountsLoading(false)
@@ -1362,14 +1451,16 @@ export function CheckoutPageClient() {
                         setDeliveryFee(Number(quote.fee || 0))
                         setDeliveryDistanceKm(Number(quote.distanceKm || 0))
                         setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
+                        setOwnDeliveryBlocked(false)
                     } else if (
-                        quote.error?.toLowerCase().includes("raio") &&
+                        Boolean(quote.error) &&
                         selectedCarrierServiceId &&
                         carrierOptions.length > 0
                     ) {
                         // Own delivery has no coverage → apply selected carrier freight
                         const opt = carrierOptions.find(o => o.serviceId === selectedCarrierServiceId) || carrierOptions[0]
                         setDeliveryError(null)
+                        setOwnDeliveryBlocked(true)
                         setDeliveryFee(Number(opt.price))
                         setDeliveryDistanceKm(null)
                         setDeliveryBreakdown({
@@ -1384,6 +1475,7 @@ export function CheckoutPageClient() {
                         })
                     } else {
                         setDeliveryError(quote.error)
+                        setOwnDeliveryBlocked(true)
                         if (quote.error?.toLowerCase().includes("raio") && !destinationCep) {
                             setShowOutsideRadiusModal(true)
                         }
@@ -1401,6 +1493,7 @@ export function CheckoutPageClient() {
                 setDeliveryQuoteLoading(false)
                 setCheckoutAmounts(null)
                 setCheckoutAmountsLoading(false)
+                setOwnDeliveryBlocked(false)
             }
         }, 120)
 
@@ -1414,14 +1507,14 @@ export function CheckoutPageClient() {
         hasFreeDeliveryCoupon,
         productDeliveryQuoteActive,
         orderSubtotal,
-        activeCartItemIds,
-        checkoutContext,
+        activeCartItemIdsKey,
+        checkoutContextKey,
         formData.deliveryType,
         couponCode,
         payDepositOnly,
         depositAvailable,
         refreshTrigger,
-        selectedAddress,
+        selectedAddressKey,
         selectedCarrierServiceId,
         destinationCep,
     ])
@@ -1524,6 +1617,12 @@ export function CheckoutPageClient() {
     const isFullyCoveredByStoreCredit = useMemo(() => {
         return useStoreCredit && availableStoreCredit > 0 && remainingBalanceToCharge <= 0.009
     }, [useStoreCredit, availableStoreCredit, remainingBalanceToCharge])
+
+    const destinationCoords = useMemo(() => {
+        if (!selectedAddress?.latitude || !selectedAddress?.longitude) return null
+        return { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+    }, [selectedAddress?.latitude, selectedAddress?.longitude])
+
     const checkoutPricingSnapshot = useMemo(() => {
         const chargedBase = checkoutChargeTotal
         const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
@@ -1556,6 +1655,7 @@ export function CheckoutPageClient() {
             finalTotal: checkoutTotalToCharge,
             carrierServiceId: selectedCarrierServiceId,
             destinationPostalCode: destinationCep || null,
+            destinationCoords: destinationCoords || null,
         }
     }, [
         couponDiscount,
@@ -1568,6 +1668,7 @@ export function CheckoutPageClient() {
         checkoutTotalToCharge,
         payDepositOnly,
         depositAvailable,
+        destinationCoords,
         checkoutAmounts,
         checkoutFullTotal,
         checkoutDepositChargeTotal,
@@ -2399,7 +2500,7 @@ export function CheckoutPageClient() {
             }
             if (deliveryError) {
                 const carrierCoversError = Boolean(
-                    deliveryError.toLowerCase().includes("raio") && selectedCarrierServiceId,
+                    carrierSectionVisible && selectedCarrierServiceId,
                 )
                 if (!carrierCoversError) {
                     setDeliveryError(deliveryError)
@@ -2989,13 +3090,15 @@ export function CheckoutPageClient() {
                                     deliveryPlanEnabled={deliveryPlanEnabled}
                                     deliveryEnabled={deliveryEnabled}
                                     pickupEnabled={pickupEnabled}
+                                    shippingEnabled={shippingEnabled}
                                     partnerAddressLabel={partnerAddressLabel}
                                     deliveryError={displayDeliveryError}
-                                    carrierOptions={carrierOptions}
+                                    carrierOptions={carrierSectionVisible ? carrierOptions : []}
                                     selectedCarrierServiceId={selectedCarrierServiceId}
-                                    carrierQuoteLoading={raioNoCoverage && carrierQuoteLoading}
-                                    carrierError={raioNoCoverage && !carrierQuoteLoading ? carrierError : null}
+                                    carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
+                                    carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
                                     onSelectCarrier={handleCarrierSelect}
+                                    deliveryFree={deliveryFree}
                                     schedulingLines={schedulingLines}
                                     lines={checkoutContext?.lines || []}
                                     onFulfillmentModesSave={handleBulkFulfillmentModesSave}
@@ -3465,13 +3568,15 @@ export function CheckoutPageClient() {
                                             deliveryPlanEnabled={deliveryPlanEnabled}
                                             deliveryEnabled={deliveryEnabled}
                                             pickupEnabled={pickupEnabled}
+                                            shippingEnabled={shippingEnabled}
                                             partnerAddressLabel={partnerAddressLabel}
                                             deliveryError={displayDeliveryError}
-                                            carrierOptions={carrierOptions}
+                                            carrierOptions={carrierSectionVisible ? carrierOptions : []}
                                             selectedCarrierServiceId={selectedCarrierServiceId}
-                                            carrierQuoteLoading={raioNoCoverage && carrierQuoteLoading}
-                                            carrierError={raioNoCoverage && !carrierQuoteLoading ? carrierError : null}
+                                            carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
+                                            carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
                                             onSelectCarrier={handleCarrierSelect}
+                                            deliveryFree={deliveryFree}
                                             schedulingLines={schedulingLines}
                                             lines={checkoutContext?.lines || []}
                                             onFulfillmentModesSave={handleBulkFulfillmentModesSave}

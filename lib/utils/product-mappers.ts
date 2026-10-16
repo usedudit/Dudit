@@ -42,5 +42,8 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
     video_thumbnail: (initialProduct as any).video_thumbnail || null,
     video_duration: (initialProduct as any).video_duration || null,
     video_provider_id: (initialProduct as any).video_provider_id || null,
+    fulfillment_modes: Array.isArray((initialProduct as any).fulfillment_modes)
+      ? (initialProduct as any).fulfillment_modes
+      : undefined,
   }
 }

@@ -244,12 +244,15 @@ export default function AvailableDeliveryDetail({
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                                {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBackClick} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
 
+                                {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
@@ -259,14 +262,12 @@ export default function AvailableDeliveryDetail({
                                                 <Badge variant="gray" className="shrink-0">{ordersList.length} paradas</Badge>
                                             )}
                                         </h1>
-                                        <div className="flex items-center gap-4 text-xs text-brand-inactive-text dark:text-dark-body">
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             <span>Loja: <strong className="text-brand-dark dark:text-dark-heading">{offer.store_name || offer.partner_name || "Estabelecimento"}</strong></span>
-                                            <span>•</span>
-                                            <span>Taxa de Entrega: <strong className="text-brand-green">{formatCurrency(totalRouteDeliveryFee)}</strong></span>
                                             {timeLeftSeconds !== null && (
                                                 <>
                                                     <span>•</span>
-                                                    <span className={`flex items-center gap-1 font-semibold ${isExpired ? "text-red-500" : timeLeftSeconds < 180 ? "text-amber-500" : "text-brand-inactive-text"}`}>
+                                                    <span className={`flex items-center gap-1 font-semibold ${isExpired ? "text-brand-red" : timeLeftSeconds < 180 ? "text-brand-orange" : "text-brand-inactive-text"}`}>
                                                         <ClockIcon size={13} />
                                                         {isExpired ? "Expirada" : `${Math.floor(timeLeftSeconds / 60)} min restantes`}
                                                     </span>
@@ -323,7 +324,7 @@ export default function AvailableDeliveryDetail({
                                                 )}
 
                                                 {/* Local de Coleta */}
-                                                <FormSection title="Local de Coleta (Estabelecimento)" hasSeparator>
+                                                <FormSection title="Local de Coleta (Estabelecimento)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1 min-w-0">
                                                             <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
@@ -439,13 +440,13 @@ export default function AvailableDeliveryDetail({
 
                                             {/* RIGHT SIDEBAR COLUMN with divider */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
-                                                <SidebarCard hasSeparator title="Remuneração & Valores">
+                                                <SidebarCard hasSeparator hasTopStrip title="Remuneração & Valores">
                                                     <InfoCard
                                                         title="Sua Taxa de Entrega (Total)"
                                                         message={formatCurrency(totalRouteDeliveryFee)}
                                                         color="green"
                                                     />
-                                                    <div className="space-y-3 text-xs mt-4">
+                                                    <div className="space-y-3 text-sm mt-4">
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total de Paradas:</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{ordersList.length}</span>
@@ -643,225 +644,225 @@ export default function AvailableDeliveryDetail({
                     </div>
                 </Tabs>
 
-                    {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
-                    {(() => {
-                        const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
-                        const handleClose = () => {
-                            setIsOrderDetailSheetOpen(false)
-                            setSelectedOrderForDetail(null)
-                        }
+                {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
+                {(() => {
+                    const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
+                    const handleClose = () => {
+                        setIsOrderDetailSheetOpen(false)
+                        setSelectedOrderForDetail(null)
+                    }
 
-                        if (!selectedOrderForDetail) return null
-                        const order = selectedOrderForDetail
-                        const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
-                        const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
-                        const deliveryMeta = getDeliveryStatusMeta("available")
-                        const ordItems = order.items || []
-                        const orderDate = order.created_at || order.order_date || order.order_created_at || offer.assigned_at
+                    if (!selectedOrderForDetail) return null
+                    const order = selectedOrderForDetail
+                    const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
+                    const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
+                    const deliveryMeta = getDeliveryStatusMeta("available")
+                    const ordItems = order.items || []
+                    const orderDate = order.created_at || order.order_date || order.order_created_at || offer.assigned_at
 
-                        const orderHistoryEntries: HistoryEntry[] = []
-                        if (order.created_at || order.order_date) {
-                            orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
-                        }
-                        if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
-                            orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
-                        }
+                    const orderHistoryEntries: HistoryEntry[] = []
+                    if (order.created_at || order.order_date) {
+                        orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
+                    }
+                    if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                        orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
+                    }
 
-                        const sheetContent = (
-                            <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                                <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
-                                    </div>
-                                    <Button variant="filled" onClick={handleClose} size="icon">
-                                        <XIcon className="h-5 w-5" />
-                                    </Button>
-                                </header>
+                    const sheetContent = (
+                        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                                <div>
+                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
+                                </div>
+                                <Button variant="filled" onClick={handleClose} size="icon">
+                                    <XIcon className="h-5 w-5" />
+                                </Button>
+                            </header>
 
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                                    <Tabs defaultValue="dados_gerais" className="w-full">
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                                            <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                                Dados Gerais
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                <Tabs defaultValue="dados_gerais" className="w-full">
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                        <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                            Dados Gerais
+                                        </TabsTrigger>
+                                        <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                            Itens do Pedido ({ordItems.length})
+                                        </TabsTrigger>
+                                        {orderHistoryEntries.length > 0 && (
+                                            <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
+                                                Histórico
                                             </TabsTrigger>
-                                            <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                                Itens do Pedido ({ordItems.length})
-                                            </TabsTrigger>
-                                            {orderHistoryEntries.length > 0 && (
-                                                <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
-                                                    Histórico
-                                                </TabsTrigger>
-                                            )}
-                                        </TabsList>
+                                        )}
+                                    </TabsList>
 
-                                        <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                                        {formatCurrency(order.total_amount || 0)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(order.delivery_fee || 0)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                        {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
-                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon("available")}>
-                                                        {deliveryMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {orderDate ? formatDateTime(orderDate) : "-"}
-                                                    </span>
-                                                </div>
-                                                {order.delivery_address && (
-                                                    <div className="flex justify-between items-start text-sm gap-4">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
-                                                            <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
-                                                            {order.delivery_address}
-                                                        </span>
-                                                    </div>
-                                                )}
+                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                    {formatCurrency(order.total_amount || 0)}
+                                                </span>
                                             </div>
-
-                                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                            <CustomerCard
-                                                customer={{
-                                                    name: order.customer_name || "Cliente",
-                                                    phone: order.customer_phone || "",
-                                                    email: order.customer_email || "",
-                                                }}
-                                                address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
-                                                showMap={true}
-                                                chrome="minimal"
-                                            />
-
-                                            {order.notes && (
-                                                <div>
-                                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
-                                                    <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
-                                                        {order.notes}
-                                                    </p>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(order.delivery_fee || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                    {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
+                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon("available")}>
+                                                    {deliveryMeta.label}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {orderDate ? formatDateTime(orderDate) : "-"}
+                                                </span>
+                                            </div>
+                                            {order.delivery_address && (
+                                                <div className="flex justify-between items-start text-sm gap-4">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
+                                                        <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
+                                                        {order.delivery_address}
+                                                    </span>
                                                 </div>
                                             )}
-                                        </TabsContent>
+                                        </div>
 
-                                        <TabsContent value="itens" className="mt-0">
-                                            {ordItems.length === 0 ? (
-                                                <div className="flex items-center justify-center py-8">
-                                                    <IconPlaceholder
-                                                        icon={BoxIcon}
-                                                        title="Sem itens por aqui"
-                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    {ordItems.map((item: any, idx: number) => {
-                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
-                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
-                                                        const itemUnit = item.products?.unit || item.unit || "un"
-                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                        const itemQty = Number(item.quantity || 1)
-                                                        const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
+                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
-                                                        return (
-                                                            <div key={item.id || idx} className="flex items-start gap-4">
-                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-xl"
-                                                                        alt={item.name || item.product_name || "Produto sem nome"}
-                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                    />
+                                        <CustomerCard
+                                            customer={{
+                                                name: order.customer_name || "Cliente",
+                                                phone: order.customer_phone || "",
+                                                email: order.customer_email || "",
+                                            }}
+                                            address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                            showMap={true}
+                                            chrome="minimal"
+                                        />
+
+                                        {order.notes && (
+                                            <div>
+                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
+                                                <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
+                                                    {order.notes}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </TabsContent>
+
+                                    <TabsContent value="itens" className="mt-0">
+                                        {ordItems.length === 0 ? (
+                                            <div className="flex items-center justify-center py-8">
+                                                <IconPlaceholder
+                                                    icon={BoxIcon}
+                                                    title="Sem itens por aqui"
+                                                    subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {ordItems.map((item: any, idx: number) => {
+                                                    const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
+                                                    const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
+                                                    const itemUnit = item.products?.unit || item.unit || "un"
+                                                    const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                    const itemQty = Number(item.quantity || 1)
+                                                    const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
+
+                                                    return (
+                                                        <div key={item.id || idx} className="flex items-start gap-4">
+                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={itemImage}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.name || item.product_name || "Produto sem nome"}
+                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                        {item.name || item.product_name || "Produto sem nome"}
+                                                                    </h4>
+                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(itemSubtotal)}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {item.name || item.product_name || "Produto sem nome"}
-                                                                        </h4>
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(itemSubtotal)}
-                                                                        </span>
+                                                                {itemSku && (
+                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                        SKU: {itemSku}
                                                                     </div>
-                                                                    {itemSku && (
-                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                            SKU: {itemSku}
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
-                                                                    </div>
+                                                                )}
+                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                    {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
                                                                 </div>
                                                             </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </TabsContent>
-
-                                        {orderHistoryEntries.length > 0 && (
-                                            <TabsContent value="historico" className="mt-0">
-                                                <HistoryTimeline entries={orderHistoryEntries} />
-                                            </TabsContent>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
                                         )}
-                                    </Tabs>
-                                </div>
-                            </div>
-                        )
+                                    </TabsContent>
 
-                        return isMobile ? (
-                            <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                                {sheetContent}
-                            </BottomSheet>
-                        ) : (
-                            <Portal>
-                                <AnimatePresence>
-                                    {isOpen && (
-                                        <motion.div
-                                            className="fixed inset-0 z-[110] bg-black/50"
-                                            style={{ zIndex: orderDetailZIndex }}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            onClick={handleClose}
-                                        >
-                                            <motion.div
-                                                className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
-                                                initial={{ x: "120%", opacity: 0 }}
-                                                animate={{ x: 0, opacity: 1 }}
-                                                exit={{ x: "120%", opacity: 0 }}
-                                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                {sheetContent}
-                                            </motion.div>
-                                        </motion.div>
+                                    {orderHistoryEntries.length > 0 && (
+                                        <TabsContent value="historico" className="mt-0">
+                                            <HistoryTimeline entries={orderHistoryEntries} />
+                                        </TabsContent>
                                     )}
-                                </AnimatePresence>
-                            </Portal>
-                        )
-                    })()}
+                                </Tabs>
+                            </div>
+                        </div>
+                    )
+
+                    return isMobile ? (
+                        <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                            {sheetContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <AnimatePresence>
+                                {isOpen && (
+                                    <motion.div
+                                        className="fixed inset-0 z-[110] bg-black/50"
+                                        style={{ zIndex: orderDetailZIndex }}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        onClick={handleClose}
+                                    >
+                                        <motion.div
+                                            className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                                            initial={{ x: "120%", opacity: 0 }}
+                                            animate={{ x: 0, opacity: 1 }}
+                                            exit={{ x: "120%", opacity: 0 }}
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {sheetContent}
+                                        </motion.div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </Portal>
+                    )
+                })()}
             </div>
         </FadeIn>
     )

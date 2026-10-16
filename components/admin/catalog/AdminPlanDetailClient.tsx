@@ -43,11 +43,12 @@ export default function AdminPlanDetailClient({
 
     const handleSave = async (payload: any): Promise<{ success?: boolean; error?: string; cancelled?: boolean } | void> => {
         const changedFields = diffChangedFields(plan, payload)
-        const result = await runAction({
-            title: "Salvar alterações",
-            description: `Plano "${plan.name}"`,
-            changedFields,
-            confirmLabel: "Salvar",
+            const result = await runAction({
+                title: "Salvar alterações",
+                description: `Plano "${plan.name}"`,
+                changedFields,
+                force: true,
+                confirmLabel: "Salvar",
             runner: async (actionPayload) => {
                 const res: any = await updateAdminRecurringPlan(
                     { ...payload, planId: plan.id },

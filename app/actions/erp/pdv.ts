@@ -997,7 +997,7 @@ export async function getPOSInitialDataAction(
         supabase
           .from("products")
           .select(
-            "id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, addon_groups, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)",
+            "id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)",
           )
           .eq("partner_id", partnerId)
           .eq("is_active", true)
@@ -2254,7 +2254,7 @@ export async function getPOSCustomerDetailsAction(input: {
       supabase
         .from("addresses")
         .select(
-          "zip_code, street, number, complement, neighborhood, city, state, country",
+          "zip_code, street, number, complement, neighborhood, city, state, country, latitude, longitude",
         )
         .eq("customer_id", input.customerId)
         .eq("address_type", "primary")
@@ -2299,6 +2299,14 @@ export async function getPOSCustomerDetailsAction(input: {
             city: address.city || "",
             state: address.state || "",
             country: address.country || "BR",
+            latitude:
+              (address as any).latitude != null
+                ? Number((address as any).latitude)
+                : null,
+            longitude:
+              (address as any).longitude != null
+                ? Number((address as any).longitude)
+                : null,
           }
         : null,
     },

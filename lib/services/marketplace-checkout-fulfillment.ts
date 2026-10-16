@@ -244,6 +244,8 @@ async function createBookingFromMetadata(
     fulfillmentMode?: LineFulfillmentMode | null
     bufferMinutes?: number
     paymentMethod?: string | null
+    travelFee?: number
+    travelFeeBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = params.customerId || await ensureMarketplaceCustomer({
@@ -300,6 +302,8 @@ async function createBookingFromMetadata(
       fulfillment_mode:
         params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
       needs_reschedule: needsReschedule,
+      travel_fee: params.travelFee ?? 0,
+      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
       status: needsReschedule
         ? "Reservado"
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
@@ -353,6 +357,8 @@ async function createBookingFromMetadata(
       fulfillment_mode:
         params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
       needs_reschedule: !slotOk,
+      travel_fee: params.travelFee ?? 0,
+      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
       pricing_unit: "Por Serviço",
       notes: params.meta.notes || null,
       status: !slotOk
@@ -424,6 +430,8 @@ async function createGroupedBookingFromMetadata(
     paidAmount: number
     paymentStatus: "unpaid" | "partially_paid" | "paid"
     paymentMethod?: string | null
+    travelFee?: number
+    travelFeeBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = params.customerId || await ensureMarketplaceCustomer({
@@ -489,6 +497,8 @@ async function createGroupedBookingFromMetadata(
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
           ? "Confirmado"
           : "Reservado",
+      travel_fee: params.travelFee ?? 0,
+      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
     }
     if (receivableId) updatePayload.receivable_transaction_id = receivableId
 
@@ -532,11 +542,13 @@ async function createGroupedBookingFromMetadata(
       paid_amount: params.paidAmount,
       payment_status: params.paymentStatus,
       sales_channel: STOREFRONT_CHANNEL,
-      fulfillment_mode:
-        params.group.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
-      needs_reschedule: !slotOk,
-      pricing_unit: "Por Serviço",
-      notes: params.group.services[0]?.notes || null,
+       fulfillment_mode:
+         params.group.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
+       needs_reschedule: !slotOk,
+       pricing_unit: "Por Serviço",
+       notes: params.group.services[0]?.notes || null,
+       travel_fee: params.travelFee ?? 0,
+       travel_fee_breakdown: params.travelFeeBreakdown ?? null,
       status: !slotOk
         ? "Reservado"
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
@@ -950,7 +962,7 @@ export async function fulfillMarketplaceOrder(
               remaining,
               paidAmount: groupPaidAmount,
               paymentMethod: order.payment_method,
-            })
+          })
             if (receivableId) {
               await supabase
                 .from("appointments")

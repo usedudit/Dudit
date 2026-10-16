@@ -19,6 +19,8 @@ import {
     AlertModal,
     SavingStatusModal,
     NumberInputWithCheckbox,
+    MoneyInput,
+    PercentageInput,
     FormSection,
     FormDropdown,
     SidebarCard,
@@ -193,6 +195,13 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: store?.inscricao_municipal || "",
     })
 
+    // Regime tributário simplificado usado no DRE gerencial.
+    const [taxInfo, setTaxInfo] = useState({
+        simplesTaxRateProducts: Number(store?.simples_tax_rate_products || 0),
+        simplesTaxRateServices: Number(store?.simples_tax_rate_services || 0),
+        meiFixedTaxAmount: Number(store?.mei_fixed_tax_amount || 0),
+    })
+
     const storeHoursObj = store?.opening_hours && typeof store.opening_hours === "object" && Object.keys(store.opening_hours).length > 0 ? store.opening_hours : null
     const partnerHoursObj = partner?.opening_hours && typeof partner.opening_hours === "object" && Object.keys(partner.opening_hours).length > 0 ? partner.opening_hours : null
     const effectiveHours = storeHoursObj || partnerHoursObj || {}
@@ -205,6 +214,7 @@ export const BusinessDataSubPage = ({
         generalInfo: { ...generalInfo },
         addresses: { ...addresses },
         fiscalInfo: { ...fiscalInfo },
+        taxInfo: { ...taxInfo },
         hours: { ...hours },
         timezone: store?.timezone || partner?.timezone || "America/Sao_Paulo",
         acceptOrdersWhenClosed: store?.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
@@ -214,10 +224,11 @@ export const BusinessDataSubPage = ({
         return JSON.stringify(initialState.generalInfo) !== JSON.stringify(generalInfo) ||
             JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
             JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
+            JSON.stringify(initialState.taxInfo) !== JSON.stringify(taxInfo) ||
             JSON.stringify(initialState.hours) !== JSON.stringify(hours) ||
             initialState.timezone !== timezone ||
             initialState.acceptOrdersWhenClosed !== acceptOrdersWhenClosed
-    }, [initialState, generalInfo, addresses, fiscalInfo, hours, timezone, acceptOrdersWhenClosed])
+    }, [initialState, generalInfo, addresses, fiscalInfo, taxInfo, hours, timezone, acceptOrdersWhenClosed])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -376,6 +387,9 @@ export const BusinessDataSubPage = ({
                         inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
                         ieIsento: fiscalInfo.ieIsento,
                         inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
+                        simplesTaxRateProducts: taxInfo.simplesTaxRateProducts,
+                        simplesTaxRateServices: taxInfo.simplesTaxRateServices,
+                        meiFixedTaxAmount: taxInfo.meiFixedTaxAmount,
                     })
                     if (!storeResult.success) {
                         notifyError(storeResult.error!)
@@ -402,6 +416,7 @@ export const BusinessDataSubPage = ({
                         generalInfo: { ...generalInfo },
                         addresses: { ...addresses },
                         fiscalInfo: { ...fiscalInfo },
+                        taxInfo: { ...taxInfo },
                         hours: { ...hours },
                         timezone: timezone || "America/Sao_Paulo",
                         acceptOrdersWhenClosed: acceptOrdersWhenClosed,
@@ -671,6 +686,34 @@ export const BusinessDataSubPage = ({
                                                                 <label htmlFor="ieIsento" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
                                                                     Inscrição Estadual isenta (IE Isento)
                                                                 </label>
+                                                            </div>
+
+                                                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-4">
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Impostos sobre faturamento (DRE)</p>
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
+                                                                        Usado para estimar a dedução de impostos no DRE. Informe apenas o regime da sua empresa: as alíquotas do Simples têm prioridade; se informar somente o DAS-MEI (valor fixo mensal), ele será rateado por dia no período selecionado.
+                                                                    </p>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <PercentageInput
+                                                                        label="Simples Nacional — Produtos (%)"
+                                                                        value={taxInfo.simplesTaxRateProducts}
+                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateProducts: v }))}
+                                                                    />
+                                                                    <PercentageInput
+                                                                        label="Simples Nacional — Serviços (%)"
+                                                                        value={taxInfo.simplesTaxRateServices}
+                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateServices: v }))}
+                                                                    />
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <MoneyInput
+                                                                        label="DAS-MEI (valor fixo mensal)"
+                                                                        value={taxInfo.meiFixedTaxAmount}
+                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, meiFixedTaxAmount: v }))}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         </motion.div>
                                                     )}

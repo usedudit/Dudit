@@ -6,6 +6,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { priceMarketplaceCartCheckout } from "@/lib/services/marketplace-cart-checkout"
 
+// Cache em memória (TTL curto) dos totais do checkout. O checkout recalcula os
+// totais a cada alteração (entrega/retirada, endereço, cupom); repetições da
+// mesma assinatura (ex.: voltar ao estado anterior) retornam instantâneo, sem
+// refazer resolução de carrinho, promoções e geocoding.
+const CHECKOUT_AMOUNTS_CACHE_TTL_MS = 20 * 1000
+const CHECKOUT_AMOUNTS_CACHE_MAX = 200
+const checkoutAmountsServerCache = new Map<string, { at: number; result: { success: true; data: MarketplaceCheckoutAmounts } }>()
+
+function pruneCheckoutAmountsServerCache(now: number) {
+  for (const [key, entry] of checkoutAmountsServerCache) {
+    if (now - entry.at > CHECKOUT_AMOUNTS_CACHE_TTL_MS) checkoutAmountsServerCache.delete(key)
+  }
+  while (checkoutAmountsServerCache.size > CHECKOUT_AMOUNTS_CACHE_MAX) {
+    const oldest = checkoutAmountsServerCache.keys().next().value
+    if (oldest === undefined) break
+    checkoutAmountsServerCache.delete(oldest)
+  }
+}
+
 export type MarketplaceCheckoutAmounts = {
   fullOrderTotal: number
   depositChargeTotal: number
@@ -40,6 +59,25 @@ export async function computeMarketplaceCheckoutAmounts(
   },
 ): Promise<{ success: true; data: MarketplaceCheckoutAmounts } | { success: false; error: string }> {
   const serviceCartIds = params.cartItemIds
+
+  const cacheKey = JSON.stringify([
+    params.userId,
+    params.cartItemIds,
+    params.deliveryType,
+    params.deliveryAddress,
+    params.destinationCoords?.lat ?? null,
+    params.destinationCoords?.lng ?? null,
+    params.couponCode || null,
+    params.payDepositOnly,
+    params.depositPercent,
+    params.depositAvailable,
+    params.carrierServiceId || null,
+    params.destinationPostalCode || null,
+  ])
+  const cached = checkoutAmountsServerCache.get(cacheKey)
+  if (cached && Date.now() - cached.at <= CHECKOUT_AMOUNTS_CACHE_TTL_MS) {
+    return cached.result
+  }
 
   // Single fast pricing run without modifying database rows
   const priced = await priceMarketplaceCartCheckout(adminClient, {
@@ -112,8 +150,8 @@ export async function computeMarketplaceCheckoutAmounts(
   const chargeTotal = usesDeposit ? depositChargeTotal : fullOrderTotal
   const remainingAfterDeposit = Math.max(0, Number((fullOrderTotal - depositChargeTotal).toFixed(2)))
 
-  return {
-    success: true,
+  const result = {
+    success: true as const,
     data: {
       fullOrderTotal,
       depositChargeTotal,
@@ -128,6 +166,9 @@ export async function computeMarketplaceCheckoutAmounts(
       chargeTotal,
     },
   }
+  pruneCheckoutAmountsServerCache(Date.now())
+  checkoutAmountsServerCache.set(cacheKey, { at: Date.now(), result })
+  return result
 }
 
 export { buildDepositCheckoutMeta } from "@/lib/services/marketplace-deposit-meta"

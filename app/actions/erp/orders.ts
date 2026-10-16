@@ -2675,6 +2675,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     store_credit_amount: paymentMethodStoreCreditAmount,
     coupon_id: couponIdToSave,
     delivery_fee: serverShippingCost,
+    delivery_breakdown: (data.deliveryBreakdown as Record<string, unknown> | null) || null,
     additional_costs: data.additionalCosts,
     notes: sanitizeNotes(data.notes),
     payment_method: paymentMethodSummary,
@@ -4332,6 +4333,9 @@ export async function updateERPOrderAction(
     payment_method_fee_amount: updatePaymentMethodFeeAmount,
     payment_method_fixed_fee_amount: updatePaymentMethodFixedFeeAmount,
     delivery_fee: updateServerShipping,
+    delivery_breakdown: data.deliveryBreakdown !== undefined
+      ? ((data.deliveryBreakdown as Record<string, unknown>) || null)
+      : (currentOrder as any).delivery_breakdown || null,
     delivery_payer: updateEffectiveDeliveryPayer,
     additional_costs: data.additionalCosts,
     notes: sanitizeNotes(data.notes),

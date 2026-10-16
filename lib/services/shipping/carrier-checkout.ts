@@ -76,6 +76,34 @@ function pruneCarrierQuoteCache(now: number): void {
   }
 }
 
+// Fast-path cache keyed only by partner + destination CEP. The detailed cache
+// (carrierQuoteCache) is only checked after loading plan + integration + config
+// (2+ queries). This responds repeated quotes from PDV, cart and checkout with
+// zero queries while the merchant's SuperFrete config stays the same.
+const carrierFastCache = new Map<string, { at: number; result: CarrierQuoteResult }>()
+const carrierFastInflight = new Map<string, Promise<CarrierQuoteResult>>()
+
+function pruneCarrierFastCache(now: number): void {
+  for (const [key, entry] of carrierFastCache) {
+    if (now - entry.at > CARRIER_QUOTE_STALE_MS) carrierFastCache.delete(key)
+  }
+  while (carrierFastCache.size > CARRIER_QUOTE_CACHE_MAX) {
+    const oldest = carrierFastCache.keys().next().value
+    if (oldest === undefined) break
+    carrierFastCache.delete(oldest)
+  }
+}
+
+function storeCarrierFastResult(key: string, result: CarrierQuoteResult): void {
+  // Only cache useful, CEP-stable outcomes. Config-related unavailability
+  // (plan/connection/origin) may change at any time, so those are not cached.
+  const cacheable = result.available === true || result.reason === "no_options"
+  if (!cacheable) return
+  pruneCarrierFastCache(Date.now())
+  carrierFastCache.delete(key)
+  carrierFastCache.set(key, { at: Date.now(), result })
+}
+
 async function loadCarrierContext(
   supabase: SupabaseClient,
   partnerId: string,
@@ -138,82 +166,106 @@ export async function quoteCarrierFreightOptions(
   input: { partnerId: string; toPostalCode: string },
 ): Promise<CarrierQuoteResult> {
   const toPostalCode = String(input.toPostalCode || "").replace(/\D/g, "")
-  const ctx = await loadCarrierContext(supabase, input.partnerId, toPostalCode)
-  if (!ctx.ok) return { available: false, reason: ctx.reason }
-
-  const { client, config, fromPostalCode } = ctx
-  const services: SuperFreteServiceId[] =
-    Array.isArray(config.services) && config.services.length > 0
-      ? config.services
-      : ([1, 2] as SuperFreteServiceId[])
-
-  const requestParams = {
-    fromPostalCode,
-    toPostalCode,
-    services,
-    package: buildSuperFreteVolumes(config),
-    options: {
-      own_hand: Boolean(config.ownHand),
-      receipt: Boolean(config.receipt),
-      insurance_value: Number(config.insuranceValue || 0),
-      use_insurance_value: Number(config.insuranceValue || 0) > 0,
-    },
+  if (!/^\d{8}$/.test(toPostalCode)) {
+    return { available: false, reason: "invalid_destination" }
   }
 
-  const cacheKey = `${input.partnerId}|${JSON.stringify(requestParams)}`
-  const now = Date.now()
-  const cached = carrierQuoteCache.get(cacheKey)
-  if (cached && now - cached.at <= CARRIER_QUOTE_TTL_MS) {
-    return cached.result
+  const fastKey = `${input.partnerId}|${toPostalCode}`
+  const fastNow = Date.now()
+  const fastCached = carrierFastCache.get(fastKey)
+  if (fastCached && fastNow - fastCached.at <= CARRIER_QUOTE_TTL_MS) {
+    return fastCached.result
   }
+  const fastInflight = carrierFastInflight.get(fastKey)
+  if (fastInflight) return fastInflight
 
-  const inflight = carrierQuoteInflight.get(cacheKey)
-  if (inflight) return inflight
+  const run = (async (): Promise<CarrierQuoteResult> => {
+    const ctx = await loadCarrierContext(supabase, input.partnerId, toPostalCode)
+    if (!ctx.ok) return { available: false, reason: ctx.reason }
 
-  const pending = (async (): Promise<CarrierQuoteResult> => {
-    try {
-      const quotes = await client.calculateFreight(requestParams)
+    const { client, config, fromPostalCode } = ctx
+    const services: SuperFreteServiceId[] =
+      Array.isArray(config.services) && config.services.length > 0
+        ? config.services
+        : ([1, 2] as SuperFreteServiceId[])
 
-      const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
-        .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
-        .map((q: any) => ({
-          serviceId: Number(q.id),
-          serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
-          price: Math.round(Number(q.price) * 100) / 100,
-          deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
-          deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,
-          companyName: q.company?.name || null,
-        }))
-        .filter((o: CarrierFreightOption) => o.serviceId > 0)
-        .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
+    const requestParams = {
+      fromPostalCode,
+      toPostalCode,
+      services,
+      package: buildSuperFreteVolumes(config),
+      options: {
+        own_hand: Boolean(config.ownHand),
+        receipt: Boolean(config.receipt),
+        insurance_value: Number(config.insuranceValue || 0),
+        use_insurance_value: Number(config.insuranceValue || 0) > 0,
+      },
+    }
 
-      const result: CarrierQuoteResult =
-        options.length === 0
-          ? { available: false, reason: "no_options" }
-          : { available: true, options, fromPostalCode }
-      pruneCarrierQuoteCache(Date.now())
-      carrierQuoteCache.delete(cacheKey)
-      carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
-      return result
-    } catch (err) {
-      const stale = carrierQuoteCache.get(cacheKey)
-      if (stale && Date.now() - stale.at <= CARRIER_QUOTE_STALE_MS) {
-        console.warn("[carrier-quote] SuperFrete falhou; servindo cotação stale:", cacheKey)
-        return stale.result
+    const cacheKey = `${input.partnerId}|${JSON.stringify(requestParams)}`
+    const now = Date.now()
+    const cached = carrierQuoteCache.get(cacheKey)
+    if (cached && now - cached.at <= CARRIER_QUOTE_TTL_MS) {
+      return cached.result
+    }
+
+    const inflight = carrierQuoteInflight.get(cacheKey)
+    if (inflight) return inflight
+
+    const pending = (async (): Promise<CarrierQuoteResult> => {
+      try {
+        const quotes = await client.calculateFreight(requestParams)
+
+        const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
+          .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
+          .map((q: any) => ({
+            serviceId: Number(q.id),
+            serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
+            price: Math.round(Number(q.price) * 100) / 100,
+            deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
+            deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,
+            companyName: q.company?.name || null,
+          }))
+          .filter((o: CarrierFreightOption) => o.serviceId > 0)
+          .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
+
+        const result: CarrierQuoteResult =
+          options.length === 0
+            ? { available: false, reason: "no_options" }
+            : { available: true, options, fromPostalCode }
+        pruneCarrierQuoteCache(Date.now())
+        carrierQuoteCache.delete(cacheKey)
+        carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
+        return result
+      } catch (err) {
+        const stale = carrierQuoteCache.get(cacheKey)
+        if (stale && Date.now() - stale.at <= CARRIER_QUOTE_STALE_MS) {
+          console.warn("[carrier-quote] SuperFrete falhou; servindo cotação stale:", cacheKey)
+          return stale.result
+        }
+        captureError(err, {
+          module: "shipping",
+          action: "quote_carrier_freight",
+          partnerId: input.partnerId,
+        })
+        return { available: false, reason: "quote_failed" }
       }
-      captureError(err, {
-        module: "shipping",
-        action: "quote_carrier_freight",
-        partnerId: input.partnerId,
-      })
-      return { available: false, reason: "quote_failed" }
+    })()
+    carrierQuoteInflight.set(cacheKey, pending)
+    try {
+      return await pending
+    } finally {
+      carrierQuoteInflight.delete(cacheKey)
     }
   })()
-  carrierQuoteInflight.set(cacheKey, pending)
+
+  carrierFastInflight.set(fastKey, run)
   try {
-    return await pending
+    const result = await run
+    storeCarrierFastResult(fastKey, result)
+    return result
   } finally {
-    carrierQuoteInflight.delete(cacheKey)
+    carrierFastInflight.delete(fastKey)
   }
 }
 

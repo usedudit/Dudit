@@ -269,6 +269,7 @@ export function ExplorarPageClient({
     const [minPrice, setMinPrice] = useState<number | string>("")
     const [maxPrice, setMaxPrice] = useState<number | string>("")
     const [selectedCondition, setSelectedCondition] = useState<string>("")
+    const [onlyShipping, setOnlyShipping] = useState(false)
 
     const isFirstMountParamsRef = useRef(true)
     const prevParamsKeyRef = useRef("")
@@ -812,6 +813,15 @@ export function ExplorarPageClient({
             }
         }
 
+        // Filtragem por Envio nacional (transportadora)
+        if (onlyShipping) {
+            filtered = filtered.filter((p) => {
+                if (p.itemType !== 'produto') return true
+                const modes = p.fulfillment_modes || p.fulfillmentModes || []
+                return Array.isArray(modes) && modes.includes("shipping")
+            })
+        }
+
         // Filtragem por Seção
         if (selectedSection) {
             if (selectedSection === "promos") {
@@ -839,7 +849,7 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, selectedSection, isStandardCategory])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, sortBy, selectedSection, isStandardCategory])
 
     const filteredResults = useMemo(
         () => applyBrowseFilters(dataToFilter),
@@ -1261,6 +1271,7 @@ export function ExplorarPageClient({
         setMaxPrice("")
         setPromoOn(false)
         setSelectedCondition("")
+        setOnlyShipping(false)
         setSortBy("relevancia")
         setCurrentType("tudo")
         updateUrl(selectedCitySlug, [], query, "tudo")
@@ -1273,6 +1284,7 @@ export function ExplorarPageClient({
         maxPrice: string | number
         promoOn: boolean
         condition?: string
+        shipping?: boolean
     }) => {
         triggerFilterLoading()
         setCurrentType(filters.type as any)
@@ -1281,6 +1293,7 @@ export function ExplorarPageClient({
         setMaxPrice(filters.maxPrice)
         setPromoOn(filters.promoOn)
         setSelectedCondition(filters.condition || "")
+        setOnlyShipping(filters.shipping === true)
         updateUrl(selectedCitySlug, filters.categories, query, filters.type, selectedSection)
     }
 
@@ -1349,6 +1362,17 @@ export function ExplorarPageClient({
                 },
             })
         }
+        if (onlyShipping) {
+            chips.push({
+                key: "shipping",
+                label: "Envio nacional",
+                value: "Ativo",
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setOnlyShipping(false)
+                },
+            })
+        }
         if (sortBy !== "relevancia") {
             const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
             chips.push({
@@ -1375,7 +1399,7 @@ export function ExplorarPageClient({
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType, selectedCitySlug, query, resolveCategoryName, triggerFilterLoading])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, sortBy, currentType, selectedCitySlug, query, resolveCategoryName, triggerFilterLoading])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -2147,6 +2171,7 @@ export function ExplorarPageClient({
                 minPrice={minPrice}
                 maxPrice={maxPrice}
                 promoOn={promoOn}
+                shipping={onlyShipping}
                 typeOptions={[
                     { value: "tudo", label: "Tudo" },
                     { value: "produtos", label: "Produtos" },

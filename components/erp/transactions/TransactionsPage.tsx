@@ -227,6 +227,7 @@ export default function TransactionsPage({
     }>({ accountName: "", currentBalance: 0, amount: 0 })
     const skipPaymentBalanceWarningRef = useRef(false)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
+    const [settleAccountId, setSettleAccountId] = useState<string | null>(null)
     const [confirmCancelTransaction, setConfirmCancelTransaction] = useState<ERPTransaction | null>(null)
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
@@ -402,6 +403,36 @@ export default function TransactionsPage({
         const source = (paymentMethods && paymentMethods.length > 0) ? paymentMethods : fallbackPaymentMethods
         return (source || []).filter((m: any) => m.is_active !== false)
     }, [paymentMethods, fallbackPaymentMethods])
+
+    // ── Bank account resolution for the "Quitar todas as parcelas" flow ──
+    // The account field is only changeable when the chosen payment method(s) do NOT
+    // have a linked finance account. A sale (pedido) installment is born with a fixed
+    // payment method; if that method exposes a default_finance_account_id the balance
+    // must go there (auto-filled & locked). Otherwise the user may choose the account.
+    const settlePendingInstallments = (installmentDetail?.installments || []).filter((row: any) => row.status !== "paid")
+    const settlePendingCount = settlePendingInstallments.length
+    const settleMethodsHaveLinkedAccount =
+        settlePendingCount > 0 &&
+        settlePendingInstallments.every((row: any) => {
+            const pmId = row.paymentMethodId ? sanitizeUUID(row.paymentMethodId) : null
+            const method = pmId ? activePaymentMethodsList.find((m: any) => m.id === pmId) : null
+            return Boolean(method?.default_finance_account_id)
+        })
+    const settleAccountLocked = Boolean(settleMethodsHaveLinkedAccount)
+    const settleAccountOptions = useMemo(
+        () => financeAccounts.map((a: any) => ({ value: a.id, label: a.name })),
+        [financeAccounts],
+    )
+    const settleResolvedAccount = useMemo<string | null>(() => {
+        if (settleAccountLocked && settlePendingCount > 0) {
+            for (const row of settlePendingInstallments) {
+                const pmId = row.paymentMethodId ? sanitizeUUID(row.paymentMethodId) : null
+                const method = pmId ? activePaymentMethodsList.find((m: any) => m.id === pmId) : null
+                if (method?.default_finance_account_id) return method.default_finance_account_id
+            }
+        }
+        return settleAccountId
+    }, [settleAccountLocked, settlePendingCount, settlePendingInstallments, activePaymentMethodsList, settleAccountId])
 
     const getMatchedPaymentMethod = useCallback((methodIdOrLabel: string | null | undefined) => {
         if (!methodIdOrLabel) return null
@@ -1259,6 +1290,7 @@ export default function TransactionsPage({
             const res = await settleInstallmentGroupAction({
                 partnerId,
                 installmentGroupId: confirmSettleGroup.installmentGroupId,
+                settleAccountId: settleResolvedAccount,
                 installmentPayments: Object.entries(settlePaymentsByInstallment).map(([transactionId, values]) => ({
                     transactionId,
                     paymentAmount: Number(values.paymentAmount || 0),
@@ -1274,12 +1306,13 @@ export default function TransactionsPage({
             notifySuccess("Parcelado quitado com sucesso.")
             setConfirmSettleGroup(null)
             setInstallmentDetail(null)
+            setSettleAccountId(null)
             closeEntity()
             void refreshTransactionsNow()
         } finally {
             setSettlingGroup(false)
         }
-    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, refreshTransactionsNow, settlePaymentsByInstallment])
+    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, refreshTransactionsNow, settlePaymentsByInstallment, settleAccountId, settleResolvedAccount])
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
@@ -1319,30 +1352,37 @@ export default function TransactionsPage({
         openEntity("edit", tx.id)
     }, [loadedTransactions, notifyError, openEntity, closeEntity])
 
-    const handlePayInstallment = useCallback(async (installmentId: string) => {
-        const row = (installmentDetail?.installments || []).find((item: any) => item.id === installmentId)
-        if (!row) return
-        if (row.status === "paid") {
-            notifyError("Parcela já está quitada.")
-            return
-        }
-        setSelectedInstallmentForPayment(row)
-        setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
-        setInterestAmount("0")
-        setDiscountAmount("0")
-        const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
-        setPaymentMethodId(initialMethod)
-        const matched = getMatchedPaymentMethod(initialMethod)
-        if (matched?.default_finance_account_id) {
-            setFinanceAccountId(matched.default_finance_account_id)
-        } else if (row.accountId) {
-            setFinanceAccountId(row.accountId)
-        } else {
-            const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
-            setFinanceAccountId(defaultAcc)
-        }
-        setPaymentModalOpen(true)
-    }, [installmentDetail, notifyError, getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts])
+     const handlePayInstallment = useCallback(
+        (row: any, meta?: { ledgerDirection: ERPTransaction["ledgerDirection"]; isOrderOrigin: boolean }) => {
+            if (!row) return
+            if (row.status === "paid") {
+                notifyError("Parcela já está quitada.")
+                return
+            }
+            const ledgerDirection = meta?.ledgerDirection ?? row.ledgerDirection ?? "in"
+            setSelectedInstallmentForPayment({
+                ...row,
+                description: row.description || row.reference || row.headerTitle || "Parcela",
+                ledgerDirection,
+            })
+            setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
+            setInterestAmount("0")
+            setDiscountAmount("0")
+            const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+            setPaymentMethodId(initialMethod)
+            const matched = getMatchedPaymentMethod(initialMethod)
+            if (matched?.default_finance_account_id) {
+                setFinanceAccountId(matched.default_finance_account_id)
+            } else if (row.accountId) {
+                setFinanceAccountId(row.accountId)
+            } else {
+                const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+                setFinanceAccountId(defaultAcc)
+            }
+            setPaymentModalOpen(true)
+        },
+        [installmentDetail, notifyError, getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts],
+    )
 
     const handleConfirmInstallmentPayment = useCallback(async () => {
         if (!selectedInstallmentForPayment) return
@@ -1853,7 +1893,31 @@ export default function TransactionsPage({
                                     ]}
                                 />
 
-                                {/* Table / List Container */}
+                                 {/* Conta bancária da quitação */}
+                                 <FormSection
+                                     hasSeparator
+                                     title="Conta bancária da quitação"
+                                     description={settleAccountLocked ? "Conta vinculada automaticamente ao meio de pagamento do pedido." : "Conta onde o saldo da quitação será aplicado."}
+                                 >
+                                     <div className="md:w-1/2">
+                                         <FormDropdown
+                                             label="Conta bancária *"
+                                             value={settleResolvedAccount || ""}
+                                             setValue={(val) => setSettleAccountId(val)}
+                                             options={settleAccountOptions}
+                                             placeholder="Selecione a conta bancária"
+                                             disabled={settleAccountLocked}
+                                             error={settleAccountLocked ? false : !settleResolvedAccount}
+                                         />
+                                         {settleAccountLocked && settleResolvedAccount && (
+                                             <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                 Conta vinculada automaticamente ao meio de pagamento.
+                                             </p>
+                                         )}
+                                     </div>
+                                 </FormSection>
+
+                                 {/* Table / List Container */}
                                 <FormSection hasSeparator title="Parcelas pendentes">
                                     {pendingInstallments.length === 0 ? (
                                         <IconPlaceholder

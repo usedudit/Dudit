@@ -24,6 +24,7 @@ export interface AppliedFilters {
     maxPrice: string | number
     promoOn: boolean
     condition?: string
+    shipping?: boolean
 }
 
 interface ExplorarFiltersBottomSheetProps {
@@ -44,6 +45,7 @@ interface ExplorarFiltersBottomSheetProps {
     productCategories: { name: string; icon_url: string | null }[]
     serviceCategories: { name: string; icon_url: string | null }[]
     partnerCategories: { name: string; icon_url: string | null }[]
+    shipping?: boolean
     userProfile?: any
     filterConfig?: FilterConfig
 }
@@ -66,6 +68,7 @@ export function ExplorarFiltersBottomSheet({
     productCategories,
     serviceCategories,
     partnerCategories,
+    shipping,
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true },
 }: ExplorarFiltersBottomSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
@@ -93,6 +96,7 @@ export function ExplorarFiltersBottomSheet({
     const [draftMaxPrice, setDraftMaxPrice] = useState<string | number>(maxPrice)
     const [draftPromo, setDraftPromo] = useState(promoOn)
     const [draftCondition, setDraftCondition] = useState(selectedCondition || "")
+    const [draftShipping, setDraftShipping] = useState(shipping === true)
 
     useEffect(() => {
         if (!isOpen) return
@@ -102,7 +106,8 @@ export function ExplorarFiltersBottomSheet({
         setDraftMaxPrice(maxPrice)
         setDraftPromo(promoOn)
         setDraftCondition(selectedCondition || "")
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        setDraftShipping(shipping === true)
+        // eslint-disable-next-line react/hooks/exhaustive-deps
     }, [isOpen])
 
     const hasDraftFilters = (typeOptions.length > 0 && draftType !== "tudo")
@@ -111,6 +116,7 @@ export function ExplorarFiltersBottomSheet({
         || !!draftMaxPrice
         || draftPromo
         || !!draftCondition
+        || draftShipping
 
     const draftCategoryList = useMemo(() => {
         if (draftType === "servicos") return serviceCategories
@@ -126,6 +132,7 @@ export function ExplorarFiltersBottomSheet({
             maxPrice: draftMaxPrice,
             promoOn: draftPromo,
             condition: draftCondition,
+            shipping: draftShipping,
         })
         onClose()
     }
@@ -305,6 +312,33 @@ export function ExplorarFiltersBottomSheet({
                     </button>
                 </section>
             )}
+
+            {/* Envio nacional Section */}
+            <section>
+                <button
+                    onClick={() => setDraftShipping(!draftShipping)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftShipping
+                        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
+                        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
+                        }`}
+                >
+                    <span
+                        className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftShipping
+                            ? "border-brand-green bg-brand-green"
+                            : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
+                            }`}
+                    >
+                        {draftShipping && (
+                            <Check className="h-3.5 w-3.5 text-white" />
+                        )}
+                    </span>
+                    Envio nacional
+                </button>
+
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
+                    Mostra apenas produtos que oferecem envio pelo correios/transportadora para todo o Brasil.
+                </p>
+            </section>
         </>
     )
 

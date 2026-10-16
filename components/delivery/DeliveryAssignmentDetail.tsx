@@ -391,898 +391,901 @@ export default function DeliveryAssignmentDetail({
         <>
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="flex flex-col h-full w-full">
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                        {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={handleBackClick} className="w-10 h-10 p-0 flex items-center justify-center">
-                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    </Button>
-                                </div>
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="hidden md:inline truncate">{pageTitle}</span>
-                                            <Badge variant={statusMeta.variant} className="shrink-0">{statusMeta.label}</Badge>
-                                            {ordersList.length > 1 && (
-                                                <Badge variant="gray" className="shrink-0">{deliveredOrdersCount}/{ordersList.length} entregues</Badge>
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={handleBackClick} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
+                                    </div>
+
+                                    {/* Title row */}
+                                    <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">{pageTitle}</span>
+                                                <Badge variant={statusMeta.variant} className="shrink-0">{statusMeta.label}</Badge>
+                                                {ordersList.length > 1 && (
+                                                    <Badge variant="gray" className="shrink-0">{deliveredOrdersCount}/{ordersList.length} entregues</Badge>
+                                                )}
+                                            </h1>
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                {assignment.store_name || assignment.partner_name || "Loja"} • {assignment.assigned_at ? formatDate(assignment.assigned_at) : "Hoje"}
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) && (
+                                                <Button variant="outlinered" onClick={() => setFailureOpen(true)} disabled={loading}>
+                                                    Informar Falha
+                                                </Button>
                                             )}
-                                        </h1>
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            {assignment.store_name || assignment.partner_name || "Loja"} • {assignment.assigned_at ? formatDate(assignment.assigned_at) : "Hoje"}
+                                            {assignment.status === "out_for_delivery" && ordersList.length > 1 ? (
+                                                allOrdersDelivered ? (
+                                                    <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
+                                                        Finalizar Rota de Entrega
+                                                    </Button>
+                                                ) : (
+                                                    <Badge variant="orange">
+                                                        Entregue os pedidos individualmente ({deliveredOrdersCount}/{ordersList.length})
+                                                    </Badge>
+                                                )
+                                            ) : (
+                                                NEXT_STATUS[assignment.status] && (
+                                                    <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
+                                                        {NEXT_STATUS[assignment.status].label}
+                                                    </Button>
+                                                )
+                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) && (
-                                            <Button variant="outlinered" onClick={() => setFailureOpen(true)} disabled={loading}>
-                                                Informar Falha
-                                            </Button>
-                                        )}
-                                        {assignment.status === "out_for_delivery" && ordersList.length > 1 ? (
-                                            allOrdersDelivered ? (
-                                                <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
-                                                    Finalizar Rota de Entrega
-                                                </Button>
-                                            ) : (
-                                                <Badge variant="orange" className="py-2 px-3 text-xs font-semibold">
-                                                    Entregue os pedidos individualmente ({deliveredOrdersCount}/{ordersList.length})
-                                                </Badge>
-                                            )
-                                        ) : (
-                                            NEXT_STATUS[assignment.status] && (
-                                                <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
-                                                    {NEXT_STATUS[assignment.status].label}
-                                                </Button>
-                                            )
-                                        )}
+                                    <div className="pt-2 md:pt-4">
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border">
+                                            <TabsTrigger value="resumo">Resumo</TabsTrigger>
+                                            <TabsTrigger value="itens">Itens do Pedido ({items.length})</TabsTrigger>
+                                            <TabsTrigger value="historico">Histórico</TabsTrigger>
+                                        </TabsList>
                                     </div>
                                 </div>
-
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="resumo">Resumo</TabsTrigger>
-                                        <TabsTrigger value="itens">Itens do Pedido ({items.length})</TabsTrigger>
-                                        <TabsTrigger value="historico">Histórico</TabsTrigger>
-                                    </TabsList>
-                                </div>
                             </div>
-                        </div>
 
-                        {/* Tab Content */}
-                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            <AnimatePresence mode="wait">
-                                {activeTab === "resumo" && (
-                                    <FadeIn key="resumo" className="block">
-                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                            {/* LEFT MAIN COLUMN */}
-                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
-                                                {/* STEPPER PROGRESS - Desktop */}
-                                                <div className="hidden lg:block">
-                                                    {!isTerminalFailed ? (
-                                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                                <div className="flex justify-between items-center">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
-                                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                            {assignment.store_name || assignment.partner_name || "Loja"}
+                            {/* Tab Content */}
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <AnimatePresence mode="wait">
+                                    {activeTab === "resumo" && (
+                                        <FadeIn key="resumo" className="block">
+                                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                                                {/* LEFT MAIN COLUMN */}
+                                                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
+                                                    {/* STEPPER PROGRESS - Desktop */}
+                                                    <div className="hidden lg:block">
+                                                        {!isTerminalFailed ? (
+                                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
+                                                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                                {assignment.store_name || assignment.partner_name || "Loja"}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                            Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                        Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
+                                                                </div>
+                                                                <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                                    <div className="relative px-4">
+                                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                                            <div
+                                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                                style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
+                                                                            />
+                                                                            {STEPS.map((step, idx) => {
+                                                                                const isPassed = currentStepIndex >= idx
+                                                                                const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
+                                                                                const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
+                                                                                return (
+                                                                                    <div key={step.key} className="relative flex flex-col items-center">
+                                                                                        <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                                            <span className={`text-xs font-medium ${isPassed && !isFailed ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                                                {step.label}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                                            {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
+                                                                                        </div>
+                                                                                        <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                                            {isPassed && !isFailed ? (
+                                                                                                <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">✓</div>
+                                                                                            ) : (
+                                                                                                <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )
+                                                                            })}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                                <div className="relative px-4">
-                                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                                        <div
-                                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                            style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
+                                                        ) : (
+                                                            <InfoCard
+                                                                title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
+                                                                message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
+                                                                color="red"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {/* STEPPER PROGRESS - Mobile/Tablet */}
+                                                    <div className="lg:hidden">
+                                                        {!isTerminalFailed ? (
+                                                            <FormSection title="" className="mt-0">
+                                                                <ListItem
+                                                                    title={currentActiveStep.label}
+                                                                    description={currentActiveStep.date ? `${currentActiveStep.date} às ${currentActiveStep.time}` : undefined}
+                                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                    showChevron={true}
+                                                                    onClick={() => setIsStepsSheetOpen(true)}
+                                                                    left={
+                                                                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
+                                                                            <TruckIcon size={18} />
+                                                                        </div>
+                                                                    }
+                                                                />
+                                                            </FormSection>
+                                                        ) : (
+                                                            <InfoCard
+                                                                title="Entrega Cancelada ou com Falha"
+                                                                message="Esta entrega não está mais em andamento."
+                                                                color="red"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Store Section */}
+                                                    <FormSection title="Local de Coleta (Estabelecimento)">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                            <div className="space-y-1 min-w-0">
+                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                    {assignment.store_name || assignment.partner_name || "Estabelecimento Parceiro"}
+                                                                </h3>
+                                                                {assignment.store_address && (
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
+                                                                        <MapPinIcon size={14} className="shrink-0 text-brand-inactive-text mt-0.5" />
+                                                                        <span>{assignment.store_address}</span>
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <div className="shrink-0">
+                                                                <ActionsDropdown
+                                                                    trigger={
+                                                                        <Button variant="outline" size="sm">Opções</Button>
+                                                                    }
+                                                                >
+                                                                    {storeMapsUrl && (
+                                                                        <DropdownItem onClick={() => window.open(storeMapsUrl, "_blank")}>
+                                                                            <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                        </DropdownItem>
+                                                                    )}
+                                                                    {cleanStorePhone && (
+                                                                        <DropdownItem onClick={() => window.open(`tel:${cleanStorePhone}`, "_self")}>
+                                                                            <PhoneIcon size={16} /> Ligar para o Estabelecimento
+                                                                        </DropdownItem>
+                                                                    )}
+                                                                    {storeWhatsappUrl && (
+                                                                        <DropdownItem onClick={() => window.open(storeWhatsappUrl, "_blank")}>
+                                                                            <WhatsappIcon size={16} /> WhatsApp
+                                                                        </DropdownItem>
+                                                                    )}
+                                                                </ActionsDropdown>
+                                                            </div>
+                                                        </div>
+                                                    </FormSection>
+
+                                                    {/* Customer Section(s) / Paradas - Desktop */}
+                                                    <div className="hidden lg:block">
+                                                        {ordersList.map((order: any, idx: number) => {
+                                                            const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
+                                                            const custMaps = order.delivery_address
+                                                                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
+                                                                : null
+                                                            const custWaze = order.delivery_address
+                                                                ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
+                                                                : null
+                                                            const custWhatsapp = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
+                                                            const stopTitle = ordersList.length > 1
+                                                                ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
+                                                                : "Local de Entrega (Cliente)"
+                                                            const isOrderDelivered = orderDeliveredMap[order.order_id] || false
+
+                                                            return (
+                                                                <FormSection key={order.order_id || idx} title={stopTitle} hasSeparator>
+                                                                    <div
+                                                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer rounded-xl hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors -mx-2 px-2 py-2"
+                                                                        onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}
+                                                                    >
+                                                                        <div className="space-y-1 min-w-0">
+                                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2 flex-wrap">
+                                                                                <span>{order.customer_name || "Cliente"}</span>
+                                                                                {order.total_amount && (
+                                                                                    <span className="text-xs font-normal text-brand-inactive-text">
+                                                                                        ({formatCurrency(order.total_amount)})
+                                                                                    </span>
+                                                                                )}
+                                                                                {isOrderDelivered && (
+                                                                                    <Badge variant="green" className="shrink-0">Entregue</Badge>
+                                                                                )}
+                                                                            </h3>
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
+                                                                                <span>{order.delivery_address || "Endereço não informado"}</span>
+                                                                            </p>
+                                                                            {order.notes && (
+                                                                                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                                                                    <strong>Obs:</strong> {order.notes}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                            <ActionsDropdown
+                                                                                trigger={
+                                                                                    <Button variant="outline" size="sm">Opções</Button>
+                                                                                }
+                                                                            >
+                                                                                <DropdownItem onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}>
+                                                                                    <EyeIcon size={16} /> Ver Detalhes do Pedido
+                                                                                </DropdownItem>
+                                                                                {assignment.status === "out_for_delivery" && !isOrderDelivered && (
+                                                                                    <DropdownItem onClick={async () => {
+                                                                                        setLoading(true)
+                                                                                        const res = await markSingleOrderDeliveredAction({
+                                                                                            assignmentId: assignment.assignment_id,
+                                                                                            orderId: order.order_id,
+                                                                                        })
+                                                                                        setLoading(false)
+                                                                                        if (!res.success) {
+                                                                                            toast.error(res.error || "Não foi possível marcar como entregue.")
+                                                                                            return
+                                                                                        }
+                                                                                        setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
+                                                                                        toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue!`)
+                                                                                        const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
+                                                                                        if (allDone) {
+                                                                                            setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+                                                                                        }
+                                                                                    }}>
+                                                                                        <CheckCircleIcon size={16} className="text-emerald-600" /> Confirmar Entrega deste Pedido
+                                                                                    </DropdownItem>
+                                                                                )}
+                                                                                {custMaps && (
+                                                                                    <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
+                                                                                        <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                                    </DropdownItem>
+                                                                                )}
+                                                                                {custWaze && (
+                                                                                    <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
+                                                                                        <TruckIcon size={16} /> Abrir no Waze
+                                                                                    </DropdownItem>
+                                                                                )}
+                                                                                {cleanCustPhone && (
+                                                                                    <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
+                                                                                        <PhoneIcon size={16} /> Ligar para o Cliente
+                                                                                    </DropdownItem>
+                                                                                )}
+                                                                                {custWhatsapp && (
+                                                                                    <DropdownItem onClick={() => window.open(custWhatsapp, "_blank")}>
+                                                                                        <WhatsappIcon size={16} /> WhatsApp
+                                                                                    </DropdownItem>
+                                                                                )}
+                                                                            </ActionsDropdown>
+                                                                        </div>
+                                                                    </div>
+                                                                </FormSection>
+                                                            )
+                                                        })}
+                                                    </div>
+
+                                                    {/* Customer Section(s) / Paradas - Mobile/Tablet */}
+                                                    <div className="lg:hidden">
+                                                        <FormSection title={`Pedidos Vinculados (${ordersList.length})`} hasSeparator>
+                                                            {ordersList.length === 1 ? (
+                                                                <ListItem
+                                                                    title={`${ordersList[0].customer_name || "Cliente"} • ${ordersList[0].total_amount ? formatCurrency(ordersList[0].total_amount) : ""}`}
+                                                                    description={ordersList[0].delivery_address || "Endereço não informado"}
+                                                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                    showChevron={true}
+                                                                    onClick={() => { setSelectedOrderForDetail(ordersList[0]); setIsOrderDetailSheetOpen(true) }}
+                                                                    left={
+                                                                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
+                                                                            <TruckIcon size={18} />
+                                                                        </div>
+                                                                    }
+                                                                />
+                                                            ) : (
+                                                                ordersList.map((order: any, idx: number) => {
+                                                                    const isOrderDelivered = orderDeliveredMap[order.order_id] || false
+                                                                    return (
+                                                                        <ListItem
+                                                                            key={order.order_id || idx}
+                                                                            title={
+                                                                                <span className="flex items-center gap-2">
+                                                                                    Parada {idx + 1} – {order.customer_name || "Cliente"}
+                                                                                    {isOrderDelivered && <Badge variant="green" className="text-[10px] px-1.5 py-0">Entregue</Badge>}
+                                                                                </span>
+                                                                            }
+                                                                            description={`${order.total_amount ? formatCurrency(order.total_amount) : ""} • ${order.delivery_address || ""}`}
+                                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                            showChevron={true}
+                                                                            onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}
+                                                                            left={
+                                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isOrderDelivered ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"}`}>
+                                                                                    {isOrderDelivered ? <CheckCircleIcon size={18} /> : <span className="text-sm font-bold">{idx + 1}</span>}
+                                                                                </div>
+                                                                            }
                                                                         />
-                                                                        {STEPS.map((step, idx) => {
-                                                                            const isPassed = currentStepIndex >= idx
-                                                                            const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
-                                                                            const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
+                                                                    )
+                                                                })
+                                                            )}
+                                                        </FormSection>
+                                                    </div>
+                                                </div>
+
+                                                {/* RIGHT SIDEBAR COLUMN with divider */}
+                                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                                    {/* Order Instructions */}
+                                                    {assignment.notes && (
+                                                        <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
+                                                    )}
+
+                                                    <SidebarCard hasSeparator hasTopStrip title="Remuneração & Valores">
+                                                        <InfoCard
+                                                            title="Sua Taxa de Entrega (Total)"
+                                                            message={formatCurrency(totalRouteDeliveryFee)}
+                                                            color="green"
+                                                        />
+                                                        <div className="space-y-3 text-sm mt-4">
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total de Paradas</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{ordersList.length}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total dos Pedidos</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalRouteAmount)}</span>
+                                                            </div>
+                                                            {ordersList.length === 1 && (
+                                                                <>
+                                                                    <div className="flex justify-between items-center text-sm">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {formatPaymentMethodLabel(assignment.payment_method, null) || "Não informada"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center text-sm">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(assignment.payment_status).label}</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {ordersList.length === 1 && hasUnpaidPayment && (
+                                                            <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">
+                                                                {assignment.payment_confirmed_at ? (
+                                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                                        Recebimento confirmado
+                                                                    </div>
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        onClick={() => {
+                                                                            setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
+                                                                            setShowPaymentModal(true)
+                                                                        }}
+                                                                        disabled={loading}
+                                                                        className="w-full"
+                                                                    >
+                                                                        Processar Pagamento
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </SidebarCard>
+                                                </div>
+                                            </div>
+                                        </FadeIn>
+                                    )}
+
+                                    {activeTab === "itens" && (
+                                        <FadeIn key="itens" className="block">
+                                            <FormSection title={`Itens do Pedido (${items.length})`}>
+                                                {items.length === 0 ? (
+                                                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                                                        <IconPlaceholder
+                                                            icon={BoxIcon}
+                                                            title="Nenhum item detalhado"
+                                                            subtitle="Os itens individuais não foram especificados para este pedido."
+                                                        />
+                                                    </div>
+                                                ) : ordersList.length > 1 ? (
+                                                    <div className="space-y-4">
+                                                        {ordersList.map((order: any, oIdx: number) => {
+                                                            const orderItems = order.items || []
+                                                            return (
+                                                                <Accordion
+                                                                    key={order.order_id || oIdx}
+                                                                    title={
+                                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                            Parada {oIdx + 1}: Pedido #{order.order_number || String(order.order_id).slice(0, 8)} – {order.customer_name || "Cliente"} ({orderItems.length} {orderItems.length === 1 ? "item" : "itens"} • {formatCurrency(order.total_amount || 0)})
+                                                                        </span>
+                                                                    }
+                                                                    defaultOpen={oIdx === 0}
+                                                                >
+                                                                    <div className="divide-y divide-brand-border dark:divide-dark-border pt-2">
+                                                                        {orderItems.map((it: any, idx: number) => {
+                                                                            const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
+                                                                            const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
+                                                                            const qty = Number(it.quantity || 1)
+                                                                            const unit = it.unit || it.products?.unit || "un"
+                                                                            const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
+                                                                            const total = Number(it.subtotal || unitPrice * qty)
+
                                                                             return (
-                                                                                <div key={step.key} className="relative flex flex-col items-center">
-                                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                                        <span className={`text-xs font-medium ${isPassed && !isFailed ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                                            {step.label}
-                                                                                        </span>
+                                                                                <div key={it.id || idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                                                                                    <div className="flex items-center gap-4 min-w-0">
+                                                                                        <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                                            <img
+                                                                                                src={itemImg}
+                                                                                                alt={it.name || it.product_name || "Produto"}
+                                                                                                className="w-full h-full object-cover"
+                                                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div className="min-w-0">
+                                                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                                {it.name || it.product_name || "Produto sem nome"}
+                                                                                            </h4>
+                                                                                            {itemSku && (
+                                                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
+                                                                                                    SKU: {itemSku}
+                                                                                                </div>
+                                                                                            )}
+                                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
+                                                                                                <span>{formatQuantityWithUnit(qty, unit)}</span>
+                                                                                            </div>
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                        {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
-                                                                                    </div>
-                                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                                        {isPassed && !isFailed ? (
-                                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">✓</div>
-                                                                                        ) : (
-                                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                                    <div className="text-right shrink-0">
+                                                                                        <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                                            {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
+                                                                                        </div>
+                                                                                        {qty > 1 && unitPrice > 0 && (
+                                                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                                                {formatUnitPriceWithUnit(unitPrice, unit)}
+                                                                                            </div>
                                                                                         )}
                                                                                     </div>
                                                                                 </div>
                                                                             )
                                                                         })}
                                                                     </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <InfoCard
-                                                            title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
-                                                            message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
-                                                            color="red"
-                                                        />
-                                                    )}
-                                                </div>
-
-                                                {/* STEPPER PROGRESS - Mobile/Tablet */}
-                                                <div className="lg:hidden">
-                                                    {!isTerminalFailed ? (
-                                                        <FormSection title="" className="mt-0">
-                                                            <ListItem
-                                                                title={currentActiveStep.label}
-                                                                description={currentActiveStep.date ? `${currentActiveStep.date} às ${currentActiveStep.time}` : undefined}
-                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                                showChevron={true}
-                                                                onClick={() => setIsStepsSheetOpen(true)}
-                                                                left={
-                                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
-                                                                        <TruckIcon size={18} />
-                                                                    </div>
-                                                                }
-                                                            />
-                                                        </FormSection>
-                                                    ) : (
-                                                        <InfoCard
-                                                            title="Entrega Cancelada ou com Falha"
-                                                            message="Esta entrega não está mais em andamento."
-                                                            color="red"
-                                                        />
-                                                    )}
-                                                </div>
-
-                                                {/* Store Section */}
-                                                <FormSection title="Local de Coleta (Estabelecimento)" hasSeparator>
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                        <div className="space-y-1 min-w-0">
-                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                                                {assignment.store_name || assignment.partner_name || "Estabelecimento Parceiro"}
-                                                            </h3>
-                                                            {assignment.store_address && (
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                    <MapPinIcon size={14} className="shrink-0 text-brand-inactive-text mt-0.5" />
-                                                                    <span>{assignment.store_address}</span>
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <div className="shrink-0">
-                                                            <ActionsDropdown
-                                                                trigger={
-                                                                    <Button variant="outline" size="sm">Opções</Button>
-                                                                }
-                                                            >
-                                                                {storeMapsUrl && (
-                                                                    <DropdownItem onClick={() => window.open(storeMapsUrl, "_blank")}>
-                                                                        <MapPinIcon size={16} /> Abrir Rota no Maps
-                                                                    </DropdownItem>
-                                                                )}
-                                                                {cleanStorePhone && (
-                                                                    <DropdownItem onClick={() => window.open(`tel:${cleanStorePhone}`, "_self")}>
-                                                                        <PhoneIcon size={16} /> Ligar para o Estabelecimento
-                                                                    </DropdownItem>
-                                                                )}
-                                                                {storeWhatsappUrl && (
-                                                                    <DropdownItem onClick={() => window.open(storeWhatsappUrl, "_blank")}>
-                                                                        <WhatsappIcon size={16} /> WhatsApp
-                                                                    </DropdownItem>
-                                                                )}
-                                                            </ActionsDropdown>
-                                                        </div>
-                                                    </div>
-                                                </FormSection>
-
-                                                {/* Customer Section(s) / Paradas - Desktop */}
-                                                <div className="hidden lg:block">
-                                                    {ordersList.map((order: any, idx: number) => {
-                                                        const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
-                                                        const custMaps = order.delivery_address
-                                                            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
-                                                            : null
-                                                        const custWaze = order.delivery_address
-                                                            ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
-                                                            : null
-                                                        const custWhatsapp = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
-                                                        const stopTitle = ordersList.length > 1
-                                                            ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
-                                                            : "Local de Entrega (Cliente)"
-                                                        const isOrderDelivered = orderDeliveredMap[order.order_id] || false
-
-                                                        return (
-                                                            <FormSection key={order.order_id || idx} title={stopTitle} hasSeparator>
-                                                                <div
-                                                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer rounded-xl hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors -mx-2 px-2 py-2"
-                                                                    onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}
-                                                                >
-                                                                    <div className="space-y-1 min-w-0">
-                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2 flex-wrap">
-                                                                            <span>{order.customer_name || "Cliente"}</span>
-                                                                            {order.total_amount && (
-                                                                                <span className="text-xs font-normal text-brand-inactive-text">
-                                                                                    ({formatCurrency(order.total_amount)})
-                                                                                </span>
-                                                                            )}
-                                                                            {isOrderDelivered && (
-                                                                                <Badge variant="green" className="shrink-0">Entregue</Badge>
-                                                                            )}
-                                                                        </h3>
-                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                            <span>{order.delivery_address || "Endereço não informado"}</span>
-                                                                        </p>
-                                                                        {order.notes && (
-                                                                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                                                                                <strong>Obs:</strong> {order.notes}
-                                                                            </p>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                                        <ActionsDropdown
-                                                                            trigger={
-                                                                                <Button variant="outline" size="sm">Opções</Button>
-                                                                            }
-                                                                        >
-                                                                            <DropdownItem onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}>
-                                                                                <EyeIcon size={16} /> Ver Detalhes do Pedido
-                                                                            </DropdownItem>
-                                                                            {assignment.status === "out_for_delivery" && !isOrderDelivered && (
-                                                                                <DropdownItem onClick={async () => {
-                                                                                    setLoading(true)
-                                                                                    const res = await markSingleOrderDeliveredAction({
-                                                                                        assignmentId: assignment.assignment_id,
-                                                                                        orderId: order.order_id,
-                                                                                    })
-                                                                                    setLoading(false)
-                                                                                    if (!res.success) {
-                                                                                        toast.error(res.error || "Não foi possível marcar como entregue.")
-                                                                                        return
-                                                                                    }
-                                                                                    setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
-                                                                                    toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue!`)
-                                                                                    const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
-                                                                                    if (allDone) {
-                                                                                        setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
-                                                                                    }
-                                                                                }}>
-                                                                                    <CheckCircleIcon size={16} className="text-emerald-600" /> Confirmar Entrega deste Pedido
-                                                                                </DropdownItem>
-                                                                            )}
-                                                                            {custMaps && (
-                                                                                <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
-                                                                                    <MapPinIcon size={16} /> Abrir Rota no Maps
-                                                                                </DropdownItem>
-                                                                            )}
-                                                                            {custWaze && (
-                                                                                <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
-                                                                                    <TruckIcon size={16} /> Abrir no Waze
-                                                                                </DropdownItem>
-                                                                            )}
-                                                                            {cleanCustPhone && (
-                                                                                <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
-                                                                                    <PhoneIcon size={16} /> Ligar para o Cliente
-                                                                                </DropdownItem>
-                                                                            )}
-                                                                            {custWhatsapp && (
-                                                                                <DropdownItem onClick={() => window.open(custWhatsapp, "_blank")}>
-                                                                                    <WhatsappIcon size={16} /> WhatsApp
-                                                                                </DropdownItem>
-                                                                            )}
-                                                                        </ActionsDropdown>
-                                                                    </div>
-                                                                </div>
-                                                            </FormSection>
-                                                        )
-                                                    })}
-                                                </div>
-
-                                                {/* Customer Section(s) / Paradas - Mobile/Tablet */}
-                                                <div className="lg:hidden">
-                                                    <FormSection title={`Pedidos Vinculados (${ordersList.length})`} hasSeparator>
-                                                        {ordersList.length === 1 ? (
-                                                            <ListItem
-                                                                title={`${ordersList[0].customer_name || "Cliente"} • ${ordersList[0].total_amount ? formatCurrency(ordersList[0].total_amount) : ""}`}
-                                                                description={ordersList[0].delivery_address || "Endereço não informado"}
-                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                                showChevron={true}
-                                                                onClick={() => { setSelectedOrderForDetail(ordersList[0]); setIsOrderDetailSheetOpen(true) }}
-                                                                left={
-                                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
-                                                                        <TruckIcon size={18} />
-                                                                    </div>
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            ordersList.map((order: any, idx: number) => {
-                                                                const isOrderDelivered = orderDeliveredMap[order.order_id] || false
-                                                                return (
-                                                                    <ListItem
-                                                                        key={order.order_id || idx}
-                                                                        title={
-                                                                            <span className="flex items-center gap-2">
-                                                                                Parada {idx + 1} – {order.customer_name || "Cliente"}
-                                                                                {isOrderDelivered && <Badge variant="green" className="text-[10px] px-1.5 py-0">Entregue</Badge>}
-                                                                            </span>
-                                                                        }
-                                                                        description={`${order.total_amount ? formatCurrency(order.total_amount) : ""} • ${order.delivery_address || ""}`}
-                                                                        className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                                        showChevron={true}
-                                                                        onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}
-                                                                        left={
-                                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isOrderDelivered ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"}`}>
-                                                                                {isOrderDelivered ? <CheckCircleIcon size={18} /> : <span className="text-sm font-bold">{idx + 1}</span>}
-                                                                            </div>
-                                                                        }
-                                                                    />
-                                                                )
-                                                            })
-                                                        )}
-                                                    </FormSection>
-                                                </div>
-                                            </div>
-
-                                            {/* RIGHT SIDEBAR COLUMN with divider */}
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
-                                                {/* Order Instructions */}
-                                                {assignment.notes && (
-                                                    <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
-                                                )}
-
-                                                <SidebarCard hasSeparator title="Remuneração & Valores">
-                                                    <InfoCard
-                                                        title="Sua Taxa de Entrega (Total)"
-                                                        message={formatCurrency(totalRouteDeliveryFee)}
-                                                        color="green"
-                                                    />
-                                                    <div className="space-y-3 text-xs mt-4">
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total de Paradas</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{ordersList.length}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total dos Pedidos</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalRouteAmount)}</span>
-                                                        </div>
-                                                        {ordersList.length === 1 && (
-                                                            <>
-                                                                <div className="flex justify-between items-center text-sm">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {formatPaymentMethodLabel(assignment.payment_method, null) || "Não informada"}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex justify-between items-center text-sm">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(assignment.payment_status).label}</span>
-                                                                </div>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    {ordersList.length === 1 && hasUnpaidPayment && (
-                                                        <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">
-                                                            {assignment.payment_confirmed_at ? (
-                                                                <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                                    Recebimento confirmado
-                                                                </div>
-                                                            ) : (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    onClick={() => {
-                                                                        setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
-                                                                        setShowPaymentModal(true)
-                                                                    }}
-                                                                    disabled={loading}
-                                                                    className="w-full"
-                                                                >
-                                                                    Processar Pagamento
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </SidebarCard>
-                                            </div>
-                                        </div>
-                                    </FadeIn>
-                                )}
-
-                                {activeTab === "itens" && (
-                                    <FadeIn key="itens" className="block">
-                                        <FormSection title={`Itens do Pedido (${items.length})`}>
-                                            {items.length === 0 ? (
-                                                <div className="py-12 flex flex-col items-center justify-center text-center">
-                                                    <IconPlaceholder
-                                                        icon={BoxIcon}
-                                                        title="Nenhum item detalhado"
-                                                        subtitle="Os itens individuais não foram especificados para este pedido."
-                                                    />
-                                                </div>
-                                            ) : ordersList.length > 1 ? (
-                                                <div className="space-y-4">
-                                                    {ordersList.map((order: any, oIdx: number) => {
-                                                        const orderItems = order.items || []
-                                                        return (
-                                                            <Accordion
-                                                                key={order.order_id || oIdx}
-                                                                title={
-                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                        Parada {oIdx + 1}: Pedido #{order.order_number || String(order.order_id).slice(0, 8)} – {order.customer_name || "Cliente"} ({orderItems.length} {orderItems.length === 1 ? "item" : "itens"} • {formatCurrency(order.total_amount || 0)})
-                                                                    </span>
-                                                                }
-                                                                defaultOpen={oIdx === 0}
-                                                            >
-                                                                <div className="divide-y divide-brand-border dark:divide-dark-border pt-2">
-                                                                    {orderItems.map((it: any, idx: number) => {
-                                                                        const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
-                                                                        const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
-                                                                        const qty = Number(it.quantity || 1)
-                                                                        const unit = it.unit || it.products?.unit || "un"
-                                                                        const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
-                                                                        const total = Number(it.subtotal || unitPrice * qty)
-
-                                                                        return (
-                                                                            <div key={it.id || idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                                                                                <div className="flex items-center gap-4 min-w-0">
-                                                                                    <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
-                                                                                        <img
-                                                                                            src={itemImg}
-                                                                                            alt={it.name || it.product_name || "Produto"}
-                                                                                            className="w-full h-full object-cover"
-                                                                                            onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className="min-w-0">
-                                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                            {it.name || it.product_name || "Produto sem nome"}
-                                                                                        </h4>
-                                                                                        {itemSku && (
-                                                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
-                                                                                                SKU: {itemSku}
-                                                                                            </div>
-                                                                                        )}
-                                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
-                                                                                            <span>{formatQuantityWithUnit(qty, unit)}</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="text-right shrink-0">
-                                                                                    <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                        {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
-                                                                                    </div>
-                                                                                    {qty > 1 && unitPrice > 0 && (
-                                                                                        <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                                            {formatUnitPriceWithUnit(unitPrice, unit)}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                            </Accordion>
-                                                        )
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    <div className="divide-y divide-brand-border dark:divide-dark-border">
-                                                        {paginatedItems.map((it: any, idx: number) => {
-                                                            const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
-                                                            const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
-                                                            const qty = Number(it.quantity || 1)
-                                                            const unit = it.unit || it.products?.unit || "un"
-                                                            const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
-                                                            const total = Number(it.subtotal || unitPrice * qty)
-
-                                                            return (
-                                                                <div key={it.id || idx} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                                                                    <div className="flex items-center gap-4 min-w-0">
-                                                                        <div className="w-12 h-12 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
-                                                                            <img
-                                                                                src={itemImg}
-                                                                                alt={it.name || it.product_name || "Produto"}
-                                                                                className="w-full h-full object-cover"
-                                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                            />
-                                                                        </div>
-                                                                        <div className="min-w-0">
-                                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                {it.name || it.product_name || "Produto sem nome"}
-                                                                            </h4>
-                                                                            {itemSku && (
-                                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
-                                                                                SKU: {itemSku}
-                                                                                </div>
-                                                                            )}
-                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
-                                                                                <span>{formatQuantityWithUnit(qty, unit)}</span>
-                                                                                {it.order_number && (
-                                                                                    <span>• Pedido #{it.order_number}</span>
-                                                                                )}
-                                                                                {it.customer_name && (
-                                                                                    <span>• {it.customer_name}</span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="text-right shrink-0">
-                                                                        <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                            {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
-                                                                        </div>
-                                                                        {qty > 1 && unitPrice > 0 && (
-                                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                                {formatUnitPriceWithUnit(unitPrice, unit)}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
+                                                                </Accordion>
                                                             )
                                                         })}
                                                     </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        <div className="divide-y divide-brand-border dark:divide-dark-border">
+                                                            {paginatedItems.map((it: any, idx: number) => {
+                                                                const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
+                                                                const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
+                                                                const qty = Number(it.quantity || 1)
+                                                                const unit = it.unit || it.products?.unit || "un"
+                                                                const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
+                                                                const total = Number(it.subtotal || unitPrice * qty)
 
-                                                    {totalItemPages > 1 && (
-                                                        <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                                                            <Pagination
-                                                                currentPage={itemsPage}
-                                                                totalPages={totalItemPages}
-                                                                onPageChange={setItemsPage}
-                                                            />
+                                                                return (
+                                                                    <div key={it.id || idx} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                                                                        <div className="flex items-center gap-4 min-w-0">
+                                                                            <div className="w-12 h-12 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                                <img
+                                                                                    src={itemImg}
+                                                                                    alt={it.name || it.product_name || "Produto"}
+                                                                                    className="w-full h-full object-cover"
+                                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                                />
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                    {it.name || it.product_name || "Produto sem nome"}
+                                                                                </h4>
+                                                                                {itemSku && (
+                                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
+                                                                                        SKU: {itemSku}
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
+                                                                                    <span>{formatQuantityWithUnit(qty, unit)}</span>
+                                                                                    {it.order_number && (
+                                                                                        <span>• Pedido #{it.order_number}</span>
+                                                                                    )}
+                                                                                    {it.customer_name && (
+                                                                                        <span>• {it.customer_name}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right shrink-0">
+                                                                            <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                                {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
+                                                                            </div>
+                                                                            {qty > 1 && unitPrice > 0 && (
+                                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                                    {formatUnitPriceWithUnit(unitPrice, unit)}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })}
                                                         </div>
+
+                                                        {totalItemPages > 1 && (
+                                                            <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                                                                <Pagination
+                                                                    currentPage={itemsPage}
+                                                                    totalPages={totalItemPages}
+                                                                    onPageChange={setItemsPage}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </FormSection>
+                                        </FadeIn>
+                                    )}
+
+                                    {activeTab === "historico" && (
+                                        <FadeIn key="historico" className="block">
+                                            <div className="space-y-6">
+                                                <HistoryTimeline entries={historyEntries} />
+                                            </div>
+                                        </FadeIn>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                    </Tabs>
+
+                    {/* Report Failure Modal */}
+                    <DefaultModal
+                        isOpen={failureOpen}
+                        onClose={() => setFailureOpen(false)}
+                        title="Informar Falha na Entrega"
+                        maxWidth="md"
+                        footer={
+                            <div className="flex justify-end gap-3 w-full">
+                                <Button variant="outline" onClick={() => setFailureOpen(false)}>Cancelar</Button>
+                                <Button variant="outlinered" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
+                                    Confirmar Falha
+                                </Button>
+                            </div>
+                        }
+                    >
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Informe o motivo pelo qual a entrega não pôde ser concluída (ex: endereço incorreto, cliente ausente, problema com o veículo).
+                            </p>
+                            <textarea
+                                value={failureReason}
+                                onChange={(e) => setFailureReason(e.target.value)}
+                                placeholder="Descreva o motivo da falha..."
+                                className="w-full h-28 p-3 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                            />
+                        </div>
+                    </DefaultModal>
+
+                    {/* Mobile Stepper Sheet */}
+                    <BottomSheet isOpen={isStepsSheetOpen} onClose={() => setIsStepsSheetOpen(false)}>
+                        <div className="p-6 space-y-6">
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Progresso da Entrega</h3>
+                            <div className="space-y-4">
+                                {timelineSteps.map((step, idx) => (
+                                    <div key={idx} className="flex items-start gap-4">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${step.active ? (step.failed ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700") : "bg-gray-100 dark:bg-dark-border/40 text-gray-400"}`}>
+                                            {step.active ? "✓" : idx + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className={`text-sm font-semibold ${step.active ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 dark:text-dark-body"}`}>
+                                                {step.label}
+                                            </p>
+                                            {step.date && (
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    {step.date} às {step.time}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </BottomSheet>
+
+                    {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
+                    {(() => {
+                        const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
+                        const handleClose = () => {
+                            setIsOrderDetailSheetOpen(false)
+                            setSelectedOrderForDetail(null)
+                        }
+
+                        if (!selectedOrderForDetail) return null
+                        const order = selectedOrderForDetail
+                        const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
+                        const isOrderDelivered = orderDeliveredMap[order.order_id] || false
+                        const canMarkDelivered = assignment.status === "out_for_delivery" && !isOrderDelivered
+                        const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
+                        const deliveryMeta = getDeliveryStatusMeta(isOrderDelivered ? "delivered" : (assignment.status === "out_for_delivery" ? "sent" : assignment.status))
+                        const ordItems = order.items || []
+                        const orderDate = order.created_at || order.order_date || order.order_created_at || assignment.assigned_at
+                        const orderIsPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((order.payment_status || order.situation || "").toLowerCase())
+                        const orderNeedsPayment = !orderIsPaid
+
+                        const orderHistoryEntries: HistoryEntry[] = []
+                        if (order.created_at || order.order_date) {
+                            orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
+                        }
+                        if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                            orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
+                        }
+                        if (isOrderDelivered) {
+                            orderHistoryEntries.push({ id: "delivered", actor_name: "Entregador", change_lines: ["Pedido entregue ao cliente"], created_at: assignment.delivered_at, entry_type: "status" })
+                        }
+
+                        const sheetContent = (
+                            <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                                <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
+                                    </div>
+                                    <Button variant="filled" onClick={handleClose} size="icon">
+                                        <XIcon className="h-5 w-5" />
+                                    </Button>
+                                </header>
+
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                    <Tabs defaultValue="dados_gerais" className="w-full">
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                            <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                                Dados Gerais
+                                            </TabsTrigger>
+                                            <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                                Itens do Pedido ({ordItems.length})
+                                            </TabsTrigger>
+                                            <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
+                                                Histórico
+                                            </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                        {formatCurrency(order.total_amount || 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(order.delivery_fee || 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                        {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
+                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
+                                                        {deliveryMeta.label}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                        {orderDate ? formatDateTime(orderDate) : "-"}
+                                                    </span>
+                                                </div>
+                                                {order.delivery_address && (
+                                                    <div className="flex justify-between items-start text-sm gap-4">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
+                                                            <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
+                                                            {order.delivery_address}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                                            <CustomerCard
+                                                customer={{
+                                                    name: order.customer_name || "Cliente",
+                                                    phone: order.customer_phone || "",
+                                                    email: order.customer_email || "",
+                                                }}
+                                                address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                                showMap={true}
+                                                chrome="minimal"
+                                            />
+
+                                            {order.notes && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
+                                                    <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
+                                                        {order.notes}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {orderNeedsPayment && (
+                                                <div className="pt-2">
+                                                    {assignment.payment_confirmed_at ? (
+                                                        <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                            Recebimento confirmado
+                                                        </div>
+                                                    ) : (
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setSelectedPaymentOrder(buildOrderForModal(order, assignment))
+                                                                setShowPaymentModal(true)
+                                                            }}
+                                                            disabled={loading}
+                                                            className="w-full"
+                                                        >
+                                                            Processar Pagamento
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
-                                        </FormSection>
-                                    </FadeIn>
-                                )}
 
-                                {activeTab === "historico" && (
-                                    <FadeIn key="historico" className="block">
-                                        <div className="space-y-6">
-                                            <HistoryTimeline entries={historyEntries} />
-                                        </div>
-                                    </FadeIn>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    </div>
-                </Tabs>
-
-                {/* Report Failure Modal */}
-                <DefaultModal
-                    isOpen={failureOpen}
-                    onClose={() => setFailureOpen(false)}
-                    title="Informar Falha na Entrega"
-                    maxWidth="md"
-                    footer={
-                        <div className="flex justify-end gap-3 w-full">
-                            <Button variant="outline" onClick={() => setFailureOpen(false)}>Cancelar</Button>
-                            <Button variant="outlinered" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
-                                Confirmar Falha
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Informe o motivo pelo qual a entrega não pôde ser concluída (ex: endereço incorreto, cliente ausente, problema com o veículo).
-                        </p>
-                        <textarea
-                            value={failureReason}
-                            onChange={(e) => setFailureReason(e.target.value)}
-                            placeholder="Descreva o motivo da falha..."
-                            className="w-full h-28 p-3 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-green/20"
-                        />
-                    </div>
-                </DefaultModal>
-
-                {/* Mobile Stepper Sheet */}
-                <BottomSheet isOpen={isStepsSheetOpen} onClose={() => setIsStepsSheetOpen(false)}>
-                    <div className="p-6 space-y-6">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Progresso da Entrega</h3>
-                        <div className="space-y-4">
-                            {timelineSteps.map((step, idx) => (
-                                <div key={idx} className="flex items-start gap-4">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${step.active ? (step.failed ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700") : "bg-gray-100 dark:bg-dark-border/40 text-gray-400"}`}>
-                                        {step.active ? "✓" : idx + 1}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className={`text-sm font-semibold ${step.active ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 dark:text-dark-body"}`}>
-                                            {step.label}
-                                        </p>
-                                        {step.date && (
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {step.date} às {step.time}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </BottomSheet>
-
-                {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
-                {(() => {
-                    const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
-                    const handleClose = () => {
-                        setIsOrderDetailSheetOpen(false)
-                        setSelectedOrderForDetail(null)
-                    }
-
-                    if (!selectedOrderForDetail) return null
-                    const order = selectedOrderForDetail
-                    const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
-                    const isOrderDelivered = orderDeliveredMap[order.order_id] || false
-                    const canMarkDelivered = assignment.status === "out_for_delivery" && !isOrderDelivered
-                    const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
-                    const deliveryMeta = getDeliveryStatusMeta(isOrderDelivered ? "delivered" : (assignment.status === "out_for_delivery" ? "sent" : assignment.status))
-                    const ordItems = order.items || []
-                    const orderDate = order.created_at || order.order_date || order.order_created_at || assignment.assigned_at
-                    const orderIsPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((order.payment_status || order.situation || "").toLowerCase())
-                    const orderNeedsPayment = !orderIsPaid
-
-                    const orderHistoryEntries: HistoryEntry[] = []
-                    if (order.created_at || order.order_date) {
-                        orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
-                    }
-                    if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
-                        orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
-                    }
-                    if (isOrderDelivered) {
-                        orderHistoryEntries.push({ id: "delivered", actor_name: "Entregador", change_lines: ["Pedido entregue ao cliente"], created_at: assignment.delivered_at, entry_type: "status" })
-                    }
-
-                    const sheetContent = (
-                        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                                <div>
-                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
-                                </div>
-                                <Button variant="filled" onClick={handleClose} size="icon">
-                                    <XIcon className="h-5 w-5" />
-                                </Button>
-                            </header>
-
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                                <Tabs defaultValue="dados_gerais" className="w-full">
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                                        <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                            Dados Gerais
-                                        </TabsTrigger>
-                                        <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                            Itens do Pedido ({ordItems.length})
-                                        </TabsTrigger>
-                                        <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
-                                            Histórico
-                                        </TabsTrigger>
-                                    </TabsList>
-
-                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                                    {formatCurrency(order.total_amount || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(order.delivery_fee || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                    {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
-                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
-                                                    {deliveryMeta.label}
-                                                </Badge>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {orderDate ? formatDateTime(orderDate) : "-"}
-                                                </span>
-                                            </div>
-                                            {order.delivery_address && (
-                                                <div className="flex justify-between items-start text-sm gap-4">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
-                                                        <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
-                                                        {order.delivery_address}
-                                                    </span>
+                                            {isOrderDelivered && (
+                                                <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                    <CheckCircleIcon size={16} className="inline mr-1" />
+                                                    Este pedido já foi entregue ao cliente
                                                 </div>
                                             )}
-                                        </div>
+                                        </TabsContent>
 
-                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
+                                        <TabsContent value="itens" className="mt-0">
+                                            {ordItems.length === 0 ? (
+                                                <div className="flex items-center justify-center py-8">
+                                                    <IconPlaceholder
+                                                        icon={BoxIcon}
+                                                        title="Sem itens por aqui"
+                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {ordItems.map((item: any, idx: number) => {
+                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
+                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
+                                                        const itemUnit = item.products?.unit || item.unit || "un"
+                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                        const itemQty = Number(item.quantity || 1)
+                                                        const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
 
-                                        <CustomerCard
-                                            customer={{
-                                                name: order.customer_name || "Cliente",
-                                                phone: order.customer_phone || "",
-                                                email: order.customer_email || "",
-                                            }}
-                                            address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
-                                            showMap={true}
-                                            chrome="minimal"
-                                        />
-
-                                        {order.notes && (
-                                            <div>
-                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
-                                                <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
-                                                    {order.notes}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {orderNeedsPayment && (
-                                            <div className="pt-2">
-                                                {assignment.payment_confirmed_at ? (
-                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                        Recebimento confirmado
-                                                    </div>
-                                                ) : (
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            setSelectedPaymentOrder(buildOrderForModal(order, assignment))
-                                                            setShowPaymentModal(true)
-                                                        }}
-                                                        disabled={loading}
-                                                        className="w-full"
-                                                    >
-                                                        Processar Pagamento
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {isOrderDelivered && (
-                                            <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                <CheckCircleIcon size={16} className="inline mr-1" />
-                                                Este pedido já foi entregue ao cliente
-                                            </div>
-                                        )}
-                                    </TabsContent>
-
-                                    <TabsContent value="itens" className="mt-0">
-                                        {ordItems.length === 0 ? (
-                                            <div className="flex items-center justify-center py-8">
-                                                <IconPlaceholder
-                                                    icon={BoxIcon}
-                                                    title="Sem itens por aqui"
-                                                    subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {ordItems.map((item: any, idx: number) => {
-                                                    const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
-                                                    const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
-                                                    const itemUnit = item.products?.unit || item.unit || "un"
-                                                    const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                    const itemQty = Number(item.quantity || 1)
-                                                    const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
-
-                                                    return (
-                                                        <div key={item.id || idx} className="flex items-start gap-4">
-                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                <img
-                                                                    src={itemImage}
-                                                                    className="w-full h-full object-cover rounded-xl"
-                                                                    alt={item.name || item.product_name || "Produto sem nome"}
-                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start mb-0.5">
-                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                        {item.name || item.product_name || "Produto sem nome"}
-                                                                    </h4>
-                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(itemSubtotal)}
-                                                                    </span>
+                                                        return (
+                                                            <div key={item.id || idx} className="flex items-start gap-4">
+                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={itemImage}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.name || item.product_name || "Produto sem nome"}
+                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                    />
                                                                 </div>
-                                                                {itemSku && (
-                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                        SKU: {itemSku}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            {item.name || item.product_name || "Produto sem nome"}
+                                                                        </h4>
+                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(itemSubtotal)}
+                                                                        </span>
                                                                     </div>
-                                                                )}
-                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                    {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
+                                                                    {itemSku && (
+                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                            SKU: {itemSku}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                        {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </TabsContent>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </TabsContent>
 
-                                    <TabsContent value="historico" className="mt-0">
-                                        <HistoryTimeline entries={orderHistoryEntries} />
-                                    </TabsContent>
-                                </Tabs>
+                                        <TabsContent value="historico" className="mt-0">
+                                            <HistoryTimeline entries={orderHistoryEntries} />
+                                        </TabsContent>
+                                    </Tabs>
+                                </div>
                             </div>
-                        </div>
-                    )
+                        )
 
-                    return isMobile ? (
-                        <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                            {sheetContent}
-                        </BottomSheet>
-                    ) : (
-                        <Portal>
-                            <AnimatePresence>
-                                {isOpen && (
-                                    <motion.div
-                                        className="fixed inset-0 z-[110] bg-black/50"
-                                        style={{ zIndex: orderDetailZIndex }}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        onClick={handleClose}
-                                    >
+                        return isMobile ? (
+                            <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                                {sheetContent}
+                            </BottomSheet>
+                        ) : (
+                            <Portal>
+                                <AnimatePresence>
+                                    {isOpen && (
                                         <motion.div
-                                            className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
-                                            initial={{ x: "120%", opacity: 0 }}
-                                            animate={{ x: 0, opacity: 1 }}
-                                            exit={{ x: "120%", opacity: 0 }}
-                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                            onClick={(e) => e.stopPropagation()}
+                                            className="fixed inset-0 z-[110] bg-black/50"
+                                            style={{ zIndex: orderDetailZIndex }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            onClick={handleClose}
                                         >
-                                            {sheetContent}
+                                            <motion.div
+                                                className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                                                initial={{ x: "120%", opacity: 0 }}
+                                                animate={{ x: 0, opacity: 1 }}
+                                                exit={{ x: "120%", opacity: 0 }}
+                                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {sheetContent}
+                                            </motion.div>
                                         </motion.div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </Portal>
-                    )
-                })()}
-            </div>
-        </FadeIn>
+                                    )}
+                                </AnimatePresence>
+                            </Portal>
+                        )
+                    })()}
+                </div>
+            </FadeIn>
 
-        <DriverPaymentModal
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            assignmentId={assignment.assignment_id || assignment.id}
-            order={selectedPaymentOrder}
-            onSuccess={() => {
-                setShowPaymentModal(false)
-                setAssignment((prev: any) => ({
-                    ...prev,
-                    payment_confirmed_at: new Date().toISOString(),
-                    payment_status: "paid",
-                    payment_method: selectedPaymentOrder?.payment_method || prev.payment_method,
-                }))
-            }}
-        />
+            <DriverPaymentModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                assignmentId={assignment.assignment_id || assignment.id}
+                order={selectedPaymentOrder}
+                onSuccess={() => {
+                    setShowPaymentModal(false)
+                    setAssignment((prev: any) => ({
+                        ...prev,
+                        payment_confirmed_at: new Date().toISOString(),
+                        payment_status: "paid",
+                        payment_method: selectedPaymentOrder?.payment_method || prev.payment_method,
+                    }))
+                }}
+            />
         </>
     )
 }

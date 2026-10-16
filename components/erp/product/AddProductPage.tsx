@@ -38,6 +38,8 @@ import { ProductVariationsTab } from "./ProductVariationsTab"
 import { ProductSuppliersTab } from "./ProductSuppliersTab"
 import { ProductMarketplaceTab } from "./ProductMarketplaceTab"
 import { ProductMetricsTab } from "./ProductMetricsTab"
+import { getStoreFulfillmentCapabilitiesAction } from "@/app/actions/shared/delivery"
+import { DEFAULT_STORE_FULFILLMENT_CAPABILITIES, type StoreFulfillmentCapabilities } from "@/lib/commerce/capabilities"
 
 const NUMERIC_FIELDS = new Set([
     "price", "costPrice", "stock", "minStock", "maxStock", "promotional_price",
@@ -101,6 +103,7 @@ const getEmptyProduct = () => ({
     product_situation: "revenda", c_benef: null, inf_ad_prod: null,
     weight_gross: 0, weight_net: 0, width: 0, height: 0, length: 0, packaging_type: "package", preparation_days: 0,
     tags: [], pending_variants: [], pending_suppliers: [],
+    fulfillment_modes: ["delivery", "pickup"],
 })
 
 
@@ -166,6 +169,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const partnerId = propPartnerId || selectedStore?.partner_id || ""
     const storeId = propStoreId || selectedStore?.id || ""
+
+    const [storeFulfillmentCaps, setStoreFulfillmentCaps] = useState<StoreFulfillmentCapabilities>(
+        DEFAULT_STORE_FULFILLMENT_CAPABILITIES,
+    )
+    useEffect(() => {
+        let cancelled = false
+        if (!partnerId) return
+        getStoreFulfillmentCapabilitiesAction(partnerId, storeId || null)
+            .then((caps) => { if (!cancelled) setStoreFulfillmentCaps(caps) })
+            .catch(() => { })
+        return () => { cancelled = true }
+    }, [partnerId, storeId])
 
     // Sidebar hiding logic removed per user plan (using specific mobile header)
 
@@ -555,7 +570,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 return {
                     ...prev,
                     images: [...(prev.images || []), ...images.map((img) => img.file)],
-                name: aiData.name || prev.name,
+                    name: aiData.name || prev.name,
                     description: aiData.description || prev.description,
                     brand: brandName,
                     brand_id: brandId,
@@ -823,6 +838,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 availability_value: Number(d.availability_value) || 0,
                 availability_unit: d.availability_unit || "Dias",
                 tags: d.tags || [],
+                fulfillment_modes: Array.isArray(d.fulfillment_modes) && d.fulfillment_modes.length > 0
+                    ? d.fulfillment_modes
+                    : undefined,
                 isDuplicate: internalMode === "duplicate",
             }
 
@@ -1203,6 +1221,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 }}
                                                 onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
                                                 videoPlanBlocked={videoPlanBlocked}
+                                                storeFulfillmentCapabilities={storeFulfillmentCaps}
                                             />
                                         )}
                                     </FadeIn>

@@ -9,8 +9,10 @@ import { formatCurrency } from "@/lib/utils"
 import {
     deleteDeliveryFeeRuleAction,
     getPartnerDeliveryConfigAction,
+    getServiceAttendanceSettingsAction,
     upsertDeliveryFeeRuleAction,
     upsertPartnerDeliveryConfigAction,
+    upsertServiceAttendanceSettingsAction,
 } from "@/app/actions/shared/delivery"
 
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -68,6 +70,23 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
         freeDeliveryThreshold: "",
         deliveryPayer: "customer" as "customer" | "seller",
     })
+    const [serviceSettings, setServiceSettings] = useState<{
+        maxServiceKm: string
+        travelFeeMode: "free" | "flat" | "per_km" | "tiered"
+        freeTravelKm: string
+        travelFlatFee: string
+        travelPerKm: string
+        enforceServiceArea: boolean
+        hasOverride: boolean
+    }>({
+        maxServiceKm: "",
+        travelFeeMode: "free",
+        freeTravelKm: "0",
+        travelFlatFee: "0",
+        travelPerKm: "0",
+        enforceServiceArea: true,
+        hasOverride: false,
+    })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
     const [newRule, setNewRule] = useState({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
@@ -115,6 +134,22 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
             setChargeByDistance(Number(res.settings.extraKmPrice || 0) > 0 || res.settings.maxDeliveryKm != null)
             setRules(res.rules || [])
             setRulePage(1)
+
+            const svcRes = await getServiceAttendanceSettingsAction(partnerId, storeId)
+            setServiceSettings({
+                maxServiceKm: svcRes.maxServiceKm == null ? "" : String(svcRes.maxServiceKm),
+                travelFeeMode: svcRes.travelFeeMode,
+                freeTravelKm: String(svcRes.freeTravelKm || 0),
+                travelFlatFee: String(svcRes.travelFlatFee || 0),
+                travelPerKm: String(svcRes.travelPerKm || 0),
+                enforceServiceArea: Boolean(svcRes.enforceServiceArea ?? true),
+                hasOverride: svcRes.maxServiceKm != null
+                    || svcRes.travelFeeMode !== "free"
+                    || svcRes.freeTravelKm > 0
+                    || svcRes.travelFlatFee > 0
+                    || svcRes.travelPerKm > 0
+                    || !svcRes.enforceServiceArea,
+            })
         }
         setLoading(false)
     }
@@ -182,10 +217,25 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                         })
                                         if (res.success) {
                                             notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
-                                            await reload()
                                         } else {
                                             notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
                                         }
+                                        const svcRes = await upsertServiceAttendanceSettingsAction({
+                                            partnerId,
+                                            storeId,
+                                            settings: {
+                                                maxServiceKm: serviceSettings.maxServiceKm ? Number(serviceSettings.maxServiceKm) : null,
+                                                travelFeeMode: serviceSettings.travelFeeMode,
+                                                freeTravelKm: Number(serviceSettings.freeTravelKm || 0),
+                                                travelFlatFee: Number(serviceSettings.travelFlatFee || 0),
+                                                travelPerKm: Number(serviceSettings.travelPerKm || 0),
+                                                enforceServiceArea: serviceSettings.enforceServiceArea,
+                                            },
+                                        })
+                                        if (!svcRes.success) {
+                                            notifyError("Erro ao salvar atendimento", svcRes.error || "Não foi possível salvar as configurações de atendimento de serviços.")
+                                        }
+                                        await reload()
                                         setSaving(false)
                                     }}
                                     leftIcon={<SaveIcon size={18} />}
@@ -319,6 +369,76 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                                     </Accordion>
                                 </div>
                             )}
+
+                            {/* Atendimento de serviços (raio + taxa de deslocamento) */}
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
+                                <Accordion
+                                    title={
+                                        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading inline-flex items-center gap-2">
+                                            Atendimento a domicílio de serviços
+                                            {!serviceSettings.hasOverride && (
+                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">(padrão da loja)</span>
+                                            )}
+                                        </span>
+                                    }
+                                    defaultOpen={false}
+                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 mt-6 text-left"
+                                >
+                                    <div className="space-y-6 pb-4">
+                                            <Input
+                                            label="Distância máxima de atendimento"
+                                            value={serviceSettings.maxServiceKm}
+                                            onChange={(e) => setServiceSettings((s) => ({ ...s, maxServiceKm: e.target.value }))}
+                                            suffix="km"
+                                            placeholder="Ilimitado"
+                                        />
+                                        <FormDropdown
+                                            label="Taxa de deslocamento"
+                                            value={serviceSettings.travelFeeMode}
+                                            setValue={(value) => setServiceSettings((s) => ({ ...s, travelFeeMode: (value as any) || "free" }))}
+                                            options={[
+                                                { value: "free", label: "Gratuito" },
+                                                { value: "flat", label: "Valor fixo" },
+                                                { value: "per_km", label: "Por km cobrado" },
+                                                { value: "tiered", label: "Por faixa de km" },
+                                            ]}
+                                        />
+                                        <Input
+                                            label="KM gratuito de deslocamento"
+                                            value={serviceSettings.freeTravelKm}
+                                            onChange={(e) => setServiceSettings((s) => ({ ...s, freeTravelKm: e.target.value }))}
+                                            suffix="km"
+                                            type="number"
+                                            min={0}
+                                        />
+                                        {serviceSettings.travelFeeMode === "flat" && (
+                                            <MoneyInput
+                                                label="Taxa fixa de deslocamento"
+                                                value={serviceSettings.travelFlatFee}
+                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelFlatFee: String(val) }))}
+                                            />
+                                        )}
+                                        {serviceSettings.travelFeeMode === "per_km" && (
+                                            <MoneyInput
+                                                label="Preço por km cobrado"
+                                                value={serviceSettings.travelPerKm}
+                                                onChange={(val) => setServiceSettings((s) => ({ ...s, travelPerKm: String(val) }))}
+                                            />
+                                        )}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Bloquear agendamento fora do raio</span>
+                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Impedir que clientes agendem quando o endereço estiver fora do raio.</span>
+                                            </div>
+                                            <Switch
+                                                checked={serviceSettings.enforceServiceArea}
+                                                onCheckedChange={(checked) => setServiceSettings((s) => ({ ...s, enforceServiceArea: checked }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </Accordion>
+                            </div>
 
                             {/* Regras por horário */}
                             {settings.isDeliveryEnabled && (

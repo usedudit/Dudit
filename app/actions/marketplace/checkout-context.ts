@@ -11,7 +11,7 @@ import {
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
+import { getPartnerDeliveryConfigAction, resolveStoreFulfillmentCapabilities } from "@/app/actions/shared/delivery"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { cachedResolveCheckoutCartLines, cachedListActivePromotionsInBatch } from "@/lib/cache/checkout-cache"
@@ -65,6 +65,7 @@ export type MarketplaceCheckoutContextResult =
         planEnabled: boolean
         partnerEnabled: boolean
         pickupEnabled: boolean
+        shippingEnabled: boolean
       }
       deliverySettings: Record<string, unknown> | null
       storefrontPaymentMethods: Array<{
@@ -103,7 +104,13 @@ export async function getMarketplaceCheckoutContextAction(input: {
   }
 
   const admin = getAdminClient()
-  const resolved = await cachedResolveCheckoutCartLines(admin, user.id, input.cartItemIds)
+  const storeCaps = await resolveStoreFulfillmentCapabilities(input.partnerId, input.storeId || null)
+  const resolved = await cachedResolveCheckoutCartLines(
+    admin,
+    user.id,
+    input.cartItemIds,
+    storeCaps,
+  )
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const lineContexts = buildCheckoutLineContextsFromResolved(resolved.lines)
@@ -437,6 +444,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       pickupEnabled: deliveryConfig.success
         ? Boolean(deliveryConfig.settings.isPickupEnabled ?? true)
         : true,
+      shippingEnabled: storeCaps.shipping,
     },
     deliverySettings: deliveryConfig.success ? (deliveryConfig.settings as Record<string, unknown>) : null,
     storefrontPaymentMethods,

@@ -71,6 +71,7 @@ export default function AdminProductDetailClient({
                 title: "Salvar alterações",
                 description: `Produto "${product.name}"`,
                 changedFields,
+                force: true,
                 confirmLabel: "Salvar",
                 runner: async (actionPayload) => {
                     const res = await updateAdminProduct(product.id, data, {

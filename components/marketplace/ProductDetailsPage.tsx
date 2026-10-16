@@ -197,6 +197,7 @@ export function ProductDetailsPageClient({
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, any> | null>(null)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [deliveryLoading, setDeliveryLoading] = useState(false)
+    const [deliveryOutsideRadius, setDeliveryOutsideRadius] = useState(false)
     // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierOptions, setCarrierOptions] = useState<CarrierFreightOption[]>([])
     const [carrierQuoteLoading, setCarrierQuoteLoading] = useState(false)
@@ -708,9 +709,11 @@ export function ProductDetailsPageClient({
                     setDeliveryFee(Number(quote.fee || 0))
                     setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
                     setDeliveryError(null)
+                    setDeliveryOutsideRadius(false)
                 } else {
                     setDeliveryFee(null)
                     setDeliveryError(quote.error || "Não realizamos entrega para este endereço.")
+                    setDeliveryOutsideRadius(Boolean(quote.isOutsideRadius))
                 }
             } catch (err) {
                 if (active) {
@@ -737,6 +740,7 @@ export function ProductDetailsPageClient({
             if (cleanedCep.length === 0) {
                 setDeliveryFee(null)
                 setDeliveryError(null)
+                setDeliveryOutsideRadius(false)
                 setCalculatedAddress(null)
                 setShippingState("initial")
             }
@@ -757,6 +761,7 @@ export function ProductDetailsPageClient({
 
                 if (data.erro || data.error) {
                     setDeliveryError("CEP não encontrado.")
+                    setDeliveryOutsideRadius(false)
                     setDeliveryFee(null)
                     setCalculatedAddress(null)
                     return
@@ -777,9 +782,11 @@ export function ProductDetailsPageClient({
                     setDeliveryFee(Number(quote.fee || 0))
                     setDeliveryBreakdown((quote.breakdown as Record<string, any>) || null)
                     setDeliveryError(null)
+                    setDeliveryOutsideRadius(false)
                 } else {
                     setDeliveryFee(null)
                     setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
+                    setDeliveryOutsideRadius(Boolean(quote.isOutsideRadius))
                 }
             } catch (err) {
                 if (active) {
@@ -855,7 +862,7 @@ export function ProductDetailsPageClient({
     // Apply the first carrier option as delivery fee whenever own quote failed
     useEffect(() => {
         if (carrierOptions.length === 0) return
-        if (!deliveryError || !deliveryError.toLowerCase().includes("raio")) return
+        if (!deliveryOutsideRadius) return
         const opt = carrierOptions[0]
         setDeliveryFee(Number(opt.price))
         setDeliveryBreakdown({
@@ -1908,12 +1915,17 @@ export function ProductDetailsPageClient({
                                     })()}
 
                                     {/* Transportadora: só quando o frete próprio falhou por raio
-                                        (ou já foi aplicada como fonte do frete) */}
-                                    {!deliveryLoading &&
-                                        ((deliveryError && deliveryError.toLowerCase().includes("raio")) ||
+                                        (ou já foi aplicada como fonte do frete) e o produto oferece envio nacional */}
+                                     {!deliveryLoading &&
+                                        (deliveryOutsideRadius ||
                                             deliveryBreakdown?.source === "superfrete") &&
+                                        Array.isArray(product?.fulfillment_modes) &&
+                                        product.fulfillment_modes.includes("shipping") &&
                                         (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
                                             <div className="pt-3 space-y-2">
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                    Envio nacional (transportadora)
+                                                </p>
                                                 {carrierOptions.map((opt) => (
                                                     <div
                                                         key={opt.serviceId}

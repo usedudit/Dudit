@@ -1514,6 +1514,13 @@ export function ServiceDetailsPageClient({
                                     className="border-0 px-0 py-0"
                                 />
                             )}
+                            {service.fulfillment_modes?.includes("customer_location") &&
+                                (service.max_service_km != null || service.travel_fee_mode != null) && (
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
+                                    {service.max_service_km != null && `Atendimento até ${service.max_service_km} km. `}
+                                    {service.travel_fee_mode === "free" ? "Deslocamento grátis." : "Taxa de deslocamento a combinar."}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </FormSection>

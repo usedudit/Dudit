@@ -55,11 +55,12 @@ export default function AdminServiceDetailClient({
 
     const handleSave = async (payload: any): Promise<{ success: boolean; error?: string; cancelled?: boolean }> => {
         const changedFields = diffChangedFields(service, payload)
-        const result = await runAction({
-            title: "Salvar alterações",
-            description: `Serviço "${service.name}"`,
-            changedFields,
-            confirmLabel: "Salvar",
+            const result = await runAction({
+                title: "Salvar alterações",
+                description: `Serviço "${service.name}"`,
+                changedFields,
+                force: true,
+                confirmLabel: "Salvar",
             runner: async (actionPayload) => {
                 const res = await updateAdminService(service.id, payload, {
                     reason: actionPayload.reason || null,

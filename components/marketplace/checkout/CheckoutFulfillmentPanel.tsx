@@ -83,6 +83,8 @@ export type CheckoutFulfillmentPanelProps = {
   deliveryPlanEnabled: boolean
   deliveryEnabled: boolean
   pickupEnabled: boolean
+  /** Loja possui envio nacional (transportadora/SuperFrete) conectado. */
+  shippingEnabled?: boolean
   partnerAddressLabel: string
   preparationHint?: React.ReactNode
   deliveryError: string | null
@@ -91,6 +93,7 @@ export type CheckoutFulfillmentPanelProps = {
   carrierQuoteLoading?: boolean
   carrierError?: string | null
   onSelectCarrier?: (opt: CarrierFreightOption) => void
+  deliveryFree?: boolean
   addressProps: AddressBlockProps
   schedulingLines: Array<{ name: string; summary: string | null }>
   lines?: MarketplaceCheckoutDisplayLine[]
@@ -104,6 +107,7 @@ export function CheckoutFulfillmentPanel({
   deliveryPlanEnabled,
   deliveryEnabled,
   pickupEnabled,
+  shippingEnabled = false,
   partnerAddressLabel,
   preparationHint,
   deliveryError,
@@ -112,17 +116,27 @@ export function CheckoutFulfillmentPanel({
   carrierQuoteLoading = false,
   carrierError = null,
   onSelectCarrier,
+  deliveryFree = false,
   addressProps,
   schedulingLines,
   lines = [],
   onFulfillmentModesSave,
 }: CheckoutFulfillmentPanelProps) {
   const isPickup = deliveryType === "pickup"
-  const canShowProductDelivery =
+  const canShowLocalDelivery =
     requirements.showProductFulfillmentOptions &&
     requirements.showDeliverySection &&
+    requirements.showLocalDeliveryOption &&
     deliveryPlanEnabled &&
     deliveryEnabled
+  const canShowShipping =
+    requirements.showProductFulfillmentOptions &&
+    requirements.showDeliverySection &&
+    requirements.showShippingOption &&
+    shippingEnabled
+  // Aba "Entrega" cobre entrega local (frete próprio) e/ou envio nacional
+  // (transportadora). Endereço é necessário nos dois casos.
+  const canShowProductDelivery = canShowLocalDelivery || canShowShipping
   const canShowProductPickup =
     requirements.showProductFulfillmentOptions && requirements.showPickupOption && pickupEnabled
 
@@ -271,10 +285,10 @@ export function CheckoutFulfillmentPanel({
             )}
           </AnimatePresence>
 
-          {!isPickup && canShowProductDelivery && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
+          {!isPickup && canShowShipping && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
             <div className="space-y-3">
               <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                Entrega por transportadora
+                Envio nacional (transportadora)
               </p>
               {carrierQuoteLoading && (
                 <div className="flex items-center gap-2 text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
@@ -298,9 +312,18 @@ export function CheckoutFulfillmentPanel({
                   className="px-4 py-3"
                   right={
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                        {formatCurrency(Number(opt.price))}
-                      </span>
+                      {deliveryFree ? (
+                        <span className="flex items-center gap-1.5 justify-end">
+                          <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">
+                            {formatCurrency(Number(opt.price))} |
+                          </span>
+                          <span className="text-sm font-bold text-brand-green">Grátis</span>
+                        </span>
+                      ) : (
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                          {formatCurrency(Number(opt.price))}
+                        </span>
+                      )}
                       <RadioButton
                         name="carrierFreightOption"
                         value={String(opt.serviceId)}

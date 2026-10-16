@@ -7,11 +7,87 @@
 export const FULFILLMENT_MODES = [
   "delivery",
   "pickup",
+  "shipping",
   "on_site",
   "customer_location",
 ] as const
 
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number]
+
+/**
+ * Capacidades de fulfillment da LOJA (o que a loja pode oferecer).
+ * O modo efetivo de cada item é a interseção entre os modos do catálogo
+ * (produto/serviço) e estas capacidades.
+ */
+export type StoreFulfillmentCapabilities = {
+  /** Entrega local (raio próprio + rede de entregadores). Requer plano + is_delivery_enabled. */
+  delivery: boolean
+  /** Retirada no local. Requer is_pickup_enabled. */
+  pickup: boolean
+  /** Envio nacional via transportadora (SuperFrete). Requer plano + integração conectada. */
+  shipping: boolean
+}
+
+export const DEFAULT_STORE_FULFILLMENT_CAPABILITIES: StoreFulfillmentCapabilities = {
+  delivery: true,
+  pickup: true,
+  shipping: false,
+}
+
+/** Modos que dependem de entregar/enviar — exigem endereço do cliente. */
+export const ADDRESS_REQUIRED_MODES: readonly FulfillmentMode[] = [
+  "delivery",
+  "customer_location",
+  "shipping",
+]
+
+export function isAddressRequiredMode(mode: FulfillmentMode | null | undefined): boolean {
+  return Boolean(mode && (ADDRESS_REQUIRED_MODES as readonly string[]).includes(mode))
+}
+
+export function isModeSupportedByStore(
+  mode: FulfillmentMode,
+  caps: StoreFulfillmentCapabilities,
+): boolean {
+  switch (mode) {
+    case "delivery":
+      return caps.delivery
+    case "pickup":
+      return caps.pickup
+    case "shipping":
+      return caps.shipping
+    // Serviços não dependem das capacidades de entrega da loja.
+    case "on_site":
+    case "customer_location":
+      return true
+    default:
+      return false
+  }
+}
+
+/**
+ * Retorna os modos efetivos de um item = modos do catálogo filtrados pelas
+ * capacidades da loja. Se a interseção for vazia, cai no melhor fallback
+ * disponível na loja (nunca retorna vazio).
+ */
+export function resolveEffectiveFulfillmentModes(
+  catalogModes: FulfillmentMode[],
+  storeCaps: StoreFulfillmentCapabilities,
+  kind: "product" | "service" = "product",
+): FulfillmentMode[] {
+  const supported = catalogModes.filter((m) => isModeSupportedByStore(m, storeCaps))
+  if (supported.length > 0) return supported
+
+  if (kind === "service") {
+    return catalogModes.includes("customer_location") ? ["customer_location"] : ["on_site"]
+  }
+
+  const fallback: FulfillmentMode[] = []
+  if (storeCaps.pickup) fallback.push("pickup")
+  if (storeCaps.delivery) fallback.push("delivery")
+  if (storeCaps.shipping) fallback.push("shipping")
+  return fallback.length ? fallback : ["pickup"]
+}
 
 export const PAYMENT_REQUIREMENTS = [
   "full_payment",
@@ -47,15 +123,21 @@ export function defaultServiceFulfillmentModes(): FulfillmentMode[] {
   return ["on_site"]
 }
 
-export function serviceCatalogCapabilities(row: {
-  fulfillment_modes?: string[] | null
-  payment_requirement?: string | null
-}): CatalogCapabilities {
+export function serviceCatalogCapabilities(
+  row: {
+    fulfillment_modes?: string[] | null
+    payment_requirement?: string | null
+  },
+  storeCaps?: StoreFulfillmentCapabilities,
+): CatalogCapabilities {
+  const catalogModes = normalizeFulfillmentModes(
+    row.fulfillment_modes,
+    defaultServiceFulfillmentModes(),
+  )
   return {
-    fulfillmentModes: normalizeFulfillmentModes(
-      row.fulfillment_modes,
-      defaultServiceFulfillmentModes(),
-    ),
+    fulfillmentModes: storeCaps
+      ? resolveEffectiveFulfillmentModes(catalogModes, storeCaps, "service")
+      : catalogModes,
     paymentRequirement: PAYMENT_REQUIREMENTS.includes(
       row.payment_requirement as PaymentRequirement,
     )
@@ -65,15 +147,21 @@ export function serviceCatalogCapabilities(row: {
   }
 }
 
-export function productCatalogCapabilities(row: {
-  fulfillment_modes?: string[] | null
-  product_type?: string | null
-}): CatalogCapabilities {
+export function productCatalogCapabilities(
+  row: {
+    fulfillment_modes?: string[] | null
+    product_type?: string | null
+  },
+  storeCaps?: StoreFulfillmentCapabilities,
+): CatalogCapabilities {
+  const catalogModes = normalizeFulfillmentModes(
+    row.fulfillment_modes,
+    defaultProductFulfillmentModes(row.product_type),
+  )
   return {
-    fulfillmentModes: normalizeFulfillmentModes(
-      row.fulfillment_modes,
-      defaultProductFulfillmentModes(row.product_type),
-    ),
+    fulfillmentModes: storeCaps
+      ? resolveEffectiveFulfillmentModes(catalogModes, storeCaps, "product")
+      : catalogModes,
     paymentRequirement: "full_payment",
     schedulingEnabled: false,
   }
@@ -95,6 +183,8 @@ export function mergePlanItemFulfillmentModes(
 export function pickDefaultFulfillmentMode(modes: FulfillmentMode[]): FulfillmentMode {
   if (modes.includes("pickup")) return "pickup"
   if (modes.includes("on_site")) return "on_site"
+  if (modes.includes("delivery")) return "delivery"
+  if (modes.includes("shipping")) return "shipping"
   return modes[0]
 }
 
@@ -108,6 +198,7 @@ export function isFulfillmentModeAllowed(
 
 export type DerivedLineFlags = {
   requiresDelivery: boolean
+  requiresShipping: boolean
   requiresCustomerAddress: boolean
   requiresScheduling: boolean
   supportsDeposit: boolean
@@ -125,7 +216,8 @@ export function deriveLineFlags(
 
   return {
     requiresDelivery: mode === "delivery",
-    requiresCustomerAddress: mode === "delivery" || mode === "customer_location",
+    requiresShipping: mode === "shipping",
+    requiresCustomerAddress: isAddressRequiredMode(mode),
     requiresScheduling,
     supportsDeposit: caps.paymentRequirement === "deposit_only",
     expectsAppointment: caps.schedulingEnabled,

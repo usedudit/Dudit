@@ -3,7 +3,22 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { getOrderRevenueBucket, isOrderDerivedTransaction } from "@/lib/services/dre-rules"
+import {
+  getOrderRevenueBucket,
+  isOrderDerivedTransaction,
+  isRealizedServiceOrder,
+  isCancelledServiceOrder,
+  isRealizedAppointment,
+  isExcludedAppointmentFromRevenue,
+  isOrderRevenueRecognized,
+  isOrderCashCollected,
+  isServiceOrderLinkedOrder,
+  isServiceOrderOriginSale,
+  isPaidAmountSettled,
+  computeServiceOrderAmounts,
+  computeProratedMonthlyTax,
+  getTaxRegimeLabel,
+} from "@/lib/services/dre-rules"
 
 export type DreRegime = "competencia" | "caixa"
 
@@ -157,7 +172,7 @@ async function computeDrePeriod(
   // 0. Configurações da Loja e Parceiro
   let storeQuery = supabase
     .from("stores")
-    .select("id, name, logo_url, person_type, crt, cnpj, cpf, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount, is_headquarters")
+    .select("id, name, razao_social, nome_fantasia, logo_url, person_type, crt, cnpj, cpf, simples_tax_rate_products, simples_tax_rate_services, mei_fixed_tax_amount, is_headquarters")
     .eq("partner_id", partnerId)
     .order("is_headquarters", { ascending: false })
 
@@ -172,7 +187,8 @@ async function computeDrePeriod(
     .from("sales")
     .select(`
       id, total_amount, discount_amount, final_amount, paid_amount,
-      payment_status, status, created_at,
+      payment_status, status, origin_type, created_at,
+      payment_method_fee_amount, payment_method_fixed_fee_amount,
       sale_items (id, product_id, variant_id, product_name, quantity, unit_price, unit_cost, total_price, subtotal)
     `)
     .eq("partner_id", partnerId)
@@ -194,12 +210,11 @@ async function computeDrePeriod(
   let ordersQuery = supabase
     .from("orders")
     .select(`
-      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at, order_source,
+      id, total_amount, discount_amount, paid_amount, delivery_fee, situation, created_at, paid_at, order_source, source_service_order_id,
        payment_method_fee_amount, payment_method_fixed_fee_amount, payment_method_interest_amount, payment_method_discount_amount,
       order_items (id, product_id, variant_id, product_name, quantity, product_price, unit_cost, subtotal)
     `)
     .eq("partner_id", partnerId)
-    .not("situation", "in", '("cancelled","pending_payment")')
     .limit(10000)
 
   if (storeId) {
@@ -210,15 +225,19 @@ async function computeDrePeriod(
   if (regime === "competencia") {
     ordersQuery = ordersQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
-    ordersQuery = ordersQuery.in("situation", ["paid", "preparing", "shipped", "delivered", "completed"]).gte("created_at", startIso).lte("created_at", endIso)
+    // `paid_at` não é gravado pela aplicação; a data real de caixa é
+    // `mp_date_approved` (carimbo do gateway) e, na sua ausência, `updated_at`
+    // (sempre preenchido e que coincide com o momento do pagamento).
+    ordersQuery = ordersQuery.or(
+      `and(mp_date_approved.gte.${startIso},mp_date_approved.lte.${endIso}),and(mp_date_approved.is.null,updated_at.gte.${startIso},updated_at.lte.${endIso})`,
+    )
   }
 
   // 3. Ordens de Serviço (`service_orders`)
   let soQuery = supabase
     .from("service_orders")
-    .select("id, total_amount, status, created_at")
+    .select("id, total_amount, total_service_amount, total_product_amount, other_costs, discount_value, discount_type, coupon_discount_amount, status, payment_status, paid_amount, created_at, completed_at")
     .eq("partner_id", partnerId)
-    .not("status", "in", '("cancelled","draft")')
     .limit(10000)
 
   if (storeId) {
@@ -226,18 +245,17 @@ async function computeDrePeriod(
   } else if (allowedStoreIds && allowedStoreIds.length > 0) {
     soQuery = soQuery.in("store_id", allowedStoreIds)
   }
-  if (regime === "competencia") {
-    soQuery = soQuery.gte("created_at", startIso).lte("created_at", endIso)
-  } else {
-    soQuery = soQuery.eq("status", "completed").gte("created_at", startIso).lte("created_at", endIso)
-  }
+  // A OS é reconhecida quando realizada: usamos a data de conclusão
+  // (ou, na ausência, a de criação) como referência de período.
+  soQuery = soQuery.or(
+    `and(completed_at.gte.${startIso},completed_at.lte.${endIso}),and(completed_at.is.null,created_at.gte.${startIso},created_at.lte.${endIso})`,
+  )
 
   // 4. Agendamentos (`appointments`)
   let apptQuery = supabase
     .from("appointments")
-    .select("id, price, status, start_date, created_at")
+    .select("id, price, status, payment_status, paid_amount, start_date, created_at, marketplace_order_id")
     .eq("partner_id", partnerId)
-    .not("status", "in", '("cancelled")')
     .limit(10000)
 
   if (storeId) {
@@ -245,11 +263,7 @@ async function computeDrePeriod(
   } else if (allowedStoreIds && allowedStoreIds.length > 0) {
     apptQuery = apptQuery.in("store_id", allowedStoreIds)
   }
-  if (regime === "competencia") {
-    apptQuery = apptQuery.gte("start_date", startDate).lte("start_date", endDate)
-  } else {
-    apptQuery = apptQuery.eq("status", "completed").gte("start_date", startDate).lte("start_date", endDate)
-  }
+  apptQuery = apptQuery.gte("start_date", startDate).lte("start_date", endDate)
 
   // 5. Transações Financeiras (`transactions`)
   let txQuery = supabase
@@ -339,10 +353,15 @@ async function computeDrePeriod(
 
   // 1.1 PDV: Receita Bruta = Subtotal nominal (antes de descontos)
   for (const s of salesList) {
+    // Vendas geradas por baixa de Ordem de Serviço são contabilizadas na OS,
+    // não aqui (evita dupla contagem de receita).
+    if (isServiceOrderOriginSale(s as any)) continue
     const discount = Number(s.discount_amount || 0)
     const nominalGross = Number(s.total_amount || 0) > 0 ? Number(s.total_amount) : Number(s.final_amount || 0) + discount
     productsRevenue += nominalGross
     posDiscounts += discount
+    // Taxas de cartão/gateway do PDV (juros de parcelamento não são taxa).
+    posFees += Number(s.payment_method_fee_amount || 0) + Number(s.payment_method_fixed_fee_amount || 0)
     posSaleCount++
   }
 
@@ -351,7 +370,23 @@ async function computeDrePeriod(
   let orderDiscounts = 0
   let orderFees = 0
 
+  // Pedidos vinculados a agendamentos são contabilizados na tabela appointments.
+  const appointmentLinkedOrderIds = new Set(
+    appointmentsList.map((a: any) => a.marketplace_order_id).filter(Boolean),
+  )
+
   for (const o of ordersList) {
+    // Pedidos criados por Ordem de Serviço são contabilizados na própria OS.
+    if (isServiceOrderLinkedOrder(o as any)) continue
+    // Pedidos criados por agendamento são contabilizados na tabela appointments.
+    if ((o as any).id && appointmentLinkedOrderIds.has((o as any).id)) continue
+
+    const situation = (o as any).situation
+    const countsInRegime = regime === "caixa"
+      ? isOrderCashCollected(situation)
+      : isOrderRevenueRecognized(situation)
+    if (!countsInRegime) continue
+
     const couponDiscount = Number(o.discount_amount || 0)
     const pmDiscount = Number(o.payment_method_discount_amount || 0)
     const totalOrderDiscount = couponDiscount + pmDiscount
@@ -378,23 +413,43 @@ async function computeDrePeriod(
     }
 
     orderDiscounts += totalOrderDiscount
-    orderFees += Number(o.payment_method_interest_amount || 0) + Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
+    // Taxas de cartão/gateway são despesa financeira do lojista. Juros de
+    // parcelamento cobrados do cliente NÃO são taxa (são receita), por isso
+    // não entram nas deduções.
+    orderFees += Number(o.payment_method_fee_amount || 0) + Number(o.payment_method_fixed_fee_amount || 0)
     orderCount++
   }
 
   // 1.3 Prestação de Serviços (OS + Agendamentos)
+  // Reconhecimento por competência: apenas serviços realizados
+  // (OS concluída/entregue; agendamento concluído).
   let soCount = 0
   let soDiscounts = 0
   for (const so of serviceOrdersList) {
-    const discount = Number(so.discount_amount || 0)
-    const grossVal = Number(so.total_amount || 0) > 0 ? Number(so.total_amount) : Number(so.final_amount || 0) + discount
-    servicesRevenue += grossVal
-    soDiscounts += discount
+    const realized = isRealizedServiceOrder((so as any).status)
+    const cancelled = isCancelledServiceOrder((so as any).status)
+    const cashSettled = isPaidAmountSettled((so as any).payment_status, (so as any).paid_amount)
+    // No regime Caixa, o foco é o dinheiro que entrou: reconhecemos a OS
+    // quando foi paga (não cancelada), mesmo sem estar concluída.
+    const countsInRegime = regime === "caixa" ? (!cancelled && cashSettled) : realized
+    if (!countsInRegime) continue
+
+    const amounts = computeServiceOrderAmounts(so as any)
+    productsRevenue += amounts.productsRevenue
+    servicesRevenue += amounts.servicesRevenue
+    soDiscounts += amounts.discount
     soCount++
   }
 
   let apptCount = 0
   for (const a of appointmentsList) {
+    const realized = isRealizedAppointment((a as any).status)
+    const excluded = isExcludedAppointmentFromRevenue((a as any).status)
+    const cashSettled = isPaidAmountSettled((a as any).payment_status, (a as any).paid_amount)
+    // No regime Caixa, reconhecemos o agendamento quando houve pagamento
+    // (e não está cancelado/ausência), independentemente de concluído.
+    const countsInRegime = regime === "caixa" ? (!excluded && cashSettled) : realized
+    if (!countsInRegime) continue
     servicesRevenue += Number(a.price || 0)
     apptCount++
   }
@@ -458,7 +513,8 @@ async function computeDrePeriod(
     salesTaxes += (productsRevenue + recurringRevenue) * simplesProductTaxRate
     salesTaxes += servicesRevenue * simplesServiceTaxRate
   } else if (meiFixedTax > 0) {
-    salesTaxes += meiFixedTax
+    // DAS do MEI é valor fixo mensal; rateamos por dia no período selecionado.
+    salesTaxes += computeProratedMonthlyTax(meiFixedTax, startDate, endDate)
   }
 
   // 2.3 Transações financeiras manuais de dedução (sem duplicar as já calculadas)
@@ -483,7 +539,9 @@ async function computeDrePeriod(
   }
 
   const totalDeductions = paymentFees + discountsGiven + returnsAndRefunds + salesTaxes
-  const netRevenueTotal = Math.max(0, grossRevenueTotal - totalDeductions)
+  // Não limitar a zero: uma sobre-dedução (ex.: DAS fixo em mês fraco) deve
+  // aparecer como receita líquida negativa, sinalizando distorção real.
+  const netRevenueTotal = grossRevenueTotal - totalDeductions
 
   // ==========================================================================
   // 3. CUSTOS DIRETOS DA OPERAÇÃO (CMV / CSP / Insumos)
@@ -570,7 +628,20 @@ async function computeDrePeriod(
     if (tx.transaction_type === "expense") {
       if (g === "despesa_comercial") {
         commercialExpenses += val
-        dynamicCommercialItems[catName] = (dynamicCommercialItems[catName] || 0) + val
+        const lowerCat = catName.toLowerCase()
+        if (lowerCat.includes("comiss")) {
+          commissionsTotal += val
+        } else if (
+          lowerCat.includes("frete") ||
+          lowerCat.includes("entrega") ||
+          lowerCat.includes("logíst") ||
+          lowerCat.includes("logist") ||
+          lowerCat.includes("motoboy")
+        ) {
+          deliveriesTotal += val
+        } else {
+          dynamicCommercialItems[catName] = (dynamicCommercialItems[catName] || 0) + val
+        }
       } else if (g === "despesa_administrativa" || (!g && tx.origin !== "system")) {
         administrativeExpenses += val
         dynamicAdminItems[catName] = (dynamicAdminItems[catName] || 0) + val
@@ -681,8 +752,8 @@ async function computeDrePeriod(
       averageTicket,
     },
     companyInfo: {
-      partnerName: hqStore?.name || "Empresa Matriz",
-      tradeName: hqStore?.name,
+      partnerName: activeStore?.razao_social || activeStore?.nome_fantasia || hqStore?.name || "Empresa Matriz",
+      tradeName: activeStore?.nome_fantasia || hqStore?.name,
       documentNumber: resolvedDoc.documentNumber || undefined,
       documentType: resolvedDoc.documentType,
       partnerAvatar: (selectedStore?.logo_url || hqStore?.logo_url) ? getR2ImageUrl(selectedStore?.logo_url || hqStore?.logo_url) : undefined,
@@ -691,7 +762,7 @@ async function computeDrePeriod(
         : (allowedStoreIds && allowedStoreIds.length === 1
           ? (stores.find((s: any) => s.id === allowedStoreIds[0])?.name || "Loja Selecionada")
           : "Todas as Lojas (Consolidado)"),
-      taxRegimeLabel: (selectedStore?.person_type || hqStore?.person_type) === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
+      taxRegimeLabel: getTaxRegimeLabel(activeStore?.person_type, activeStore?.crt),
       generatedAt: new Date().toLocaleString("pt-BR"),
     },
     alerts: {

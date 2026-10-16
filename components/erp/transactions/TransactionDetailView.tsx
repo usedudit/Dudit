@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, FormSection } from "@/components/reusable"
+import { Button, Badge, ActionsDropdown, DropdownItem, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, FormSection } from "@/components/reusable"
 import { getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
+import type { ERPTransaction } from "@/lib/services/transactions.types"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
 import { TransactionGoalCard } from "./TransactionGoalCard"
@@ -28,7 +29,7 @@ interface TransactionDetailViewProps {
     initialDetail?: TransactionDetailPayload | null
     loading?: boolean
     onEditInstallment?: (id: string) => void
-    onPayInstallment?: (id: string) => void
+    onPayInstallment?: (row: InstallmentParcelRow, meta: { ledgerDirection: ERPTransaction["ledgerDirection"]; isOrderOrigin: boolean }) => void
 }
 
 export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading, onEditInstallment, onPayInstallment }: TransactionDetailViewProps) {
@@ -319,7 +320,33 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                         reason: detail.categoryLine,
                                                                         reference: detail.headerTitle,
                                                                         remainingAmount: row.remainingAmount,
-                                                                    }),
+                                                                        paymentMethodId: row.paymentMethodId ?? null,
+                                                                        installmentGroupId: row.installmentGroupId ?? null,
+                                                                        isOrderOrigin: !!row.isOrderOrigin,
+                                                                    })
+                                                                )
+                                                            }
+                                                            getActionsSlot={(row) =>
+                                                                row.status === "paid" ? null : (
+                                                                    <ActionsDropdown
+                                                                        trigger={
+                                                                            <Button variant="outline" className="w-[34px] h-[34px] p-0 flex items-center justify-center">
+                                                                                <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                                                            </Button>
+                                                                        }
+                                                                    >
+                                                                        <DropdownItem
+                                                                            onClick={() =>
+                                                                                onPayInstallment?.(row, {
+                                                                                    ledgerDirection: detail.ledgerDirection,
+                                                                                    isOrderOrigin: !!row.isOrderOrigin,
+                                                                                })
+                                                                            }
+                                                                        >
+                                                                            <MoneyIcon size={18} />
+                                                                            Marcar como {detail.ledgerDirection === "in" ? "recebido" : "pago"}
+                                                                        </DropdownItem>
+                                                                    </ActionsDropdown>
                                                                 )
                                                             }
                                                         />

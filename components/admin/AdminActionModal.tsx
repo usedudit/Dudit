@@ -186,6 +186,8 @@ export interface AdminActionRequest {
     changedFields?: string[]
     /** Sempre abre o modal (ações destrutivas exigem motivo). */
     requireReason?: boolean
+    /** Força abertura do modal mesmo sem changedFields/requireReason (ex.: save admin de pedido). */
+    force?: boolean
     confirmLabel: string
     runner: (payload: AdminActionPayload) => Promise<AdminActionResult>
 }
@@ -210,7 +212,10 @@ export function useAdminActionModal() {
 
     const runAction = useCallback(
         (req: AdminActionRequest): Promise<AdminActionResult> => {
-            const needsModal = Boolean(req.requireReason) || (req.changedFields?.length ?? 0) > 0
+            const needsModal =
+                Boolean(req.requireReason) ||
+                (req.changedFields?.length ?? 0) > 0 ||
+                Boolean(req.force)
             if (!needsModal) {
                 return Promise.resolve(
                     req.runner({ reason: "", riskScore: null, notifySeller: false }),

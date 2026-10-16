@@ -36,6 +36,24 @@ interface CartPageClientProps {
     initialUserAddresses: any[]
 }
 
+// Cache em memória (client) das cotações de frete próprio. O carrinho recota a
+// cada mudança de seleção/quantidade/endereço - alternar entre estados (marcar/
+// desmarcar itens, trocar de endereço) repete a mesma assinatura e fica
+// instantâneo, sem novo roundtrip.
+const CART_DELIVERY_QUOTE_TTL_MS = 20 * 1000
+const CART_DELIVERY_QUOTE_CACHE_MAX = 30
+const cartDeliveryQuoteCache = new Map<string, { at: number; fee: number; distanceKm: number | null; breakdown: any; error: string | null }>()
+
+function rememberCartDeliveryQuote(key: string, value: { fee: number; distanceKm: number | null; breakdown: any; error: string | null }) {
+    cartDeliveryQuoteCache.delete(key)
+    cartDeliveryQuoteCache.set(key, { at: Date.now(), ...value })
+    while (cartDeliveryQuoteCache.size > CART_DELIVERY_QUOTE_CACHE_MAX) {
+        const oldest = cartDeliveryQuoteCache.keys().next().value
+        if (oldest === undefined) break
+        cartDeliveryQuoteCache.delete(oldest)
+    }
+}
+
 export function CartPageClient({ itemsByPartner, userId, initialCartCount, initialUserProfile, initialUserAddresses }: CartPageClientProps) {
     const router = useRouter()
     const { user } = useSupabase()
@@ -65,7 +83,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         return selected?.id || ""
     })
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
-    const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
+    const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null; isOutsideRadius?: boolean }>>({})
     // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
     const deliveryQuoteSeqRef = useRef<Record<string, number>>({})
@@ -716,7 +734,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 // responde enquanto o geocoding/radi check roda; se o frete próprio
                 // cobrir, as opções simplesmente ficam escondidas (gate por "raio").
                 const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
-                if (destinationCep.length === 8 && data.partner?.mp_user_id) {
+                if (destinationCep.length === 8 && data.partner?.mp_user_id && data.shippingEnabled) {
                     const carrierKey = `${targetPartnerId}:${destinationCep}`
                     if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
                         carrierFetchedKeysRef.current[storeKey] = carrierKey
@@ -751,6 +769,22 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                     }
                 }
 
+                const deliveryQuoteCacheKey = `${storeKey}|${destinationCep}|${destinationCoords ? `${destinationCoords.lat},${destinationCoords.lng}` : addressStr}|${Math.round(partnerItemsTotal * 100)}`
+                const cachedDeliveryQuote = cartDeliveryQuoteCache.get(deliveryQuoteCacheKey)
+                if (cachedDeliveryQuote && Date.now() - cachedDeliveryQuote.at <= CART_DELIVERY_QUOTE_TTL_MS) {
+                    setDeliveryQuotes(prev => ({
+                        ...prev,
+                        [storeKey]: {
+                            fee: cachedDeliveryQuote.fee,
+                            distanceKm: cachedDeliveryQuote.distanceKm,
+                            breakdown: cachedDeliveryQuote.breakdown,
+                            loading: false,
+                            error: cachedDeliveryQuote.error,
+                        }
+                    }))
+                    return
+                }
+
                 quoteDeliveryFeeAction({
                     partnerId: targetPartnerId,
                     storeId: targetStoreId,
@@ -760,26 +794,18 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 }).then(quote => {
                     if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                     if (quote.success) {
+                        const entry = { fee: Number(quote.fee || 0), distanceKm: Number(quote.distanceKm || 0), breakdown: quote.breakdown || null, error: null as string | null, isOutsideRadius: false }
+                        rememberCartDeliveryQuote(deliveryQuoteCacheKey, entry)
                         setDeliveryQuotes(prev => ({
                             ...prev,
-                            [storeKey]: {
-                                fee: Number(quote.fee || 0),
-                                distanceKm: Number(quote.distanceKm || 0),
-                                breakdown: quote.breakdown || null,
-                                loading: false,
-                                error: null,
-                            }
+                            [storeKey]: { ...entry, loading: false }
                         }))
                     } else {
+                        const entry = { fee: 0, distanceKm: null as number | null, breakdown: null as any, error: (quote.error || null) as string | null, isOutsideRadius: Boolean((quote as any).isOutsideRadius) }
+                        rememberCartDeliveryQuote(deliveryQuoteCacheKey, entry)
                         setDeliveryQuotes(prev => ({
                             ...prev,
-                            [storeKey]: {
-                                fee: 0,
-                                distanceKm: null,
-                                breakdown: null,
-                                loading: false,
-                                error: quote.error || null,
-                            }
+                            [storeKey]: { ...entry, loading: false }
                         }))
                     }
                 }).catch(() => {
@@ -814,7 +840,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     const isOwnQuoteRaio = (storeKey?: string) => {
         if (!storeKey) return false
         const q = deliveryQuotes[storeKey]
-        return Boolean(q && !q.loading && q.error && q.error.toLowerCase().includes("raio"))
+        if (!q || q.loading || !q.error) return false
+        // Prefere o sinal estruturado da cotação; o match textual fica só como
+        // fallback para entradas vindas do cache.
+        return Boolean(q.isOutsideRadius) || q.error.toLowerCase().includes("raio")
     }
 
     const getCarrierSelectedOption = (storeKey?: string) => {

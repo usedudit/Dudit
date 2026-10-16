@@ -75,7 +75,7 @@ export async function fetchPartnerProductsBucket() {
 
   let query = supabase
     .from("products")
-    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, addon_groups, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
 

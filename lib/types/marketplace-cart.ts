@@ -15,7 +15,12 @@ export type ServiceBookingMetadata = {
   storeId?: string
 }
 
-export type LineFulfillmentMode = "delivery" | "pickup" | "on_site" | "customer_location"
+export type LineFulfillmentMode =
+  | "delivery"
+  | "pickup"
+  | "shipping"
+  | "on_site"
+  | "customer_location"
 
 export type CheckoutFulfillmentLine = {
   cartItemId?: string

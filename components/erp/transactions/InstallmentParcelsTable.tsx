@@ -21,6 +21,12 @@ export type InstallmentParcelRow = {
     reason: string
     reference: string
     remainingAmount?: number
+    /** payment_method_id UUID (fixo para parcelas de venda) ou null. */
+    paymentMethodId?: string | null
+    /** Grupo de parcelas ao qual a parcela pertence. */
+    installmentGroupId?: string | null
+    /** Indica se a parcela provém de um pedido/venda (método travado). */
+    isOrderOrigin?: boolean
 }
 
 type InstallmentParcelsTableProps = {

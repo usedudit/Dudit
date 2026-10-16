@@ -237,6 +237,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const [isSelectCustomerOpen, setIsSelectCustomerOpen] = useState(false)
     const [isSelectSellerOpen, setIsSelectSellerOpen] = useState(false)
     const [isResetAlertOpen, setIsResetAlertOpen] = useState(false)
+    const [isRemoveShippingAlertOpen, setIsRemoveShippingAlertOpen] = useState(false)
     const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: any; variantId?: string | null; quantity?: number; callback?: () => void } | null>(null)
     const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
     const [isPreSaleSheetOpen, setIsPreSaleSheetOpen] = useState(false)
@@ -279,6 +280,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             city?: string
             state?: string
             country?: string
+            latitude?: number | null
+            longitude?: number | null
         } | null
     } | null>(null)
     const [isUserDraftSaveUi, setIsUserDraftSaveUi] = useState(false)
@@ -1563,6 +1566,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     neighborhood: addr.neighborhood || "",
                     city: addr.city || "",
                     state: addr.state || addr.uf || "",
+                    latitude: addr.latitude ?? null,
+                    longitude: addr.longitude ?? null,
                 } : null,
             })
         }
@@ -1583,11 +1588,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         setIsSelectCustomerOpen(true)
     }, [selectedCustomerId, openShippingSheetWithCustomer])
 
-    const handleRemoveShipping = useCallback(() => {
+    const requestRemoveShipping = useCallback(() => {
+        setIsRemoveShippingAlertOpen(true)
+    }, [])
+
+    const confirmRemoveShipping = useCallback(() => {
         setShippingFee(0)
         setDeliveryDistanceKm(null)
         setDeliveryBreakdown(null)
         setShippingCustomerDetails(null)
+        setIsRemoveShippingAlertOpen(false)
         notifySuccess("Entrega removida com sucesso.")
     }, [notifySuccess])
 
@@ -1978,7 +1988,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     onContinue={handleOpenPaymentModal}
                                     onSaveDraft={saveDraftFromMenu}
                                     onAddShipping={handleOpenShippingSheet}
-                                    onRemoveShipping={handleRemoveShipping}
+                                    onRemoveShipping={requestRemoveShipping}
                                     hasDelivery={hasDelivery}
                                     onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
                                     onOpenNotes={handleOpenNotesSheet}
@@ -2107,7 +2117,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 onContinue={handleOpenPaymentModal}
                                 onSaveDraft={saveDraftFromMenu}
                                 onAddShipping={handleOpenShippingSheet}
-                                onRemoveShipping={handleRemoveShipping}
+                                onRemoveShipping={requestRemoveShipping}
                                 hasDelivery={hasDelivery}
                                 onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
                                 onOpenNotes={handleOpenNotesSheet}
@@ -2612,6 +2622,17 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         title="Limpar pedido?"
                         description="Todos os itens adicionados serão removidos do pedido atual."
                         confirmText="Limpar"
+                        cancelText="Cancelar"
+                        variant="danger"
+                    />
+
+                    <AlertModal
+                        isOpen={isRemoveShippingAlertOpen}
+                        onClose={() => setIsRemoveShippingAlertOpen(false)}
+                        onConfirm={confirmRemoveShipping}
+                        title="Remover entrega?"
+                        description="A taxa de entrega e o endereço de envio serão removidos deste pedido."
+                        confirmText="Remover"
                         cancelText="Cancelar"
                         variant="danger"
                     />

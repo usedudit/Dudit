@@ -491,9 +491,11 @@ export class AccountDeletionService {
 
       await pipeline.exec()
 
-      // 5. Invalidate global search cache
-      const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
-      await redis.incr(GLOBAL_VERSION_KEY)
+      // 5. Invalidate marketplace search cache
+      try {
+        const { revalidateExploreSearch } = await import("@/lib/utils/revalidation")
+        await revalidateExploreSearch()
+      } catch { }
     } catch (err) {
       SecureLogger.error("Failed to purge Redis cache during deletion", { partnerId, userId, error: err })
     }

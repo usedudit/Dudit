@@ -13,7 +13,7 @@ import { isPartnerWhatsappFlow } from "@/lib/partner-order-flow"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import { resolveDeliverySettingsRow, resolveStoreFulfillmentCapabilities, calculateServiceTravelFeeForOrder } from "@/app/actions/shared/delivery"
 import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
@@ -28,6 +28,9 @@ import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import {
   buildFulfillmentPayload,
+  allFlowLinesAllowLocalDelivery,
+  allFlowLinesAllowShipping,
+  deliverySelectionIssue,
 } from "@/lib/services/marketplace-cart-resolver"
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
@@ -61,6 +64,7 @@ export type MarketplaceCheckoutPricingSnapshot = {
   /** Selected carrier freight service (SuperFrete) when own delivery has no coverage */
   carrierServiceId?: number | null
   destinationPostalCode?: string | null
+  destinationCoords?: { lat: number; lng: number } | null
 }
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -315,6 +319,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         timezone,
         isStoreOpen: isStoreCurrentlyOpen,
         isAcceptingOrders,
+        shippingEnabled: false,
         items: [],
         products: [],
         services: [],
@@ -335,6 +340,19 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
     else if (type === "subscription") acc[storeKey].subscriptions.push(item)
     return acc
   }, {})
+
+  // 3.5. Resolvemos as capabilities de envio nacional (transportadora/SuperFrete)
+  // por parceiro/loja — usado pela sacola para só cotar/mostrar transportadora
+  // quando a loja realmente oferece "shipping" (evita flash de frete inválido).
+  for (const storeKey of Object.keys(itemsByPartner)) {
+    const entry: any = itemsByPartner[storeKey]
+    try {
+      const caps = await resolveStoreFulfillmentCapabilities(entry.partnerId, entry.storeId || null)
+      entry.shippingEnabled = Boolean(caps.shipping)
+    } catch {
+      entry.shippingEnabled = false
+    }
+  }
 
   // 4. Busca variantes alternativas para itens com variante esgotada
   const outOfStockVariantProductIds: string[] = []
@@ -934,10 +952,24 @@ export async function checkoutCartAction(
     ),
   )
 
-  const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, cartItemIds)
+  const { data: cartMeta } = await adminClient
+    .from("cart_items")
+    .select("partner_id, store_id")
+    .in("id", cartItemIds)
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle()
+  const checkoutCaps = cartMeta?.partner_id
+    ? await resolveStoreFulfillmentCapabilities(cartMeta.partner_id, storeId || cartMeta.store_id || null)
+    : undefined
+
+  const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, cartItemIds, checkoutCaps)
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  const selectionIssue = deliverySelectionIssue(resolvedLines, deliveryType)
+  if (selectionIssue) return { error: selectionIssue }
 
   // Assinatura é comprada direto da página do plano (checkout dedicado) e
   // nunca na mesma finalização que produtos/serviços da sacola.
@@ -1127,23 +1159,41 @@ export async function checkoutCartAction(
   let deliveryBreakdown: Record<string, unknown> | null = null
   let carrierApplied = false
   if (shouldQuoteDelivery) {
-    if (!deliveryQuote.success) {
-      const carrierServiceId = checkoutPricingSnapshot?.carrierServiceId ?? null
-      if (!carrierServiceId) return { error: (deliveryQuote as any).error }
-      // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
+    const canUseLocalDelivery = allFlowLinesAllowLocalDelivery(resolvedLines)
+    const canUseCarrier = allFlowLinesAllowShipping(resolvedLines)
+    const carrierServiceId = checkoutPricingSnapshot?.carrierServiceId ?? null
+
+    const applyCarrier = async () => {
       const cep =
         String(checkoutPricingSnapshot?.destinationPostalCode || "").replace(/\D/g, "") ||
         extractPostalCodeFromAddress(deliveryAddress)
       const carrier = await quoteCarrierFreightFee(adminClient, {
         partnerId,
         toPostalCode: cep,
-        serviceId: carrierServiceId,
+        serviceId: carrierServiceId as number,
       })
-      if (!carrier.success) return { error: carrier.error }
+      if (!carrier.success) return carrier.error
       deliveryFee = carrier.fee
       distanceKm = null
       deliveryBreakdown = carrier.breakdown
       carrierApplied = true
+      return null
+    }
+
+    if (!canUseLocalDelivery) {
+      // Itens só aceitam envio nacional → transportadora é obrigatória.
+      if (!canUseCarrier) {
+        return { error: "Um dos itens é apenas para retirada no local e não pode ser enviado. Ajuste os itens ou escolha retirada." }
+      }
+      if (!carrierServiceId) return { error: "Selecione uma opção de envio para concluir o pedido." }
+      const carrierError = await applyCarrier()
+      if (carrierError) return { error: carrierError }
+    } else if (!deliveryQuote.success) {
+      // Sem cobertura de entrega própria → transporte nacional (se todos aceitarem envio).
+      if (!canUseCarrier) return { error: (deliveryQuote as any).error }
+      if (!carrierServiceId) return { error: (deliveryQuote as any).error }
+      const carrierError = await applyCarrier()
+      if (carrierError) return { error: carrierError }
     } else {
       deliveryFee = Number(deliveryQuote.fee || 0)
       distanceKm = Number(deliveryQuote.distanceKm || 0)
@@ -1151,8 +1201,61 @@ export async function checkoutCartAction(
     }
   }
 
+  // Taxa de deslocamento de serviços a domicílio (customer_location).
+  // Calculada a partir mesmo da distância loja↔cliente usada no frete próprio;
+  // quando o carrinho só possui serviços (sem products/entrega local) a distância
+  // é calculada diretamente aqui. Fora do raio com enforce → bloqueia o checkout.
+  const serviceLinesForTravel = resolvedLines.filter(
+    (l) => (l.itemType as string) === "service_booking" && (l.fulfillmentMode === "customer_location" || l.lineRequiresDelivery),
+  )
+  if (serviceLinesForTravel.length > 0 && deliveryAddress) {
+    const serviceTravel = await calculateServiceTravelFeeForOrder({
+      supabase: adminClient,
+      partnerId,
+      storeId: targetStoreId,
+      serviceId: serviceLinesForTravel[0].serviceId || null,
+      deliveryAddress,
+      destinationCoords: checkoutPricingSnapshot?.destinationCoords ?? null,
+      orderSubtotal: totalAmount,
+    })
+    if (!serviceTravel.success) {
+      return { error: serviceTravel.error || "Endereço fora do raio de atendimento deste serviço." }
+    }
+    if (serviceTravel.fee > 0) {
+      deliveryFee = moneyOrZero(deliveryFee + serviceTravel.fee)
+      deliveryBreakdown = {
+        ...(deliveryBreakdown || {}),
+        serviceTravelFee: serviceTravel.fee,
+        serviceTravelDistanceKm: serviceTravel.distanceKm,
+        serviceTravelOutOfRadius: serviceTravel.outOfRadius,
+        travelFee: serviceTravel.fee,
+        ...(serviceTravel.distanceKm != null ? { serviceTravelKm: serviceTravel.distanceKm } : {}),
+      }
+    }
+  }
+
   // Frete fixo do plano (shipping_mode = flat) entra no total do pedido.
   deliveryFee += subscriptionShippingFee
+
+  // Frete grátis por valor mínimo também vale para a transportadora: acima do
+  // limite, a loja absorve o frete (mesma regra do preview do checkout).
+  if (carrierApplied && deliveryFee > 0) {
+    const resolvedSettings = await resolveDeliverySettingsRow(adminClient, partnerId, targetStoreId)
+    const rawThreshold = resolvedSettings?.free_delivery_threshold == null ? null : Number(resolvedSettings.free_delivery_threshold)
+    const freeDeliveryThreshold = rawThreshold != null && !Number.isNaN(rawThreshold) && rawThreshold > 0 ? rawThreshold : null
+    if (freeDeliveryThreshold !== null && totalAmount >= freeDeliveryThreshold) {
+      deliveryBreakdown = {
+        ...(deliveryBreakdown || {}),
+        originalFee: deliveryFee,
+        deliverySubsidy: deliveryFee,
+        deliveryPayer: "seller",
+        isFreeByThreshold: true,
+        freeDeliveryThreshold,
+        freeDeliveryReason: "threshold",
+      }
+      deliveryFee = 0
+    }
+  }
 
   let couponIdToSave: string | null = null
   let couponDiscountAmount = 0

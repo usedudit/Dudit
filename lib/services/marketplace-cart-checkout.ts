@@ -6,13 +6,19 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing-engine"
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
-import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import {
+  quoteDeliveryFeeAction,
+  resolveDeliverySettingsRow,
+  resolveStoreFulfillmentCapabilities,
+} from "@/app/actions/shared/delivery"
 import {
   quoteCarrierFreightFee,
   extractPostalCodeFromAddress,
 } from "@/lib/services/shipping/carrier-checkout"
 import {
+  allFlowLinesAllowLocalDelivery,
   buildFulfillmentPayload,
+  deliverySelectionIssue,
   type ResolvedCartLine,
 } from "@/lib/services/marketplace-cart-resolver"
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
@@ -70,10 +76,31 @@ export async function priceMarketplaceCartCheckout(
       .or("item_type.eq.product,item_type.is.null,product_id.not.is.null")
   }
 
-  const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
+  const { data: cartMeta } = await adminClient
+    .from("cart_items")
+    .select("partner_id, store_id")
+    .in("id", params.cartItemIds)
+    .eq("user_id", params.userId)
+    .limit(1)
+    .maybeSingle()
+  const storeCaps = cartMeta?.partner_id
+    ? await resolveStoreFulfillmentCapabilities(cartMeta.partner_id, cartMeta.store_id || null)
+    : undefined
+
+  const resolved = await resolveCheckoutCartLines(
+    adminClient,
+    params.userId,
+    params.cartItemIds,
+    storeCaps,
+  )
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  // Autoritativo: bloqueia escolha incompatível com os modos efetivos dos itens.
+  const selectionIssue = deliverySelectionIssue(resolvedLines, params.deliveryType)
+  if (selectionIssue) return { success: false, error: selectionIssue }
+
   let subtotal = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const orderItems = resolvedLines.map((line) => ({ ...line.orderItemRow }))
   const pricingItems = resolvedLines.map((line) => line.pricingItem)
@@ -179,6 +206,10 @@ export async function priceMarketplaceCartCheckout(
         }
       }
     } else {
+      // Itens que não aceitam entrega própria exigem escolha de envio nacional.
+      if (!allFlowLinesAllowLocalDelivery(resolvedLines)) {
+        return { success: false, error: "Selecione uma opção de envio para concluir o pedido." }
+      }
       const quote = await quoteDeliveryFeeAction({
         partnerId,
         storeId: targetStoreId,
@@ -277,6 +308,28 @@ export async function priceMarketplaceCartCheckout(
       if (quote.success) {
         deliveryFee = Number(quote.fee || 0)
         deliveryBreakdown = quote.breakdown
+      }
+    }
+  }
+
+  // Frete grátis por valor mínimo também vale para a transportadora: acima do
+  // limite, a loja absorve o frete (valor original riscado + "Grátis" na UI).
+  // O frete próprio já aplica o threshold dentro de quoteDeliveryFeeAction.
+  if (carrierApplied && deliveryFee > 0) {
+    const settingsRow = await resolveDeliverySettingsRow(adminClient, partnerId, targetStoreId)
+    const rawThreshold = settingsRow?.free_delivery_threshold == null ? null : Number(settingsRow.free_delivery_threshold)
+    const freeDeliveryThreshold = rawThreshold != null && !Number.isNaN(rawThreshold) && rawThreshold > 0 ? rawThreshold : null
+    if (freeDeliveryThreshold !== null && subtotal >= freeDeliveryThreshold) {
+      const originalFee = deliveryFee
+      deliveryFee = 0
+      deliveryBreakdown = {
+        ...(deliveryBreakdown || {}),
+        originalFee,
+        deliverySubsidy: originalFee,
+        deliveryPayer: "seller",
+        isFreeByThreshold: true,
+        freeDeliveryThreshold,
+        freeDeliveryReason: "threshold",
       }
     }
   }

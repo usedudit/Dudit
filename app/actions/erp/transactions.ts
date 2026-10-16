@@ -2300,6 +2300,9 @@ export async function recordRegularTransactionPaymentAction(input: {
 export async function settleInstallmentGroupAction(input: {
     partnerId: string
     installmentGroupId: string
+    /** Conta bancária definida pelo usuário na quitação em massa. Quando informada,
+     *  sobrescreve a conta resolvida pelo RPC (do método de pagamento). */
+    settleAccountId?: string | null
     installmentPayments?: Array<{
         transactionId: string
         paymentAmount: number
@@ -2330,8 +2333,10 @@ export async function settleInstallmentGroupAction(input: {
         const sanitizedPayments = (input.installmentPayments || []).map((p) => {
             const validPmId = sanitizeUUID(p.paymentMethodId)
             const rawMethodName = (typeof p.paymentMethodId === "string" && !sanitizeUUID(p.paymentMethodId)) ? p.paymentMethodId : null
+            const settleAccountId = input.settleAccountId ? sanitizeUUID(input.settleAccountId) : null
             return {
                 ...p,
+                accountId: settleAccountId,
                 paymentMethodId: validPmId,
                 rawPaymentType: rawMethodName,
             }
@@ -2849,6 +2854,14 @@ export type TransactionDetailPayload = {
         principalCleared: number
         remainingAmount?: number
         paymentType: string
+        /** payment_method_id UUID (fixo para parcelas de venda) ou null. */
+        paymentMethodId?: string | null
+        /** Conta financeira já vinculada à transação. */
+        accountId?: string | null
+        /** Grupo de parcelas ao qual a parcela pertence. */
+        installmentGroupId?: string | null
+        /** Indica se a parcela provém de um pedido/venda (método travado). */
+        isOrderOrigin?: boolean
         status: "paid" | "pending" | "overdue"
     }>
     /** Quando a transação faz parte de um parcelado: rótulo da data no resumo. */
@@ -3146,8 +3159,22 @@ export async function getTransactionDetailsAction(
 
             currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
-            const targetGroupRows = (groupRows || []).filter((g: any) => String(g.id) === String(row.id))
-            installmentBreakdown = (targetGroupRows.length > 0 ? targetGroupRows : groupRows || []).map((g: any) => {
+            // Show ALL installments of the group (the selected transaction is just one of them).
+            // Fallback: if the group rows weren't returned (e.g. empty result), synthesize the
+            // current transaction so the breakdown still renders at least one row.
+            const groupRowsAll = (groupRows && groupRows.length > 0)
+                ? groupRows
+                : [{
+                    id: row.id,
+                    installment_number: row.installment_number,
+                    due_date: row.due_date,
+                    payment_date: row.payment_date,
+                    status: row.status,
+                    original_amount: row.original_amount,
+                    amount: row.amount,
+                    payment_type: row.payment_type,
+                }]
+            installmentBreakdown = (groupRowsAll as any[]).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
                 const agg = paymentByTx.get(String(g.id)) || { base: 0, cash: 0, interest: 0, discount: 0 }
                 const paidFlagFromStatus = String(g.status || "").toLowerCase() === "paid"
@@ -3172,6 +3199,10 @@ export async function getTransactionDetailsAction(
                     /^\d{4}-\d{2}-\d{2}$/.test(dueYmdInstallment) &&
                     diffCalendarDaysInSaoPaulo(dueYmdInstallment) < 0
                 const paidFlag = paidFlagFromStatus || principalCleared + 0.0001 >= original
+                // Determine whether this installment originates from a sales order (pedido).
+                // Sales installments (category "Vendas" with a doc reference) are born with a
+                // fixed payment_method_id and are locked from edits.
+                const isOrderOrigin = row.category === "Vendas" && !!row.description
                 return {
                     id: String(g.id),
                     installmentNumber: Number(g.installment_number || 0),
@@ -3185,6 +3216,10 @@ export async function getTransactionDetailsAction(
                     principalCleared,
                     remainingAmount,
                     paymentType: paymentTypeLabel,
+                    paymentMethodId: g.payment_method_id ? String(g.payment_method_id) : null,
+                    accountId: row.account_id ? String(row.account_id) : null,
+                    installmentGroupId: row.installment_group_id ? String(row.installment_group_id) : null,
+                    isOrderOrigin,
                     status: (paidFlag ? "paid" : overdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
                 }
             })

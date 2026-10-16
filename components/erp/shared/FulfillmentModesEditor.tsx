@@ -4,8 +4,9 @@ import { Checkbox } from "@/components/reusable"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 
 const LABELS: Record<FulfillmentMode, string> = {
-  delivery: "Entrega",
+  delivery: "Entrega local",
   pickup: "Retirada no local",
+  shipping: "Envio nacional (transportadora)",
   on_site: "No estabelecimento",
   customer_location: "No endereço do cliente",
 }

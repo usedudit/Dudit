@@ -11,8 +11,8 @@ export function DeliveryAccessDenied({ userEmail }: { userEmail?: string }) {
                     title="Acesso Restrito ao Portal do Entregador"
                     subtitle={
                         userEmail
-                            ? `A conta (${userEmail}) não está cadastrada como entregador ativo na Dudit. Se você recebeu um convite de um parceiro ou administrador, utilize o link de convite enviado por e-mail para ativar seu acesso.`
-                            : "Sua conta não está cadastrada como entregador ativo na Dudit. Se você recebeu um convite de um parceiro ou administrador, utilize o link de convite enviado por e-mail para ativar seu acesso."
+                            ? `A conta (${userEmail}) não está cadastrada como entregador ativo na Dudit. Se você recebeu um convite, utilize o link de convite enviado por e-mail para ativar seu acesso.`
+                            : "Sua conta não está cadastrada como entregador ativo na Dudit. Se você recebeu um convite, utilize o link de convite enviado por e-mail para ativar seu acesso."
                     }
                     buttons={[
                         {

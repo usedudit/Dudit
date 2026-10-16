@@ -211,6 +211,9 @@ export default function POSShippingSheet({
     const isSubsidized = isCustomShipping ? shippingFree : isStoreSubsidizedBySettings
 
     const calculatedOriginalFee = Number((breakdown as any)?.originalFee || (breakdown as any)?.baseFee || 0)
+    const isFreeByThreshold = Boolean((breakdown as any)?.isFreeByThreshold)
+    const freeDeliveryThreshold = Number((breakdown as any)?.freeDeliveryThreshold || 0)
+    const orderSubtotalNumber = Number(orderSubtotal || 0)
 
     // A seção de transportadora só vale quando o frete próprio não cobre
     // (fora do raio ou erro de cotação).
@@ -226,6 +229,24 @@ export default function POSShippingSheet({
             ? effectiveCarrierOption.price
             : (calculatedOriginalFee > 0 ? calculatedOriginalFee : calculatedFee))
 
+    const isFreeShipping = feeToDisplay <= 0 && (isSubsidized || isFreeByThreshold)
+    const isWithinRadius = !carrierSectionVisible
+    const isOwnDeliveryActive = isWithinRadius && !useCarrier && !isCustomShipping
+    const showFreeShippingThreshold =
+        isOwnDeliveryActive && freeDeliveryThreshold > 0 && orderSubtotalNumber > 0
+
+    const shippingFreeRef = useRef(shippingFree)
+    useEffect(() => {
+        shippingFreeRef.current = shippingFree
+    }, [shippingFree])
+
+    // Coordenadas já conhecidas do endereço ativo (cliente/pedido). Quando
+    // presentes, evitam a geocodificação no servidor (a parte mais lenta da
+    // cotação de frete próprio - API externa com retries).
+    const activeCoords = (activeAddress?.latitude != null && activeAddress?.longitude != null)
+        ? { lat: Number(activeAddress.latitude), lng: Number(activeAddress.longitude) }
+        : null
+
     useEffect(() => {
         let active = true
         if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
@@ -233,11 +254,14 @@ export default function POSShippingSheet({
         setIsQuoteLoading(true)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
+        // Debounce: evita disparar a cotação a cada tecla/atualização de estado.
+        const timer = setTimeout(() => {
             ; (async () => {
                 const quote = await quoteDeliveryFeeAction({
                     partnerId,
                     storeId,
                     destinationAddress,
+                    destinationCoords: activeCoords,
                     orderSubtotal,
                     allowOutsideRadius: true,
                 })
@@ -248,7 +272,7 @@ export default function POSShippingSheet({
                     const fee = Number(quote.fee || 0)
                     const origFee = Number((quote.breakdown as any)?.originalFee || fee)
                     setCalculatedFee(origFee || fee)
-                    if (!shippingFree) setShippingInput(origFee || fee)
+                    if (!shippingFreeRef.current) setShippingInput(origFee || fee)
                     setDeliveryError(null)
                     if (quote.isOutsideRadius || (quote.breakdown as any)?.isOutsideRadius) {
                         setOutsideRadiusWarning(
@@ -265,19 +289,20 @@ export default function POSShippingSheet({
                 }
                 setIsQuoteLoading(false)
             })()
-        return () => { active = false }
+        }, 300)
+        return () => { active = false; clearTimeout(timer) }
     }, [
         isOpen,
         hasSelectedCustomer,
         activeHasStreet,
         partnerId,
         storeId,
-        shippingFree,
-        activeTab,
         useOrderAddress,
         customerDetails?.id,
         customerDetails?.address?.street,
         customerDetails?.address?.zipCode,
+        customerDetails?.address?.latitude,
+        customerDetails?.address?.longitude,
         deliveryAddress?.street,
         deliveryAddress?.zipCode,
         orderSubtotal,
@@ -286,9 +311,13 @@ export default function POSShippingSheet({
     // Transportadora em paralelo com o frete próprio; só aparece na UI quando
     // o frete próprio não cobre o endereço. Efeito separado com deps só de
     // identidade (CEP/cliente) - trocar de aba ou subtotal não refaz a cotação.
+    // Transportadora só é cotada quando o frete próprio não cobre o endereço
+    // (fora do raio ou erro). Evita um roundtrip à API SuperFrete a cada
+    // abertura do sheet quando o frete próprio já resolve.
     const destinationCep = String(activeAddress?.zipCode || "").replace(/\D/g, "")
     useEffect(() => {
         if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
+        if (!carrierSectionVisible) return
         if (carrierFetchedCepRef.current === destinationCep && !carrierError) return
         carrierFetchedCepRef.current = destinationCep
         const fetchId = ++carrierFetchIdRef.current
@@ -320,7 +349,7 @@ export default function POSShippingSheet({
             setCarrierLoading(false)
             setCarrierError("Informe o CEP para cotar a transportadora.")
         }
-    }, [isOpen, hasSelectedCustomer, activeHasStreet, destinationCep, partnerId])
+    }, [isOpen, hasSelectedCustomer, activeHasStreet, carrierSectionVisible, destinationCep, partnerId])
 
     const content = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -332,14 +361,6 @@ export default function POSShippingSheet({
             </header>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-6">
-                {outsideRadiusWarning && (
-                    <InfoCard
-                        color="orange"
-                        title="Atenção: Raio de entrega"
-                        message={outsideRadiusWarning}
-                    />
-                )}
-
                 {carrierSectionVisible && (
                     <div className="space-y-2">
                         {carrierLoading && (
@@ -422,6 +443,13 @@ export default function POSShippingSheet({
                         )}
                     </TabsContent>
                     <TabsContent value="valores" className="mt-4 space-y-4">
+                        {outsideRadiusWarning && (
+                            <InfoCard
+                                color="orange"
+                                title="Atenção: Raio de entrega"
+                                message={outsideRadiusWarning}
+                            />
+                        )}
                         {deliveryError ? (
                             <InfoCard
                                 color="red"
@@ -430,6 +458,27 @@ export default function POSShippingSheet({
                             />
                         ) : (
                             <div className="space-y-3">
+                                {showFreeShippingThreshold && !isFreeByThreshold && (() => {
+                                    const diff = Math.max(0, freeDeliveryThreshold - orderSubtotalNumber)
+                                    const pct = Math.min(100, (orderSubtotalNumber / freeDeliveryThreshold) * 100)
+                                    return (
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                                            <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
+                                                <TruckIcon className="h-4 w-4 text-brand-green" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Frete Grátis</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                    Falta <strong className="text-brand-green">{formatCurrency(diff)}</strong> para entrega grátis
+                                                </p>
+                                                <div className="w-full bg-brand-gray dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                                                    <div className="bg-brand-green h-full rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
+
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Distância</span>
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span>
@@ -447,13 +496,22 @@ export default function POSShippingSheet({
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span>
                                 </div>
 
-                                <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                <div className="flex items-center justify-between gap-2 text-sm mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
                                     <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
-                                    {isSubsidized && (
-                                        <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
-                                    )}
+                                    <div className="flex items-center justify-end gap-1.5">
+                                        {isFreeShipping ? (
+                                            <>
+                                                <s className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(calculatedOriginalFee)} | </s>
+                                                <span className="text-sm font-bold text-brand-green">Grátis</span>
+                                            </>
+                                        ) : (
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {feeToDisplay.toFixed(2)}</span>
+                                        )}
+                                    </div>
                                 </div>
+                                {isSubsidized && !isFreeShipping && (
+                                    <p className="text-xs text-brand-orange">Subsidiado pela loja</p>
+                                )}
 
                                 {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
                             </div>

@@ -46,6 +46,7 @@ export default function AdminOrderDetailClient({ detail }: AdminOrderDetailClien
                 title: "Salvar alterações",
                 description: `Pedido #${detail.order_number || String(detail.id).slice(0, 8)}`,
                 changedFields,
+                force: true,
                 confirmLabel: "Salvar",
                 runner: async (payload: AdminActionPayload) => {
                     capturedCtx = {

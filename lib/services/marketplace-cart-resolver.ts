@@ -14,6 +14,7 @@ import {
   serviceCatalogCapabilities,
   type CatalogCapabilities,
   type FulfillmentMode,
+  type StoreFulfillmentCapabilities,
 } from "@/lib/commerce/capabilities"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
@@ -87,6 +88,7 @@ export async function resolveCheckoutCartLines(
   supabase: SupabaseClient,
   userId: string,
   cartItemIds: string[],
+  storeCaps?: StoreFulfillmentCapabilities,
 ): Promise<ResolveCartResult> {
   if (!cartItemIds.length) {
     return { success: false, error: "Nenhum item selecionado." }
@@ -204,13 +206,13 @@ export async function resolveCheckoutCartLines(
       const baseUnitPrice = unitPrice
       unitPrice = baseUnitPrice + addonsUnitPrice
 
-      const caps = productCatalogCapabilities(product)
+      const caps = productCatalogCapabilities(product, storeCaps)
       const fulfillmentMode = resolveLineFulfillmentMode(
         caps.fulfillmentModes,
         row.fulfillment_mode,
-        row.fulfillment_mode === "delivery" ? "delivery" : "pickup",
+        (row.fulfillment_mode as FulfillmentMode) || "pickup",
       ) as LineFulfillmentMode
-      if (fulfillmentMode === "delivery") hasDeliveryLines = true
+      if (fulfillmentMode === "delivery" || fulfillmentMode === "shipping") hasDeliveryLines = true
 
       const subtotal = unitPrice * qty
       const fulfillmentLine: CheckoutFulfillmentLine = {
@@ -264,7 +266,7 @@ export async function resolveCheckoutCartLines(
         stockProductId: row.product_id,
         stockVariantId: variantId,
         fulfillmentMode,
-        lineRequiresDelivery: fulfillmentMode === "delivery",
+        lineRequiresDelivery: fulfillmentMode === "delivery" || fulfillmentMode === "shipping",
         capabilities: caps,
         imageUrl: product.images?.[0] || null,
         baseName: product.name,
@@ -283,7 +285,7 @@ export async function resolveCheckoutCartLines(
         return { success: false, error: "Agendamento inválido na sacola." }
       }
 
-      const caps = serviceCatalogCapabilities(service)
+      const caps = serviceCatalogCapabilities(service, storeCaps)
       const fulfillmentMode = resolveLineFulfillmentMode(
         caps.fulfillmentModes,
         row.fulfillment_mode,
@@ -398,13 +400,13 @@ export async function resolveCheckoutCartLines(
         if (pi.item_type === "product" && pi.products) {
           subscriptionUnitCost += Number(pi.products.cost_price || 0) * Number(pi.quantity || 1)
           productModeLists.push(
-            productCatalogCapabilities(pi.products).fulfillmentModes,
+            productCatalogCapabilities(pi.products, storeCaps).fulfillmentModes,
           )
         }
         if (pi.item_type === "service" && pi.services) {
           subscriptionUnitCost += Number(pi.services.cost_price || 0) * Number(pi.quantity || 1)
           serviceModeLists.push(
-            serviceCatalogCapabilities(pi.services).fulfillmentModes,
+            serviceCatalogCapabilities(pi.services, storeCaps).fulfillmentModes,
           )
         }
       }
@@ -421,7 +423,11 @@ export async function resolveCheckoutCartLines(
         row.fulfillment_mode,
         mergedModes.includes("delivery") ? "delivery" : pickDefaultFulfillmentMode(mergedModes),
       ) as LineFulfillmentMode
-      if (fulfillmentMode === "delivery" || fulfillmentMode === "customer_location") {
+      if (
+        fulfillmentMode === "delivery" ||
+        fulfillmentMode === "shipping" ||
+        fulfillmentMode === "customer_location"
+      ) {
         hasDeliveryLines = true
       }
 
@@ -473,7 +479,7 @@ export async function resolveCheckoutCartLines(
         fulfillmentLine,
         requiresStock: false,
         fulfillmentMode,
-        lineRequiresDelivery: fulfillmentMode === "delivery",
+        lineRequiresDelivery: fulfillmentMode === "delivery" || fulfillmentMode === "shipping",
         capabilities: caps,
         imageUrl: null,
         baseName: planRow.name || "Assinatura",
@@ -484,6 +490,48 @@ export async function resolveCheckoutCartLines(
   }
 
   return { success: true, lines, partnerId, hasProducts, hasDeliveryLines }
+}
+
+type FlowLineLike = Pick<ResolvedCartLine, "itemType" | "lineName" | "capabilities">
+
+/** Linhas de produto/assinatura (fluxo físico) — serviços são validados à parte. */
+export function flowLines(lines: FlowLineLike[]) {
+  return lines.filter((l) => l.itemType === "product" || l.itemType === "subscription")
+}
+
+/**
+ * Valida a escolha order-level (delivery/pickup) contra os modos efetivos de cada
+ * linha. Retorna mensagem clara quando um item não suporta a opção escolhida.
+ */
+export function deliverySelectionIssue(
+  lines: FlowLineLike[],
+  deliveryType: "delivery" | "pickup",
+): string | null {
+  for (const line of flowLines(lines)) {
+    const modes = line.capabilities.fulfillmentModes
+    if (deliveryType === "pickup") {
+      if (!modes.includes("pickup")) {
+        return `"${line.lineName}" não está disponível para retirada.`
+      }
+    } else if (!modes.includes("delivery") && !modes.includes("shipping")) {
+      return `"${line.lineName}" é apenas para retirada no local — não pode ser entregue nem enviado.`
+    }
+  }
+  return null
+}
+
+/** Todas as linhas físicas precisam aceitar envio nacional para a transportadora atender o pedido inteiro. */
+export function allFlowLinesAllowShipping(lines: FlowLineLike[]): boolean {
+  const flows = flowLines(lines)
+  if (flows.length === 0) return false
+  return flows.every((l) => l.capabilities.fulfillmentModes.includes("shipping"))
+}
+
+/** Todas as linhas físicas precisam aceitar entrega local para a entrega própria atender o pedido inteiro. */
+export function allFlowLinesAllowLocalDelivery(lines: FlowLineLike[]): boolean {
+  const flows = flowLines(lines)
+  if (flows.length === 0) return false
+  return flows.every((l) => l.capabilities.fulfillmentModes.includes("delivery"))
 }
 
 /** Legacy order-level delivery fields: derived from product/subscription lines that use delivery or order-level deliveryType. */

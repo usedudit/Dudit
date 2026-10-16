@@ -11,7 +11,13 @@ export default async function AdminOrderDetailPage({
     params: Promise<{ id: string }>
 }) {
     const { id } = await params
-    const detail = await getAdminMarketplaceOrderDetail(id)
+    let detail: any
+    try {
+        detail = await getAdminMarketplaceOrderDetail(id)
+    } catch (err: any) {
+        console.error("[ADMIN_ORDER_DETAIL_PAGE] fetch failed:", err)
+        throw err
+    }
     if (!detail) notFound()
 
     const orderLabel = detail.order_number

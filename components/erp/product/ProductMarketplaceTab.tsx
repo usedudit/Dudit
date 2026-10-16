@@ -7,7 +7,21 @@ import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/ico
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"
+import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
+import {
+    DEFAULT_STORE_FULFILLMENT_CAPABILITIES,
+    type FulfillmentMode,
+    type StoreFulfillmentCapabilities,
+} from "@/lib/commerce/capabilities"
+
+const FULFILLMENT_LABELS: Record<FulfillmentMode, string> = {
+    delivery: "Entrega local",
+    pickup: "Retirada no local",
+    shipping: "Envio nacional",
+    on_site: "No estabelecimento",
+    customer_location: "No endereço do cliente",
+}
 
 const CONDITION_OPTIONS = [
     { value: "Novo", label: "Novo" },
@@ -26,6 +40,7 @@ interface ProductMarketplaceTabProps {
     video: any
     onVideoChange: (video: any) => void
     videoPlanBlocked?: boolean
+    storeFulfillmentCapabilities?: StoreFulfillmentCapabilities
 }
 
 export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
@@ -36,6 +51,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     video,
     onVideoChange,
     videoPlanBlocked = false,
+    storeFulfillmentCapabilities = DEFAULT_STORE_FULFILLMENT_CAPABILITIES,
 }) => {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
@@ -68,6 +84,25 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     }
 
     const isDigital = productData?.productType === "Digital"
+
+    const allowedFulfillmentModes: FulfillmentMode[] = isDigital
+        ? ["pickup"]
+        : ([
+            ...(storeFulfillmentCapabilities.delivery ? ["delivery"] : []),
+            ...(storeFulfillmentCapabilities.pickup ? ["pickup"] : []),
+            ...(storeFulfillmentCapabilities.shipping ? ["shipping"] : []),
+        ] as FulfillmentMode[])
+
+    const rawFulfillmentModes: string[] = Array.isArray(productData?.fulfillment_modes)
+        ? productData.fulfillment_modes
+        : []
+    const selectedFulfillmentModes: FulfillmentMode[] = (() => {
+        const filtered = rawFulfillmentModes.filter((m) =>
+            allowedFulfillmentModes.includes(m as FulfillmentMode),
+        ) as FulfillmentMode[]
+        if (filtered.length > 0) return filtered
+        return allowedFulfillmentModes.length ? [allowedFulfillmentModes[0]] : ["pickup"]
+    })()
 
     // ─── MODO DETALHES (READ-ONLY) ───────────────────────────────────────────
     if (!isEditing) {
@@ -181,11 +216,20 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     {productData?.availability_value ? `${productData.availability_value} ${productData.availability_unit || "Dias"}` : "Imediata"}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center py-2">
+                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Garantia</span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                     {productData?.warranty_value ? `${productData.warranty_value} ${productData.warranty_period || "Meses"}` : "Sem garantia"}
                                 </span>
+                            </div>
+
+                            <div className="py-2">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Formas de entrega</span>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {selectedFulfillmentModes.map((mode) => (
+                                        <Badge key={mode} variant="gray">{FULFILLMENT_LABELS[mode]}</Badge>
+                                    ))}
+                                </div>
                             </div>
 
                             {(productData?.accepts_offers || productData?.accepts_trades) && (
@@ -487,12 +531,22 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     disabled={!isEditing}
                                 />
                             </div>
+
+                            <div className="pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                                <FulfillmentModesEditor
+                                    label="Formas de entrega deste produto"
+                                    allowedModes={allowedFulfillmentModes}
+                                    value={selectedFulfillmentModes}
+                                    onChange={(modes) => manualChange("fulfillment_modes", modes)}
+                                    disabled={!isEditing}
+                                />
+                            </div>
                         </div>
                     </FormSection>
 
                     <FormSection
                         title="Palavras-chave de busca"
-                        description="Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace."
+                        description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         hasSeparator
                     >
                         <TagsInput
@@ -614,13 +668,23 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                     disabled={!isEditing}
                                 />
                             </div>
+
+                            <div className="pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                                <FulfillmentModesEditor
+                                    label="Formas de entrega deste produto"
+                                    allowedModes={allowedFulfillmentModes}
+                                    value={selectedFulfillmentModes}
+                                    onChange={(modes) => manualChange("fulfillment_modes", modes)}
+                                    disabled={!isEditing}
+                                />
+                            </div>
                         </div>
                     </SidebarCard>
 
                     {/* Card de Tags */}
-                    <SidebarCard hasSeparator title="Palavras-chave de busca">
+                    <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
                         <p className="text-sm text-brand-inactive-text mb-4">
-                            Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
+                            Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine.
                         </p>
                         <TagsInput
                             tags={tags}

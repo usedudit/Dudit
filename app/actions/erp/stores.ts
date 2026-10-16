@@ -271,6 +271,10 @@ interface UpdateStoreInput {
     inscricaoEstadual?: string | null
     ieIsento?: boolean
     inscricaoMunicipal?: string | null
+    // Regime tributário simplificado (DRE gerencial)
+    simplesTaxRateProducts?: number | null
+    simplesTaxRateServices?: number | null
+    meiFixedTaxAmount?: number | null
     // Address fields
     city?: string
     state?: string
@@ -379,6 +383,10 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.inscricaoEstadual !== undefined) updateData.inscricao_estadual = input.inscricaoEstadual
         if (input.ieIsento !== undefined) updateData.ie_isento = input.ieIsento
         if (input.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = input.inscricaoMunicipal
+        // Regime tributário simplificado (usado no DRE gerencial)
+        if (input.simplesTaxRateProducts !== undefined) updateData.simples_tax_rate_products = input.simplesTaxRateProducts ?? 0
+        if (input.simplesTaxRateServices !== undefined) updateData.simples_tax_rate_services = input.simplesTaxRateServices ?? 0
+        if (input.meiFixedTaxAmount !== undefined) updateData.mei_fixed_tax_amount = input.meiFixedTaxAmount ?? 0
         updateData.updated_at = new Date().toISOString()
 
         // Upsert address on addresses table (linked via store_id)

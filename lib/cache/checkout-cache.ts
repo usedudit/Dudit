@@ -1,6 +1,7 @@
 import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { resolveCheckoutCartLines, type ResolveCartResult } from "@/lib/services/marketplace-cart-resolver"
+import type { StoreFulfillmentCapabilities } from "@/lib/commerce/capabilities"
 import {
   listActivePromotionsInBatch as rawListActivePromotionsInBatch,
   listActivePromotionsForMarketplaceAction as rawListActivePromotionsForMarketplaceAction,
@@ -15,13 +16,19 @@ export async function resolveCheckoutCartLinesFresh(
   supabase: SupabaseClient,
   userId: string,
   cartItemIds: string[],
+  storeCaps?: StoreFulfillmentCapabilities,
 ): Promise<ResolveCartResult> {
-  return resolveCheckoutCartLines(supabase, userId, cartItemIds)
+  return resolveCheckoutCartLines(supabase, userId, cartItemIds, storeCaps)
 }
 
 export const cachedResolveCheckoutCartLines = cache(
-  async (supabase: SupabaseClient, userId: string, cartItemIds: string[]): Promise<ResolveCartResult> => {
-    return resolveCheckoutCartLinesFresh(supabase, userId, cartItemIds)
+  async (
+    supabase: SupabaseClient,
+    userId: string,
+    cartItemIds: string[],
+    storeCaps?: StoreFulfillmentCapabilities,
+  ): Promise<ResolveCartResult> => {
+    return resolveCheckoutCartLinesFresh(supabase, userId, cartItemIds, storeCaps)
   },
 )
 
