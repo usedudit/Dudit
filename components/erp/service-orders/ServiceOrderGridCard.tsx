@@ -14,6 +14,7 @@ interface ServiceOrderGridCardProps {
   onEdit?: () => void
   onStatus?: () => void
   onShare?: () => void
+  onPrint?: () => void
   onDelete?: () => void
   statusColor: string
   statusLabel: string
@@ -33,6 +34,7 @@ const ServiceOrderGridCard = React.memo(
     onEdit,
     onStatus,
     onShare,
+    onPrint,
     onDelete,
     statusColor,
     statusLabel,
@@ -149,6 +151,7 @@ const ServiceOrderGridCard = React.memo(
                 onEdit={onEdit}
                 onStatus={onStatus}
                 onShare={onShare}
+                onPrint={onPrint}
                 onDelete={onDelete}
               />
             </div>

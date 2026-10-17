@@ -31,6 +31,12 @@ export interface UseEntityPageOptions<
     initialItems: TListItem[]
     initialNextCursor: TCursor | null
     initialHasMore: boolean
+    /**
+     * When true, the SSR initial page is not injected as React Query initialData.
+     * Use for filtered/fetched views whose queryKey differs from the SSR key, so
+     * the hook fetches fresh page 1 instead of seeding with unfiltered data.
+     */
+    skipInitialData?: boolean
     fetchPageFn: (args: { cursor: TCursor | null }) => Promise<{
         items: TListItem[]
         nextCursor: TCursor | null
@@ -68,6 +74,7 @@ export function useEntityPage<
         listToDetail,
         staleTime: staleTimeProp,
         priority,
+        skipInitialData,
     } = options
 
     const staleTime = staleTimeProp ?? (priority ? PRIORITY_STALE_TIME[priority] : 30000)
@@ -88,11 +95,13 @@ export function useEntityPage<
         isLoading: isListLoading,
     } = useInfiniteList<TListItem, TCursor>({
         queryKey,
-        initialPage: {
-            items: initialItems,
-            nextCursor: initialNextCursor,
-            hasMore: initialHasMore,
-        },
+        initialPage: skipInitialData
+            ? undefined
+            : {
+                items: initialItems,
+                nextCursor: initialNextCursor,
+                hasMore: initialHasMore,
+            },
         fetchFn: fetchPageFn,
         dedupeKey,
         refetchOnWindowFocus: false,

@@ -364,9 +364,9 @@ export async function middleware(request: NextRequest) {
   const cspHeader = `
     default-src 'self';
     worker-src 'self' blob:;
-    child-src 'self' blob: https://*.googlesyndication.com https://*.doubleclick.net https://googleads.g.doubleclick.net https://*.google;
+    child-src 'self' blob: https://*.googlesyndication.com https://*.doubleclick.net https://googleads.g.doubleclick.net https://*.google https://challenges.cloudflare.com;
     media-src 'self' blob: ${r2MediaOrigins};
-    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''}
+    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''} https://challenges.cloudflare.com
         ${posthogOrigins}
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
@@ -440,7 +440,7 @@ export async function middleware(request: NextRequest) {
         https://*.facebook.com
         https://graph.facebook.com
         https://connect.facebook.net;
-    frame-src 'self' 
+    frame-src 'self' https://challenges.cloudflare.com 
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
         https://*.mercadopago.com 

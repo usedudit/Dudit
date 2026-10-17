@@ -15,7 +15,7 @@ import {
     updateServiceOrderStatusAction,
     getServiceOrderDetailsAction,
 } from "@/app/actions/erp/service-orders"
-import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, isServiceOrderBackwardTransition, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -26,17 +26,9 @@ import { useRouter } from "next/navigation"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
-const SERVICE_STATUS_ORDER: string[] = [
-    "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
-    "aguardando_peca", "concluida", "entregue"
-]
-
 function doesServiceTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
     if (currentStatus === "cancelada" || nextStatus === "cancelada") return false
-    const currentIdx = SERVICE_STATUS_ORDER.indexOf(currentStatus)
-    const nextIdx = SERVICE_STATUS_ORDER.indexOf(nextStatus)
-    if (currentIdx === -1 || nextIdx === -1) return false
-    return nextIdx < currentIdx
+    return isServiceOrderBackwardTransition(currentStatus as ServiceOrderStatus, nextStatus as ServiceOrderStatus)
 }
 
 const CHANGE_STATUS_REASONS = [
@@ -411,6 +403,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 }
                                                 setShowShareModal(true);
                                             }}
+                                            onPrint={() => window.open(`/print/os/${order.id}`, "_blank")}
                                             onDelete={() => setConfirmDelete(true)}
                                         />
                                     </div>
@@ -620,6 +613,21 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total da OS</span>
                                                             <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount || 0)}</span>
                                                         </div>
+
+                                                        {order.costs?.canView && (
+                                                            <div className="pt-4 mt-3 border-t border-brand-border dark:border-dark-border space-y-2">
+                                                                <div className="flex justify-between items-center text-[13px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Custo dos itens</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.costs.totalCost || 0)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-[13px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Margem</span>
+                                                                    <span className={`font-bold ${(order.costs.margin || 0) >= 0 ? "text-brand-green" : "text-brand-red"}`}>
+                                                                        {formatCurrency(order.costs.margin || 0)} ({Number(order.costs.marginPercent || 0).toFixed(1)}%)
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
 
                                                         {order.payment_status !== "paid" && order.order_id && (
                                                             <div className="pt-4 flex justify-end">
@@ -1069,7 +1077,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                     </p>
                     <FormDropdown
                         label="Novo Status"
-                        options={(Object.keys(SERVICE_ORDER_STATUS_META) as ServiceOrderStatus[]).map((status) => ({
+                        options={getServiceOrderNextStatuses(order.status as ServiceOrderStatus).map((status) => ({
                             value: status,
                             label: SERVICE_ORDER_STATUS_META[status].label
                         }))}

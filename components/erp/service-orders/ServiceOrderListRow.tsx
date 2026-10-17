@@ -24,6 +24,7 @@ interface ServiceOrderListRowProps {
   onEdit?: () => void
   onStatus?: () => void
   onShare?: () => void
+  onPrint?: () => void
   onDelete?: () => void
   statusColor: string
   statusLabel: string
@@ -44,6 +45,7 @@ const ServiceOrderListRow = React.memo(
     onEdit,
     onStatus,
     onShare,
+    onPrint,
     onDelete,
     statusColor,
     statusLabel,
@@ -130,6 +132,7 @@ const ServiceOrderListRow = React.memo(
                 onEdit={onEdit}
                 onStatus={onStatus}
                 onShare={onShare}
+                onPrint={onPrint}
                 onDelete={onDelete}
               />
             </div>

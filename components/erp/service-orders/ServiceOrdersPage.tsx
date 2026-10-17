@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
@@ -39,8 +39,10 @@ import {
   getERPServiceOrdersPageAction,
   getServiceOrderDetailsAction,
   updateServiceOrderStatusAction,
+  bulkUpdateServiceOrderStatusAction,
+  bulkDeleteServiceOrderAction,
 } from "@/app/actions/erp/service-orders"
-import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, type ServiceOrderStatus } from "@/lib/types/service-order"
 
 const SERVICE_STATUS_ORDER: string[] = [
   "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
@@ -62,6 +64,14 @@ const CHANGE_STATUS_REASONS = [
   { value: "logistics_issue", label: "Problema logístico" },
   { value: "other", label: "Outro" }
 ]
+
+const TAB_STATUSES: Record<string, string[]> = {
+  all: [],
+  aberta: ["aberta", "aguardando_aprovacao", "aprovada"],
+  em_andamento: ["em_andamento", "aguardando_peca"],
+  concluida: ["concluida", "entregue"],
+  cancelada: ["cancelada"],
+}
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
@@ -134,15 +144,24 @@ export default function ServiceOrdersPage({
     refetchOnWindowFocus: false,
   })
 
+  const isDefaultView = activeTab === "all" && !debouncedSearch
+
   const entityPage = useEntityPage<any, any, any>({
     entityType: "service_orders",
     partnerId,
-    queryKey: ["service-orders", partnerId, storeId],
+    queryKey: ["service-orders", partnerId, storeId, activeTab, debouncedSearch],
     initialItems: rawOrders,
     initialNextCursor,
     initialHasMore,
+    skipInitialData: !isDefaultView,
     fetchPageFn: async ({ cursor }) => {
-      const res = await getERPServiceOrdersPageAction(partnerId, { cursor, limit: 100, storeId })
+      const res = await getERPServiceOrdersPageAction(partnerId, {
+        cursor,
+        limit: 100,
+        storeId,
+        statuses: TAB_STATUSES[activeTab] || [],
+        search: debouncedSearch || undefined,
+      })
       if (!res.success) throw new Error(res.error || "Erro ao carregar OS")
       return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
@@ -183,51 +202,29 @@ export default function ServiceOrdersPage({
 
     if (payload.type === 'service_order_status' && payload.serviceOrderStatus) {
       const status = payload.serviceOrderStatus
-      let successCount = 0
-      let failCount = 0
-      let skippedCount = 0
-      const errors: string[] = []
+      const res = await bulkUpdateServiceOrderStatusAction(partnerId, ids, status)
 
-      for (const id of ids) {
-        const order = effectiveOrders?.find(o => o.id === id)
-        if (!order) {
-          failCount++
-          continue
-        }
-        // Skip orders that are already in final status (entregue, cancelada)
-        if (order.status === 'entregue' || order.status === 'cancelada') {
-          skippedCount++
-          continue
-        }
-        // Skip if already has the target status
-        if (order.status === status) {
-          skippedCount++
-          continue
-        }
-
-        const result = await updateServiceOrderStatusAction(partnerId, id, status)
-        if (result.success) {
-          successCount++
-        } else {
-          failCount++
-          errors.push(`${order.order_number}: ${result.error}`)
-        }
+      if (!res.success) {
+        toast({ title: "Erro", description: res.error || "Erro ao atualizar status", variant: "destructive" })
+        setBulkEditModal({ isOpen: false })
+        setSelection(new Set())
+        return
       }
 
       let message = ""
-      if (successCount > 0) message += `${successCount} ordem(ns) atualizada(s). `
-      if (skippedCount > 0) message += `${skippedCount} ignorada(s) (já no status final ou mesmo status). `
-      if (failCount > 0) message += `${failCount} falharam.`
+      if (res.updated > 0) message += `${res.updated} ordem(ns) atualizada(s). `
+      if (res.skipped > 0) message += `${res.skipped} ignorada(s) (já no status final ou mesmo status). `
+      if (res.failed.length > 0) message += `${res.failed.length} falharam.`
 
-      if (successCount > 0) {
+      if (res.updated > 0) {
         handleMutation()
         toast({ title: "Sucesso", description: message.trim() })
       } else {
         toast({ title: "Erro", description: message.trim() || "Nenhuma ordem foi atualizada", variant: "destructive" })
       }
 
-      if (errors.length > 0) {
-        console.warn("Bulk status update errors:", errors)
+      if (res.failed.length > 0) {
+        console.warn("Bulk status update errors:", res.failed)
       }
 
       setBulkEditModal({ isOpen: false })
@@ -243,8 +240,16 @@ export default function ServiceOrdersPage({
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setSearch(e.target.value)
-    setDebouncedSearch(e.target.value)
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, activeTab, filters])
 
   const filteredOrders = useMemo(() => {
     const term = debouncedSearch.toLowerCase()
@@ -396,15 +401,10 @@ export default function ServiceOrdersPage({
   const handleBulkDelete = async () => {
     setIsDeleting(true)
     try {
-      const { deleteServiceOrderAction } = await import("@/app/actions/erp/service-orders")
       const ids = Array.from(selection)
-      let successCount = 0
-      for (const id of ids) {
-        const res = await deleteServiceOrderAction(partnerId, id)
-        if (res.success) successCount++
-      }
-      if (successCount > 0) {
-        toast({ description: `${successCount} ordem(ns) de serviço deletada(s)` })
+      const res = await bulkDeleteServiceOrderAction(partnerId, ids)
+      if (res.success && res.deleted > 0) {
+        toast({ description: `${res.deleted} ordem(ns) de serviço deletada(s)` })
         handleMutation()
       }
       setSelection(new Set())
@@ -817,6 +817,7 @@ export default function ServiceOrdersPage({
                                     const token = await ensurePublicTokenAction(partnerId, o.id)
                                     if (token) setShowShareModal({ id: o.id, token })
                                   }}
+                                  onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
                                   onDelete={() => setConfirmDelete(o.id)}
                                   statusColor={statusColor(o.status)}
                                   statusLabel={statusLabel(o.status)}
@@ -902,6 +903,7 @@ export default function ServiceOrdersPage({
                                           const token = await ensurePublicTokenAction(partnerId, o.id)
                                           if (token) setShowShareModal({ id: o.id, token })
                                         }}
+                                        onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
                                         onDelete={() => setConfirmDelete(o.id)}
                                         statusColor={statusColor(o.status)}
                                         statusLabel={statusLabel(o.status)}
@@ -1054,7 +1056,10 @@ export default function ServiceOrdersPage({
             label="Novo Status"
             value={statusModal?.nextStatus || ""}
             setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
-            options={(Object.keys(SERVICE_ORDER_STATUS_META) as ServiceOrderStatus[]).map((s) => ({
+            options={Array.from(new Set([
+              ...(statusModal?.currentStatus ? [statusModal.currentStatus as ServiceOrderStatus] : []),
+              ...getServiceOrderNextStatuses((statusModal?.currentStatus || "aberta") as ServiceOrderStatus),
+            ])).map((s) => ({
               value: s,
               label: SERVICE_ORDER_STATUS_META[s].label
             }))}

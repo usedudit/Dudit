@@ -1,9 +1,14 @@
-import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+import {
+  SERVICE_ORDER_STATUS_META,
+  isServiceOrderStatus,
+  isValidServiceOrderTransition,
+  type ServiceOrderStatus,
+} from "@/lib/types/service-order"
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
-import { requirePermission } from "@/lib/permissions/access"
+import { requirePermission, checkPermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -36,9 +41,70 @@ function buildKeysetOrFilter(cursor: { createdAt: string; id: string }): string 
 
 const PAGE_SIZE = 100
 
+/**
+ * Guard não-bloqueante de estoque: registra um evento de timeline quando itens
+ * de produto são adicionados sem estoque suficiente. NÃO impede a operação —
+ * a baixa de estoque acontece apenas no pagamento do pedido vinculado.
+ */
+async function logStockShortagesForServiceOrder(
+  partnerId: string,
+  serviceOrderId: string,
+  items: { product_id?: string | null; variant_id?: string | null; quantity?: number; product_name?: string }[],
+): Promise<void> {
+  try {
+    const productIds = items.map((i) => i.product_id).filter((id): id is string => !!id)
+    if (productIds.length === 0) return
+
+    const admin = getAdminClient()
+    const { data: productRows } = await admin
+      .from("products")
+      .select("id, name, stock_available, allow_sell_without_stock")
+      .in("id", productIds)
+    const productMap = new Map<string, any>((productRows || []).map((r: any) => [r.id, r]))
+
+    const variantIds = items.map((i) => i.variant_id).filter((id): id is string => !!id)
+    let variantMap = new Map<string, any>()
+    if (variantIds.length > 0) {
+      const { data: variantRows } = await admin
+        .from("product_variants")
+        .select("id, stock_available")
+        .in("id", variantIds)
+      variantMap = new Map((variantRows || []).map((r: any) => [r.id, r]))
+    }
+
+    const shortages: string[] = []
+    for (const item of items) {
+      if (!item.product_id) continue
+      const product = productMap.get(item.product_id)
+      if (!product || product.allow_sell_without_stock) continue
+      const qty = Number(item.quantity || 1)
+      const available = item.variant_id
+        ? Number(variantMap.get(item.variant_id)?.stock_available ?? 0)
+        : Number(product.stock_available ?? 0)
+      if (qty > available) {
+        shortages.push(`${item.product_name || product.name || "Produto"}: solicitado ${qty}, disponível ${available}`)
+      }
+    }
+
+    if (shortages.length > 0) {
+      await logAuditEvent({
+        partnerId,
+        actorUserId: null,
+        entityType: "service_order",
+        entityId: serviceOrderId,
+        actionType: "stock_shortage_warning",
+        changeLines: shortages,
+        source: "system",
+      })
+    }
+  } catch (err) {
+    console.error("[service_order_stock_warning] failed:", err)
+  }
+}
+
 export async function getERPServiceOrdersPageAction(
   partnerId: string,
-  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; storeId?: string | null },
+  options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; statuses?: string[]; search?: string; storeId?: string | null },
 ): Promise<
   | { success: true; items: any[]; nextCursor: ServiceOrderListCursor; hasMore: boolean }
   | { success: false; error: string }
@@ -48,8 +114,18 @@ export async function getERPServiceOrdersPageAction(
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || PAGE_SIZE))))
     const fetchLimit = limit + 1
+    const statuses = (options?.statuses || []).filter((s): s is string => !!s)
+    const search = (options?.search || "").replace(/[%*(),]/g, "").trim().slice(0, 80)
     const rows = await getCachedErpPage(
-      ["erp-service-orders-page", partnerId, options?.storeId || "all-stores", options?.status || "all", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
+      [
+        "erp-service-orders-page",
+        partnerId,
+        options?.storeId || "all-stores",
+        statuses.length > 0 ? statuses.join("+") : (options?.status || "all"),
+        search || "no-search",
+        cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+        String(limit),
+      ],
       [TAGS.serviceOrders(partnerId)],
       async () => {
         const supabase = getAdminClient()
@@ -57,7 +133,11 @@ export async function getERPServiceOrdersPageAction(
           .from("service_orders")
           .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
           .eq("partner_id", partnerId)
-        if (options?.status && options.status !== "all") q = q.eq("status", options.status)
+        if (statuses.length > 0) q = q.in("status", statuses)
+        else if (options?.status && options.status !== "all") q = q.eq("status", options.status)
+        if (search) {
+          q = q.or(`order_number.ilike.%${search}%,title.ilike.%${search}%,customer_snapshot->>name.ilike.%${search}%`)
+        }
         if (options?.storeId) q = q.eq("store_id", options.storeId)
         if (cursor) q = q.or(buildKeysetOrFilter(cursor))
         const { data, error } = await q
@@ -131,6 +211,53 @@ export async function getServiceOrderDetailsAction(
 
     const { order } = detail
 
+    // ── Custo / margem (somente quando o usuário pode ver preço de custo) ──
+    // A permissão é verificada por usuário (fora do cache); apenas os preços de
+    // custo (por parceiro/OS) são cacheados para evitar queries repetidas.
+    let costs: { canView: boolean; totalCost?: number; margin?: number; marginPercent?: number } = { canView: false }
+    try {
+      const { allowed: canViewCost } = await checkPermission(partnerId, "products", "view_cost_price")
+      if (canViewCost) {
+        const costData = await getCachedErpPage(
+          ["erp-service-order-costs", partnerId, serviceOrderId],
+          [TAGS.serviceOrders(partnerId)],
+          async () => {
+            const admin = getAdminClient()
+            const svcIds = (detail.services || []).map((s: any) => s.service_id).filter(Boolean)
+            const prodIds = (detail.products || []).map((p: any) => p.product_id).filter(Boolean)
+            const [svcCostRes, prodCostRes] = await Promise.all([
+              svcIds.length
+                ? admin.from("services").select("id, cost_price").in("id", svcIds)
+                : Promise.resolve({ data: [] as any[] }),
+              prodIds.length
+                ? admin.from("products").select("id, cost_price").in("id", prodIds)
+                : Promise.resolve({ data: [] as any[] }),
+            ])
+            return {
+              svcCost: (svcCostRes.data || []) as { id: string; cost_price: number | null }[],
+              prodCost: (prodCostRes.data || []) as { id: string; cost_price: number | null }[],
+            }
+          },
+          15,
+        )
+        const svcCost = new Map<string, number>((costData.svcCost || []).map((r: any) => [r.id, Number(r.cost_price || 0)]))
+        const prodCost = new Map<string, number>((costData.prodCost || []).map((r: any) => [r.id, Number(r.cost_price || 0)]))
+        const totalCost =
+          (detail.services || []).reduce((sum: number, s: any) => sum + (s.service_id ? (svcCost.get(s.service_id) || 0) : 0) * Number(s.quantity || 1), 0) +
+          (detail.products || []).reduce((sum: number, p: any) => sum + (p.product_id ? (prodCost.get(p.product_id) || 0) : 0) * Number(p.quantity || 1), 0)
+        const totalAmount = Number(order.total_amount || 0)
+        const margin = totalAmount - totalCost
+        costs = {
+          canView: true,
+          totalCost: Math.round(totalCost * 100) / 100,
+          margin: Math.round(margin * 100) / 100,
+          marginPercent: totalAmount > 0 ? (margin / totalAmount) * 100 : 0,
+        }
+      }
+    } catch {
+      costs = { canView: false }
+    }
+
     let specifications = order.specifications
     if (typeof specifications === "string") {
       try {
@@ -150,6 +277,7 @@ export async function getServiceOrderDetailsAction(
         attachments: detail.attachments,
         history: detail.history,
         sale: detail.sale,
+        costs,
       },
     }
   } catch (err: any) {
@@ -502,6 +630,8 @@ export async function createServiceOrderAction(
 
     await Promise.all(insertPromises)
 
+    void logStockShortagesForServiceOrder(partnerId, data.id, productsList)
+
     const orderNumber = data.order_number
 
     // 4. Background tasks (audits, notifications, usage counter)
@@ -718,6 +848,8 @@ export async function addProductsToOrderAction(
     const { data, error } = await admin.from("service_order_products").insert(items).select("*")
     if (error) throw error
 
+    void logStockShortagesForServiceOrder(partnerId, serviceOrderId, products)
+
     await recalcTotals(admin, serviceOrderId)
 
     await logAuditEvent({
@@ -746,23 +878,50 @@ export async function updateServiceOrderStatusAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
+    if (!isServiceOrderStatus(status)) {
+      throw new Error("Status inválido para ordem de serviço.")
+    }
+
     const { data: current } = await admin
       .from("service_orders")
-      .select("status, order_number")
+      .select("status, order_number, title, completed_at, assigned_user_id, created_by, store_id")
       .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
       .single()
 
     if (!current) throw new Error("OS não encontrada")
 
+    const currentStatus = current.status as ServiceOrderStatus
+
+    if (status === currentStatus) {
+      throw new Error("A ordem de serviço já está neste status.")
+    }
+
+    if (!isValidServiceOrderTransition(currentStatus, status)) {
+      const fromLabel = SERVICE_ORDER_STATUS_META[currentStatus]?.label || currentStatus
+      const toLabel = SERVICE_ORDER_STATUS_META[status]?.label || status
+      const isTerminal = ["entregue", "cancelada"].includes(currentStatus)
+      throw new Error(
+        isTerminal
+          ? `Não é possível alterar o status de uma OS ${fromLabel.toLowerCase()}.`
+          : `Transição inválida: ${fromLabel} → ${toLabel}.`,
+      )
+    }
+
     const updateData: any = { status }
-    if (status === "concluida") {
+    if (status === "concluida" && !current.completed_at) {
       updateData.completed_at = new Date().toISOString()
+    }
+    // Ao retroceder de "concluída", limpa o marco de conclusão.
+    if (currentStatus === "concluida" && status !== "concluida") {
+      updateData.completed_at = null
     }
 
     const { data, error } = await admin
       .from("service_orders")
       .update(updateData)
       .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
       .select("*")
       .single()
 
@@ -773,10 +932,26 @@ export async function updateServiceOrderStatusAction(
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "status_changed", source: "manual",
       changeLines: [
-        `Status alterado: ${current.status} → ${status}`,
+        `Status alterado: ${currentStatus} → ${status}`,
         ...(changeReason?.trim() ? [`Motivo: ${changeReason.trim()}`] : []),
       ],
     })
+
+    if (data.assigned_user_id && data.assigned_user_id !== user.id) {
+      try {
+        const { createNotification } = await import("@/lib/services/notification.service")
+        await createNotification({
+          userId: data.assigned_user_id,
+          type: "service_order_status_changed" as any,
+          title: "OS atualizada",
+          message: `OS #${data.order_number}: ${SERVICE_ORDER_STATUS_META[status].label}`,
+          entityType: "service_order" as any,
+          entityId: serviceOrderId,
+          data: { partnerId, orderNumber: data.order_number, status },
+          idempotencyKey: `os-status-${serviceOrderId}-${status}-${Date.now()}`,
+        })
+      } catch { }
+    }
 
     revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
@@ -1108,114 +1283,141 @@ export async function deleteServiceOrderAction(
   }
 }
 
-async function recalcTotals(admin: any, serviceOrderId: string) {
-  const { data: order } = await admin
-    .from("service_orders")
-    .select("discount_value, discount_type, coupon_discount_amount, other_costs, order_id")
-    .eq("id", serviceOrderId)
-    .single()
+export async function bulkUpdateServiceOrderStatusAction(
+  partnerId: string,
+  serviceOrderIds: string[],
+  status: string,
+  changeReason?: string,
+): Promise<
+  | { success: true; updated: number; skipped: number; failed: { id: string; error: string }[] }
+  | { success: false; error: string }
+> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "edit")
+    const user = await requireUser()
+    const admin = getAdminClient()
 
-  const { data: services } = await admin
-    .from("service_order_services")
-    .select("service_id, service_name, service_price, quantity, total_price")
-    .eq("service_order_id", serviceOrderId)
+    const ids = Array.from(new Set((serviceOrderIds || []).filter(Boolean)))
+    if (ids.length === 0) return { success: true, updated: 0, skipped: 0, failed: [] }
+    if (!isServiceOrderStatus(status)) {
+      throw new Error("Status inválido para ordem de serviço.")
+    }
 
-  const { data: products } = await admin
-    .from("service_order_products")
-    .select("product_id, variant_id, product_name, unit_price, quantity, total_price")
-    .eq("service_order_id", serviceOrderId)
+    const { data: rows, error } = await admin
+      .from("service_orders")
+      .select("id, status, completed_at")
+      .eq("partner_id", partnerId)
+      .in("id", ids)
+    if (error) throw error
 
-  const totalService = (services || []).reduce((sum: number, s: any) => sum + Number(s.total_price || 0), 0)
-  const totalProduct = (products || []).reduce((sum: number, p: any) => sum + Number(p.total_price || 0), 0)
-  const subtotal = totalService + totalProduct
+    const rowsById = new Map<string, any>((rows || []).map((r: any) => [r.id, r]))
+    const failed: { id: string; error: string }[] = []
+    let skipped = 0
+    const toComplete: string[] = []
+    const toClearCompletedAt: string[] = []
+    const plain: string[] = []
 
-  const discVal = Number(order?.discount_value || 0)
-  const discType = order?.discount_type || 'fixed'
-  const couponDisc = Number(order?.coupon_discount_amount || 0)
-  const otherCosts = Number(order?.other_costs || 0)
+    for (const id of ids) {
+      const current = rowsById.get(id)
+      if (!current) {
+        failed.push({ id, error: "OS não encontrada" })
+        continue
+      }
+      const currentStatus = current.status as ServiceOrderStatus
+      if (status === currentStatus || !isValidServiceOrderTransition(currentStatus, status)) {
+        skipped++
+        continue
+      }
+      if (status === "concluida" && !current.completed_at) toComplete.push(id)
+      else if (currentStatus === "concluida" && status !== "concluida") toClearCompletedAt.push(id)
+      else plain.push(id)
+    }
 
-  let discountAmount = 0
-  if (discType === 'percentage') {
-    discountAmount = (subtotal * discVal) / 100
-  } else if (discType === 'fixed') {
-    discountAmount = discVal
-  } else if (discType === 'coupon') {
-    discountAmount = couponDisc
+    const applyUpdate = async (targetIds: string[], extra: Record<string, any>) => {
+      if (targetIds.length === 0) return
+      const { error: uErr } = await admin
+        .from("service_orders")
+        .update({ status, ...extra })
+        .eq("partner_id", partnerId)
+        .in("id", targetIds)
+      if (uErr) targetIds.forEach((id) => failed.push({ id, error: uErr.message }))
+    }
+
+    await Promise.all([
+      applyUpdate(plain, {}),
+      applyUpdate(toComplete, { completed_at: new Date().toISOString() }),
+      applyUpdate(toClearCompletedAt, { completed_at: null }),
+    ])
+
+    const updatedIds = [...plain, ...toComplete, ...toClearCompletedAt]
+    const updated = updatedIds.length
+
+    if (updated > 0) {
+      void logAuditEvent({
+        partnerId, actorUserId: user.id,
+        entityType: "service_order", entityId: updatedIds[0],
+        actionType: "status_changed", source: "manual",
+        changeLines: [
+          `Status em lote → ${SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status} (${updated} OS)`,
+          ...(changeReason?.trim() ? [`Motivo: ${changeReason.trim()}`] : []),
+        ],
+      }).catch(() => {})
+    }
+
+    revalidatePath("/erp/ordens-de-servico")
+    return { success: true, updated, skipped, failed }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao atualizar status em lote" }
   }
+}
 
-  const finalTotal = Math.max(0, subtotal - discountAmount + otherCosts)
+export async function bulkDeleteServiceOrderAction(
+  partnerId: string,
+  serviceOrderIds: string[],
+): Promise<{ success: true; deleted: number } | { success: false; error: string }> {
+  try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    await requirePermission(partnerId, "service_orders", "delete")
+    const user = await requireUser()
+    const admin = getAdminClient()
 
-  await admin
-    .from("service_orders")
-    .update({
-      total_service_amount: totalService,
-      total_product_amount: totalProduct,
-      total_amount: finalTotal,
-    })
-    .eq("id", serviceOrderId)
+    const ids = Array.from(new Set((serviceOrderIds || []).filter(Boolean)))
+    if (ids.length === 0) return { success: true, deleted: 0 }
 
-  // Sync linked order (mirror appointments flow)
-  const linkedOrderId = order?.order_id
-  if (linkedOrderId) {
-    const orderItems = [
-      ...(services || []).map((s: any) => ({
-        order_id: linkedOrderId,
-        product_id: s.service_id || null,
-        variant_id: null,
-        product_name: s.service_name || "Mão de Obra",
-        product_price: Number(s.service_price || 0),
-        quantity: Number(s.quantity || 1),
-        subtotal: Number(s.total_price || 0),
-        line_type: "service_booking",
-        fulfillment_mode: "on_site",
-        service_id: s.service_id || null,
-        is_gift: false,
-        original_price: null,
-        is_promotional: false,
-        promotion_id: null,
-      })),
-      ...(products || []).map((p: any) => ({
-        order_id: linkedOrderId,
-        product_id: p.product_id || null,
-        variant_id: p.variant_id || null,
-        product_name: p.product_name || "Produto",
-        product_price: Number(p.unit_price || 0),
-        quantity: Number(p.quantity || 1),
-        subtotal: Number(p.total_price || 0),
-        line_type: "product",
-        fulfillment_mode: "delivery",
-        service_id: null,
-        is_gift: false,
-        original_price: null,
-        is_promotional: false,
-        promotion_id: null,
-      })),
-    ]
+    const { data, error } = await admin
+      .from("service_orders")
+      .delete()
+      .eq("partner_id", partnerId)
+      .in("id", ids)
+      .select("id")
+    if (error) throw error
 
-    await admin.from("order_items").delete().eq("order_id", linkedOrderId)
-    if (orderItems.length > 0) {
-      await admin.from("order_items").insert(orderItems)
+    const deleted = data?.length || 0
+    if (deleted > 0) {
+      void logAuditEvent({
+        partnerId, actorUserId: user.id,
+        entityType: "service_order", entityId: (data as any[])[0].id,
+        actionType: "deleted", source: "manual",
+        changeLines: [`${deleted} OS deletada(s) em lote`],
+      }).catch(() => {})
     }
 
-    const orderUpdateData: any = {
-      total_amount: finalTotal,
-      discount_value: discVal,
-      discount_type: discType,
-      discount_amount: discountAmount,
-      additional_costs: otherCosts,
-      order_source: "Ordem de Serviço",
-      source_service_order_id: serviceOrderId,
-    }
+    revalidatePath("/erp/ordens-de-servico")
+    return { success: true, deleted }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao deletar OS em lote" }
+  }
+}
 
-    const { error: orderUpdErr } = await admin
-      .from("orders")
-      .update(orderUpdateData)
-      .eq("id", linkedOrderId)
-
-    if (orderUpdErr && /source_service_order_id|column/i.test(String(orderUpdErr.message || ""))) {
-      delete orderUpdateData.source_service_order_id
-      await admin.from("orders").update(orderUpdateData).eq("id", linkedOrderId)
-    }
+async function recalcTotals(admin: any, serviceOrderId: string) {
+  // Recalcula totais da OS (e ressincroniza order_items/orders) em um único
+  // round-trip set-based no banco. Ver migration 20261017_service_orders_perf.sql.
+  const { error } = await admin.rpc("recalc_service_order_totals", {
+    p_service_order_id: serviceOrderId,
+  })
+  if (error) {
+    console.error("[recalcTotals] rpc error:", error)
   }
 }
 
@@ -1241,7 +1443,10 @@ export async function getServiceOrderByTokenAction(
   token: string,
 ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; sale: any } } | { success: false; error: string }> {
   try {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const rl = await requireRateLimit(RateLimitCategory.SERVICE_ORDER_PUBLIC)
+    if (!rl.success) {
+      return { success: false, error: rl.error || "Muitas tentativas. Tente novamente em breve." }
+    }
     const cleanToken = String(token || "").trim()
     if (!cleanToken || cleanToken.length < 6) {
       return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
@@ -1305,15 +1510,24 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
-    if ((!resolvedCustomer || !resolvedCustomer.name) && row.customer_id) {
-      const { data: dbCustomer } = await admin
-        .from("customers")
-        .select("id, name, email, phone, document, image_url, avatar_url, addresses(*)")
-        .eq("id", row.customer_id)
-        .maybeSingle()
-      if (dbCustomer) {
-        resolvedCustomer = dbCustomer
-      }
+    // Consultas independentes resolvidas em paralelo (latência pública)
+    const needsCustomerLookup = (!resolvedCustomer || !(resolvedCustomer as any).name) && !!row.customer_id
+    const storeObjFromJoin = row.stores ? (Array.isArray(row.stores) ? row.stores[0] : row.stores) : null
+    const [{ getPartnerPlan }, dbCustomerRes, assignedProfileRes, storeFallbackRes] = await Promise.all([
+      import("@/lib/services/subscription.service"),
+      needsCustomerLookup
+        ? admin.from("customers").select("id, name, email, phone, document, image_url, avatar_url, addresses(*)").eq("id", row.customer_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+      row.assigned_user_id
+        ? admin.from("user_profiles").select("full_name").eq("user_id", row.assigned_user_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+      !storeObjFromJoin && row.partner_id
+        ? admin.from("stores").select("id, name, logo_url, phone").eq("partner_id", row.partner_id).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+    ])
+
+    if (dbCustomerRes?.data) {
+      resolvedCustomer = dbCustomerRes.data
     }
 
     const customerName = resolvedCustomer?.name || (row.customer_snapshot as any)?.name || null
@@ -1327,31 +1541,12 @@ export async function getServiceOrderByTokenAction(
       }
     }
 
-    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
     const plan = await getPartnerPlan(row.partner_id)
     const planTier = plan?.slug || "free"
 
-    let assignedUserName = null
-    if (row.assigned_user_id) {
-      const { data: profile } = await admin
-        .from("user_profiles")
-        .select("full_name")
-        .eq("user_id", row.assigned_user_id)
-        .maybeSingle()
-      assignedUserName = profile?.full_name || null
-    }
+    const assignedUserName = assignedProfileRes?.data?.full_name || null
 
-    let storeObj = row.stores ? (Array.isArray(row.stores) ? row.stores[0] : row.stores) : null
-    if (!storeObj && row.partner_id) {
-      const { data: storeFallback } = await admin
-        .from("stores")
-        .select("id, name, logo_url, phone")
-        .eq("partner_id", row.partner_id)
-        .order("is_headquarters", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      storeObj = storeFallback
-    }
+    const storeObj = storeObjFromJoin || storeFallbackRes?.data || null
 
     const addressesList = addressRes.data || []
     const addressRow = addressesList.find((a: any) => a.is_default) || addressesList[0]
@@ -1522,7 +1717,7 @@ export async function updateServiceOrderAction(
 
     const { data: current, error: getErr } = await admin
       .from("service_orders")
-      .select("*")
+      .select("id, store_id, title, status, payment_status, completed_at")
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
       .single()
@@ -1550,9 +1745,22 @@ export async function updateServiceOrderAction(
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
     if (input.assigned_user_id !== undefined && !isPaid) updateData.assigned_user_id = input.assigned_user_id
     if (input.status !== undefined) {
-      updateData.status = input.status
-      if (input.status === "concluida" && !current.completed_at) {
-        updateData.completed_at = new Date().toISOString()
+      if (!isServiceOrderStatus(input.status)) {
+        throw new Error("Status inválido para ordem de serviço.")
+      }
+      if (input.status !== current.status) {
+        if (!isValidServiceOrderTransition(current.status as ServiceOrderStatus, input.status)) {
+          const fromLabel = SERVICE_ORDER_STATUS_META[current.status as ServiceOrderStatus]?.label || current.status
+          const toLabel = SERVICE_ORDER_STATUS_META[input.status]?.label || input.status
+          throw new Error(`Transição de status inválida: ${fromLabel} → ${toLabel}.`)
+        }
+        updateData.status = input.status
+        if (input.status === "concluida" && !current.completed_at) {
+          updateData.completed_at = new Date().toISOString()
+        }
+        if (current.status === "concluida" && input.status !== "concluida") {
+          updateData.completed_at = null
+        }
       }
     }
     if (input.priority !== undefined) updateData.priority = input.priority
@@ -1613,6 +1821,7 @@ export async function updateServiceOrderAction(
           }
         })
         await admin.from("service_order_products").insert(productItems)
+        void logStockShortagesForServiceOrder(partnerId, serviceOrderId, input.products)
       }
     }
 
@@ -1641,7 +1850,17 @@ export async function updateServiceOrderAction(
       metadata: { storeId: updatedStoreId, partnerId, userId: user.id, serviceOrderId },
     }).catch(e => console.error("[updateServiceOrderAction] audit log error:", e))
 
-    await recalcTotals(admin, serviceOrderId)
+    const totalsChanged =
+      input.services !== undefined ||
+      input.products !== undefined ||
+      input.discount_value !== undefined ||
+      input.discount_type !== undefined ||
+      input.coupon_discount_amount !== undefined ||
+      input.other_costs !== undefined
+
+    if (totalsChanged) {
+      await recalcTotals(admin, serviceOrderId)
+    }
     revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
@@ -1784,459 +2003,6 @@ export async function syncServiceOrderProductsAction(
   }
 }
 
-export async function confirmServiceOrderPaymentAction(payload: {
-  serviceOrderId: string
-  partnerId: string
-  paymentStatus: "paid" | "partially_paid" | "unpaid"
-  paidAmount: number
-  paymentMethod: string
-  paymentBreakdown?: Array<{
-    method: string
-    amount: number
-    paymentMethodId?: string | null
-    installmentNumber?: number
-    adjustmentType?: string
-    adjustmentAmount?: number
-    feeBearer?: string
-    amountReceived?: number
-    paymentMethodDiscountAmount?: number
-    interestAmount?: number
-    feeAmount?: number
-    fixedFeeAmount?: number
-    installmentCostAmount?: number
-    installmentFeeBearer?: string
-  }>
-  paymentProvider?: string | null
-  mpPaymentId?: string | null
-  financeAccountId?: string | null
-  notes?: string
-}) {
-  try {
-    const user = await requireUser()
-    if (!user) return { success: false, error: "Não autenticado" }
-    await requirePermission(payload.partnerId, "service_orders", "edit")
-
-    const supabase = await getSupabaseServerClient()
-
-    // 1. Get the service order
-    const { data: order, error: orderErr } = await supabase
-      .from("service_orders")
-      .select("*")
-      .eq("id", payload.serviceOrderId)
-      .eq("partner_id", payload.partnerId)
-      .single()
-
-    if (orderErr || !order) {
-      throw new Error("Ordem de serviço não encontrada")
-    }
-
-    // 2. Fetch services and products to build sale items
-    const [servicesRes, productsRes] = await Promise.all([
-      supabase.from("service_order_services").select("*").eq("service_order_id", order.id),
-      supabase.from("service_order_products").select("*").eq("service_order_id", order.id),
-    ])
-
-    const orderServices = servicesRes.data || []
-    const orderProducts = productsRes.data || []
-
-    // Calculate subtotal (merchandise/services base total)
-    const subtotal = orderServices.reduce((acc: number, s: any) => acc + Number(s.total_price || 0), 0) +
-      orderProducts.reduce((acc: number, p: any) => acc + Number(p.total_price || 0), 0)
-
-    // Calculate discount amount from order discount fields
-    let discountAmount = 0
-    if (order.discount_type === "percentage") {
-      discountAmount = subtotal * (Number(order.discount_value || 0) / 100)
-    } else if (order.discount_type === "fixed") {
-      discountAmount = Number(order.discount_value || 0)
-    } else if (order.discount_type === "coupon") {
-      discountAmount = Number(order.coupon_discount_amount || 0)
-    }
-
-    const otherCosts = Number(order.other_costs || 0)
-    const baseFinalAmount = subtotal - discountAmount + otherCosts
-
-    // Aggregate payment method adjustments
-    let paymentMethodDiscountAmount = 0
-    let paymentMethodExtraAmount = 0
-    let interestAmount = 0
-    let customerVisibleInterest = 0
-    let feeAmount = 0
-    let originalAmount = 0
-
-    if (payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
-      let customerFeeAmount = 0
-      for (const entry of payload.paymentBreakdown) {
-        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
-        originalAmount += received
-        paymentMethodDiscountAmount += Number(entry.paymentMethodDiscountAmount ?? 0)
-
-        const entryInterest = Number(entry.interestAmount ?? 0)
-        interestAmount += entryInterest
-        const entryInstallmentCost = Number(entry.installmentCostAmount ?? 0)
-        const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
-        const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
-        const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
-        const entryFee = Number(entry.feeAmount ?? 0) + Number(entry.fixedFeeAmount ?? 0)
-        const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
-        const isCustomerBearer = bearer === "customer" || bearer === "buyer"
-
-        if (isCustomerBearer) {
-          customerVisibleInterest += entryFixedInterest
-        }
-        if (isCustomerInstallmentBearer) {
-          customerVisibleInterest += entryInstallmentCost
-        }
-        if (isCustomerBearer) {
-          customerFeeAmount += entryFee
-        } else {
-          feeAmount += entryFee
-        }
-      }
-      paymentMethodExtraAmount = customerVisibleInterest + customerFeeAmount
-    } else {
-      originalAmount = payload.paidAmount
-    }
-
-    const finalAmount = baseFinalAmount - paymentMethodDiscountAmount + paymentMethodExtraAmount
-
-    // Map payment status to valid sales table values
-    const salePaymentStatus = payload.paymentStatus === "unpaid" ? "pending" : payload.paymentStatus
-    const saleStatus = payload.paymentStatus === "unpaid" ? "pending" : payload.paymentStatus
-
-    // 3. Update the service order's payment info
-    const { error: updateErr } = await supabase
-      .from("service_orders")
-      .update({
-        payment_status: payload.paymentStatus,
-        paid_amount: payload.paidAmount,
-        payment_method: payload.paymentMethod || null,
-        payment_breakdown: payload.paymentBreakdown ? JSON.stringify(payload.paymentBreakdown) : null,
-      })
-      .eq("id", order.id)
-
-    if (updateErr) throw updateErr
-
-    // 4. Create or update sale in `sales` table
-    const saleRefNote = `service_order:${order.id}:sale`
-    const { data: existingSale } = await supabase
-      .from("sales")
-      .select("id, sale_number")
-      .eq("partner_id", payload.partnerId)
-      .eq("notes", saleRefNote)
-      .limit(1)
-      .maybeSingle()
-
-    let saleId = existingSale?.id || null
-    let saleNumber = existingSale?.sale_number || null
-
-    if (!saleId) {
-      const { data: saleNumberData } = await supabase.rpc("generate_sale_number")
-      saleNumber = String(saleNumberData || "").trim() || `OS-DDT-${String(order.id).slice(0, 8).toUpperCase()}`
-
-      const { data: sale, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          partner_id: payload.partnerId,
-          customer_id: order.customer_id || null,
-          total_amount: subtotal,
-          discount_amount: discountAmount,
-          final_amount: finalAmount,
-          paid_amount: payload.paidAmount,
-          payment_status: salePaymentStatus,
-          status: saleStatus,
-          finance_account_id: payload.financeAccountId || null,
-          notes: saleRefNote,
-          finalized_by_user_id: user.id,
-          sale_number: saleNumber,
-          origin_type: "service_order",
-          origin_id: order.id,
-        })
-        .select("id")
-        .single()
-
-      if (saleError) throw saleError
-      saleId = sale?.id || null
-
-      if (saleId) {
-        // Link sale to OS bidirecionalmente
-        const admin = getAdminClient()
-        await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id).eq("partner_id", payload.partnerId)
-        await admin.from("sales").update({ origin_type: "service_order", origin_id: order.id }).eq("id", saleId)
-
-        // Insert sale_items for services and products
-        const saleItems: any[] = []
-        orderServices.forEach((s: any) => {
-          saleItems.push({
-            sale_id: saleId,
-            partner_id: payload.partnerId,
-            product_id: null,
-            variant_id: null,
-            product_name: s.service_name || "Mão de Obra",
-            variant_name: null,
-            unit_price: Number(s.service_price || 0),
-            quantity: Number(s.quantity || 1),
-            subtotal: Number(s.total_price || 0),
-            total_price: Number(s.total_price || 0),
-          })
-        })
-
-        orderProducts.forEach((p: any) => {
-          saleItems.push({
-            sale_id: saleId,
-            partner_id: payload.partnerId,
-            product_id: p.product_id,
-            variant_id: p.variant_id || null,
-            product_name: p.product_name || "Produto",
-            variant_name: null,
-            unit_price: Number(p.unit_price || 0),
-            quantity: Number(p.quantity || 1),
-            subtotal: Number(p.total_price || 0),
-            total_price: Number(p.total_price || 0),
-          })
-        })
-
-        if (saleItems.length > 0) {
-          const { error: itemsError } = await supabase.from("sale_items").insert(saleItems)
-          if (itemsError) throw itemsError
-        }
-      }
-    } else {
-      // Update existing sale
-      const admin = getAdminClient()
-      const { error: saleUpdateError } = await supabase
-        .from("sales")
-        .update({
-          total_amount: subtotal,
-          discount_amount: discountAmount,
-          final_amount: finalAmount,
-          paid_amount: payload.paidAmount,
-          payment_status: salePaymentStatus,
-          status: saleStatus,
-          finance_account_id: payload.financeAccountId || null,
-        })
-        .eq("id", saleId)
-
-      if (saleUpdateError) throw saleUpdateError
-      await admin.from("sales").update({ origin_type: "service_order", origin_id: order.id }).eq("id", saleId)
-      await admin.from("service_orders").update({ sale_id: saleId }).eq("id", order.id)
-    }
-
-    // 5. Sync linked orders entry (use order.order_id instead of notes lookup)
-    const linkedOrderId = order.order_id
-    if (!linkedOrderId) {
-      throw new Error("Pedido vinculado não encontrado. A OS deve ter um pedido associado.")
-    }
-
-    const paymentMethodSummary = payload.paymentMethod
-      ? [{ method: payload.paymentMethod, amount: payload.paidAmount }]
-      : []
-
-    const { error: orderUpdateErr } = await supabase
-      .from("orders")
-      .update({
-        total_amount: finalAmount,
-        discount_value: order.discount_value || 0,
-        discount_type: order.discount_type || "fixed",
-        discount_amount: discountAmount,
-        payment_method_discount_amount: paymentMethodDiscountAmount,
-        payment_method_extra_amount: paymentMethodExtraAmount,
-        additional_costs: otherCosts,
-        paid_amount: payload.paidAmount,
-        situation: saleStatus,
-        order_source: "Ordem de Serviço",
-        payment_method: payload.paymentMethod || null,
-        payment_breakdown: JSON.stringify(paymentMethodSummary),
-      })
-      .eq("id", linkedOrderId)
-
-    if (orderUpdateErr) throw orderUpdateErr
-
-    // Sync order_items from services and products (use correct columns: product_price/subtotal)
-    if (linkedOrderId && (orderServices.length > 0 || orderProducts.length > 0)) {
-      const orderItems = [
-        ...orderServices.map((s: any) => ({
-          order_id: linkedOrderId,
-          product_id: s.service_id || null,
-          variant_id: null,
-          product_name: s.service_name || "Mão de Obra",
-          product_price: Number(s.service_price || 0),
-          quantity: Number(s.quantity || 1),
-          subtotal: Number(s.total_price || 0),
-          line_type: "service_booking" as const,
-          fulfillment_mode: "on_site",
-          service_id: s.service_id || null,
-          is_gift: false,
-          original_price: null,
-          is_promotional: false,
-          promotion_id: null,
-        })),
-        ...orderProducts.map((p: any) => ({
-          order_id: linkedOrderId,
-          product_id: p.product_id,
-          variant_id: p.variant_id || null,
-          product_name: p.product_name || "Produto",
-          product_price: Number(p.unit_price || 0),
-          quantity: Number(p.quantity || 1),
-          subtotal: Number(p.total_price || 0),
-          line_type: "product" as const,
-          fulfillment_mode: "delivery",
-          service_id: null,
-          is_gift: false,
-          original_price: null,
-          is_promotional: false,
-          promotion_id: null,
-        })),
-      ]
-
-      await supabase.from("order_items").delete().eq("order_id", linkedOrderId)
-      const { error: itemsErr } = await supabase.from("order_items").insert(orderItems)
-      if (itemsErr) throw itemsErr
-    }
-
-    const capabilities = await getPartnerCapabilities(payload.partnerId, { storeId: order.store_id || null })
-
-    // 6. Create or update transaction in `transactions` table (if paidAmount > 0)
-    if (capabilities.hasFinancial && payload.paidAmount > 0.009) {
-      const txRefNote = `service_order:${order.id}:payment`
-      const { data: existingPaymentTx } = await supabase
-        .from("transactions")
-        .select("id")
-        .eq("partner_id", payload.partnerId)
-        .eq("reference_note", txRefNote)
-        .limit(1)
-        .maybeSingle()
-
-      const nowIso = new Date().toISOString()
-      let txId = existingPaymentTx?.id || null
-
-      if (!txId) {
-        const { data: insertedTx, error: txError } = await supabase
-          .from("transactions")
-          .insert({
-            partner_id: payload.partnerId,
-            description: saleNumber || order.order_number,
-            category: "Vendas",
-            customer_id: order.customer_id || null,
-            contact_type: "customer",
-            amount: payload.paidAmount,
-            due_date: null,
-            payment_date: nowIso,
-            transaction_date: nowIso,
-            status: "paid",
-            notes: null,
-            payment_type: payload.paymentMethod || "Ordem de Serviço",
-            payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
-            original_amount: originalAmount,
-            interest_amount: interestAmount > 0 ? interestAmount : null,
-            fee_amount: feeAmount,
-            discount_amount: paymentMethodDiscountAmount > 0 ? paymentMethodDiscountAmount : null,
-            transaction_type: "income",
-            origin: "system",
-            reference_note: txRefNote,
-            account_id: payload.financeAccountId || null,
-            created_by_user_id: user.id,
-          })
-          .select("id")
-          .single()
-
-        if (txError) throw txError
-        txId = insertedTx?.id || null
-      } else {
-        const { error: txError } = await supabase
-          .from("transactions")
-          .update({
-            amount: payload.paidAmount,
-            original_amount: originalAmount,
-            interest_amount: interestAmount > 0 ? interestAmount : null,
-            fee_amount: feeAmount,
-            discount_amount: paymentMethodDiscountAmount > 0 ? paymentMethodDiscountAmount : null,
-            payment_type: payload.paymentMethod || "Ordem de Serviço",
-            payment_method_id: (payload.paymentBreakdown && payload.paymentBreakdown[0]?.paymentMethodId) || null,
-            account_id: payload.financeAccountId || null,
-          })
-          .eq("id", txId)
-
-        if (txError) throw txError
-      }
-
-      // Sync transaction_payments
-      if (txId && payload.paymentBreakdown && Array.isArray(payload.paymentBreakdown)) {
-        let paymentLine = 0
-        const paymentsToInsert = payload.paymentBreakdown.map((entry: any) => {
-          paymentLine++
-          const amt = Number(entry.amount || 0)
-          const received = Number(entry.amountReceived || 0)
-          const bearer = entry.feeBearer || "merchant"
-
-          const entryInterest = Number(entry.interestAmount ?? 0)
-          const entryDiscount = Number(entry.paymentMethodDiscountAmount ?? 0)
-
-          return {
-            partner_id: payload.partnerId,
-            transaction_id: txId,
-            amount: amt,
-            base_amount: received,
-            interest_amount: entryInterest,
-            discount_amount: entryDiscount,
-            payment_method_id: entry.paymentMethodId || null,
-            created_by_user_id: user.id,
-            idempotency_key: `${payload.partnerId}:${saleId}:line${paymentLine}:${entry.paymentMethodId || 'none'}`,
-          }
-        }).filter((p: any) => p.amount > 0)
-
-        if (paymentsToInsert.length > 0) {
-          await supabase.from("transaction_payments").delete().eq("transaction_id", txId)
-          const { error: insPayErr } = await supabase.from("transaction_payments").insert(paymentsToInsert)
-          if (insPayErr) console.error("Error inserting transaction_payments:", insPayErr)
-        }
-      }
-    }
-
-    // 7. Sync goals
-    const sellerUserId = order.assigned_user_id || user.id
-    if (capabilities.hasProductivity && sellerUserId) {
-      try {
-        const { applyServiceOrderToGoals } = await import("@/lib/services/sales-goals.service")
-        const adminClient = getAdminClient()
-        await applyServiceOrderToGoals({
-          supabase: adminClient,
-          partnerId: payload.partnerId,
-          sellerUserId,
-          saleAmount: finalAmount,
-          createdByUserId: user.id,
-        })
-      } catch (err) {
-        console.error("Error applying service order to goals:", err)
-      }
-    }
-
-    // Log audit event
-    await logAuditEvent({
-      partnerId: payload.partnerId,
-      actorUserId: user.id,
-      entityType: "service_order",
-      entityId: order.id,
-      actionType: "payment_confirmed",
-      source: "manual",
-      changeLines: [
-        `confirmou pagamento da OS: ${payload.paymentMethod} (R$ ${payload.paidAmount.toFixed(2)})`,
-      ],
-      metadata: {
-        paymentMethod: payload.paymentMethod,
-        amount: payload.paidAmount,
-      },
-    })
-
-    revalidatePath("/erp/ordens-de-servico")
-    return { success: true, orderId: order.id, orderNumber: order.order_number }
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro ao processar pagamento da ordem de serviço" }
-  }
-}
-
-
-
 export async function saveServiceOrderSpecificationsAction(
   partnerId: string,
   serviceOrderId: string,
@@ -2348,7 +2114,10 @@ export async function getPublicPresignedUploadUrlAction(
   | { success: false; error: string }
 > {
   try {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const rl = await requireRateLimit(RateLimitCategory.SERVICE_ORDER_PUBLIC_SIGN)
+    if (!rl.success) {
+      return { success: false, error: rl.error || "Muitas tentativas. Tente novamente em breve." }
+    }
     const cleanToken = String(token || "").trim()
     if (!cleanToken || cleanToken.length < 6) {
       return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
@@ -2409,7 +2178,10 @@ export async function signPublicServiceOrderAction(
   userAgent?: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const rl = await requireRateLimit(RateLimitCategory.SERVICE_ORDER_PUBLIC_SIGN)
+    if (!rl.success) {
+      return { success: false, error: rl.error || "Muitas tentativas. Tente novamente em breve." }
+    }
     const cleanToken = String(token || "").trim()
     if (!cleanToken || cleanToken.length < 6) {
       return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
@@ -2509,6 +2281,9 @@ export async function signPublicServiceOrderAction(
 
     if (isAuthorized) {
       // Direct update for authorized user (partner member, assigned tech, or authenticated customer)
+      const promiseStatuses: ServiceOrderStatus[] = ["aberta", "aguardando_aprovacao"]
+      const shouldApprove = promiseStatuses.includes(order.status as ServiceOrderStatus)
+
       const { error: updateErr } = await admin
         .from("service_orders")
         .update({
@@ -2517,7 +2292,8 @@ export async function signPublicServiceOrderAction(
           failed_attempts: 0,
           lockout_until: null,
           lockout_count: 0,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          ...(shouldApprove ? { status: "aprovada" } : {}),
         })
         .eq("id", order.id)
 
@@ -2534,7 +2310,8 @@ export async function signPublicServiceOrderAction(
         changeLines: [
           method === "erp_portal"
             ? 'OS assinada diretamente via portal (membro da loja autenticado)'
-            : 'OS assinada pelo cliente via portal público (autenticado por e-mail)'
+            : 'OS assinada pelo cliente via portal público (autenticado por e-mail)',
+          ...(shouldApprove ? ['Status alterado: ' + order.status + ' → aprovada (assinatura do cliente)'] : []),
         ],
         source: 'system',
         metadata: {
@@ -2572,6 +2349,75 @@ export async function signPublicServiceOrderAction(
   } catch (err: any) {
     console.error("[signPublicServiceOrderAction] Error:", err)
     return { success: false, error: err.message || "Erro interno ao assinar ordem de serviço" }
+  }
+}
+
+export async function rejectPublicServiceOrderAction(
+  token: string,
+  reason?: string,
+  ip?: string,
+  userAgent?: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.SERVICE_ORDER_PUBLIC_SIGN)
+    if (!rl.success) {
+      return { success: false, error: rl.error || "Muitas tentativas. Tente novamente em breve." }
+    }
+    const cleanToken = String(token || "").trim()
+    if (!cleanToken || cleanToken.length < 6) {
+      return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
+    }
+
+    const admin = getAdminClient()
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, status, partner_id, signature_image_key")
+      .eq("public_token", cleanToken)
+      .maybeSingle()
+
+    if (error || !order) {
+      return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
+    }
+
+    if (order.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já foi assinada e não pode ser recusada." }
+    }
+
+    if (order.status !== "aberta" && order.status !== "aguardando_aprovacao") {
+      return { success: false, error: "Esta ordem de serviço não está mais disponível para recusa." }
+    }
+
+    const cleanReason = sanitizeNotes(reason) || null
+
+    const { error: updateErr } = await admin
+      .from("service_orders")
+      .update({ status: "cancelada", updated_at: new Date().toISOString() })
+      .eq("id", order.id)
+      .in("status", ["aberta", "aguardando_aprovacao"])
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message || "Erro ao recusar ordem de serviço" }
+    }
+
+    await logAuditEvent({
+      partnerId: order.partner_id,
+      actorUserId: null,
+      entityType: "service_order",
+      entityId: order.id,
+      actionType: "cancelled",
+      source: "system",
+      changeLines: [
+        "OS recusada pelo cliente via portal público",
+        ...(cleanReason ? [`Motivo: ${cleanReason}`] : []),
+      ],
+      metadata: { ipAddress: ip || null, userAgent: userAgent || null, reason: cleanReason },
+    })
+
+    revalidatePath("/erp/ordens-de-servico")
+    return { success: true }
+  } catch (err: any) {
+    console.error("[rejectPublicServiceOrderAction] Error:", err)
+    return { success: false, error: err.message || "Erro interno ao recusar ordem de serviço" }
   }
 }
 

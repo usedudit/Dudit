@@ -108,3 +108,48 @@ export const PAYMENT_STATUS_META: Record<string, { label: string; variant: "gree
   partially_paid:   { label: "Parcialmente Pago", variant: "orange" },
   unpaid:           { label: "Não Pago",         variant: "gray" },
 }
+
+// Ordem canônica do fluxo operacional (usada para detectar retrocessos).
+export const SERVICE_ORDER_STATUS_ORDER: ServiceOrderStatus[] = [
+  "aberta",
+  "aguardando_aprovacao",
+  "aprovada",
+  "em_andamento",
+  "aguardando_peca",
+  "concluida",
+  "entregue",
+]
+
+// Transições permitidas por status. Estados terminais não possuem saída.
+export const SERVICE_ORDER_ALLOWED_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
+  aberta:               ["aguardando_aprovacao", "aprovada", "em_andamento", "aguardando_peca", "concluida", "cancelada"],
+  aguardando_aprovacao: ["aprovada", "cancelada"],
+  aprovada:             ["em_andamento", "aguardando_peca", "concluida", "cancelada"],
+  em_andamento:         ["aguardando_peca", "concluida", "cancelada"],
+  aguardando_peca:      ["em_andamento", "concluida", "cancelada"],
+  concluida:            ["entregue", "em_andamento", "cancelada"],
+  entregue:             [],
+  cancelada:            [],
+}
+
+export function isServiceOrderStatus(value: unknown): value is ServiceOrderStatus {
+  return typeof value === "string" && value in SERVICE_ORDER_STATUS_META
+}
+
+export function isValidServiceOrderTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
+  if (from === to) return false
+  const allowed = SERVICE_ORDER_ALLOWED_TRANSITIONS[from]
+  return Array.isArray(allowed) && allowed.includes(to)
+}
+
+export function getServiceOrderNextStatuses(from: ServiceOrderStatus): ServiceOrderStatus[] {
+  return SERVICE_ORDER_ALLOWED_TRANSITIONS[from] || []
+}
+
+// Retrocesso = target aparece antes do status atual na ordem canônica.
+export function isServiceOrderBackwardTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
+  const fromIdx = SERVICE_ORDER_STATUS_ORDER.indexOf(from)
+  const toIdx = SERVICE_ORDER_STATUS_ORDER.indexOf(to)
+  if (fromIdx === -1 || toIdx === -1) return false
+  return toIdx < fromIdx
+}

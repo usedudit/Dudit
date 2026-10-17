@@ -26,8 +26,6 @@ import {
     updateServiceOrderAction,
     addServicesToOrderAction,
     addProductsToOrderAction,
-    syncServiceOrderServicesAction,
-    syncServiceOrderProductsAction,
     saveServiceOrderSpecificationsAction,
     getPresignedUploadUrlAction,
     saveAttachmentAction,
@@ -35,7 +33,7 @@ import {
 } from "@/app/actions/erp/service-orders"
 import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
-import { SERVICE_ORDER_STATUS_META } from "@/lib/types/service-order"
+import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, type ServiceOrderStatus } from "@/lib/types/service-order"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectServiceSheet from "./SelectServiceSheet"
 import SelectProductSheet from "./SelectProductSheet"
@@ -1083,7 +1081,9 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         setValue={(val) => setStatus(val)}
                                                         disabled={isFieldLocked("status")}
                                                         options={Object.entries(SERVICE_ORDER_STATUS_META)
-                                                            .filter(([value]) => editData || ["aberta", "aguardando_aprovacao"].includes(value))
+                                                            .filter(([value]) => editData
+                                                                ? value === status || getServiceOrderNextStatuses((editData.status || "aberta") as ServiceOrderStatus).includes(value as ServiceOrderStatus)
+                                                                : ["aberta", "aguardando_aprovacao"].includes(value))
                                                             .map(([value, meta]) => ({
                                                                 value,
                                                                 label: meta.label,

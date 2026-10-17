@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useMemo } from "react"
 import {
     getServiceOrderByTokenAction,
     getPublicPresignedUploadUrlAction,
-    signPublicServiceOrderAction
+    signPublicServiceOrderAction,
+    rejectPublicServiceOrderAction
 } from "@/app/actions/erp/service-orders"
 import { useTimezone } from "@/lib/date"
 import {
@@ -72,6 +73,12 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
     // Modal Error State
     const [signModalError, setSignModalError] = useState<string | null>(null)
+
+    // Reject Modal State
+    const [showRejectModal, setShowRejectModal] = useState(false)
+    const [rejectReason, setRejectReason] = useState("")
+    const [isProcessingReject, setIsProcessingReject] = useState(false)
+    const [rejectError, setRejectError] = useState<string | null>(null)
 
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -343,6 +350,33 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
+    const canReject = !order.signature_image_key && (order.status === "aberta" || order.status === "aguardando_aprovacao")
+
+    const handleRejectOS = async () => {
+        setIsProcessingReject(true)
+        setRejectError(null)
+        try {
+            const token = order.public_token || window.location.pathname.split("/").pop() || ""
+            const res = await rejectPublicServiceOrderAction(token, rejectReason.trim(), ip, userAgent)
+            if (res.success) {
+                setShowRejectModal(false)
+                setRejectReason("")
+                setSuccessMessage("Ordem de serviço recusada.")
+                const refreshRes = await getServiceOrderByTokenAction(token)
+                if (refreshRes.success && refreshRes.data) {
+                    setOrder(refreshRes.data.serviceOrder)
+                    setHistory(refreshRes.data.history)
+                }
+            } else {
+                setRejectError(res.error || "Erro ao recusar a ordem de serviço.")
+            }
+        } catch (err: any) {
+            setRejectError(err.message || "Ocorreu um erro ao recusar a ordem de serviço.")
+        } finally {
+            setIsProcessingReject(false)
+        }
+    }
+
     // Group attachments by category
     const groupedAttachments = useMemo(() => {
         const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
@@ -521,7 +555,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                                                 {/* Sign Button */}
                                                 {!isFinalized && (
-                                                    <div className="pt-6 border-t border-brand-border dark:border-dark-border">
+                                                    <div className="pt-6 border-t border-brand-border dark:border-dark-border space-y-3">
                                                         <Button
                                                             onClick={() => {
                                                                 setSignerName(order.customer_name || "")
@@ -531,6 +565,19 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                         >
                                                             Assinar Ordem de Serviço
                                                         </Button>
+                                                        {canReject && (
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setRejectReason("")
+                                                                    setRejectError(null)
+                                                                    setShowRejectModal(true)
+                                                                }}
+                                                                className="w-full h-12 text-brand-red border-brand-red/40 hover:bg-brand-red/5"
+                                                            >
+                                                                Recusar Ordem de Serviço
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -793,6 +840,60 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     Limpar quadro
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </DefaultModal>
+
+                {/* ─── MODAL: REJECT SERVICE ORDER ───────────────────────────────────── */}
+                <DefaultModal
+                    isOpen={showRejectModal}
+                    onClose={() => {
+                        setShowRejectModal(false)
+                        setRejectError(null)
+                    }}
+                    title="Recusar Ordem de Serviço"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex gap-3 w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowRejectModal(false)
+                                    setRejectError(null)
+                                }}
+                                className="flex-1 py-2.5 h-auto"
+                            >
+                                Voltar
+                            </Button>
+                            <Button
+                                onClick={handleRejectOS}
+                                disabled={isProcessingReject}
+                                className="flex-1 bg-brand-red hover:bg-brand-red/90 text-white font-bold py-2.5 h-auto border-none"
+                            >
+                                {isProcessingReject ? "Recusando..." : "Confirmar Recusa"}
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 text-left">
+                        {rejectError && (
+                            <InfoCard message={rejectError} color="red" />
+                        )}
+
+                        <InfoCard color="red" message="Ao recusar, esta ordem de serviço será cancelada e não poderá mais ser aprovada pelo link." />
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                Motivo da recusa (opcional)
+                            </label>
+                            <textarea
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                rows={4}
+                                maxLength={500}
+                                placeholder="Descreva o motivo da recusa, se desejar."
+                                className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-red/40 resize-none"
+                            />
                         </div>
                     </div>
                 </DefaultModal>

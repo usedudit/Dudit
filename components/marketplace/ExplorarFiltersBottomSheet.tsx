@@ -334,10 +334,6 @@ export function ExplorarFiltersBottomSheet({
                     </span>
                     Envio nacional
                 </button>
-
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
-                    Mostra apenas produtos que oferecem envio pelo correios/transportadora para todo o Brasil.
-                </p>
             </section>
         </>
     )
