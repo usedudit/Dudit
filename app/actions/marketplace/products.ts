@@ -38,6 +38,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       images, rating, partner_id, sku, 
       condition, show_in_marketplace, technical_specs, created_at,
       show_price_in_store,
+      fulfillment_modes,
       video_type, video_url, video_thumbnail, video_duration, video_provider_id,
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),

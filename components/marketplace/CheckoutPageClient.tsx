@@ -33,6 +33,8 @@ import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
 import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
+import BottomSheet from "@/components/BottomSheet"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 import { getMarketplaceCheckoutAmountsAction } from "@/app/actions/marketplace/checkout-amounts"
@@ -518,6 +520,7 @@ export function CheckoutPageClient() {
     const [mobileStep, setMobileStep] = useState<1 | 2>(1)
     const [showReviewModal, setShowReviewModal] = useState(false)
     const [showNotesModal, setShowNotesModal] = useState(false)
+    const [showItemsSheet, setShowItemsSheet] = useState(false)
 
     const [wantsChange, setWantsChange] = useState<boolean | null>(null)
     const [payWithAmount, setPayWithAmount] = useState<number | null>(null)
@@ -1216,6 +1219,140 @@ export function CheckoutPageClient() {
     const partnerAddressLabel = formatPartnerAddress(
         checkoutContext?.partner?.address || partnerInfo.address,
     )
+
+    const checkoutItemCount = useMemo(() => {
+        if (checkoutContext?.lines && checkoutContext.lines.length > 0) {
+            return checkoutContext.lines.reduce((sum, l) => sum + (Number(l.quantity) || 1), 0)
+        }
+        return products.reduce((sum, p) => sum + (quantities[p.id] || p.quantity || 1), 0)
+    }, [checkoutContext?.lines, products, quantities])
+
+    const renderItemsShortcutButton = () => (
+        <button
+            type="button"
+            onClick={() => setShowItemsSheet(true)}
+            className="flex w-full items-center justify-between rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/50 px-1 py-1 text-left"
+        >
+            <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
+                    <FileTextIcon className="h-4 w-4" />
+                </div>
+                <span className="font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido ({checkoutItemCount})</span>
+            </div>
+            <ChevronRightIcon className="mr-2 h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
+        </button>
+    )
+
+    const renderReviewLocations = () => {
+        const lines = checkoutContext?.lines || []
+        const hasProducts = lines.some((l) => l.lineKind === "product") || Boolean(requirements?.showProductFulfillmentOptions)
+        const serviceLines = lines.filter((l) => l.lineKind === "service_booking")
+        const anyServiceOnSite = serviceLines.some((l) => l.fulfillmentMode === "on_site" || !l.fulfillmentMode)
+        const anyServiceCustomerAddress = serviceLines.some((l) => l.fulfillmentMode === "customer_location")
+        const selectedCarrier = selectedCarrierServiceId != null
+            ? carrierOptions.find((o) => o.serviceId === selectedCarrierServiceId) || null
+            : null
+
+        const rows: React.ReactNode[] = []
+
+        if (hasProducts) {
+            if (formData.deliveryType === "pickup") {
+                rows.push(
+                    <div key="product-pickup" className="flex items-start gap-3">
+                        <img src="https://img.dudit.com.br/static/Map.png" alt="Mapa" className="w-10 h-10 object-cover rounded-full shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-snug">{partnerAddressLabel}</p>
+                            {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
+                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1.5 font-medium">
+                                    {getReadyDayLabel(preparationEstimate) === "hoje"
+                                        ? `Pronto em ${preparationEstimate.readyInMinutes} min`
+                                        : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`} • Retirar das {pickupStartLabel} às {pickupEndLabel}
+                                </p>
+                            )}
+                        </div>
+                    </div>,
+                )
+            } else if (selectedCarrier) {
+                rows.push(
+                    <div key="product-carrier" className="flex items-center gap-3">
+                        <img
+                            src={getCarrierBrandIcon(selectedCarrier.companyName, selectedCarrier.serviceName)}
+                            alt={selectedCarrier.companyName || "Transportadora"}
+                            className="w-10 h-10 object-contain rounded-full shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {selectedCarrier.companyName ? `${selectedCarrier.companyName} - ${selectedCarrier.serviceName}` : selectedCarrier.serviceName}
+                            </p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                Envio nacional · {formatDeliveryDaysRange(selectedCarrier.deliveryMinDays, selectedCarrier.deliveryMaxDays)}
+                            </p>
+                            {selectedAddress && (
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                    {selectedAddress.street}, {selectedAddress.number}{selectedAddress.neighborhood ? ` - ${selectedAddress.neighborhood}` : ""}
+                                </p>
+                            )}
+                        </div>
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">{formatCurrency(Number(selectedCarrier.price))}</span>
+                    </div>,
+                )
+            } else if (selectedAddress) {
+                rows.push(
+                    <div key="product-delivery" className="flex items-center gap-3">
+                        <img src="https://img.dudit.com.br/static/Map.png" alt="Mapa" className="w-10 h-10 object-cover rounded-full shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de entrega</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{selectedAddress.street}, {selectedAddress.number}</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}</p>
+                        </div>
+                    </div>,
+                )
+            } else {
+                rows.push(
+                    <div key="product-tbd" className="flex items-center gap-3">
+                        <img src="https://img.dudit.com.br/static/Map.png" alt="Mapa" className="w-10 h-10 object-cover rounded-full shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">O vendedor entrará em contato para combinar a entrega.</p>
+                        </div>
+                    </div>,
+                )
+            }
+        }
+
+        if (anyServiceOnSite) {
+            rows.push(
+                <div key="service-onsite" className="flex items-start gap-3">
+                    <img src="https://img.dudit.com.br/static/Map.png" alt="Mapa" className="w-10 h-10 object-cover rounded-full shrink-0" />
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local do atendimento no estabelecimento</p>
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">{partnerAddressLabel}</p>
+                    </div>
+                </div>,
+            )
+        }
+
+        if (anyServiceCustomerAddress) {
+            rows.push(
+                <div key="service-customer" className="flex items-start gap-3">
+                    <img src="https://img.dudit.com.br/static/Map.png" alt="Mapa" className="w-10 h-10 object-cover rounded-full shrink-0" />
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Seu endereço para o atendimento</p>
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                            {selectedAddress ? `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.neighborhood ? ` - ${selectedAddress.neighborhood}` : ""}` : "Endereço não selecionado"}
+                        </p>
+                    </div>
+                </div>,
+            )
+        }
+
+        if (rows.length === 0) {
+            return <div className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum local de atendimento definido.</div>
+        }
+
+        return <div className="space-y-4">{rows}</div>
+    }
 
     const showMobileFulfillmentStep = Boolean(
         requirements &&
@@ -3539,6 +3676,7 @@ export function CheckoutPageClient() {
 
                     {/* Mobile/Tablet Stage Flow Layout */}
                     <div className="block lg:hidden space-y-6">
+                        {renderItemsShortcutButton()}
                         {mobileStep === 1 && showMobileFulfillmentStep && (
                             <div className="space-y-6 pb-24">
                                 {contextError && <InfoCard message={contextError} color="red" />}
@@ -4170,47 +4308,7 @@ export function CheckoutPageClient() {
             >
                 <div className="space-y-6">
                     <div className="space-y-4">
-                        {formData.deliveryType === "delivery" && selectedAddress ? (
-                            <div className="flex items-center gap-3 p-0 border-none bg-transparent shadow-none">
-                                <img
-                                    src="https://img.dudit.com.br/static/Map.png"
-                                    alt="Mapa"
-                                    className="w-10 h-10 object-cover rounded-full shrink-0"
-                                />
-                                <div className="flex flex-col min-w-0">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                        {selectedAddress.street}, {selectedAddress.number}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                        {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : formData.deliveryType === "pickup" ? (
-                            <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
-                                <img
-                                    src="https://img.dudit.com.br/static/Map.png"
-                                    alt="Mapa"
-                                    className="w-10 h-10 object-cover rounded-full shrink-0"
-                                />
-                                <div className="min-w-0">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-snug">
-                                        {formatPartnerAddress(partnerInfo.address)}
-                                    </p>
-                                    {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                        <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1.5 font-medium">
-                                            {getReadyDayLabel(preparationEstimate) === "hoje"
-                                                ? `Pronto em ${preparationEstimate.readyInMinutes} min`
-                                                : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
-                                            } • Retirar das {pickupStartLabel} às {pickupEndLabel}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-sm text-brand-inactive-text dark:text-dark-body">Endereço não selecionado</div>
-                        )}
+                        {renderReviewLocations()}
                     </div>
 
                     <div className="space-y-4">
@@ -4259,6 +4357,20 @@ export function CheckoutPageClient() {
                     )}
                 </div>
             </DefaultModal>
+
+            {/* Order Items Sheet (mobile/tablet) */}
+            <BottomSheet
+                isOpen={showItemsSheet}
+                onClose={() => setShowItemsSheet(false)}
+            >
+                <div className="space-y-5 px-1 pb-2">
+                    <div>
+                        <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
+                        <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{checkoutItemCount} item(ns) no pedido</p>
+                    </div>
+                    {renderSummaryContent(false)}
+                </div>
+            </BottomSheet>
 
             {/* Restored Custom Modals */}
             <DefaultModal

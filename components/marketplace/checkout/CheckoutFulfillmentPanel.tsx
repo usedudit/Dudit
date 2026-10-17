@@ -252,7 +252,7 @@ export function CheckoutFulfillmentPanel({
             onValueChange={(val) => onDeliveryTypeChange(val as "delivery" | "pickup")}
             className="w-full"
           >
-            <TabsList className="mb-6">
+            <TabsList className="mb-6 px-0">
               {canShowProductDelivery && <TabsTrigger value="delivery">Entrega</TabsTrigger>}
               {canShowProductPickup && <TabsTrigger value="pickup">Retirada no local</TabsTrigger>}
             </TabsList>
@@ -335,7 +335,7 @@ export function CheckoutFulfillmentPanel({
                 />
               ))}
               {carrierError && !carrierQuoteLoading && (
-                <p className="text-xs text-red-500">{carrierError}</p>
+                <p className="text-xs text-brand-red">{carrierError}</p>
               )}
             </div>
           )}
@@ -347,39 +347,45 @@ export function CheckoutFulfillmentPanel({
   const renderServicesFulfillment = () => {
     if (!showServicesSection) return null
     return (
-      <FormSection title="Serviços">
+      <FormSection title="Serviços" hasSeparator>
         <div className="space-y-3">
           {servicesWithChoice.length > 0 && (
-            <ListItem
-              icon={ServiceIcon}
-              title="Forma de atendimento"
-              description="Defina onde cada serviço será realizado"
-              className="px-4 py-3"
-              onClick={openModal}
-              showChevron
-            />
-          )}
+            <>
+              {anyServiceRequiresOnSite && (
+                <div className="flex items-stretch gap-4 py-2">
+                  <img
+                    src="https://img.dudit.com.br/static/Map.png"
+                    alt="Local"
+                    className="w-12 h-12 object-cover rounded-full shrink-0"
+                  />
+                  <div>
+                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                      Local do atendimento no estabelecimento
+                    </p>
+                    <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">{partnerAddressLabel}</p>
+                  </div>
+                </div>
+              )}
 
-          {anyServiceRequiresCustomerAddress && (
-            <div className="pt-2">
-              <AddressBlock {...addressProps} title="Seu endereço para o atendimento" />
-            </div>
-          )}
+              {anyServiceRequiresCustomerAddress && (
+                <div className="pt-2">
+                  <AddressBlock {...addressProps} title="Seu endereço para o atendimento" />
+                </div>
+              )}
 
-          {anyServiceRequiresOnSite && (
-            <div className="flex items-stretch gap-4 border-t border-brand-border dark:border-dark-border pt-4">
-              <img
-                src="https://img.dudit.com.br/static/Map.png"
-                alt="Local"
-                className="w-12 h-12 object-cover rounded-full shrink-0"
+              <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                Forma de atendimento
+              </p>
+
+              <ListItem
+                icon={ServiceIcon}
+                title="Forma de atendimento"
+                description="Defina onde cada serviço será realizado"
+                className="px-4 py-3"
+                onClick={openModal}
+                showChevron
               />
-              <div>
-                <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                  Local do atendimento no estabelecimento
-                </p>
-                <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">{partnerAddressLabel}</p>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </FormSection>

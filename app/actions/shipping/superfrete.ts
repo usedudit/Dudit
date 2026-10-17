@@ -1708,43 +1708,56 @@ export async function updateOrderCarrierStatusAction(payload: {
 
   try {
     const supabase = getAdminClient()
-    const { data: shipment } = await supabase
-      .from("order_shipments")
-      .select("id, status, paid_at")
-      .eq("order_id", payload.orderId)
-      .eq("partner_id", ctx.partnerId)
-      .neq("kind", "return")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const [shipmentRes, orderRes] = await Promise.all([
+      supabase
+        .from("order_shipments")
+        .select("id, status, paid_at")
+        .eq("order_id", payload.orderId)
+        .eq("partner_id", ctx.partnerId)
+        .neq("kind", "return")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("orders")
+        .select(
+          "id, situation, delivery_status, order_number, buyer_id, store_id, delivery_departure_at, delivery_arrived_at, delivery_completed_at, delivery_breakdown",
+        )
+        .eq("id", payload.orderId)
+        .eq("partner_id", ctx.partnerId)
+        .maybeSingle(),
+    ])
 
-    if (!shipment) {
-      return { success: false, error: "Este pedido não possui envio por transportadora." }
-    }
-
-    const { data: order } = await supabase
-      .from("orders")
-      .select(
-        "id, situation, delivery_status, order_number, buyer_id, store_id, delivery_departure_at, delivery_arrived_at, delivery_completed_at",
-      )
-      .eq("id", payload.orderId)
-      .eq("partner_id", ctx.partnerId)
-      .maybeSingle()
+    const shipment = shipmentRes.data
+    const order = orderRes.data
 
     if (!order) return { success: false, error: "Pedido não encontrado." }
 
-    const nowIso = new Date().toISOString()
-    const shipmentPatch: Record<string, unknown> = { status: nextStatus }
-    if (nextStatus === "released" && !shipment.paid_at) shipmentPatch.paid_at = nowIso
-    if (nextStatus === "delivered") shipmentPatch.delivered_at = nowIso
-    if (nextStatus === "cancelled") shipmentPatch.cancelled_at = nowIso
+    // Pedidos do ERP/PDV com entrega por transportadora gravam apenas o
+    // delivery_breakdown (source = "superfrete"); a linha em order_shipments
+    // só existe depois de gerar a etiqueta. Sem tolerar isso, alterar o status
+    // manualmente falhava com "Este pedido não possui envio por transportadora".
+    const isCarrierOrder =
+      Boolean(shipment) || (order.delivery_breakdown as any)?.source === "superfrete"
+    if (!isCarrierOrder) {
+      return { success: false, error: "Este pedido não possui envio por transportadora." }
+    }
 
-    const { error: shipErr } = await supabase
-      .from("order_shipments")
-      .update(shipmentPatch)
-      .eq("id", shipment.id)
-      .eq("partner_id", ctx.partnerId)
-    if (shipErr) return { success: false, error: shipErr.message }
+    const nowIso = new Date().toISOString()
+
+    if (shipment) {
+      const shipmentPatch: Record<string, unknown> = { status: nextStatus }
+      if (nextStatus === "released" && !shipment.paid_at) shipmentPatch.paid_at = nowIso
+      if (nextStatus === "delivered") shipmentPatch.delivered_at = nowIso
+      if (nextStatus === "cancelled") shipmentPatch.cancelled_at = nowIso
+
+      const { error: shipErr } = await supabase
+        .from("order_shipments")
+        .update(shipmentPatch)
+        .eq("id", shipment.id)
+        .eq("partner_id", ctx.partnerId)
+      if (shipErr) return { success: false, error: shipErr.message }
+    }
 
     // Mantém o status de entrega do pedido em sincronia (mesmo mapa do webhook).
     if (order.situation !== "cancelled") {
@@ -1777,7 +1790,7 @@ export async function updateOrderCarrierStatusAction(payload: {
         `Status de envio (transportadora) alterado para "${SUPERFRETE_LABEL_STATUS[nextStatus] || nextStatus}".`,
       ],
       source: "user",
-      metadata: { from_status: shipment.status, to_status: nextStatus, shipment_id: shipment.id, manual: true },
+      metadata: { from_status: shipment?.status ?? null, to_status: nextStatus, shipment_id: shipment?.id ?? null, manual: true },
     })
 
     // Avisa o cliente quando a encomenda é postada/entregue.

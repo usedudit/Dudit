@@ -25,6 +25,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { quoteCarrierFreightAction, type CarrierFreightOption } from "@/app/actions/marketplace/carrier-shipping"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 import { MapPinIcon, PlusIcon, CheckCircleIcon, TruckIcon } from "@/lib/icons"
 import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 
@@ -412,6 +413,29 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         return optimisticItems[item.id]?.selected ?? (item.selected !== false)
     }
 
+    // Envio nacional (transportadora) só é válido quando TODOS os produtos
+    // selecionados da loja declaram "shipping". Se houver mistura, a
+    // transportadora é bloqueada e avisamos o cliente.
+    const getPartnerShippingAvailability = (partnerData: any) => {
+        const selectedProductItems = (partnerData?.products || []).filter((item: any) => getItemSelected(item))
+        if (selectedProductItems.length === 0) {
+            return { allAllowShipping: false, someAllowShipping: false, hasMixedShipping: false, blockedCount: 0 }
+        }
+        let shippingCount = 0
+        let blockedCount = 0
+        for (const item of selectedProductItems) {
+            const modes = normalizeFulfillmentModes(item.products?.fulfillment_modes, ["delivery", "pickup"])
+            if (modes.includes("shipping")) shippingCount++
+            else blockedCount++
+        }
+        return {
+            allAllowShipping: shippingCount > 0 && blockedCount === 0,
+            someAllowShipping: shippingCount > 0,
+            hasMixedShipping: shippingCount > 0 && blockedCount > 0,
+            blockedCount,
+        }
+    }
+
     const getItemQuantity = (item: any): number =>
         optimisticItems[item.id]?.quantity ?? item.quantity
 
@@ -734,7 +758,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 // responde enquanto o geocoding/radi check roda; se o frete próprio
                 // cobrir, as opções simplesmente ficam escondidas (gate por "raio").
                 const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
-                if (destinationCep.length === 8 && data.partner?.mp_user_id && data.shippingEnabled) {
+                const shippingAvailability = getPartnerShippingAvailability(data)
+                if (destinationCep.length === 8 && data.partner?.mp_user_id && data.shippingEnabled && shippingAvailability.allAllowShipping) {
                     const carrierKey = `${targetPartnerId}:${destinationCep}`
                     if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
                         carrierFetchedKeysRef.current[storeKey] = carrierKey
@@ -893,6 +918,22 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         )
     }
 
+    // Aviso quando a loja tem produtos com e sem envio nacional ao mesmo tempo:
+    // a transportadora fica indisponível para todo o pedido.
+    const renderShippingWarning = (storeKey: string) => {
+        const info = getPartnerShippingAvailability(itemsByPartner[storeKey])
+        if (!info.hasMixedShipping) return null
+        return (
+            <div className="rounded-xl border border-brand-orange/40 bg-brand-orange/5 p-3 text-xs text-brand-dark dark:text-dark-heading">
+                <span className="font-semibold">Envio nacional indisponível para este pedido.</span>{" "}
+                {info.blockedCount === 1
+                    ? "1 item desta loja não aceita envio por transportadora."
+                    : `${info.blockedCount} itens desta loja não aceitam envio por transportadora.`}{" "}
+                Remova {info.blockedCount === 1 ? "esse item" : "esses itens"} para usar o envio nacional, ou escolha entrega local/retirada.
+            </div>
+        )
+    }
+
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
         if (hasOnlyServices(partnerData?.items || [])) return 0
         const carrierOption = getCarrierSelectedOption(storeKey)
@@ -975,7 +1016,13 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         }
         const isFreeThreshold = (settings?.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) || Boolean(quote?.breakdown?.isFreeByThreshold)
         if (isFreeThreshold) {
-            return <span className="text-brand-green font-semibold">Grátis (Entrega grátis ativada)</span>
+            const originalFee = Number(quote?.breakdown?.originalFee || 0)
+            return (
+                <span className="flex items-center gap-1.5 justify-end">
+                    {originalFee > 0 && <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(originalFee)} | </span>}
+                    <span className="text-brand-green font-semibold">Grátis</span>
+                </span>
+            )
         }
         if (quote?.fee != null) {
             if (quote.fee === 0 && quote.breakdown?.hasRatesConfigured && !quote.breakdown?.isEstimate) {
@@ -1542,6 +1589,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
+                                                                    {renderShippingWarning(storeKey)}
                                                                     {renderCarrierQuote(storeKey)}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center text-base font-bold text-brand-dark dark:text-dark-heading">
@@ -1593,6 +1641,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
+                                                                    {renderShippingWarning(storeKey)}
                                                                     {renderCarrierQuote(storeKey)}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">

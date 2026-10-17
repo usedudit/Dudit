@@ -28,6 +28,7 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { quoteCarrierFreightAction, type CarrierFreightOption } from "@/app/actions/marketplace/carrier-shipping"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
+import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
@@ -812,6 +813,15 @@ export function ProductDetailsPageClient({
         return digits.length === 8 ? digits : ""
     }, [userId, selectedAddress?.zip_code, cep])
 
+    // Modalidades declaradas pelo produto. O envio nacional (transportadora) só
+    // existe quando o produto realmente oferece "shipping" - nunca é inferido da
+    // integração da loja.
+    const productFulfillmentModes = useMemo(
+        () => normalizeFulfillmentModes(product?.fulfillment_modes ?? (product as any)?.fulfillmentModes, ["delivery", "pickup"]),
+        [product?.fulfillment_modes, (product as any)?.fulfillmentModes],
+    )
+    const productAllowsShipping = productFulfillmentModes.includes("shipping")
+
     // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
     // este efeito esperava o erro "raio" - serializando geocoding + SuperFrete.
     // Agora dispara assim que há CEP de destino; as opções ficam ocultas até
@@ -820,7 +830,7 @@ export function ProductDetailsPageClient({
     // own updates - otherwise the cleanup would cancel the in-flight request.
     useEffect(() => {
         const targetPartnerId = partner.partner_id || partner.id
-        if (!carrierDestinationCep || !targetPartnerId || !partner.mp_user_id) {
+        if (!carrierDestinationCep || !targetPartnerId || !partner.mp_user_id || !productAllowsShipping) {
             setCarrierOptions([])
             carrierQuoteKeyRef.current = null
             setCarrierError(null)
@@ -857,10 +867,11 @@ export function ProductDetailsPageClient({
             active = false
             if (!completed) carrierQuoteKeyRef.current = null
         }
-    }, [carrierDestinationCep, partner.partner_id, partner.id, partner.mp_user_id])
+    }, [carrierDestinationCep, partner.partner_id, partner.id, partner.mp_user_id, productAllowsShipping])
 
     // Apply the first carrier option as delivery fee whenever own quote failed
     useEffect(() => {
+        if (!productAllowsShipping) return
         if (carrierOptions.length === 0) return
         if (!deliveryOutsideRadius) return
         const opt = carrierOptions[0]
@@ -1883,7 +1894,7 @@ export function ProductDetailsPageClient({
                                                 <div className="text-right">
                                                     {deliveryLoading ? (
                                                         <Spinner />
-                                                    ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
+                                                    ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller" || isFreeByThreshold || deliveryBreakdown?.isFreeByThreshold) ? (
                                                         <div className="flex items-end">
                                                             {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
                                                                 <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(deliveryBreakdown.originalFee))} | </span>
@@ -1919,8 +1930,7 @@ export function ProductDetailsPageClient({
                                      {!deliveryLoading &&
                                         (deliveryOutsideRadius ||
                                             deliveryBreakdown?.source === "superfrete") &&
-                                        Array.isArray(product?.fulfillment_modes) &&
-                                        product.fulfillment_modes.includes("shipping") &&
+                                        productAllowsShipping &&
                                         (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
                                             <div className="pt-3 space-y-2">
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">

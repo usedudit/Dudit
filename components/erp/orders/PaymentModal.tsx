@@ -10,7 +10,6 @@ import {
     CopyIcon,
     ColumnsIcon as SplitIcon,
     ChevronUpIcon,
-    ChevronDownIcon,
     PrinterIcon,
     FileIcon,
     TagIcon,
@@ -27,6 +26,7 @@ import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
+import BottomSheet from '@/components/BottomSheet';
 import { getMercadoPagoStatusAction, checkMercadoPagoPaymentStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { getServiceCheckoutSettingsAction } from '@/app/actions/marketplace/service-checkout-settings';
 import { buildDepositCheckoutMeta } from '@/lib/services/marketplace-deposit-meta';
@@ -453,7 +453,6 @@ const PaymentModal = ({
 
     // z-index dinâmico: este modal/painel abre acima de tudo que já estava aberto.
     const zIndex = useModalLayer(isOpen);
-    const receiptZIndex = useModalLayer(isReceiptOpen);
 
     // Payment Status State
     const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
@@ -4191,49 +4190,24 @@ const PaymentModal = ({
                 </div>
 
                 {/* --- MOBILE BOTTOM SHEET RECEIPT --- */}
-                <AnimatePresence>
-                    {isReceiptOpen && (
-                        <>
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="fixed inset-0 bg-black/60 z-[70] md:hidden"
-                                style={{ zIndex: receiptZIndex }}
-                                onClick={() => setIsReceiptOpen(false)}
-                            />
-                            <motion.div
-                                initial={{ y: '100%' }}
-                                animate={{ y: 0 }}
-                                exit={{ y: '100%' }}
-                                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                                className="fixed bottom-0 left-0 right-0 h-[85vh] bg-white dark:bg-dark-surface z-[80] rounded-t-3xl flex flex-col overflow-hidden md:hidden shadow-2xl"
-                                style={{ zIndex: receiptZIndex }}
-                            >
-                                <div className="flex justify-between items-center p-6 border-b border-brand-border dark:border-dark-border">
-                                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
-                                    <button onClick={() => setIsReceiptOpen(false)} className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-dark-border/50 rounded-full">
-                                        <ChevronDownIcon size={20} />
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
-                                    <ReceiptContent
-                                        cart={receiptView.cart}
-                                        subTotal={receiptView.subTotal}
-                                        shippingFee={receiptView.shippingFee}
-                                        otherCosts={receiptView.otherCosts}
-                                        discountAmount={receiptView.discountAmount}
-                                        total={receiptView.total}
-                                        itemCount={receiptView.itemCount}
-                                        customerName={customer?.name}
-                                        pricingDetails={receiptPricingDetails}
-                                        deliveryBreakdown={deliveryBreakdown}
-                                    />
-                                </div>
-                            </motion.div>
-                        </>
-                    )}
-                </AnimatePresence>
+                <BottomSheet
+                    isOpen={isReceiptOpen}
+                    onClose={() => setIsReceiptOpen(false)}
+                    title="Resumo do Pedido"
+                >
+                    <ReceiptContent
+                        cart={receiptView.cart}
+                        subTotal={receiptView.subTotal}
+                        shippingFee={receiptView.shippingFee}
+                        otherCosts={receiptView.otherCosts}
+                        discountAmount={receiptView.discountAmount}
+                        total={receiptView.total}
+                        itemCount={receiptView.itemCount}
+                        customerName={customer?.name}
+                        pricingDetails={receiptPricingDetails}
+                        deliveryBreakdown={deliveryBreakdown}
+                    />
+                </BottomSheet>
             </div>
 
 

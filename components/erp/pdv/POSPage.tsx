@@ -2029,12 +2029,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         </button>
                     )}
 
-                    <BottomSheet isOpen={isCategorySheetOpen} onClose={() => setIsCategorySheetOpen(false)}>
+                    <BottomSheet isOpen={isCategorySheetOpen} onClose={() => setIsCategorySheetOpen(false)} title="Selecionar categoria">
                         <div className="space-y-3 px-1 pb-2">
-                            <div>
-                                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Selecionar categoria</h3>
-                                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar no PDV.</p>
-                            </div>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar no PDV.</p>
                             <div className="space-y-2">
                                 {categories.map((category) => (
                                     <button
@@ -2091,11 +2088,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         </DesktopPOSSheet>
                     )}
 
-                    <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
+                    <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)} title="Resumo do Pedido">
                         <div className="space-y-5 px-1 pb-2">
-                            <div>
-                                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
-                            </div>
                             <POSOrderSummaryContent
                                 itemCount={itemCount}
                                 subtotal={subtotal}
@@ -2127,12 +2121,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         </div>
                     </BottomSheet>
 
-                    <BottomSheet isOpen={isMobileItemsSheetOpen} onClose={() => setIsMobileItemsSheetOpen(false)}>
+                    <BottomSheet isOpen={isMobileItemsSheetOpen} onClose={() => setIsMobileItemsSheetOpen(false)} title="Itens do Pedido">
                         <div className="space-y-5 px-1 pb-2">
-                            <div>
-                                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
-                                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
-                            </div>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
                             {mobileCartItemsList}
                             <Button
                                 className="h-12 w-full"
@@ -2597,6 +2588,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         currentShippingFee={shippingFee}
                         partnerId={partnerId}
                         storeId={activeStoreId || null}
+                        orderSubtotal={subtotal}
                         onCreateAddress={handleCreateShippingAddress}
                         onApply={({ shippingFee: fee, distanceKm, breakdown }) => {
                             setShippingFee(Math.max(0, Number(fee || 0)))

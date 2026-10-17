@@ -3,6 +3,7 @@
 import { memo, type ReactNode } from "react"
 import { ChevronRightIcon, FileIcon, TagIcon, ThreeDotsIcon, TrashIcon, StarIcon, MotorbikeIcon, PackageIcon, SaveIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { Button, IconPlaceholder, Badge } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
@@ -130,6 +131,15 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
         )
     }
 
+    const isCarrierDelivery = (deliveryBreakdown as any)?.source === "superfrete"
+    const carrierIcon = isCarrierDelivery
+        ? getCarrierBrandIcon(
+            (deliveryBreakdown as any)?.companyName,
+            (deliveryBreakdown as any)?.serviceName,
+            (deliveryBreakdown as any)?.carrier,
+        )
+        : null
+
     return (
         <div className="bg-white space-y-4 dark:bg-dark-surface lg:rounded-2xl lg:border lg:border-brand-border lg:p-4">
             {showItemsShortcut && (
@@ -169,6 +179,12 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
                     <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-1.5">
                             <span className="font-medium">Taxa de entrega</span>
+                            {carrierIcon && (
+                                <Badge
+                                    variant="gray"
+                                    icon={<img src={carrierIcon} alt="Transportadora" className="object-contain" />}
+                                />
+                            )}
                             {onRemoveShipping && (
                                 <button
                                     type="button"
