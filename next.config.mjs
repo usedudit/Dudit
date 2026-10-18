@@ -16,6 +16,10 @@ const revision =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   "v1"
 
+// A build do Railway (Railpack) não define CI, então a checagem abaixo
+// precisa de um marcador próprio pra pular a geração/envio de source maps.
+const isRailwayBuild = Boolean(process.env.RAILWAY_ENVIRONMENT)
+
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
@@ -230,10 +234,17 @@ export default withSentryConfig(withSerwist(nextConfig), {
   project: "dudit",
 
   // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+  silent: !(process.env.CI || isRailwayBuild),
 
-  // Skip source map upload in CI (Railway build) to avoid 5-10min of upload time.
-  // Sentry error tracking still works at runtime via SENTRY_DSN.
+  // Skip source map *generation* (not just upload) on the Railway build.
+  // Desabilitando geração, o @sentry/nextjs não força o webpack
+  // (devtool = source-map/hidden-source-map) e o compile fica bem mais rápido.
+  // O Sentry continua capturando erros em runtime via SENTRY_DSN; as stack
+  // traces ficam minificadas nesse ambiente.
+  sourcemaps: {
+    disable: isRailwayBuild,
+  },
+
   authToken: process.env.CI ? undefined : process.env.SENTRY_AUTH_TOKEN,
 
   // For all available options, see:
