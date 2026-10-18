@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react
 
 export interface TurnstileRef {
   reset: () => void
+  execute: () => void
   getResponse: () => string | undefined
   getWidgetId: () => string | null
 }
@@ -14,6 +15,8 @@ export interface TurnstileProps {
   cdata?: string
   theme?: "light" | "dark" | "auto"
   size?: "normal" | "compact" | "flexible"
+  appearance?: "always" | "execute" | "interaction-only"
+  execution?: "render" | "execute"
   onSuccess: (token: string) => void
   onError?: (error: any) => void
   onExpire?: () => void
@@ -72,6 +75,8 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
     cdata,
     theme = "auto",
     size = "normal",
+    appearance = "interaction-only",
+    execution = "execute",
     onSuccess,
     onError,
     onExpire,
@@ -99,8 +104,29 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
       if (widgetIdRef.current && typeof window !== "undefined" && (window as any).turnstile) {
         try {
           ;(window as any).turnstile.reset(widgetIdRef.current)
+          // In "execute" mode the widget does not run on its own after a reset,
+          // so we re-run it (deferred) to produce a fresh token.
+          if (execution === "execute") {
+            const id = widgetIdRef.current
+            setTimeout(() => {
+              try {
+                ;(window as any).turnstile?.execute(id)
+              } catch (err) {
+                console.warn("[TURNSTILE] Failed to re-execute after reset:", err)
+              }
+            }, 0)
+          }
         } catch (err) {
           console.warn("[TURNSTILE] Failed to reset widget:", err)
+        }
+      }
+    },
+    execute: () => {
+      if (widgetIdRef.current && typeof window !== "undefined" && (window as any).turnstile) {
+        try {
+          ;(window as any).turnstile.execute(widgetIdRef.current)
+        } catch (err) {
+          console.warn("[TURNSTILE] Failed to execute widget:", err)
         }
       }
     },
@@ -149,6 +175,8 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
             cdata,
             theme,
             size,
+            appearance,
+            execution,
             callback: (token: string) => {
               if (isMountedRef.current) {
                 onSuccessRef.current?.(token)
@@ -164,10 +192,31 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
               if (isMountedRef.current) {
                 onExpireRef.current?.()
               }
+              // Tokens expire (~5min). Re-run (deferred) so a fresh token is ready.
+              if (execution === "execute") {
+                const id = widgetIdRef.current
+                setTimeout(() => {
+                  try {
+                    turnstile.execute(id)
+                  } catch (err) {
+                    console.warn("[TURNSTILE] Failed to re-execute after expiry:", err)
+                  }
+                }, 0)
+              }
             },
           })
 
           widgetIdRef.current = widgetId
+
+          // In "execute" mode (used for Invisible widgets) the widget does not run
+          // on its own, so we trigger it on mount to have the token ready.
+          if (execution === "execute") {
+            try {
+              turnstile.execute(widgetId)
+            } catch (err) {
+              console.warn("[TURNSTILE] Failed to auto-execute widget on mount:", err)
+            }
+          }
         } catch (renderError) {
           console.error("[TURNSTILE] Render error:", renderError)
           onErrorRef.current?.(renderError)
@@ -190,12 +239,12 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
         widgetIdRef.current = null
       }
     }
-  }, [siteKey, action, cdata, theme, size])
+  }, [siteKey, action, cdata, theme, size, appearance, execution])
 
   return (
     <div
       ref={containerRef}
-      className={className || "min-h-[65px] flex items-center justify-center my-2"}
+      className={className || "flex items-center justify-center"}
       data-testid="turnstile-container"
     />
   )

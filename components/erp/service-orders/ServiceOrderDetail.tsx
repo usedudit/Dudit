@@ -69,6 +69,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showShareModal, setShowShareModal] = useState(false)
+    const [shareLoading, setShareLoading] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false)
     const [showStatusModal, setShowStatusModal] = useState(false)
@@ -141,6 +142,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     // Load team members to resolve technician's name only if not provided by parent
     useEffect(() => {
         if (teamMembers.length > 0) return
+        if (order?.assigned_user_name) return
         async function loadTeam() {
             try {
                 const { getTeamMembers } = await import("@/app/actions/erp/team")
@@ -153,7 +155,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             }
         }
         loadTeam()
-    }, [teamMembers.length])
+    }, [teamMembers.length, order?.assigned_user_name])
 
     const handleStatusChange = async (newStatus: string, reason?: string) => {
         setLoading(true)
@@ -242,6 +244,16 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
     const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`
 
+    // Endereços do cliente derivados do snapshot (fallback do CustomerCard)
+    const customerPrimaryAddress = useMemo(
+        () => order?.customer_snapshot?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order?.customer_snapshot?.addresses?.[0] || null,
+        [order?.customer_snapshot]
+    )
+    const customerBillingAddress = useMemo(
+        () => order?.customer_snapshot?.addresses?.find((a: any) => a.address_type === "billing") || null,
+        [order?.customer_snapshot]
+    )
+
     // Financial calculations
     const subtotal = useMemo(() => {
         if (!order) return 0
@@ -275,7 +287,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     }
 
     const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)
-    const assignedName = assignedMember ? assignedMember.fullName : "Não atribuído"
+    const assignedName = order.assigned_user_name
+        || (assignedMember ? assignedMember.fullName : null)
+        || "Não atribuído"
 
     // Order Details style steps timeline
     const getTimelineSteps = () => {
@@ -396,12 +410,18 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     openPlanUpgrade("crescer");
                                                     return
                                                 }
+                                                if (order.public_token) {
+                                                    setShowShareModal(true);
+                                                    return
+                                                }
+                                                setShareLoading(true);
+                                                setShowShareModal(true);
                                                 const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                                 const token = await ensurePublicTokenAction(partnerId, order.id)
                                                 if (token) {
                                                     setOrder((prev: any) => ({ ...prev, public_token: token }))
                                                 }
-                                                setShowShareModal(true);
+                                                setShareLoading(false);
                                             }}
                                             onPrint={() => window.open(`/print/os/${order.id}`, "_blank")}
                                             onDelete={() => setConfirmDelete(true)}
@@ -432,7 +452,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
                                                 {/* Cliente - Mobile/Tablet only */}
                                                 <div className="lg:hidden">
-                                                    <CustomerMobileBar customer={order.customer_snapshot} showMap={false} />
+                                                    <CustomerMobileBar customer={order.customer_snapshot} address={customerPrimaryAddress} billingAddress={customerBillingAddress} showMap={false} />
                                                 </div>
                                                 <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                     <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
@@ -761,21 +781,23 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 <div className="hidden lg:block">
                                                     <CustomerCard
                                                         customer={order.customer_snapshot}
+                                                        address={customerPrimaryAddress}
+                                                        billingAddress={customerBillingAddress}
                                                         showMap={false}
                                                     />
                                                 </div>
 
                                                 {/* Online Signature Link & Code Card */}
                                                 {hasMinimumPlan(planSlug, "crescer") ? (
-                                                    <SidebarCard hasSeparator hasTopStrip title="Assinatura Online">
-                                                        <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente visualizar e assinar online.</p>
+                                                    <SidebarCard hasSeparator hasTopStrip title="Aprovação e Assinatura Online">
+                                                        <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente aprovar e assinar online.</p>
 
                                                         <div className="space-y-3">
                                                             <Button
                                                                 variant="outline"
                                                                 className="w-full"
                                                                 onClick={() => {
-                                                                    const text = `Olá! Segue o link para visualizar e assinar a Ordem de Serviço *#${order.order_number}*:\n\n${window.location.origin}/os/${order.public_token}\n\n*Código de Assinatura:* ${order.metadata?.plain_code || "Enviado por aqui"}`;
+                                                                    const text = `Olá! Segue o link para visualizar, aprovar e assinar a Ordem de Serviço *#${order.order_number}*:\n\n${window.location.origin}/os/${order.public_token}\n\n*Código de Aprovação:* ${order.metadata?.plain_code || "Enviado por aqui"}`;
                                                                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                                                                 }}
                                                             >
@@ -784,7 +806,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                             <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center">
                                                                 <div>
-                                                                    <span className="text-xs text-brand-inactive-text block">Código de Assinatura</span>
+                                                                    <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
                                                                     <span className="text-lg font-bold text-emerald-500 tracking-wider">
                                                                         {order.metadata?.plain_code || "---"}
                                                                     </span>
@@ -830,20 +852,28 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         </div>
                                                     </SidebarCard>
                                                 ) : (
-                                                    order.status !== "cancelada" && order.status !== "entregue" && (
+                                                    order.status !== "cancelada" && (
                                                         <SidebarCard hasSeparator hasTopStrip title="Assinatura do Cliente">
                                                             <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                                                <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
-                                                                <Button variant="outline" size="sm" onClick={() => {
-                                                                    if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                                        openPlanUpgrade("crescer");
-                                                                    } else {
-                                                                        setShowSignature(true);
-                                                                    }
-                                                                }} className="w-full">
-                                                                    <CheckCircleIcon className="w-4 h-4 mr-2" />
-                                                                    Assinar OS
-                                                                </Button>
+                                                                {order.status === "aberta" || order.status === "aguardando_aprovacao" ? (
+                                                                    <p className="text-sm text-brand-inactive-text text-center">
+                                                                        A assinatura ficará disponível após a aprovação da ordem de serviço.
+                                                                    </p>
+                                                                ) : (
+                                                                    <>
+                                                                        <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
+                                                                        <Button variant="outline" size="sm" onClick={() => {
+                                                                            if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                                                openPlanUpgrade("crescer");
+                                                                            } else {
+                                                                                setShowSignature(true);
+                                                                            }
+                                                                        }} className="w-full">
+                                                                            <CheckCircleIcon className="w-4 h-4 mr-2" />
+                                                                            Assinar OS
+                                                                        </Button>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </SidebarCard>
                                                     )
@@ -1040,6 +1070,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                         isOpen={showShareModal}
                         onClose={() => setShowShareModal(false)}
                         url={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${order.public_token}`}
+                        isLoading={shareLoading}
                         title={`OS #${order.order_number}`}
                         shareMessage={`Olá! Segue o link para visualizar a Ordem de Serviço *#${order.order_number}*:`}
                         label="Link da OS"

@@ -408,6 +408,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             statusColor: o.statusColor,
             deliveryStatusLabel: o.deliveryStatusLabel,
             deliveryStatusColor: o.deliveryStatusColor,
+            carrierBrandIcon: o.carrierBrandIcon,
             situation: o.situation,
             delivery_status: o.delivery_status,
             delivery_type: o.delivery_type || "delivery",

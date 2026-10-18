@@ -6,6 +6,7 @@ import {
   isServiceOrderStatus,
   isValidServiceOrderTransition,
   getServiceOrderNextStatuses,
+  getServiceOrderEditPolicy,
   isServiceOrderBackwardTransition,
   type ServiceOrderStatus,
 } from "@/lib/types/service-order"
@@ -117,6 +118,53 @@ describe("service-order status helpers", () => {
       const expected = ALL_STATUSES.filter((s) => s !== "cancelada")
       expect([...SERVICE_ORDER_STATUS_ORDER].sort()).toEqual([...expected].sort())
       expect(new Set(SERVICE_ORDER_STATUS_ORDER).size).toBe(SERVICE_ORDER_STATUS_ORDER.length)
+    })
+  })
+
+  describe("edit policy", () => {
+    it("allows full editing while open or awaiting approval", () => {
+      for (const status of ["aberta", "aguardando_aprovacao"] as ServiceOrderStatus[]) {
+        const policy = getServiceOrderEditPolicy(status)
+        expect(policy.readOnly).toBe(false)
+        expect(policy.canEditAll).toBe(true)
+        expect(policy.canEditItems).toBe(true)
+        expect(policy.canEditNotes).toBe(true)
+        expect(policy.canAttach).toBe(true)
+      }
+    })
+
+    it("restricts items and core fields once approved", () => {
+      const policy = getServiceOrderEditPolicy("aprovada")
+      expect(policy.readOnly).toBe(false)
+      expect(policy.canEditAll).toBe(false)
+      expect(policy.canEditItems).toBe(false)
+      expect(policy.canEditAssignment).toBe(true)
+      expect(policy.canChangeStatus).toBe(true)
+      expect(policy.canEditSpecs).toBe(true)
+      expect(policy.canEditNotes).toBe(true)
+      expect(policy.canAttach).toBe(true)
+    })
+
+    it("allows item additions during execution", () => {
+      for (const status of ["em_andamento", "aguardando_peca"] as ServiceOrderStatus[]) {
+        const policy = getServiceOrderEditPolicy(status)
+        expect(policy.canEditItems).toBe(true)
+        expect(policy.canEditAll).toBe(false)
+      }
+    })
+
+    it("locks terminal states except notes and attachments", () => {
+      for (const status of ["concluida", "entregue", "cancelada"] as ServiceOrderStatus[]) {
+        const policy = getServiceOrderEditPolicy(status)
+        expect(policy.readOnly).toBe(true)
+        expect(policy.canEditAll).toBe(false)
+        expect(policy.canEditItems).toBe(false)
+        expect(policy.canEditAssignment).toBe(false)
+        expect(policy.canChangeStatus).toBe(false)
+        expect(policy.canEditSpecs).toBe(false)
+        expect(policy.canEditNotes).toBe(true)
+        expect(policy.canAttach).toBe(true)
+      }
     })
   })
 })

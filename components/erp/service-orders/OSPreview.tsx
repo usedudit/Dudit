@@ -135,10 +135,12 @@ const OSPreview = ({
     const pages = useMemo(() => {
         const ROW_HEIGHT = 40;
         const TOTALS_SECTION_HEIGHT = 150;
-        const NOTES_SECTION_HEIGHT = (description || diagnosis || signatureImageKey) ? 120 : 0;
+        const NOTES_SECTION_HEIGHT = (description || diagnosis) ? 120 : 0;
         const FOOTER_HEIGHT = 40;
 
-        const P1_FIXED_CONTENT_HEIGHT = 449;
+        // A descrição/diagnóstico agora aparece no topo da 1ª página (antes da
+        // tabela), então sua altura é reservada no conteúdo fixo da página 1.
+        const P1_FIXED_CONTENT_HEIGHT = 449 + NOTES_SECTION_HEIGHT;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123;
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT;
 
@@ -148,7 +150,7 @@ const OSPreview = ({
         const chunks: { items: any[]; hasTotals: boolean; type: string }[] = [];
         let remainingItems = [...items];
 
-        const requiredHeightAllOnP1 = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT + NOTES_SECTION_HEIGHT;
+        const requiredHeightAllOnP1 = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT;
 
         if (requiredHeightAllOnP1 <= P1_AVAILABLE_FOR_ROWS_AND_TOTALS) {
             chunks.push({ items: remainingItems, hasTotals: true, type: 'first' });
@@ -161,7 +163,7 @@ const OSPreview = ({
         chunks.push({ items: itemsP1, hasTotals: false, type: 'first' });
 
         while (remainingItems.length > 0) {
-            const requiredHeightOnPn = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT + NOTES_SECTION_HEIGHT;
+            const requiredHeightOnPn = (remainingItems.length * ROW_HEIGHT) + TOTALS_SECTION_HEIGHT;
 
             if (requiredHeightOnPn <= PN_AVAILABLE_FOR_ROWS_AND_TOTALS) {
                 chunks.push({ items: remainingItems, hasTotals: true, type: 'middle' });
@@ -290,6 +292,29 @@ const OSPreview = ({
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {(description || diagnosis) && (
+                                            <div className="px-8 pb-6">
+                                                <div className="w-full border-t border-gray-100 pt-6 space-y-4">
+                                                    {description && (
+                                                        <div>
+                                                            <h4 className="font-bold text-xs mb-1.5 text-black">Descrição</h4>
+                                                            <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                                {description}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {diagnosis && (
+                                                        <div>
+                                                            <h4 className="font-bold text-xs mb-1.5 text-black">Diagnóstico</h4>
+                                                            <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                                {diagnosis}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
@@ -366,52 +391,29 @@ const OSPreview = ({
                                             </div>
                                         </div>
 
-                                        {(description || diagnosis) && (
-                                            <div className="px-8 pb-6">
-                                                <div className="w-full border-t border-brand-border pt-6">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        {description && (
-                                                            <div>
-                                                                <h4 className="font-bold text-xs mb-1.5 text-black">Observações</h4>
-                                                                <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                                    {description}
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                        {diagnosis && (
-                                                            <div>
-                                                                <h4 className="font-bold text-xs mb-1.5 text-black">Diagnóstico</h4>
-                                                                <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                                    {diagnosis}
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {signatureImageKey && (
+                                        {signatureImageKey ? (
                                             <div className="px-8 pb-12">
                                                 <div className="w-full border-t border-brand-border pt-6">
-                                                    <div className="flex flex-col items-start">
+                                                    <div className="flex flex-col items-center">
                                                         <h4 className="font-bold text-xs mb-2 text-black">Assinatura do Cliente</h4>
                                                         <img
                                                             src={buildImageUrl(signatureImageKey)}
                                                             alt="Assinatura"
                                                             className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
                                                         />
-                                                        {signedAt && (
-                                                            <span className="text-[9px] text-gray-400 mt-1">
-                                                                Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                                            </span>
-                                                        )}
+                                                        <div className="mt-4 w-full max-w-[280px] border-t border-gray-400 pt-2 text-center">
+                                                            <p className="font-bold text-[11px] text-brand-dark">{selectedCustomer?.name || "Cliente"}</p>
+                                                            <p className="text-[9px] text-gray-500">Assinatura do Cliente</p>
+                                                            {signedAt && (
+                                                                <p className="text-[9px] text-gray-400 mt-1">
+                                                                    Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        )}
-
-                                        {!description && !diagnosis && !signatureImageKey && (
+                                        ) : (
                                             <div className="px-8 pb-12">
                                                 <div className="w-full border-t border-brand-border pt-6">
                                                     <div className="flex items-center justify-center text-gray-400 text-xs italic">
@@ -428,7 +430,7 @@ const OSPreview = ({
 
                             {/* Footer */}
                             <div
-                                className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
+                                className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center shrink-0 w-full h-[40px]"
                                 style={{ backgroundColor: resolvedColors.primary }}
                             >
                                 <span>Criado via Dudit - dudit.com.br</span>

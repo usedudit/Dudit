@@ -135,7 +135,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
-  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult] = await Promise.all([
+  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult, userCartProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -202,6 +202,14 @@ export async function getMarketplaceCheckoutContextAction(input: {
       if (input.storeId) q = q.eq("store_id", input.storeId)
       return q
     })(),
+    // Produtos que já estão na sacola do usuário: não devem aparecer como
+    // sugestão de order bump, senão clicar neles somaria a quantidade da sacola.
+    admin
+      .from("cart_items")
+      .select("product_id")
+      .eq("user_id", user.id)
+      .eq("item_type", "product")
+      .not("product_id", "is", null),
   ])
 
   // mp_* status fields are sourced from partner_integrations.
@@ -449,7 +457,15 @@ export async function getMarketplaceCheckoutContextAction(input: {
     deliverySettings: deliveryConfig.success ? (deliveryConfig.settings as Record<string, unknown>) : null,
     storefrontPaymentMethods,
     userAddresses: ((userAddressesResult as any)?.data || []) as Record<string, unknown>[],
-    partnerBumpProducts: ((bumpProductsResult as any)?.data || []) as Record<string, unknown>[],
+    partnerBumpProducts: (() => {
+      const cartProductIds = new Set(
+        ((userCartProductsResult as any)?.data || [])
+          .map((row: any) => row.product_id)
+          .filter(Boolean)
+      )
+      return (((bumpProductsResult as any)?.data || []) as Record<string, unknown>[])
+        .filter((p: any) => !cartProductIds.has(p.id))
+    })(),
     mpAcceptedPaymentMethods: mpAcceptedPaymentMethods as any,
   }
 }

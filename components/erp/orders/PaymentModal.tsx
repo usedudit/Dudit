@@ -2476,7 +2476,7 @@ const PaymentModal = ({
 
             const methodLeg = {
                 method: (() => {
-                    let baseLabel = (() => {
+                    const baseLabel = (() => {
                         if (isMarketplaceOrder && originalPaymentMethod) {
                             return formatPaymentMethodToFullLabel(originalPaymentMethod);
                         }
@@ -2491,9 +2491,6 @@ const PaymentModal = ({
                         const fallbackType = view === 'money' ? 'cash' : (view === 'pix' ? 'pix' : 'card');
                         return getFormattedMethodLabel(fallbackName, fallbackType);
                     })();
-                    if (view === 'money' && wantsChange && payWithAmount > 0 && !baseLabel.toLowerCase().includes("troco para")) {
-                        return `${baseLabel} (Troco para R$ ${payWithAmount.toFixed(2).replace('.', ',')})`;
-                    }
                     return baseLabel;
                 })(),
                 amount: (isUnpaid && !selectedMethodId) ? 0 : methodLegAmount,

@@ -4,6 +4,7 @@ import {
   SERVICE_ORDER_STATUS_META,
   isServiceOrderStatus,
   isValidServiceOrderTransition,
+  getServiceOrderEditPolicy,
   type ServiceOrderStatus,
 } from "@/lib/types/service-order"
 
@@ -30,6 +31,7 @@ import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { generateShortId, isUuid } from "@/lib/utils/short-id"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { maskPersonName } from "@/lib/utils/formatters"
 
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
@@ -103,6 +105,79 @@ async function logStockShortagesForServiceOrder(
   }
 }
 
+/**
+ * Resolve a autorização de quem interage com o portal público da OS
+ * (aprovação/assinatura). Retorna `authorized: true` para membros do ERP
+ * (lojista/responsável/criador) ou quando o e-mail do usuário logado coincide
+ * com o do cliente da OS. Nesses casos o código de 4 dígitos não é exigido.
+ */
+async function resolvePortalActor(
+  admin: any,
+  partnerId: string,
+  assignedUserId: string | null,
+  createdBy: string | null,
+  customerEmail: string | null,
+  customerName: string | null,
+): Promise<{ authorized: boolean; method: "erp_portal" | "auth"; displayName: string; loggedUserId: string | null }> {
+  let loggedUser: any = null
+  try {
+    const { getCurrentUser } = await import("@/lib/auth/server-user")
+    loggedUser = await getCurrentUser()
+  } catch {
+    // Usuário não autenticado
+  }
+
+  if (!loggedUser) {
+    return { authorized: false, method: "auth", displayName: "", loggedUserId: null }
+  }
+
+  const { data: partnerUser } = await admin
+    .from("partner_users")
+    .select("role")
+    .eq("partner_id", partnerId)
+    .eq("user_id", loggedUser.id)
+    .maybeSingle()
+
+  const { data: partnerOwner } = await admin
+    .from("partners")
+    .select("id")
+    .eq("id", partnerId)
+    .eq("user_id", loggedUser.id)
+    .maybeSingle()
+
+  const isErpMember = Boolean(
+    partnerOwner ||
+    partnerUser ||
+    (assignedUserId && assignedUserId === loggedUser.id) ||
+    (createdBy && createdBy === loggedUser.id)
+  )
+
+  if (isErpMember) {
+    const { data: profile } = await admin
+      .from("user_profiles")
+      .select("full_name")
+      .eq("user_id", loggedUser.id)
+      .maybeSingle()
+    return {
+      authorized: true,
+      method: "erp_portal",
+      displayName: profile?.full_name?.trim() || loggedUser.email?.split("@")[0] || "Lojista",
+      loggedUserId: loggedUser.id,
+    }
+  }
+
+  if (customerEmail && loggedUser.email && loggedUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+    return {
+      authorized: true,
+      method: "auth",
+      displayName: customerName || loggedUser.email?.split("@")[0] || "Cliente",
+      loggedUserId: loggedUser.id,
+    }
+  }
+
+  return { authorized: false, method: "auth", displayName: "", loggedUserId: loggedUser.id }
+}
+
 export async function getERPServiceOrdersPageAction(
   partnerId: string,
   options?: { cursor?: ServiceOrderListCursor; limit?: number; status?: string; statuses?: string[]; search?: string; storeId?: string | null },
@@ -132,7 +207,7 @@ export async function getERPServiceOrdersPageAction(
         const supabase = getAdminClient()
         let q = supabase
           .from("service_orders")
-          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
+          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at, public_token")
           .eq("partner_id", partnerId)
         if (statuses.length > 0) q = q.in("status", statuses)
         else if (options?.status && options.status !== "all") q = q.eq("status", options.status)
@@ -146,7 +221,26 @@ export async function getERPServiceOrdersPageAction(
           .order("id", { ascending: false })
           .limit(fetchLimit)
         if (error) throw error
-        return data || []
+
+        const list = data || []
+        const assignedIds = Array.from(
+          new Set(list.map((r: any) => r.assigned_user_id).filter(Boolean)),
+        ) as string[]
+        let nameMap = new Map<string, string>()
+        if (assignedIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", assignedIds)
+          nameMap = new Map(
+            (profiles || []).map((p: any) => [String(p.user_id), String(p.full_name || "")]),
+          )
+        }
+
+        return list.map((r: any) => ({
+          ...r,
+          assigned_user_name: r.assigned_user_id ? (nameMap.get(String(r.assigned_user_id)) || null) : null,
+        }))
       },
       30,
     )
@@ -190,16 +284,22 @@ export async function getServiceOrderDetailsAction(
         if (error) throw error
         if (!order) throw new Error("Ordem de serviço não encontrada")
 
-        const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes] = await Promise.all([
+        const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes, assignedProfileRes] = await Promise.all([
           admin.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
           admin.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
           admin.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
           fetchTimelineForEntity("service_order", serviceOrderId, partnerId),
           order.sale_id ? admin.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
+          order.assigned_user_id
+            ? admin.from("user_profiles").select("full_name").eq("user_id", order.assigned_user_id).maybeSingle()
+            : Promise.resolve({ data: null } as any),
         ])
 
         return {
-          order,
+          order: {
+            ...order,
+            assigned_user_name: assignedProfileRes?.data?.full_name || null,
+          },
           services: servicesRes.data || [],
           products: productsRes.data || [],
           attachments: attachmentsRes.data || [],
@@ -745,11 +845,14 @@ export async function addServicesToOrderAction(
 
     const { data: current } = await admin
       .from("service_orders")
-      .select("payment_status")
+      .select("payment_status, status")
       .eq("id", serviceOrderId)
       .single()
     if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
       throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
+    if (!getServiceOrderEditPolicy((current?.status || "aberta") as ServiceOrderStatus).canEditItems) {
+      throw new Error("Não é possível alterar os itens desta ordem de serviço neste status.")
     }
 
     const validServiceIds = services.map(s => s.service_id).filter((id): id is string => !!id)
@@ -811,11 +914,14 @@ export async function addProductsToOrderAction(
 
     const { data: current } = await admin
       .from("service_orders")
-      .select("payment_status")
+      .select("payment_status, status")
       .eq("id", serviceOrderId)
       .single()
     if (current?.payment_status === "paid" || current?.payment_status === "partially_paid") {
       throw new Error("Não é possível alterar uma ordem de serviço com pagamentos registrados.")
+    }
+    if (!getServiceOrderEditPolicy((current?.status || "aberta") as ServiceOrderStatus).canEditItems) {
+      throw new Error("Não é possível alterar os itens desta ordem de serviço neste status.")
     }
 
     const validProductIds = products.map(p => p.product_id).filter((id): id is string => !!id)
@@ -1020,6 +1126,26 @@ export async function saveSignatureAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
     const admin = getAdminClient()
+
+    // A assinatura interna exige que a OS já tenha sido aprovada.
+    const { data: current, error: currentErr } = await admin
+      .from("service_orders")
+      .select("id, status, signature_image_key")
+      .eq("id", serviceOrderId)
+      .maybeSingle()
+
+    if (currentErr || !current) {
+      return { success: false, error: "Ordem de serviço não encontrada" }
+    }
+    if (current.status === "aberta" || current.status === "aguardando_aprovacao") {
+      return { success: false, error: "A OS precisa ser aprovada antes de ser assinada." }
+    }
+    if (current.status === "cancelada") {
+      return { success: false, error: "Não é possível assinar uma OS cancelada." }
+    }
+    if (current.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já possui assinatura registrada." }
+    }
 
     const { data, error } = await admin
       .from("service_orders")
@@ -1512,7 +1638,9 @@ export async function getServiceOrderByTokenAction(
     }
 
     // Consultas independentes resolvidas em paralelo (latência pública)
-    const needsCustomerLookup = (!resolvedCustomer || !(resolvedCustomer as any).name) && !!row.customer_id
+    const snapshotHasData = !!(resolvedCustomer && (resolvedCustomer as any).name)
+    const snapshotHasAddresses = Array.isArray((resolvedCustomer as any)?.addresses) && (resolvedCustomer as any).addresses.length > 0
+    const needsCustomerLookup = (!snapshotHasData || !snapshotHasAddresses) && !!row.customer_id
     const storeObjFromJoin = row.stores ? (Array.isArray(row.stores) ? row.stores[0] : row.stores) : null
     const [{ getPartnerPlan }, dbCustomerRes, assignedProfileRes, storeFallbackRes] = await Promise.all([
       import("@/lib/services/subscription.service"),
@@ -1562,21 +1690,9 @@ export async function getServiceOrderByTokenAction(
     const resolvedPartnerLogo = storeObj?.logo_url || null
     const resolvedPartnerPhone = storeObj?.phone || ""
 
-    const maskedCustomer = resolvedCustomer ? {
-      name: resolvedCustomer.name || null,
-      email: resolvedCustomer.email ? `${resolvedCustomer.email.split('@')[0].slice(0, 2)}***@${resolvedCustomer.email.split('@')[1] || 'email.com'}` : null,
-      phone: resolvedCustomer.phone ? `(***) *****-${resolvedCustomer.phone.replace(/\D/g, '').slice(-4)}` : null,
-      document: resolvedCustomer.document ? `***.${resolvedCustomer.document.replace(/\D/g, '').slice(3, 6)}.-**` : null,
-      addresses: Array.isArray(resolvedCustomer.addresses) ? resolvedCustomer.addresses.map((a: any) => ({
-        street: a.street,
-        neighborhood: a.neighborhood,
-        city: a.city,
-        state: a.state,
-        zip_code: a.zip_code ? `${a.zip_code.slice(0, 5)}-***` : null,
-        number: "***",
-        complement: "***",
-      })) : undefined,
-    } : null
+    // Portal público: cliente com dados COMPLETOS (endereço, contato, telefone
+    // e documento sem máscara). O aprovador é exibido mascarado.
+    const customerForPortal = resolvedCustomer || null
 
     let canDirectSign = false
     try {
@@ -1618,6 +1734,9 @@ export async function getServiceOrderByTokenAction(
     const safeMetadata = { ...(row.metadata || {}) }
     delete safeMetadata.plain_code
 
+    const approverName = typeof safeMetadata.approver_name === "string" ? safeMetadata.approver_name : null
+    const approvedAt = typeof safeMetadata.approved_at === "string" ? safeMetadata.approved_at : null
+
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
@@ -1636,7 +1755,7 @@ export async function getServiceOrderByTokenAction(
       signature_image_key: row.signature_image_key,
       signed_at: row.signed_at,
       customer_name: customerName,
-      customer_snapshot: maskedCustomer,
+      customer_snapshot: customerForPortal,
       sale_id: row.sale_id,
       specifications,
       metadata: safeMetadata,
@@ -1650,6 +1769,8 @@ export async function getServiceOrderByTokenAction(
       estimated_hours: row.estimated_hours,
       expected_completion_time: row.expected_completion_time,
       can_direct_sign: canDirectSign,
+      approver_name: maskPersonName(approverName),
+      approved_at: approvedAt,
       partners: {
         name: resolvedPartnerName,
         logo_url: resolvedPartnerLogo,
@@ -1724,6 +1845,51 @@ export async function updateServiceOrderAction(
       .single()
 
     if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
+
+    const policy = getServiceOrderEditPolicy(current.status as ServiceOrderStatus)
+
+    const assignmentProvided =
+      input.expected_completion_date !== undefined ||
+      input.assigned_user_id !== undefined ||
+      input.priority !== undefined ||
+      input.estimated_hours !== undefined ||
+      input.expected_completion_time !== undefined
+
+    if (!policy.canChangeStatus && input.status !== undefined && input.status !== current.status) {
+      throw new Error("Não é possível alterar o status desta ordem de serviço.")
+    }
+    if (!policy.canEditAssignment && assignmentProvided) {
+      throw new Error("Esta ordem de serviço não permite alterar responsável, previsão ou prioridade neste status.")
+    }
+    if (!policy.canEditAll && (
+      input.store_id !== undefined ||
+      input.title !== undefined ||
+      input.description !== undefined ||
+      input.diagnosis !== undefined ||
+      input.customer_id !== undefined ||
+      input.discount_value !== undefined ||
+      input.discount_type !== undefined ||
+      input.coupon_id !== undefined ||
+      input.coupon_code !== undefined ||
+      input.coupon_discount_amount !== undefined ||
+      input.other_costs !== undefined ||
+      input.payment_status !== undefined ||
+      input.paid_amount !== undefined ||
+      input.payment_method !== undefined ||
+      input.payment_breakdown !== undefined ||
+      input.created_at !== undefined
+    )) {
+      throw new Error("Esta ordem de serviço não permite editar cliente, valores ou descrição neste status.")
+    }
+    if (!policy.canEditItems && (input.services !== undefined || input.products !== undefined)) {
+      throw new Error("Não é possível alterar os itens desta ordem de serviço neste status.")
+    }
+    if (!policy.canEditSpecs && input.specifications !== undefined) {
+      throw new Error("Não é possível alterar as especificações desta ordem de serviço neste status.")
+    }
+    if (!policy.canEditNotes && input.internal_notes !== undefined) {
+      throw new Error("Não é possível alterar as observações desta ordem de serviço neste status.")
+    }
 
     const isPaid = current.payment_status === "paid" || current.payment_status === "partially_paid"
 
@@ -2014,6 +2180,19 @@ export async function saveServiceOrderSpecificationsAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const admin = getAdminClient()
 
+    const { data: current } = await admin
+      .from("service_orders")
+      .select("status")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!current) {
+      return { success: false, error: "Ordem de serviço não encontrada" }
+    }
+    if (!getServiceOrderEditPolicy(current.status as ServiceOrderStatus).canEditSpecs) {
+      return { success: false, error: "Não é possível alterar as especificações desta ordem de serviço neste status." }
+    }
+
     const { error } = await admin
       .from("service_orders")
       .update({ specifications })
@@ -2193,7 +2372,7 @@ export async function signPublicServiceOrderAction(
     // 1. Fetch OS strictly by public_token
     const { data: order, error } = await admin
       .from("service_orders")
-      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key, created_by")
+      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key, created_by, metadata")
       .eq("public_token", cleanToken)
       .maybeSingle()
 
@@ -2201,8 +2380,13 @@ export async function signPublicServiceOrderAction(
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
     }
 
-    if (order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key) {
-      return { success: false, error: "Esta ordem de serviço já foi concluída, cancelada ou já possui assinatura registrada." }
+    if (order.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já possui assinatura registrada." }
+    }
+
+    // A assinatura é o aceite final: somente após a conclusão do serviço.
+    if (order.status !== "concluida" && order.status !== "entregue") {
+      return { success: false, error: "A assinatura está disponível apenas após a conclusão do serviço." }
     }
 
     // Validate signatureImageKey format and prefix
@@ -2210,15 +2394,6 @@ export async function signPublicServiceOrderAction(
     const expectedPrefix = `users/${uploadUserId}/${R2_PREFIXES.serviceOrderSignatures}`
     if (!signatureImageKey || !signatureImageKey.startsWith(expectedPrefix) || !/\.(png|jpg|jpeg|webp)$/i.test(signatureImageKey)) {
       return { success: false, error: "Chave de assinatura inválida ou não autorizada para esta ordem de serviço." }
-    }
-
-    // 2. Determine auth method and check permission
-    let loggedUser: any = null
-    try {
-      const { getCurrentUser } = await import("@/lib/auth/server-user")
-      loggedUser = await getCurrentUser()
-    } catch {
-      // Not logged in
     }
 
     let rawCustomer = order.customer_snapshot
@@ -2230,61 +2405,34 @@ export async function signPublicServiceOrderAction(
       }
     }
     const customerEmail = (rawCustomer as any)?.email || null
-    let isAuthorized = false
+    const customerName = (rawCustomer as any)?.name || null
+
+    const actor = await resolvePortalActor(
+      admin,
+      order.partner_id,
+      order.assigned_user_id,
+      order.created_by,
+      customerEmail,
+      customerName,
+    )
+    const alreadyApprovedViaPortal = Boolean((order as any).metadata && (order as any).metadata.approved_at)
+
     let method = "code"
-    let approverDisplayName = approverName?.trim() || "Cliente"
+    let approverDisplayName = approverName?.trim() || customerName || "Cliente"
+    let doDirectUpdate = false
 
-    if (loggedUser) {
-      const { data: partnerUser } = await admin
-        .from("partner_users")
-        .select("role")
-        .eq("partner_id", order.partner_id)
-        .eq("user_id", loggedUser.id)
-        .maybeSingle()
-
-      const { data: partnerOwner } = await admin
-        .from("partners")
-        .select("id")
-        .eq("id", order.partner_id)
-        .eq("user_id", loggedUser.id)
-        .maybeSingle()
-
-      const isErpMember = Boolean(
-        partnerOwner ||
-        partnerUser ||
-        (order.assigned_user_id && order.assigned_user_id === loggedUser.id) ||
-        (order.created_by && order.created_by === loggedUser.id)
-      )
-
-      if (isErpMember) {
-        isAuthorized = true
-        method = "erp_portal"
-        const { data: profile } = await admin
-          .from("user_profiles")
-          .select("full_name")
-          .eq("user_id", loggedUser.id)
-          .maybeSingle()
-        approverDisplayName = profile?.full_name?.trim() || loggedUser.email?.split("@")[0] || "Lojista"
-      } else if (customerEmail && loggedUser.email && loggedUser.email.toLowerCase() === customerEmail.toLowerCase()) {
-        isAuthorized = true
-        method = "auth"
-        approverDisplayName = (rawCustomer as any)?.name || loggedUser.email?.split("@")[0] || "Cliente"
-      }
+    if (actor.authorized) {
+      doDirectUpdate = true
+      method = actor.method
+      approverDisplayName = actor.displayName || approverDisplayName
+    } else if (alreadyApprovedViaPortal) {
+      // OS já aprovada pelo portal: assinatura de aceite não exige novo código.
+      doDirectUpdate = true
+      method = "trusted"
+      approverDisplayName = customerName || approverDisplayName
     }
 
-    if (!isAuthorized) {
-      if (!approvalCode || !approvalCode.trim()) {
-        return { success: false, error: "Código de assinatura é obrigatório." }
-      }
-      method = "code"
-      approverDisplayName = (rawCustomer as any)?.name || approverName?.trim() || "Cliente"
-    }
-
-    if (isAuthorized) {
-      // Direct update for authorized user (partner member, assigned tech, or authenticated customer)
-      const promiseStatuses: ServiceOrderStatus[] = ["aberta", "aguardando_aprovacao"]
-      const shouldApprove = promiseStatuses.includes(order.status as ServiceOrderStatus)
-
+    if (doDirectUpdate) {
       const { error: updateErr } = await admin
         .from("service_orders")
         .update({
@@ -2294,7 +2442,6 @@ export async function signPublicServiceOrderAction(
           lockout_until: null,
           lockout_count: 0,
           updated_at: new Date().toISOString(),
-          ...(shouldApprove ? { status: "aprovada" } : {}),
         })
         .eq("id", order.id)
 
@@ -2304,15 +2451,14 @@ export async function signPublicServiceOrderAction(
 
       await logAuditEvent({
         partnerId: order.partner_id,
-        actorUserId: loggedUser?.id || null,
+        actorUserId: actor.loggedUserId,
         entityType: 'service_order',
         entityId: order.id,
         actionType: 'signed',
         changeLines: [
           method === "erp_portal"
             ? 'OS assinada diretamente via portal (membro da loja autenticado)'
-            : 'OS assinada pelo cliente via portal público (autenticado por e-mail)',
-          ...(shouldApprove ? ['Status alterado: ' + order.status + ' → aprovada (assinatura do cliente)'] : []),
+            : 'OS assinada pelo cliente via portal público',
         ],
         source: 'system',
         metadata: {
@@ -2323,6 +2469,10 @@ export async function signPublicServiceOrderAction(
         }
       })
     } else {
+      if (!approvalCode || !approvalCode.trim()) {
+        return { success: false, error: "Código de assinatura é obrigatório." }
+      }
+
       // Call DB function for code signature validation
       const { data: rpcRes, error: rpcErr } = await admin.rpc("sign_public_service_order", {
         p_so_id: order.id,
@@ -2350,6 +2500,147 @@ export async function signPublicServiceOrderAction(
   } catch (err: any) {
     console.error("[signPublicServiceOrderAction] Error:", err)
     return { success: false, error: err.message || "Erro interno ao assinar ordem de serviço" }
+  }
+}
+
+/**
+ * Aprovação da OS pelo portal (autorização pré-execução).
+ * Para membros do ERP (lojista/responsável/criador) ou quando o e-mail do
+ * usuário logado é o do cliente, não exige código. Caso contrário, valida o
+ * código de 4 dígitos via RPC. Não assina — apenas muda o status para 'aprovada'.
+ */
+export async function approvePublicServiceOrderAction(
+  token: string,
+  approverName: string,
+  approvalCode: string,
+  ip?: string,
+  userAgent?: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.SERVICE_ORDER_PUBLIC_SIGN)
+    if (!rl.success) {
+      return { success: false, error: rl.error || "Muitas tentativas. Tente novamente em breve." }
+    }
+    const cleanToken = String(token || "").trim()
+    if (!cleanToken || cleanToken.length < 6) {
+      return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
+    }
+
+    const admin = getAdminClient()
+
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key, created_by, metadata")
+      .eq("public_token", cleanToken)
+      .maybeSingle()
+
+    if (error || !order) {
+      return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
+    }
+
+    if (order.status !== "aberta" && order.status !== "aguardando_aprovacao") {
+      return { success: false, error: "Esta ordem de serviço não está mais aguardando aprovação." }
+    }
+
+    if (order.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já foi assinada." }
+    }
+
+    let rawCustomer = order.customer_snapshot
+    if (typeof rawCustomer === "string") {
+      try {
+        rawCustomer = JSON.parse(rawCustomer)
+      } catch {
+        rawCustomer = null
+      }
+    }
+    const customerEmail = (rawCustomer as any)?.email || null
+    const customerName = (rawCustomer as any)?.name || null
+
+    const actor = await resolvePortalActor(
+      admin,
+      order.partner_id,
+      order.assigned_user_id,
+      order.created_by,
+      customerEmail,
+      customerName,
+    )
+
+    let approverDisplayName = approverName?.trim() || customerName || "Cliente"
+
+    if (actor.authorized) {
+      approverDisplayName = actor.displayName || approverDisplayName
+      const nowIso = new Date().toISOString()
+      const { error: updateErr } = await admin
+        .from("service_orders")
+        .update({
+          status: "aprovada",
+          failed_attempts: 0,
+          lockout_until: null,
+          lockout_count: 0,
+          updated_at: nowIso,
+          metadata: {
+            ...((order as any).metadata || {}),
+            approver_name: approverDisplayName,
+            approved_at: nowIso,
+          },
+        })
+        .eq("id", order.id)
+
+      if (updateErr) {
+        return { success: false, error: updateErr.message || "Erro ao aprovar ordem de serviço" }
+      }
+
+      await logAuditEvent({
+        partnerId: order.partner_id,
+        actorUserId: actor.loggedUserId,
+        entityType: 'service_order',
+        entityId: order.id,
+        actionType: 'approved',
+        changeLines: [
+          actor.method === "erp_portal"
+            ? 'OS aprovada diretamente via portal (membro da loja autenticado)'
+            : 'OS aprovada pelo cliente via portal público (autenticado por e-mail)',
+          'Status alterado: ' + order.status + ' → aprovada',
+        ],
+        source: 'system',
+        metadata: {
+          ipAddress: ip || null,
+          userAgent: userAgent || null,
+          timestamp: nowIso,
+          approver_name: approverDisplayName,
+        },
+      })
+    } else {
+      if (!approvalCode || !approvalCode.trim()) {
+        return { success: false, error: "Código de aprovação é obrigatório." }
+      }
+
+      const { data: rpcRes, error: rpcErr } = await admin.rpc("approve_public_service_order", {
+        p_so_id: order.id,
+        p_name: approverDisplayName,
+        p_code: approvalCode.trim(),
+        p_ip: ip || null,
+        p_ua: userAgent || null,
+        p_method: "code",
+      })
+
+      if (rpcErr) {
+        console.error("[approvePublicServiceOrderAction] RPC Error:", rpcErr)
+        return { success: false, error: rpcErr.message || "Erro ao aprovar ordem de serviço" }
+      }
+
+      const result = rpcRes as { success: boolean; error?: string }
+      if (!result.success) {
+        return { success: false, error: result.error || "Erro ao processar aprovação" }
+      }
+    }
+
+    revalidatePath("/erp/ordens-de-servico")
+    return { success: true }
+  } catch (err: any) {
+    console.error("[approvePublicServiceOrderAction] Error:", err)
+    return { success: false, error: err.message || "Erro interno ao aprovar ordem de serviço" }
   }
 }
 

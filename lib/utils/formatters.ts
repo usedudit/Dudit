@@ -397,6 +397,17 @@ export function maskEmail(email: string | null | undefined): string {
   return `${maskedName}@${domain}`
 }
 
+/**
+ * Anonimiza um nome de pessoa preservando as iniciais de cada nome
+ * (ex: "Maria Silva" -> "M*** S***").
+ */
+export function maskPersonName(name: string | null | undefined): string {
+  if (!name || typeof name !== "string") return ""
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return ""
+  return words.map((word) => `${word[0].toUpperCase()}***`).join(" ")
+}
+
 const KNOWN_STATUS_LABELS: Record<string, string> = {
   // Service orders
   aberta: "Aberta",

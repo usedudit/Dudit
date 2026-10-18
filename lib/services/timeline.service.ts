@@ -13,6 +13,7 @@ export type ActionType =
   | "recurring_updated" | "recurring_cancelled" | "cash_opened"
   | "cash_closed" | "cash_movement" | "sale_created"
   | "withdrawal_created" | "deposit_created" | "movement_reversed"
+  | "signed" | "approved"
 
 export interface TimelineEntry {
   id: string
@@ -415,7 +416,7 @@ function isRoutineCrud(actionType: string, entityType: string): boolean {
 
   // For 'cancelled', keep financial cancellations
   if (actionType === "cancelled") {
-    const keepCancelledEntities = new Set(["order", "quote", "transaction", "return_request"])
+    const keepCancelledEntities = new Set(["order", "quote", "transaction", "return_request", "service_order"])
     return !keepCancelledEntities.has(entityType)
   }
 

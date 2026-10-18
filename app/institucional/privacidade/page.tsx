@@ -37,7 +37,7 @@ export default function PrivacyPage() {
                                 Política de Privacidade
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
-                                Versão 1.0 - Última atualização: Agosto de 2026
+                                Versão 1.1 - Última atualização: Outubro de 2026
                             </p>
                         </motion.div>
                     </div>
@@ -154,6 +154,7 @@ export default function PrivacyPage() {
                                             <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                                                 {[
                                                     { d: 'Dados de navegação (páginas, cliques)', f: 'Melhoria da plataforma', b: 'Legítimo interesse (Art. 7º, IX)' },
+                                                    { d: 'Verificação anti-bot (Cloudflare Turnstile)', f: 'Segurança, autenticação e prevenção de acessos automatizados', b: 'Legítimo interesse (Art. 7º, IX)' },
                                                     { d: 'Logs de acesso', f: 'Segurança e cumprimento do Marco Civil da Internet', b: 'Obrigação legal' }
                                                 ].map((item, i) => (
                                                     <tr key={i} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
@@ -197,9 +198,10 @@ export default function PrivacyPage() {
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
                                     <li><strong className="text-brand-dark">Superfrete / Transportadoras:</strong> nome, endereço e telefone do destinatário para geração de etiquetas de envio;</li>
-                                    <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
+                                    <li><strong className="text-brand-dark">Cloudflare:</strong> dados de tráfego para segurança e proteção contra ataques, incluindo o serviço <strong>Turnstile</strong> (verificação de que você é humano e bloqueio de acessos automatizados em formulários e autenticação), e armazenamento de imagens, vídeos e arquivos (Cloudflare R2);</li>
                                     <li><strong className="text-brand-dark">Autoridades competentes, mediante obrigação legal ou ordem judicial:</strong> quando exigido por lei, decisão judicial ou outra hipótese autorizada pela LGPD, para apuração de fraudes, ilícitos ou proteção de direitos, conforme item 2.4 dos Termos de Uso.</li>
                                 </ul>
+                                <p className="mt-4"><strong>3.1. Cloudflare Turnstile:</strong> utilizamos o Cloudflare Turnstile para proteger nossos formulários e o processo de autenticação contra acessos automatizados (bots). Ao utilizar esses recursos, a Cloudflare pode coletar e processar dados técnicos e de uso para operar e aprimorar o serviço, conforme o <a href="https://www.cloudflare.com/pt-br/turnstile-privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-brand-green font-medium underline underline-offset-4">Adendo de Privacidade do Turnstile da Cloudflare</a>, que é incorporado a esta Política de Privacidade e aplica-se especificamente ao serviço Turnstile.</p>
                                 <p className="mt-4">A DUDIT não compartilha dados cadastrais de Parceiros diretamente com Usuários (ou vice-versa) que aleguem ter sido lesados, exceto quando amparada por obrigação legal, ordem judicial ou outra hipótese prevista na legislação aplicável.</p>
                             </div>
                         </div>

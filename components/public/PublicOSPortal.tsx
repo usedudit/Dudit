@@ -5,6 +5,7 @@ import {
     getServiceOrderByTokenAction,
     getPublicPresignedUploadUrlAction,
     signPublicServiceOrderAction,
+    approvePublicServiceOrderAction,
     rejectPublicServiceOrderAction
 } from "@/app/actions/erp/service-orders"
 import { useTimezone } from "@/lib/date"
@@ -20,7 +21,8 @@ import {
     DefaultModal,
     Input,
     InfoCard,
-    IconPlaceholder
+    IconPlaceholder,
+    FormTextarea
 } from "@/components/reusable"
 import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -74,6 +76,12 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // Modal Error State
     const [signModalError, setSignModalError] = useState<string | null>(null)
 
+    // Approval Modal
+    const [showApproveModal, setShowApproveModal] = useState(false)
+    const [isProcessingApproval, setIsProcessingApproval] = useState(false)
+    const [approvalCode, setApprovalCode] = useState("")
+    const [approveModalError, setApproveModalError] = useState<string | null>(null)
+
     // Reject Modal State
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
@@ -123,6 +131,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     }, [currentUser, customerEmail])
 
     const isDirectSigner = Boolean(order?.can_direct_sign || isClientEmailMatched)
+    // Quando a OS já foi aprovada pelo portal, o aceite final (assinatura) não
+    // exige novo código.
+    const canSignWithoutCode = isDirectSigner || Boolean(order?.approved_at)
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const buildImageUrl = (key: string) => {
@@ -276,7 +287,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // ─── ONLINE SIGNING FLOW ─────────────────────────────────────────────────
     const handleSignOS = async () => {
         const canvas = canvasRef.current
-        if (!canvas || (!isDirectSigner && signatureCode.length < 4)) return
+        if (!canvas || (!canSignWithoutCode && signatureCode.length < 4)) return
 
         setIsProcessingSignature(true)
         setErrorMessage(null)
@@ -314,8 +325,8 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             // 4. Submit signature & verify code on backend
             const signRes = await signPublicServiceOrderAction(
                 token,
-                "Cliente",
-                isDirectSigner ? "" : signatureCode,
+                customerName,
+                canSignWithoutCode ? "" : signatureCode,
                 urlRes.key,
                 ip,
                 userAgent
@@ -347,10 +358,54 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         }
     }
 
+    // ─── APPROVAL FLOW (autorização pré-execução) ────────────────────────────
+    const handleApproveOS = async () => {
+        if (!isDirectSigner && approvalCode.length < 4) return
+
+        setIsProcessingApproval(true)
+        setApproveModalError(null)
+
+        try {
+            const token = order.public_token || window.location.pathname.split("/").pop() || ""
+            const res = await approvePublicServiceOrderAction(
+                token,
+                customerName,
+                isDirectSigner ? "" : approvalCode,
+                ip,
+                userAgent
+            )
+
+            if (res.success) {
+                setSuccessMessage("Ordem de serviço aprovada com sucesso!")
+                setShowApproveModal(false)
+                setApproveModalError(null)
+
+                const refreshRes = await getServiceOrderByTokenAction(token)
+                if (refreshRes.success && refreshRes.data) {
+                    setOrder(refreshRes.data.serviceOrder)
+                    setServices(refreshRes.data.services)
+                    setProducts(refreshRes.data.products)
+                    setAttachments(refreshRes.data.attachments)
+                    setHistory(refreshRes.data.history)
+                    setSale(refreshRes.data.sale)
+                }
+            } else {
+                setApproveModalError(res.error || "Erro ao aprovar a ordem de serviço.")
+            }
+        } catch (err: any) {
+            setApproveModalError(err.message || "Ocorreu um erro ao aprovar a ordem de serviço.")
+        } finally {
+            setIsProcessingApproval(false)
+        }
+    }
+
     const isFinalized = order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key
     const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
 
     const canReject = !order.signature_image_key && (order.status === "aberta" || order.status === "aguardando_aprovacao")
+    const canApprove = !order.signature_image_key && (order.status === "aberta" || order.status === "aguardando_aprovacao")
+    const canSign = !order.signature_image_key && (order.status === "concluida" || order.status === "entregue")
+    const hasActions = canApprove || canSign || canReject
 
     const handleRejectOS = async () => {
         setIsProcessingReject(true)
@@ -481,28 +536,39 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                         {/* ─── TAB: DADOS GERAIS ─── */}
                                         {activeTab === "Dados Gerais" && (
                                             <div className="space-y-8 text-left">
-                                                {isFinalized && (
-                                                    <>
+                                                {(order.approved_at || order.signature_image_key || isFinalized) && (
+                                                    <div className="space-y-3">
+                                                        {order.approved_at && order.status !== "cancelada" && (
+                                                            <InfoCard
+                                                                title='Aprovado pelo cliente'
+                                                                message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.approved_at)}`}
+                                                                color='green'
+                                                            />
+                                                        )}
                                                         {order.signature_image_key ? (
-                                                            <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${maskEmail(order.approver_name) || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
-                                                        ) : (
+                                                            <InfoCard
+                                                                title='Assinado pelo cliente'
+                                                                message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`}
+                                                                color='green'
+                                                            />
+                                                        ) : isFinalized && (!order.approved_at || order.status === "cancelada") && (
                                                             <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
                                                         )}
-                                                    </>
+                                                    </div>
                                                 )}
                                                 <FormSection title="Informações do serviço">
                                                     <div className="space-y-3">
                                                         <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da OS</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Código da OS</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">#{order.order_number}</span>
                                                         </div>
                                                         <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de abertura</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data de abertura</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(order.created_at)}</span>
                                                         </div>
                                                         {order.expected_completion_date && (
                                                             <div className="flex justify-between items-center text-sm">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Previsão de conclusão</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Previsão de conclusão</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                                     {formatDateString(order.expected_completion_date)}
                                                                     {order.expected_completion_time ? ` às ${order.expected_completion_time}` : ""}
@@ -521,20 +587,20 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     ) : (
                                                         <div className="space-y-2">
                                                             <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{order.customer_name || "Consumidor final"}</p>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum cadastro de cliente vinculado.</p>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum cadastro de cliente vinculado.</p>
                                                         </div>
                                                     )}
                                                 </FormSection>
 
                                                 <div>
                                                     {order.description && (
-                                                        <FormSection title="Observações" hasSeparator>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
+                                                        <FormSection title="Descrição" hasSeparator>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.description}</p>
                                                         </FormSection>
                                                     )}
                                                     {order.diagnosis && (
                                                         <FormSection title="Diagnóstico" hasSeparator>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.diagnosis}</p>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{order.diagnosis}</p>
                                                         </FormSection>
                                                     )}
                                                 </div>
@@ -553,18 +619,32 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     </FormSection>
                                                 )}
 
-                                                {/* Sign Button */}
-                                                {!isFinalized && (
+                                                {/* Action Buttons */}
+                                                {hasActions && (
                                                     <div className="pt-6 border-t border-brand-border dark:border-dark-border space-y-3">
-                                                        <Button
-                                                            onClick={() => {
-                                                                setSignerName(order.customer_name || "")
-                                                                setShowSignModal(true)
-                                                            }}
-                                                            className="w-full h-12"
-                                                        >
-                                                            Assinar Ordem de Serviço
-                                                        </Button>
+                                                        {canApprove && (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    setApprovalCode("")
+                                                                    setApproveModalError(null)
+                                                                    setShowApproveModal(true)
+                                                                }}
+                                                                className="w-full h-12"
+                                                            >
+                                                                Aprovar Ordem de Serviço
+                                                            </Button>
+                                                        )}
+                                                        {canSign && (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    setSignerName(order.customer_name || "")
+                                                                    setShowSignModal(true)
+                                                                }}
+                                                                className="w-full h-12"
+                                                            >
+                                                                Assinar Ordem de Serviço
+                                                            </Button>
+                                                        )}
                                                         {canReject && (
                                                             <Button
                                                                 variant="outline"
@@ -590,7 +670,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     <>
                                                         <FormSection title="Antes">
                                                             {groupedAttachments.antes.length === 0 ? (
-                                                                <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado antes do serviço.</p>
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum anexo registrado antes do serviço.</p>
                                                             ) : (
                                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                                     {groupedAttachments.antes.map((att: any, idx: number) => (
@@ -608,7 +688,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                                                         <FormSection title="Depois" hasSeparator>
                                                             {groupedAttachments.depois.length === 0 ? (
-                                                                <p className="text-xs italic text-brand-inactive-text">Nenhum anexo registrado depois do serviço.</p>
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum anexo registrado depois do serviço.</p>
                                                             ) : (
                                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                                     {groupedAttachments.depois.map((att: any, idx: number) => (
@@ -654,16 +734,6 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                             ))}
                                                         </div>
                                                     </FormSection>
-                                                )}
-
-                                                {attachments.length === 0 && (
-                                                    <div className="flex flex-col items-center justify-center text-center py-8">
-                                                        <IconPlaceholder
-                                                            icon={FileIcon}
-                                                            title="Nenhum anexo"
-                                                            subtitle="Não foram encontrados anexos para esta OS."
-                                                        />
-                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -759,6 +829,64 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                     </div>
                 </Tabs >
 
+                {/* ─── MODAL: APPROVE SERVICE ORDER ─────────────────────────────────── */}
+                <DefaultModal
+                    isOpen={showApproveModal}
+                    onClose={() => {
+                        setShowApproveModal(false)
+                        setApproveModalError(null)
+                    }}
+                    title="Aprovar Ordem de Serviço"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex gap-3 w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowApproveModal(false)
+                                    setApproveModalError(null)
+                                }}
+                                className="flex-1 py-2.5 h-auto"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleApproveOS}
+                                disabled={(!isDirectSigner && approvalCode.length < 4) || isProcessingApproval}
+                                className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
+                            >
+                                {isProcessingApproval ? "Aprovando..." : "Confirmar Aprovação"}
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 text-left">
+                        {approveModalError && (
+                            <InfoCard message={approveModalError} color="red" />
+                        )}
+
+                        <InfoCard color="blue" message={isDirectSigner
+                            ? `Você está conectado como ${maskEmail(currentUser?.email || "usuário autorizado")} e pode aprovar esta ordem de serviço diretamente.`
+                            : "Digite o código de aprovação de 4 dígitos gerado pelo profissional responsável pela OS para autorizar a execução do serviço."
+                        } />
+
+                        {!isDirectSigner && (
+                            <Input
+                                label="Código de aprovação (4 dígitos)"
+                                maxLength={4}
+                                value={approvalCode}
+                                onChange={(e) => {
+                                    setApprovalCode(e.target.value.replace(/\D/g, ""))
+                                    if (approveModalError) setApproveModalError(null)
+                                }}
+                                placeholder="0000"
+                            />
+                        )}
+
+                        <InfoCard color="gray" message="A assinatura de aceite será solicitada ao final da execução do serviço." />
+                    </div>
+                </DefaultModal>
+
                 {/* ─── MODAL: SIGN SERVICE ORDER ─────────────────────────────────────── */}
                 <DefaultModal
                     isOpen={showSignModal}
@@ -782,7 +910,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             </Button>
                             <Button
                                 onClick={handleSignOS}
-                                disabled={(!isDirectSigner && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
+                                disabled={(!canSignWithoutCode && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
                                 className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
                             >
                                 {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
@@ -795,13 +923,13 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             <InfoCard message={signModalError} color="red" />
                         )}
 
-                        <InfoCard color="blue" message={isDirectSigner
+                        <InfoCard color="blue" message={canSignWithoutCode
                             ? `Você está conectado como ${maskEmail(currentUser?.email || "usuário autorizado")} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
-                            : "Preencha o campo de código e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS."
+                            : "Preencha o campo de código e desenhe sua assinatura no quadro. O código de 4 dígitos foi gerado pelo profissional responsável pela OS."
                         } />
 
                         <div className="space-y-3">
-                            {!isDirectSigner && (
+                            {!canSignWithoutCode && (
                                 <Input
                                     label="Código de assinatura (4 dígitos)"
                                     maxLength={4}
@@ -815,7 +943,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             )}
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold uppercase text-brand-inactive-text dark:text-dark-body">Desenhe sua assinatura abaixo</label>
+                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Desenhe sua assinatura abaixo</label>
                                 <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white">
                                     <canvas
                                         ref={canvasRef}
@@ -883,16 +1011,14 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         <InfoCard color="red" message="Ao recusar, esta ordem de serviço será cancelada e não poderá mais ser aprovada pelo link." />
 
                         <div className="space-y-2">
-                            <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                Motivo da recusa (opcional)
-                            </label>
-                            <textarea
+                            <FormTextarea
+                                label="Motivo da recusa (opcional)"
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
                                 rows={4}
                                 maxLength={500}
                                 placeholder="Descreva o motivo da recusa, se desejar."
-                                className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-red/40 resize-none"
+                                className="w-full"
                             />
                         </div>
                     </div>

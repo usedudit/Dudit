@@ -141,6 +141,13 @@ export function formatPaymentMethodLabel(
     const detailPart = finalMatch[2].trim()
     const typeLabel = getFriendlyTypeLabel(typePart)
 
+    // Cash change info ("Dinheiro (Troco para R$ X)" / "Dinheiro (Valor exato)")
+    // is stored separately on the order, so the method label stays just "Dinheiro".
+    if (/^\s*(troco\b|valor\s+exato)/i.test(detailPart)) {
+      const base = titleWords(typeLabel)
+      return installmentSuffix ? `${base}${installmentSuffix}` : base
+    }
+
     // If the type part resolves to the same concept as the detail, just use the type
     if (isSamePaymentConcept(typePart, detailPart)) {
       const base = titleWords(typeLabel)

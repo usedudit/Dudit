@@ -679,13 +679,16 @@ export function CheckoutPageClient() {
 
     const bumpCandidates = useMemo(() => {
         const checkoutProductIds = new Set(
-            (sessionData?.cartItems || []).map((item) => item.productId).filter(Boolean)
+            [
+                ...(sessionData?.products || []).map((item) => item.id),
+                ...(sessionData?.cartItems || []).map((item) => item.productId),
+            ].filter(Boolean)
         )
         return partnerProducts.filter((p: any) => {
             const isStock = (p.stock_available ?? p.stock_quantity ?? 0) > 0
             return isStock && !checkoutProductIds.has(p.id)
         })
-    }, [partnerProducts, sessionData?.cartItems])
+    }, [partnerProducts, sessionData?.cartItems, sessionData?.products])
 
     const handleAddBumpProduct = async (p: any) => {
         if (!sessionData || addingBumpId) return
@@ -713,9 +716,12 @@ export function CheckoutPageClient() {
                 availabilityUnit: p.availability_unit
             }
 
-            const updatedProducts = [...products, newProductItem]
+            // Order bump nunca deve multiplicar/duplicar: se o produto já está no
+            // pedido, apenas garante a presença, sem somar quantidade.
+            const alreadyInProducts = products.some((item) => item.id === p.id)
+            const updatedProducts = alreadyInProducts ? products : [...products, newProductItem]
 
-            const updatedCartItems = sessionData.source === "cart"
+            const baseCartItems = sessionData.source === "cart"
                 ? [...(sessionData.cartItems || [])]
                 : products.map((item) => ({
                     cartItemId: "bump-" + item.id,
@@ -724,12 +730,15 @@ export function CheckoutPageClient() {
                     quantity: item.quantity
                 }))
 
-            updatedCartItems.push({
-                cartItemId: realCartItemId,
-                productId: p.id,
-                variantId: undefined,
-                quantity: 1
-            })
+            const alreadyInCart = baseCartItems.some((item) => item.productId === p.id && !item.variantId)
+            const updatedCartItems = alreadyInCart
+                ? baseCartItems
+                : [...baseCartItems, {
+                    cartItemId: realCartItemId,
+                    productId: p.id,
+                    variantId: undefined,
+                    quantity: 1
+                }]
 
             const newSessionData: CheckoutSessionData = {
                 ...sessionData,
@@ -887,14 +896,23 @@ export function CheckoutPageClient() {
             })
             setSelectedAddressId(prevId => {
                 if (prevId) return prevId
-                const defaultAddress = addresses.find((a) => a.is_default) || addresses[0]
-                if (defaultAddress) {
-                    const addressStr = buildAddressString(defaultAddress)
+                // Respeita o endereço ativo escolhido na sacola/PDP (localStorage)
+                // antes de cair no endereço padrão - senão o checkout re-cotava o
+                // frete para o padrão e trocava a transportadora pela taxa base.
+                const storedActiveId = typeof window !== "undefined"
+                    ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY)
+                    : null
+                const activeAddress = storedActiveId
+                    ? addresses.find((a) => a.id === storedActiveId)
+                    : undefined
+                const chosen = activeAddress || addresses.find((a) => a.is_default) || addresses[0]
+                if (chosen) {
+                    const addressStr = buildAddressString(chosen)
                     setFormData((prev) => ({
                         ...prev,
                         deliveryAddress: addressStr,
                     }))
-                    return defaultAddress.id
+                    return chosen.id
                 }
                 return prevId
             })
@@ -2592,6 +2610,12 @@ export function CheckoutPageClient() {
 
         if (requirements?.hasIncompatiblePaymentRestrictions) {
             setPaymentError("Alguns itens deste pedido possuem restrições incompatíveis de pagamento. Finalize-os separadamente.")
+            setIsLoading(false)
+            return
+        }
+
+        if (requirements?.hasIncompatibleFulfillmentMix) {
+            setDeliveryError("Este pedido mistura itens que só podem ser retirados com itens que só podem ser enviados. Ajuste os itens para continuar.")
             setIsLoading(false)
             return
         }
@@ -4648,7 +4672,7 @@ export function CheckoutPageClient() {
                                 handleAddressSelect(address.id)
                                 setShowAddressModal(false)
                             }}
-                            className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
+                            className={`flex items-start border px-4 py-3 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
                                 ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
                                 : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
                                 }`}
@@ -4656,9 +4680,9 @@ export function CheckoutPageClient() {
                             <div className="flex-1 pr-4">
                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">CEP: {address.zip_code}</p>
                             </div>
-                            <div className="mt-2.5 shrink-0 px-4">
+                            <div className="mt-2.5 shrink-0 pl-4">
                                 <RadioButton
                                     name="addressSelect"
                                     value={address.id}

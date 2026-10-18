@@ -94,7 +94,9 @@ const ServiceOrderListRow = React.memo(
 
         case "assigned": {
           const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)
-          const assignedName = assignedMember ? (assignedMember.fullName || assignedMember.name) : "-"
+          const assignedName = order.assigned_user_name
+            || (assignedMember ? (assignedMember.fullName || assignedMember.name) : null)
+            || "-"
           return (
             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate block">
               {assignedName}

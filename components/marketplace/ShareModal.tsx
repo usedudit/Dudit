@@ -22,6 +22,7 @@ interface ShareModalProps {
     title: string
     shareMessage: string
     label?: string
+    isLoading?: boolean
 }
 
 export function ShareModal({
@@ -30,7 +31,8 @@ export function ShareModal({
     url,
     title,
     shareMessage,
-    label = "Link"
+    label = "Link",
+    isLoading = false
 }: ShareModalProps) {
     const [isLinkCopied, setIsLinkCopied] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -122,13 +124,15 @@ export function ShareModal({
                     <div className="flex gap-2 items-end">
                         <Input
                             label={label}
-                            value={url}
+                            value={isLoading ? "" : url}
+                            placeholder={isLoading ? "Gerando link..." : undefined}
                             readOnly
                             className="flex-1"
                         />
                         <Button
                             variant="outline"
                             className="shrink-0 h-[42px] w-[42px] p-0 mb-1 flex items-center justify-center"
+                            disabled={isLoading}
                             onClick={() => {
                                 navigator.clipboard.writeText(url)
                                 setIsLinkCopied(true)
@@ -151,10 +155,10 @@ export function ShareModal({
                         {socials.map((social) => (
                             <a
                                 key={social.name}
-                                href={social.url}
+                                href={isLoading ? undefined : social.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex flex-col items-center gap-2 group transition-transform hover:scale-105"
+                                className={`flex flex-col items-center gap-2 group transition-transform hover:scale-105 ${isLoading ? "pointer-events-none opacity-50" : ""}`}
                             >
                                 <div className={`${social.color} w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all shadow-sm`}>
                                     <social.icon size={24} />

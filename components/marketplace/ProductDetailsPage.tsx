@@ -1927,15 +1927,12 @@ export function ProductDetailsPageClient({
 
                                     {/* Transportadora: só quando o frete próprio falhou por raio
                                         (ou já foi aplicada como fonte do frete) e o produto oferece envio nacional */}
-                                     {!deliveryLoading &&
+                                    {!deliveryLoading &&
                                         (deliveryOutsideRadius ||
                                             deliveryBreakdown?.source === "superfrete") &&
                                         productAllowsShipping &&
                                         (carrierOptions.length > 0 || carrierQuoteLoading || Boolean(carrierError)) && (
-                                            <div className="pt-3 space-y-2">
-                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                    Envio nacional (transportadora)
-                                                </p>
+                                            <div className="pb-2 space-y-2">
                                                 {carrierOptions.map((opt) => (
                                                     <div
                                                         key={opt.serviceId}

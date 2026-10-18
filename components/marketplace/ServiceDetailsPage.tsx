@@ -257,8 +257,8 @@ export function ServiceDetailsPageClient({
 
         const rawOrderFlow = p?.order_flow
         const orderFlow = (rawOrderFlow === "whatsapp" || rawOrderFlow === "dudit")
-          ? rawOrderFlow
-          : (normalizeBusinessInfo(p?.business_info).mode === "quick" || normalizeBusinessInfo(p?.business_info).mode === "showcase" ? "whatsapp" : "dudit")
+            ? rawOrderFlow
+            : (normalizeBusinessInfo(p?.business_info).mode === "quick" || normalizeBusinessInfo(p?.business_info).mode === "showcase" ? "whatsapp" : "dudit")
 
         return {
             isShowcaseActive,
@@ -1373,7 +1373,7 @@ export function ServiceDetailsPageClient({
                                 <button
                                     key={slot}
                                     onClick={() => setSelectedTime(slot)}
-                                    className={`p-2.5 rounded-xl border text-sm font-bold transition-all text-center ${selectedTime === slot
+                                    className={`p-2.5 rounded-lg border text-sm font-bold transition-all text-center ${selectedTime === slot
                                         ? "border-brand-dark bg-brand-dark text-white"
                                         : "border-brand-border hover:border-gray-300 dark:hover:border-dark-border text-brand-dark dark:text-dark-heading"
                                         }`}
@@ -1468,8 +1468,8 @@ export function ServiceDetailsPageClient({
                                 "Loja Fechada"
                             ) : isBooking ? (
                                 <span className="flex items-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    Redirecionando...
+                                    <Spinner />
+                                    Reservando...
                                 </span>
                             ) : (
                                 <span className="flex items-center gap-2">
@@ -1516,11 +1516,11 @@ export function ServiceDetailsPageClient({
                             )}
                             {service.fulfillment_modes?.includes("customer_location") &&
                                 (service.max_service_km != null || service.travel_fee_mode != null) && (
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                    {service.max_service_km != null && `Atendimento até ${service.max_service_km} km. `}
-                                    {service.travel_fee_mode === "free" ? "Deslocamento grátis." : "Taxa de deslocamento a combinar."}
-                                </p>
-                            )}
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
+                                        {service.max_service_km != null && `Atendimento até ${service.max_service_km} km. `}
+                                        {service.travel_fee_mode === "free" ? "Deslocamento grátis." : "Taxa de deslocamento a combinar."}
+                                    </p>
+                                )}
                         </div>
                     </div>
                 </FormSection>
@@ -2249,7 +2249,7 @@ export function ServiceDetailsPageClient({
                                         {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                     </button>
                                 )}
-                             </FormSection>
+                            </FormSection>
 
                             {/* Detalhes */}
                             {(() => {

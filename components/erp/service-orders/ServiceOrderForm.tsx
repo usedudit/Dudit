@@ -20,6 +20,8 @@ import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence, motion } from "framer-motion"
 import { useProductBucket, type ProductBucketItem } from "../hooks"
 import { fetchPartnerServicesBucket, fetchPartnerProductsBucket, type PartnerServiceBucketItem } from "@/app/actions/erp/client-loaders"
+import { getPOSCustomerDetailsAction } from "@/app/actions/erp/pdv"
+import { normalizeCustomerForCard } from "@/lib/utils/customer"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import {
     createServiceOrderAction,
@@ -33,7 +35,7 @@ import {
 } from "@/app/actions/erp/service-orders"
 import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
-import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, type ServiceOrderStatus } from "@/lib/types/service-order"
+import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, getServiceOrderEditPolicy, type ServiceOrderStatus } from "@/lib/types/service-order"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectServiceSheet from "./SelectServiceSheet"
 import SelectProductSheet from "./SelectProductSheet"
@@ -81,11 +83,42 @@ const getLocalTimeString = (d: Date) => {
 export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, editData }: ServiceOrderFormProps) {
     const { toast } = useToast()
     const [activeTab, setActiveTab] = useState("general")
-    const isLocked = editData?.payment_status === "paid" || editData?.payment_status === "partially_paid"
+    const editPolicy = editData?.status
+        ? getServiceOrderEditPolicy(editData.status as ServiceOrderStatus)
+        : null
+    const isPaid = editData?.payment_status === "paid" || editData?.payment_status === "partially_paid"
+    const isReadOnly = Boolean(editPolicy?.readOnly)
+    // `isLocked` permanece como lock da área de itens (serviços/produtos),
+    // que é o uso predominante na UI. Campos "core" usam `isCoreLocked`.
+    const isLocked = isPaid || (editPolicy ? !editPolicy.canEditItems : false)
+    const isCoreLocked = isPaid || (editPolicy ? !editPolicy.canEditAll : false)
     const isFieldLocked = (field: string) => {
-        if (!isLocked) return false
-        const unlockedFields = ["status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "internal_notes", "attachments"]
-        return !unlockedFields.includes(field)
+        if (isPaid) {
+            const unlockedFields = ["status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "internal_notes", "attachments"]
+            return !unlockedFields.includes(field)
+        }
+        if (editPolicy) {
+            switch (field) {
+                case "status": return !editPolicy.canChangeStatus
+                case "priority":
+                case "expected_completion_date":
+                case "expected_completion_time":
+                case "estimated_hours":
+                case "assigned_user_id": return !editPolicy.canEditAssignment
+                case "title":
+                case "description":
+                case "diagnosis":
+                case "customer_id":
+                case "discount": return !editPolicy.canEditAll
+                case "services":
+                case "products": return !editPolicy.canEditItems
+                case "specifications": return !editPolicy.canEditSpecs
+                case "internal_notes": return !editPolicy.canEditNotes
+                case "attachments": return !editPolicy.canAttach
+                default: return editPolicy.readOnly
+            }
+        }
+        return false
     }
 
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
@@ -141,7 +174,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const [internalNotes, setInternalNotes] = useState(editData?.internal_notes || "")
     const [customerId, setCustomerId] = useState(editData?.customer_id || "")
     const [customerName, setCustomerName] = useState(editData?.customer_snapshot?.name || "")
-    const [selectedCustomer, setSelectedCustomer] = useState<any>(editData?.customer_snapshot || null)
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(normalizeCustomerForCard(editData?.customer_snapshot) || null)
     const [expectedDate, setExpectedDate] = useState(editData?.expected_completion_date || "")
     const [assignedUserId, setAssignedUserId] = useState(editData?.assigned_user_id || "")
 
@@ -164,6 +197,20 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     })
     const [teamMembers, setTeamMembers] = useState<any[]>([])
 
+    // Hidrata endereços do cliente quando o snapshot salvo não os possui (OS legadas)
+    // ou quando vem do bucket leve (sem `addresses`).
+    useEffect(() => {
+        if (!customerId) return
+        if (selectedCustomer?.addresses && selectedCustomer.addresses.length > 0) return
+        let active = true
+        getPOSCustomerDetailsAction({ partnerId, customerId }).then((res) => {
+            if (!active || !res.success || !res.data) return
+            setSelectedCustomer((prev: any) => normalizeCustomerForCard({ ...prev, ...res.data }))
+        })
+        return () => { active = false }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [customerId, partnerId, selectedCustomer?.addresses?.length])
+
     // Financial fields matching CreateOrder / pdv
     const [discountValue, setDiscountValue] = useState(editData?.discount_value || 0)
     const [discountType, setDiscountType] = useState<'fixed' | 'percentage' | 'coupon'>(editData?.discount_type || 'fixed')
@@ -182,6 +229,16 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
 
 
+
+    // Endereços derivados do cliente para o CustomerCard / CustomerMobileBar
+    const customerPrimaryAddress = useMemo(
+        () => selectedCustomer?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer?.addresses?.[0] || null,
+        [selectedCustomer]
+    )
+    const customerBillingAddress = useMemo(
+        () => selectedCustomer?.addresses?.find((a: any) => a.address_type === "billing") || null,
+        [selectedCustomer]
+    )
 
     const initialSnapshot = useMemo(() => JSON.stringify({
         title: editData?.title || "",
@@ -539,21 +596,22 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         const localDate = new Date(year, month - 1, day, hour, minute, 0)
         const createdAt = localDate.toISOString()
 
+        const canEditCore = isPaid ? false : (editPolicy ? editPolicy.canEditAll : true)
+        const canEditScheduling = isPaid ? true : (editPolicy ? editPolicy.canEditAssignment : true)
+        const canEditStatus = isPaid ? true : (editPolicy ? editPolicy.canChangeStatus : true)
+        const canEditAssigned = isPaid ? false : (editPolicy ? editPolicy.canEditAssignment : true)
+        const canEditItemsField = isPaid ? false : (editPolicy ? editPolicy.canEditItems : true)
+        const canEditSpecsField = isPaid ? false : (editPolicy ? editPolicy.canEditSpecs : true)
+
         const payload: Record<string, any> = {
-            title: title.trim(),
             internal_notes: internalNotes.trim() || "",
-            status,
-            priority,
-            estimated_hours: estimatedHours || null,
-            expected_completion_time: expectedCompletionTime || null,
-            expected_completion_date: expectedDate || null,
         }
 
-        if (!isLocked) {
+        if (canEditCore) {
+            payload.title = title.trim()
             payload.description = description.trim() || ""
             payload.diagnosis = diagnosis.trim() || ""
             payload.customer_id = customerId || null
-            payload.assigned_user_id = assignedUserId || null
             payload.discount_value = discountValue
             payload.discount_type = discountType
             payload.coupon_id = couponId
@@ -561,6 +619,17 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             payload.coupon_discount_amount = effectiveCouponDiscountAmount
             payload.other_costs = Number(otherCosts || 0)
         }
+
+        if (canEditStatus) payload.status = status
+
+        if (canEditScheduling) {
+            payload.priority = priority
+            payload.estimated_hours = estimatedHours || null
+            payload.expected_completion_time = expectedCompletionTime || null
+            payload.expected_completion_date = expectedDate || null
+        }
+
+        if (canEditAssigned) payload.assigned_user_id = assignedUserId || null
 
         if (!editData) {
             payload.created_at = createdAt
@@ -591,9 +660,9 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             // Update OS details + services + products in a single atomic action
             const res = await updateServiceOrderAction(partnerId, editData.id, {
                 ...payload,
-                services: isLocked ? undefined : servicesPayload,
-                products: isLocked ? undefined : productsPayload,
-                specifications: specsPayload,
+                services: canEditItemsField ? servicesPayload : undefined,
+                products: canEditItemsField ? productsPayload : undefined,
+                specifications: canEditSpecsField ? specsPayload : undefined,
             })
 
             if (!res.success) {
@@ -695,8 +764,13 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const handleSelectCustomer = (customer: any) => {
         setCustomerId(customer.id)
         setCustomerName(customer.name)
-        setSelectedCustomer(customer)
+        setSelectedCustomer(normalizeCustomerForCard(customer))
         setShowCustomerSheet(false)
+        getPOSCustomerDetailsAction({ partnerId, customerId: customer.id }).then((res) => {
+            if (res.success && res.data) {
+                setSelectedCustomer((prev: any) => normalizeCustomerForCard({ ...prev, ...res.data }))
+            }
+        })
     }
 
     const handleAddService = (svc: any) => {
@@ -982,8 +1056,10 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                             <div className="lg:hidden">
                                                 <CustomerMobileBar
                                                     customer={selectedCustomer}
+                                                    address={customerPrimaryAddress}
+                                                    billingAddress={customerBillingAddress}
                                                     onSelect={() => setShowCustomerSheet(true)}
-                                                    onRemove={isLocked ? undefined : () => {
+                                                    onRemove={isCoreLocked ? undefined : () => {
                                                         if (couponId && couponPricingData?.customerScope === "specific") {
                                                             setCouponId(null)
                                                             setCouponCode("")
@@ -997,7 +1073,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         setCustomerName("")
                                                         setSelectedCustomer(null)
                                                     }}
-                                                    disabled={isLocked}
+                                                    disabled={isCoreLocked}
                                                 />
                                             </div>
 
@@ -1006,7 +1082,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                     placeholder="Ex: Manutenção de ar condicionado"
                                                     value={title}
                                                     onChange={(e) => setTitle(e.target.value)}
-                                                    disabled={isLocked}
+                                                    disabled={isCoreLocked}
                                                     error={fieldErrors.has("title")}
                                                     errorMessage={fieldErrors.has("title") ? "O título é obrigatório" : undefined}
                                                     maxLength={150}
@@ -1020,7 +1096,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         placeholder="Descreva o serviço a ser realizado..."
                                                         value={description}
                                                         onChange={(e) => setDescription(e.target.value)}
-                                                        disabled={isLocked}
+                                                        disabled={isCoreLocked}
                                                         error={fieldErrors.has("description")}
                                                         errorMessage={fieldErrors.has("description") ? "A descrição é obrigatória" : undefined}
                                                         label="Descrição"
@@ -1033,7 +1109,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         placeholder="Descreva o diagnóstico do problema..."
                                                         value={diagnosis}
                                                         onChange={(e) => setDiagnosis(e.target.value)}
-                                                        disabled={isLocked}
+                                                        disabled={isCoreLocked}
                                                         label="Diagnóstico"
                                                         name="diagnosis"
                                                         maxLength={500}
@@ -1047,7 +1123,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         label="Data de abertura"
                                                         value={openingDate}
                                                         onChange={setOpeningDate}
-                                                        disabled={isLocked}
+                                                        disabled={isCoreLocked}
                                                         placeholder="Data de hoje"
                                                     />
 
@@ -1055,7 +1131,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         label="Hora de abertura"
                                                         value={openingTime}
                                                         onChange={(time) => setOpeningTime(time)}
-                                                        disabled={isLocked}
+                                                        disabled={isCoreLocked}
                                                         placeholder="Agora"
                                                     />
 
@@ -1107,7 +1183,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         label="Responsável Técnico"
                                                         value={assignedUserId}
                                                         setValue={(val) => setAssignedUserId(val)}
-                                                        disabled={isLocked}
+                                                        disabled={isFieldLocked("assigned_user_id")}
                                                         options={teamMembers.map(m => ({
                                                             value: m.userId,
                                                             label: m.fullName || m.email || "Sem Nome",
@@ -1132,7 +1208,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                         {/* Right Column (Sidebar Card with Client Card and Totals) */}
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                                             <div>
-                                                {isLocked && (
+                                                {isPaid ? (
                                                     <div className="mb-6">
                                                         <InfoCard
                                                             title="Ordem de Serviço com Pagamento"
@@ -1140,12 +1216,24 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                             color="orange"
                                                         />
                                                     </div>
-                                                )}
+                                                ) : (editPolicy && !editPolicy.canEditAll) ? (
+                                                    <div className="mb-6">
+                                                        <InfoCard
+                                                            title={isReadOnly ? "Ordem de Serviço finalizada" : "Edição restrita"}
+                                                            message={isReadOnly
+                                                                ? "Esta ordem de serviço está finalizada. Apenas observações e anexos podem ser alterados."
+                                                                : "Esta ordem de serviço já foi aprovada. Apenas responsável, previsão, prioridade, status, especificações, observações e anexos podem ser editados."}
+                                                            color="orange"
+                                                        />
+                                                    </div>
+                                                ) : null}
                                                 <div className="hidden lg:block">
                                                 {selectedCustomer ? (
                                                     <CustomerCard
                                                         customer={selectedCustomer}
-                                                        onRemove={isLocked ? undefined : () => {
+                                                        address={customerPrimaryAddress}
+                                                        billingAddress={customerBillingAddress}
+                                                        onRemove={isCoreLocked ? undefined : () => {
                                                             if (couponId && couponPricingData?.customerScope === "specific") {
                                                                 setCouponId(null)
                                                                 setCouponCode("")
@@ -1167,7 +1255,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                             : "border-brand-border dark:border-dark-border"
                                                             }`}
                                                         data-field="customerId"
-                                                        onClick={isLocked ? undefined : () => setShowCustomerSheet(true)}
+                                                        onClick={isCoreLocked ? undefined : () => setShowCustomerSheet(true)}
                                                     >
                                                         <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
                                                             }`}></div>
@@ -1175,7 +1263,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                             icon={UserIcon}
                                                             title="Nenhum cliente selecionado"
                                                             subtitle="Selecione um cliente para vincular à ordem de serviço."
-                                                            itemButton={isLocked ? undefined : {
+                                                            itemButton={isCoreLocked ? undefined : {
                                                                 text: "Selecionar Cliente",
                                                                 action: () => setShowCustomerSheet(true),
                                                                 variant: "outline",
@@ -1197,11 +1285,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         icon={TagIcon}
                                                         title="Aplicar desconto"
                                                         description={couponId || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique na OS"}
-                                                        onClick={isLocked ? undefined : () => setIsDiscountModalOpen(true)}
+                                                        onClick={isCoreLocked ? undefined : () => setIsDiscountModalOpen(true)}
                                                         className="px-4 py-3 gap-4 cursor-pointer border border-brand-border dark:border-dark-border rounded-xl"
                                                     />
 
-                                                    {!isLocked && (
+                                                    {!isCoreLocked && (
                                                         <MoneyInput
                                                             label="Outros Custos"
                                                             value={otherCosts}
@@ -1950,7 +2038,7 @@ value={svc.service_name || ""}
                                             partnerId={partnerId}
                                             serviceOrderId={editData?.id || ""}
                                             specifications={editData?.specifications || []}
-                                            isEditing={true}
+                                            isEditing={!isFieldLocked("specifications")}
                                             onSave={async (specs) => {
                                                 if (editData?.id) {
                                                     const res = await saveServiceOrderSpecificationsAction(partnerId, editData.id, specs)

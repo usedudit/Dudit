@@ -43,7 +43,7 @@ export async function isStaffSlotAvailable(
   const { hour, minute } = getDateComponents(new Date())
   const currentMinutes = hour * 60 + minute
 
-  if (params.date < today || (params.date === today && slotEnd <= currentMinutes)) {
+  if (params.date < today || (params.date === today && slotStart < currentMinutes)) {
     return false
   }
 

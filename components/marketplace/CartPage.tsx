@@ -407,6 +407,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         return promoPrice > 0 && promoPrice < basePrice ? promoPrice : basePrice
     }
 
+    const getAlternativeImage = (alt: any, item: any) => {
+        const opts = typeof alt?.variant_options === "string"
+            ? (() => { try { return JSON.parse(alt.variant_options) } catch { return null } })()
+            : alt?.variant_options
+        if (opts?.image) return getImageUrl(opts.image)
+        return getImageUrl(item?.products?.images?.[0]) || "https://img.dudit.com.br/static/Placeholder.png"
+    }
+
     // Resolve optimistic overrides per item
     const getItemSelected = (item: any): boolean => {
         if (isItemOutOfStock(item)) return false
@@ -434,6 +442,23 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             hasMixedShipping: shippingCount > 0 && blockedCount > 0,
             blockedCount,
         }
+    }
+
+    // Indica, item a item, quais produtos não aceitam envio nacional. Só é
+    // exibido quando a loja oferece transportadora - assim o cliente entende
+    // por que um endereço distante não pode receber o pedido.
+    const renderItemShippingNote = (item: any, data: any) => {
+        if (item.item_type && item.item_type !== "product") return null
+        if (!data?.shippingEnabled) return null
+        if (!getItemSelected(item)) return null
+        const modes = normalizeFulfillmentModes(item.products?.fulfillment_modes, ["delivery", "pickup"])
+        if (modes.includes("shipping")) return null
+        const pickupOnly = !modes.includes("delivery")
+        return (
+            <p className="text-[12px] text-brand-orange dark:text-orange-400 font-medium mt-0.5 mb-1">
+                {pickupOnly ? "Apenas retirada no local (sem envio nacional)" : "Sem envio nacional (somente entrega local)"}
+            </p>
+        )
     }
 
     const getItemQuantity = (item: any): number =>
@@ -909,10 +934,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                     </button>
                 ))}
                 {cq.loading && (
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculando opções de entrega...</p>
                 )}
                 {cq.error && !cq.loading && (
-                    <p className="text-xs text-red-500">{cq.error}</p>
+                    <p className="text-xs text-brand-red">{cq.error}</p>
                 )}
             </div>
         )
@@ -924,13 +949,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         const info = getPartnerShippingAvailability(itemsByPartner[storeKey])
         if (!info.hasMixedShipping) return null
         return (
-            <div className="rounded-xl border border-brand-orange/40 bg-brand-orange/5 p-3 text-xs text-brand-dark dark:text-dark-heading">
-                <span className="font-semibold">Envio nacional indisponível para este pedido.</span>{" "}
-                {info.blockedCount === 1
-                    ? "1 item desta loja não aceita envio por transportadora."
-                    : `${info.blockedCount} itens desta loja não aceitam envio por transportadora.`}{" "}
-                Remova {info.blockedCount === 1 ? "esse item" : "esses itens"} para usar o envio nacional, ou escolha entrega local/retirada.
-            </div>
+            <InfoCard
+                title="Envio nacional indisponível para este pedido."
+                message={info.blockedCount === 1
+                    ? "1 item desta loja não aceita envio por transportadora. Remova esse item para usar o envio nacional, ou escolha entrega local/retirada."
+                    : `${info.blockedCount} itens desta loja não aceitam envio por transportadora. Remova esses itens para usar o envio nacional, ou escolha entrega local/retirada.`
+                }
+                color="orange"
+            />
         )
     }
 
@@ -938,8 +964,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (hasOnlyServices(partnerData?.items || [])) return 0
         const carrierOption = getCarrierSelectedOption(storeKey)
         if (carrierOption) return Number(carrierOption.price)
-        if (storeKey && deliveryQuotes[storeKey] && !deliveryQuotes[storeKey].loading && !deliveryQuotes[storeKey].error) {
-            return Number(deliveryQuotes[storeKey].fee || 0)
+        const quoteState = storeKey ? deliveryQuotes[storeKey] : null
+        if (quoteState && !quoteState.loading && !quoteState.error) {
+            return Number(quoteState.fee || 0)
+        }
+        // Frete próprio falhou (ex.: endereço fora do raio) e não há transportadora
+        // selecionada: não existe frete a cobrar, então não cai na taxa base.
+        if (quoteState && !quoteState.loading && quoteState.error) {
+            return 0
         }
         const settings = partnerData?.deliverySettings
         if (!settings || settings.is_delivery_enabled === false || settings.delivery_payer === "seller") return 0
@@ -1185,6 +1217,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                 const maxStock = getItemMaxStock(item);
                                                                                 const exceedsStock = !isOutOfStock && isQuantityExceedingStock(item);
                                                                                 const isSellWithoutStock = Boolean(item.products?.allow_sell_without_stock);
+                                                                                const isVariantSoldOut = isOutOfStock && Boolean(item.variant_id && item.product_variants);
+                                                                                const isServiceUnavailable = item.item_type === "service_booking" && Boolean(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available);
+                                                                                const showLowStock = !isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0;
                                                                                 return (
                                                                                     <div className="flex flex-col">
                                                                                         <div className={`flex md:hidden gap-3 ${isOutOfStock ? "opacity-75" : ""}`}>
@@ -1197,13 +1232,25 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                 />
                                                                                             </div>
 
-                                                                                            <Link
-                                                                                                href={getItemUrl(item, data.partner)}
-                                                                                                prefetch={false}
-                                                                                                className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
-                                                                                            >
-                                                                                                <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
-                                                                                            </Link>
+                                                                                            <div className="flex flex-col shrink-0 self-start">
+                                                                                                <Link
+                                                                                                    href={getItemUrl(item, data.partner)}
+                                                                                                    prefetch={false}
+                                                                                                    className={`w-[68px] h-[68px] overflow-hidden border border-brand-border dark:border-dark-border block cursor-pointer ${(isVariantSoldOut || isServiceUnavailable || showLowStock) ? "rounded-t-[8px] border-b-0" : "rounded-[8px]"}`}
+                                                                                                >
+                                                                                                    <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
+                                                                                                </Link>
+                                                                                                {isVariantSoldOut || isServiceUnavailable ? (
+                                                                                                    <div className="w-[68px] bg-gray-500 text-white text-[9px] font-bold uppercase text-center py-1 px-0.5 leading-tight rounded-b-[8px]">
+                                                                                                        {isServiceUnavailable ? "Indisponível" : "Esgotado"}
+                                                                                                    </div>
+                                                                                                ) : showLowStock ? (
+                                                                                                    <div className="w-[68px] bg-brand-orange text-white text-[9px] font-bold uppercase flex items-center justify-center gap-0.5 py-1 px-0.5 leading-tight rounded-b-[8px]">
+                                                                                                        <FireIcon size={10} className="shrink-0" />
+                                                                                                        <span>Últimos {maxStock}</span>
+                                                                                                    </div>
+                                                                                                ) : null}
+                                                                                            </div>
 
                                                                                             <div className="flex-1 min-w-0">
                                                                                                 <div className="flex items-start justify-between gap-2">
@@ -1224,13 +1271,37 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     </Button>
                                                                                                 </div>
 
-                                                                                                {item.variant_id && item.product_variants && (
+                                                                                                {isVariantSoldOut && item.available_alternatives && item.available_alternatives.length > 0 && (
+                                                                                                    <div className="mt-1.5">
+                                                                                                        <p className="text-[12px] font-semibold text-brand-dark dark:text-dark-heading mb-1.5">Disponível em outra(s) variante(s):</p>
+                                                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                                                            {item.available_alternatives.map((alt: any) => (
+                                                                                                                <button
+                                                                                                                    key={alt.id}
+                                                                                                                    onClick={() => switchVariant(item.id, alt.id)}
+                                                                                                                    disabled={loading === item.id}
+                                                                                                                    className="inline-flex items-center gap-2 pr-2 py-1 pl-1 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                                                                                                                >
+                                                                                                                    <span className="w-8 h-8 rounded-md overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                                                                                                        <img src={getAlternativeImage(alt, item)} alt={alt.variant_name} className="w-full h-full object-cover" />
+                                                                                                                    </span>
+                                                                                                                    <span className="flex flex-col items-start leading-tight">
+                                                                                                                        <span className="text-[12px] font-medium text-brand-dark dark:text-dark-heading">{alt.variant_name}</span>
+                                                                                                                        <span className="text-[12px] font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
+                                                                                                                    </span>
+                                                                                                                </button>
+                                                                                                            ))}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                )}
+
+                                                                                                {item.variant_id && item.product_variants && !isVariantSoldOut && (
                                                                                                     <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                                                         {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                     </p>
                                                                                                 )}
 
-                                                                                                {Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
+                                                                                                {!isVariantSoldOut && !isServiceUnavailable && Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
                                                                                                     <div className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5 space-y-0.5">
                                                                                                         {(() => {
                                                                                                             const addons = item.booking_metadata.selectedAddons
@@ -1249,7 +1320,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     </div>
                                                                                                 )}
 
-                                                                                                {item.item_type === "service_booking" && getItemBooking(item) && (
+                                                                                                {item.item_type === "service_booking" && !isServiceUnavailable && getItemBooking(item) && (
                                                                                                     <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
 
@@ -1258,17 +1329,15 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         Apenas {maxStock} unidade(s) disponível(is) no estoque
                                                                                                     </p>
                                                                                                 )}
-                                                                                                {!isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0 && (
-                                                                                                    <p className="text-[11px] text-brand-orange dark:text-orange-400 font-medium mt-0.5">
-                                                                                                        Apenas {maxStock} restante(s) em estoque
-                                                                                                    </p>
-                                                                                                )}
+                                                                                                {renderItemShippingNote(item, data)}
 
                                                                                                 <div className="flex flex-col items-start gap-2 md:hidden mt-2">
                                                                                                     {isOutOfStock ? (
-                                                                                                        <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
-                                                                                                            Esgotado
-                                                                                                        </Badge>
+                                                                                                        isVariantSoldOut ? null : (
+                                                                                                            <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
+                                                                                                                Esgotado
+                                                                                                            </Badge>
+                                                                                                        )
                                                                                                     ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
@@ -1278,7 +1347,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             size="sm"
                                                                                                         />
                                                                                                     ) : null}
-                                                                                                    {(() => {
+                                                                                                    {!isVariantSoldOut && !isServiceUnavailable && (() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty
                                                                                                         return (
@@ -1307,7 +1376,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Este horário não está mais disponível</span>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
 
@@ -1315,7 +1384,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -1329,14 +1398,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         <div className="mt-1 flex items-start gap-2 text-xs text-brand-orange font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -1349,30 +1418,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                             </div>
                                                                                         </div>
 
-                                                                                        {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
-                                                                                            <div className="mt-3 pl-8 md:hidden">
-                                                                                                <div className="bg-brand-gray/30 dark:bg-zinc-800/40 p-3 rounded-xl border border-brand-border dark:border-dark-border text-xs">
-                                                                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-1.5">
-                                                                                                        <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-                                                                                                        Disponível em outra(s) variante(s):
-                                                                                                    </p>
-                                                                                                    <div className="flex flex-wrap gap-2">
-                                                                                                        {item.available_alternatives.map((alt: any) => (
-                                                                                                            <button
-                                                                                                                key={alt.id}
-                                                                                                                onClick={() => switchVariant(item.id, alt.id)}
-                                                                                                                disabled={loading === item.id}
-                                                                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-                                                                                                            >
-                                                                                                                <span>{alt.variant_name}</span>
-                                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                                                <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
-                                                                                                            </button>
-                                                                                                        ))}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        )}
                                                                                     </div>
                                                                                 );
                                                                             })()}
@@ -1383,6 +1428,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                 const maxStock = getItemMaxStock(item);
                                                                                 const exceedsStock = !isOutOfStock && isQuantityExceedingStock(item);
                                                                                 const isSellWithoutStock = Boolean(item.products?.allow_sell_without_stock);
+                                                                                const isVariantSoldOut = isOutOfStock && Boolean(item.variant_id && item.product_variants);
+                                                                                const isServiceUnavailable = item.item_type === "service_booking" && Boolean(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available);
+                                                                                const showLowStock = !isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0;
                                                                                 return (
                                                                                     <div className="hidden md:block">
                                                                                         <div className="flex gap-4">
@@ -1396,13 +1444,25 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                             </div>
 
                                                                                             <div className={`flex-1 flex md:justify-between md:items-center gap-4 ${isOutOfStock ? "opacity-75" : ""}`}>
-                                                                                                <Link
-                                                                                                    href={getItemUrl(item, data.partner)}
-                                                                                                    prefetch={false}
-                                                                                                    className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
-                                                                                                >
-                                                                                                    <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
-                                                                                                </Link>
+                                                                                                <div className="flex flex-col shrink-0 self-start">
+                                                                                                    <Link
+                                                                                                        href={getItemUrl(item, data.partner)}
+                                                                                                        prefetch={false}
+                                                                                                        className={`w-[68px] h-[68px] overflow-hidden border border-brand-border dark:border-dark-border block cursor-pointer ${(isVariantSoldOut || isServiceUnavailable || showLowStock) ? "rounded-t-[8px] border-b-0" : "rounded-[8px]"}`}
+                                                                                                    >
+                                                                                                        <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
+                                                                                                    </Link>
+                                                                                                    {isVariantSoldOut || isServiceUnavailable ? (
+                                                                                                        <div className="w-[68px] bg-gray-500 text-white text-[9px] font-bold uppercase text-center py-1 px-0.5 leading-tight rounded-b-[8px]">
+                                                                                                            {isServiceUnavailable ? "Indisponível" : "Esgotado"}
+                                                                                                        </div>
+                                                                                                    ) : showLowStock ? (
+                                                                                                        <div className="w-[68px] bg-brand-orange text-white text-[9px] font-bold uppercase flex items-center justify-center gap-0.5 py-1 px-0.5 leading-tight rounded-b-[8px]">
+                                                                                                            <FireIcon size={10} className="shrink-0" />
+                                                                                                            <span>Últimos {maxStock}</span>
+                                                                                                        </div>
+                                                                                                    ) : null}
+                                                                                                </div>
 
                                                                                                 <div className="flex-1">
                                                                                                     <Link
@@ -1413,13 +1473,37 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         {getItemName(item)}
                                                                                                     </Link>
 
-                                                                                                    {item.variant_id && item.product_variants && (
+                                                                                                    {isVariantSoldOut && item.available_alternatives && item.available_alternatives.length > 0 && (
+                                                                                                        <div className="mt-1.5 mb-2">
+                                                                                                            <p className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading mb-1.5">Disponível em outra(s) variante(s):</p>
+                                                                                                            <div className="flex flex-wrap gap-1.5">
+                                                                                                                {item.available_alternatives.map((alt: any) => (
+                                                                                                                    <button
+                                                                                                                        key={alt.id}
+                                                                                                                        onClick={() => switchVariant(item.id, alt.id)}
+                                                                                                                        disabled={loading === item.id}
+                                                                                                                        className="inline-flex items-center gap-2 pr-2 py-1 pl-1 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                                                                                                                    >
+                                                                                                                        <span className="w-8 h-8 rounded-md overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                                                                                                            <img src={getAlternativeImage(alt, item)} alt={alt.variant_name} className="w-full h-full object-cover" />
+                                                                                                                        </span>
+                                                                                                                        <span className="flex flex-col items-start leading-tight">
+                                                                                                                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{alt.variant_name}</span>
+                                                                                                                            <span className="text-[13px] font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
+                                                                                                                        </span>
+                                                                                                                    </button>
+                                                                                                                ))}
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    )}
+
+                                                                                                    {item.variant_id && item.product_variants && !isVariantSoldOut && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
 
-                                                                                                    {Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
+                                                                                                    {!isVariantSoldOut && !isServiceUnavailable && Array.isArray(item.booking_metadata?.selectedAddons) && item.booking_metadata.selectedAddons.length > 0 && (
                                                                                                         <div className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1 space-y-0.5">
                                                                                                             {(() => {
                                                                                                                 const addons = item.booking_metadata.selectedAddons
@@ -1438,7 +1522,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         </div>
                                                                                                     )}
 
-                                                                                                    {item.item_type === "service_booking" && getItemBooking(item) && (
+                                                                                                    {item.item_type === "service_booking" && !isServiceUnavailable && getItemBooking(item) && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
 
@@ -1447,12 +1531,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             Apenas {maxStock} unidade(s) disponível(is) no estoque
                                                                                                         </p>
                                                                                                     )}
-                                                                                                    {!isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0 && (
-                                                                                                        <p className="text-[12px] text-brand-orange dark:text-orange-400 font-medium mb-1">
-                                                                                                            <FireIcon size={12} /> Apenas {maxStock} restante(s) em estoque
-                                                                                                        </p>
-                                                                                                    )}
-                                                                                                    {(() => {
+                                                                                                    {renderItemShippingNote(item, data)}
+                                                                                                    {!isVariantSoldOut && !isServiceUnavailable && (() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         return (
                                                                                                             <div className="flex items-center gap-2">
@@ -1465,7 +1545,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Este horário não está mais disponível</span>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
 
@@ -1473,7 +1553,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -1487,14 +1567,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         <div className="mt-1 mb-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <Link
                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
                                                                                                                 className="font-semibold text-brand-green hover:underline"
                                                                                                             >
                                                                                                                 Remarcar
                                                                                                             </Link>
-                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                                             <button
                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                                                                                                 className="font-semibold text-brand-red hover:underline"
@@ -1507,9 +1587,11 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
                                                                                                 <div className="flex items-center justify-end gap-4">
                                                                                                     {isOutOfStock ? (
-                                                                                                        <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
-                                                                                                            Esgotado
-                                                                                                        </Badge>
+                                                                                                        isVariantSoldOut ? null : (
+                                                                                                            <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
+                                                                                                                Esgotado
+                                                                                                            </Badge>
+                                                                                                        )
                                                                                                     ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
@@ -1518,7 +1600,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             max={isSellWithoutStock ? undefined : maxStock}
                                                                                                         />
                                                                                                     ) : null}
-                                                                                                    {(() => {
+                                                                                                    {!isVariantSoldOut && !isServiceUnavailable && (() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty
                                                                                                         return (
@@ -1545,30 +1627,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                             </div>
                                                                                         </div>
 
-                                                                                        {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
-                                                                                            <div className="mt-3 ml-10">
-                                                                                                <div className="p-3 rounded-xl border border-brand-border dark:border-dark-border text-sm animate-fade-in">
-                                                                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-1.5">
-                                                                                                        <span className="w-2 h-2 rounded-full bg-brand-green" />
-                                                                                                        Disponível em outra(s) variante(s):
-                                                                                                    </p>
-                                                                                                    <div className="flex flex-wrap gap-2">
-                                                                                                        {item.available_alternatives.map((alt: any) => (
-                                                                                                            <button
-                                                                                                                key={alt.id}
-                                                                                                                onClick={() => switchVariant(item.id, alt.id)}
-                                                                                                                disabled={loading === item.id}
-                                                                                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-                                                                                                            >
-                                                                                                                <span>{alt.variant_name}</span>
-                                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                                                <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
-                                                                                                            </button>
-                                                                                                        ))}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        )}
                                                                                     </div>
                                                                                 );
                                                                             })()}

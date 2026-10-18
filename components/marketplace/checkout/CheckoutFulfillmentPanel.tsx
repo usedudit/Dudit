@@ -227,6 +227,17 @@ export function CheckoutFulfillmentPanel({
 
   const renderProductsFulfillment = () => {
     if (!hasProducts) return null
+    if (requirements.hasIncompatibleFulfillmentMix) {
+      return (
+        <FormSection title={hasServices ? "Produtos" : "Entrega"}>
+          <InfoCard
+            title="Itens com formas de entrega incompatíveis"
+            message="Este pedido mistura itens que só podem ser retirados com itens que só podem ser enviados. Remova ou ajuste os itens para continuar."
+            color="red"
+          />
+        </FormSection>
+      )
+    }
     if (!showProductsSection) {
       return (
         <FormSection title={hasServices ? "Produtos" : "Entrega"}>

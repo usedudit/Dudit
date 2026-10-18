@@ -118,7 +118,7 @@ export default function ServiceOrdersPage({
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [showShareModal, setShowShareModal] = useState<{ id: string; token: string } | null>(null)
+  const [showShareModal, setShowShareModal] = useState<{ id: string; token: string; loading?: boolean } | null>(null)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
   const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
@@ -127,22 +127,6 @@ export default function ServiceOrdersPage({
   const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
   const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
   const itemsPerPage = 50
-
-  const { data: teamMembers = [] } = useQuery({
-    queryKey: ['erp', 'team-members', partnerId],
-    queryFn: async () => {
-      try {
-        const { getTeamMembers } = await import("@/app/actions/erp/team")
-        const res = await getTeamMembers()
-        return res.members ?? []
-      } catch (err) {
-        console.error("Erro ao carregar equipe:", err)
-        return []
-      }
-    },
-    staleTime: 120000,
-    refetchOnWindowFocus: false,
-  })
 
   const isDefaultView = activeTab === "all" && !debouncedSearch
 
@@ -184,6 +168,30 @@ export default function ServiceOrdersPage({
     afterMutation, queryClient,
     getPrefetchProps,
   } = entityPage
+
+  // Fallback: só busca a equipe se alguma OS não tiver o nome do responsável
+  // já embutido no payload da lista (evita requisição desnecessária).
+  const needsTeamFallback = useMemo(
+    () => (effectiveOrders || []).some((o: any) => o.assigned_user_id && !o.assigned_user_name),
+    [effectiveOrders],
+  )
+
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['erp', 'team-members', partnerId],
+    enabled: needsTeamFallback,
+    queryFn: async () => {
+      try {
+        const { getTeamMembers } = await import("@/app/actions/erp/team")
+        const res = await getTeamMembers()
+        return res.members ?? []
+      } catch (err) {
+        console.error("Erro ao carregar equipe:", err)
+        return []
+      }
+    },
+    staleTime: 120000,
+    refetchOnWindowFocus: false,
+  })
 
   const activeOrder = useMemo(() => {
     if (!entityState.isOpen || !entityState.entityId) return null
@@ -813,9 +821,15 @@ export default function ServiceOrdersPage({
                                   onEdit={() => openEntity("edit", o.id)}
                                   onStatus={() => handleOpenStatusModal(o.id)}
                                   onShare={async () => {
+                                    if (o.public_token) {
+                                      setShowShareModal({ id: o.id, token: o.public_token })
+                                      return
+                                    }
+                                    setShowShareModal({ id: o.id, token: "", loading: true })
                                     const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                     const token = await ensurePublicTokenAction(partnerId, o.id)
                                     if (token) setShowShareModal({ id: o.id, token })
+                                    else setShowShareModal(null)
                                   }}
                                   onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
                                   onDelete={() => setConfirmDelete(o.id)}
@@ -899,9 +913,15 @@ export default function ServiceOrdersPage({
                                         onEdit={() => openEntity("edit", o.id)}
                                         onStatus={() => handleOpenStatusModal(o.id)}
                                         onShare={async () => {
+                                          if (o.public_token) {
+                                            setShowShareModal({ id: o.id, token: o.public_token })
+                                            return
+                                          }
+                                          setShowShareModal({ id: o.id, token: "", loading: true })
                                           const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                           const token = await ensurePublicTokenAction(partnerId, o.id)
                                           if (token) setShowShareModal({ id: o.id, token })
+                                          else setShowShareModal(null)
                                         }}
                                         onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
                                         onDelete={() => setConfirmDelete(o.id)}
@@ -996,6 +1016,7 @@ export default function ServiceOrdersPage({
           isOpen={!!showShareModal}
           onClose={() => setShowShareModal(null)}
           url={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${showShareModal.token}`}
+          isLoading={showShareModal.loading}
           title={`OS #${(paginated.find(o => o.id === showShareModal.id)?.order_number) || ''}`}
           shareMessage={`Olá! Segue o link para visualizar a Ordem de Serviço *#${(paginated.find(o => o.id === showShareModal.id)?.order_number) || ''}*:`}
           label="Link da OS"

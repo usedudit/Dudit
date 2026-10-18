@@ -631,8 +631,13 @@ export async function updateCartQuantityAction(cartItemId: string, quantity: num
     return { error: "Quantidade inválida" }
   }
 
-  // Verifica dono do item e detalhes de produto/estoque
-  const { data: item } = await supabase
+  // Verifica dono do item e detalhes de produto/estoque.
+  // Usa o admin client: a RLS de `products` só libera leitura para parceiros
+  // (products_select_partner), então com o client do usuário o embed voltava
+  // null para compradores e o produto aparecia como esgotado. O dono do item
+  // continua validado abaixo por `item.user_id`.
+  const adminClient = getAdminClient()
+  const { data: item } = await adminClient
     .from("cart_items")
     .select(`
       id, user_id, item_type, product_id, variant_id,
@@ -774,16 +779,47 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
 
+  // Admin client: a RLS de `products` só libera leitura para parceiros
+  // (products_select_partner), então com o client do usuário o embed de
+  // produto voltava null e a variante era tratada como esgotada. O dono do
+  // item continua validado por `user_id`.
+  const adminClient = getAdminClient()
+
   // Find the current cart item to get the product_id and quantity
-  const { data: currentItem, error: fetchError } = await supabase
+  const { data: currentItem, error: fetchError } = await adminClient
     .from("cart_items")
-    .select("product_id, quantity")
+    .select("product_id, quantity, user_id")
     .eq("id", cartItemId)
-    .eq("user_id", user.id)
     .single()
 
-  if (fetchError || !currentItem) {
+  if (fetchError || !currentItem || currentItem.user_id !== user.id) {
     return { error: "Item não encontrado na sacola." }
+  }
+
+  // Verify the target variant availability up-front (admin client ignores RLS)
+  const { data: targetVariant } = await adminClient
+    .from("product_variants")
+    .select("id, stock_available, stock_quantity, is_active, products(allow_sell_without_stock, is_active)")
+    .eq("id", newVariantId)
+    .maybeSingle()
+
+  if (!targetVariant) {
+    return { error: "Variante selecionada está temporariamente indisponível." }
+  }
+
+  const allowSellWithoutStock = Boolean((targetVariant.products as any)?.allow_sell_without_stock)
+  const isVariantActive = targetVariant.is_active !== false && (targetVariant.products as any)?.is_active !== false
+
+  if (!isVariantActive) {
+    return { error: "Variante selecionada está temporariamente indisponível." }
+  }
+
+  const stock = allowSellWithoutStock
+    ? 999
+    : Math.max(0, targetVariant.stock_available ?? targetVariant.stock_quantity ?? 0)
+
+  if (stock <= 0) {
+    return { error: "Variante selecionada está esgotada." }
   }
 
   // Check if an item with the new variant already exists in the cart
@@ -798,29 +834,6 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
   if (existingItem) {
     // If it already exists, merge/update quantity of the existing one and delete the old one
     const newQty = existingItem.quantity + currentItem.quantity
-
-    // We should also check the stock limit for the new variant
-    const { data: variantData } = await supabase
-      .from("product_variants")
-      .select("stock_available, stock_quantity, is_active, products!inner(allow_sell_without_stock, is_active)")
-      .eq("id", newVariantId)
-      .single()
-
-    const allowSellWithoutStock = Boolean((variantData?.products as any)?.allow_sell_without_stock)
-    const isVariantActive = variantData?.is_active !== false && (variantData?.products as any)?.is_active !== false
-
-    if (!isVariantActive) {
-      return { error: "Variante selecionada está temporariamente indisponível." }
-    }
-
-    const stock = allowSellWithoutStock
-      ? 999
-      : Math.max(0, variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 0) : 0)
-
-    if (stock <= 0) {
-      return { error: "Variante selecionada está esgotada." }
-    }
-
     const finalQty = Math.max(1, Math.min(newQty, stock))
 
     const { error: updateError } = await supabase
@@ -838,28 +851,6 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
     if (deleteError) return { error: deleteError.message }
   } else {
     // Just update the variant ID on the current item
-    // Verify stock of new variant
-    const { data: variantData } = await supabase
-      .from("product_variants")
-      .select("stock_available, stock_quantity, is_active, products!inner(allow_sell_without_stock, is_active)")
-      .eq("id", newVariantId)
-      .single()
-
-    const allowSellWithoutStock = Boolean((variantData?.products as any)?.allow_sell_without_stock)
-    const isVariantActive = variantData?.is_active !== false && (variantData?.products as any)?.is_active !== false
-
-    if (!isVariantActive) {
-      return { error: "Variante selecionada está temporariamente indisponível." }
-    }
-
-    const stock = allowSellWithoutStock
-      ? 999
-      : Math.max(0, variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 0) : 0)
-
-    if (stock <= 0) {
-      return { error: "Variante selecionada está esgotada." }
-    }
-
     const finalQty = Math.max(1, Math.min(currentItem.quantity, stock))
 
     const { error: updateError } = await supabase
@@ -1501,14 +1492,6 @@ export async function checkoutCartAction(
     paymentMethodName = bestMethod.name
   } else {
     paymentMethodName = formatPaymentMethodLabel(paymentMethod)
-  }
-
-  if (chosenType === "cash" && deliveryType === "delivery") {
-    if (wantsChange) {
-      paymentMethodName = `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})`
-    } else {
-      paymentMethodName = "Dinheiro (Valor exato)"
-    }
   }
 
   const fallbackCustomerName = buyerProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : null) || user.email || "Cliente"

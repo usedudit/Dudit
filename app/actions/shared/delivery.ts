@@ -584,16 +584,28 @@ export async function resolveServiceAttendanceSettings(
   if (cachedSettings) return cachedSettings
 
   // Partner default (store_id IS NULL) -> store override -> service override
+  // Obs.: usar .is()/.eq() explícitos em vez de .in([null, storeId]) porque o
+  // PostgREST não casa NULL dentro de .in() — a linha default (store_id NULL)
+  // nunca seria retornada e a tela parecia "não salvar".
   let settings: ServiceAttendanceSettings | null = null
-  const { data: rows } = await supabase
+  const { data: defaultRow } = await supabase
     .from("service_attendance_settings")
     .select("*")
     .eq("partner_id", partnerId)
-    .in("store_id", [null, storeId || null])
-    .limit(2)
+    .is("store_id", null)
+    .maybeSingle()
 
-  const defaultRow = rows?.find((r: any) => !r.store_id) || rows?.find((r: any) => r.store_id == null)
-  const storeRow = storeId ? rows?.find((r: any) => r.store_id === storeId) || null : null
+  let storeRow: any = null
+  if (storeId) {
+    const { data: storeData } = await supabase
+      .from("service_attendance_settings")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("store_id", storeId)
+      .maybeSingle()
+    storeRow = storeData || null
+  }
+
   const merged = { ...(defaultRow || {}), ...(storeRow || {}) }
   settings = normalizeServiceAttendanceSettings(merged || null)
 

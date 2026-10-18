@@ -5,7 +5,7 @@ incidente de bot de 16/10/2026 e da correção do Cloudflare Turnstile.
 
 - **Plano Cloudflare:** Free
 - **Zona:** `dudit.com.br` (inclui `www.dudit.com.br`, `img.dudit.com.br`)
-- **Última revisão:** 17/10/2026
+- **Última revisão:** 18/10/2026
 
 ---
 
@@ -317,7 +317,34 @@ Supabase — que **estava desativado** e foi **ativado em 17/10/2026**.
    - `dudit.com.br` (cobre subdomínios, ex.: `www`)
    - se necessário também `www.dudit.com.br`
    > Sem hostname autorizado o widget retorna `110200`.
-4. **Produção (Railway):** garantir `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e
+4. **Cloudflare Turnstile — Widget Mode = `Invisible`:**
+   **Turnstile → widget → Settings → Widget Mode = Invisible**.
+   > O modo padrão (`Managed`) **mostra o checkbox/badge** — o "cardzinho" que
+   > aparecia no login. `Non-Interactive` some o checkbox mas mantém o badge.
+   > Só `Invisible` some tudo.
+   >
+   > ⚠️ **Invisible não roda sozinho:** o token só é gerado via `turnstile.execute()`.
+   > Por isso o código foi ajustado (`components/reusable/Turnstile.tsx`):
+   > - `appearance = "interaction-only"` + `execution = "execute"` no `render`;
+   > - **auto-`execute()` no mount** (token pronto antes do submit);
+   > - re-`execute()` no `reset()` e no `onExpire` (deferido 1 tick pra evitar corrida `reset`→`execute`);
+   > - container sem o antigo `min-h-[65px]` (não deixa mais buraco invisível).
+   >
+   > ⚠️ **Ordem:** faça o **deploy do código** antes/junto do toggle no painel.
+   > Se virar `Invisible` no painel sem o código, o token fica `null` →
+   > Supabase rejeita com `captcha_failed`.
+   >
+   > Se trocar de widget (novo criado em Invisible), atualizar
+   > `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e o fallback hardcoded em
+   > `Turnstile.tsx` (`DEFAULT_SITE_KEY`).
+   >
+   > ⚖️ **Exigência legal do modo Invisible:** a Cloudflare condiciona o modo
+   > Invisible a você **referenciar o Adendo de Privacidade do Turnstile** na sua
+   > própria política de privacidade. Já incluído em
+   > `app/institucional/privacidade/page.tsx` (§3.1, com link para
+   > `https://www.cloudflare.com/pt-br/turnstile-privacy-policy/`). Precisa estar
+   > **no ar** (deploy) para valer.
+5. **Produção (Railway):** garantir `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e
    `TURNSTILE_SECRET`. (O site key tem fallback hardcoded no componente, mas
    conferir é recomendado.)
 
@@ -326,6 +353,8 @@ Supabase — que **estava desativado** e foi **ativado em 17/10/2026**.
 - **Console do browser em `/auth`:**
   - Antes: erro `Refused to frame 'https://challenges.cloudflare.com'…`
   - Depois: deve sumir; inspecionar `iframe[src*="challenges.cloudflare.com"]` presente.
+- **Visual (modo Invisible):** **nenhum** card/checkbox/badge deve aparecer no
+  login/signup/reset. O `iframe` do Turnstile existe no DOM, mas oculto.
 - **Teste negativo:** enviar login/signup sem token ou com token inválido deve
   retornar `captcha_failed`. Se **ainda** autenticar → CAPTCHA do Supabase não
   está ativo de fato.

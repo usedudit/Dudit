@@ -1,14 +1,47 @@
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getDeliveryStatusLabel, getPaymentStatusLabel, getSalesChannelLabel, getFulfillmentModeLabel } from "@/lib/orders/status"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { mapCustomerStatusLabel, stockStatusFromQuantity } from "./filters"
 import type { ExportColumnDef, ExportRow } from "./types"
 
 function formatPaymentMethods(row: any): string {
   const breakdown = Array.isArray(row.payment_breakdown) ? row.payment_breakdown : []
   if (breakdown.length > 0) {
-    return breakdown.map((p: any) => String(p.method || p.name || "-")).filter(Boolean).join(", ")
+    const labels = breakdown
+      .map((p: any) => formatPaymentMethodLabel(String(p.method || p.name || ""), null))
+      .filter(Boolean)
+    if (labels.length > 0) return labels.join(", ")
   }
-  return String(row.payment_method || "-")
+  return formatPaymentMethodLabel(String(row.payment_method || ""), null) || "-"
+}
+
+function resolveTrocoPara(row: any): number | null {
+  const breakdown = Array.isArray(row.payment_breakdown) ? row.payment_breakdown : []
+  const cashEntry = breakdown.find((e: any) => {
+    const m = String(e?.method || "").toLowerCase().trim()
+    return m === "cash" || m.startsWith("dinheiro")
+  })
+  const paymentMethodStr = String(row.payment_method || "")
+  const wantsChange = cashEntry?.wantsChange ?? /troco para/i.test(paymentMethodStr)
+  if (!wantsChange) return null
+
+  if (cashEntry?.payWithAmount != null) {
+    const value = Number(cashEntry.payWithAmount)
+    if (!Number.isNaN(value) && value > 0) return value
+  }
+
+  const match = paymentMethodStr.match(/troco para R\$\s*([\d.,]+)/i)
+  if (match) {
+    const value = Number(match[1].replace(/\./g, "").replace(",", "."))
+    if (!Number.isNaN(value) && value > 0) return value
+  }
+
+  return null
+}
+
+function formatTrocoPara(row: any): string {
+  const value = resolveTrocoPara(row)
+  return value != null ? formatCurrency(value) : "-"
 }
 
 function formatItemNames(items: any[] | null | undefined): string {
@@ -36,6 +69,7 @@ export const ORDER_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "Itens", key: "items", width: 40 },
   { header: "Status Pagamento", key: "paymentStatus", width: 18 },
   { header: "Forma de Pagamento", key: "paymentMethods", width: 24 },
+  { header: "Troco Para", key: "trocoPara", width: 16 },
   { header: "Status Entrega", key: "deliveryStatus", width: 18 },
   { header: "Canal", key: "channel", width: 16 },
   { header: "Subtotal", key: "subtotal", width: 14 },
@@ -49,7 +83,6 @@ export const ORDER_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export const ORDER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   ...ORDER_EXPORT_COLUMNS,
-  { header: "ID", key: "id", width: 36 },
   { header: "Tipo de Entrega", key: "deliveryType", width: 14 },
   { header: "Endereço de Entrega", key: "deliveryAddress", width: 30 },
   { header: "Valor Pago", key: "paidAmount", width: 14 },
@@ -86,6 +119,7 @@ export function mapOrderRow(
     items: formatItemNames(items),
     paymentStatus: situationLabel(row.situation || row.payment_status || row.status || "pending"),
     paymentMethods: formatPaymentMethods(row),
+    trocoPara: formatTrocoPara(row),
     deliveryStatus: getDeliveryStatusLabel(row.delivery_status) || row.delivery_status || "-",
     channel: row.order_source || row.sales_channel || "Presencial",
     subtotal: formatCurrency(subtotal),
@@ -101,7 +135,6 @@ export function mapOrderRow(
 
   return {
     ...base,
-    id: row.id || "-",
     deliveryType: row.delivery_type === "delivery" ? "Entrega" : "Retirada",
     deliveryAddress: row.delivery_address || "-",
     paidAmount: formatCurrency(Number(row.paid_amount ?? 0)),

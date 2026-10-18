@@ -146,6 +146,77 @@ export function getServiceOrderNextStatuses(from: ServiceOrderStatus): ServiceOr
   return SERVICE_ORDER_ALLOWED_TRANSITIONS[from] || []
 }
 
+// Política de edição por status: define o que pode ser alterado em cada etapa.
+// - aberta / aguardando_aprovacao: tudo editável.
+// - aprovada: apenas responsável, previsão, prioridade, status, especificações,
+//   observações e anexos (não itens/valores/cliente).
+// - em_andamento / aguardando_peca: idem + itens (serviços/produtos).
+// - concluida / entregue / cancelada: somente leitura (exceto anexos e observações).
+export interface ServiceOrderEditPolicy {
+  readOnly: boolean
+  canEditAll: boolean
+  canChangeStatus: boolean
+  canEditAssignment: boolean
+  canEditItems: boolean
+  canEditSpecs: boolean
+  canEditNotes: boolean
+  canAttach: boolean
+}
+
+export function getServiceOrderEditPolicy(status: ServiceOrderStatus): ServiceOrderEditPolicy {
+  switch (status) {
+    case "aberta":
+    case "aguardando_aprovacao":
+      return {
+        readOnly: false,
+        canEditAll: true,
+        canChangeStatus: true,
+        canEditAssignment: true,
+        canEditItems: true,
+        canEditSpecs: true,
+        canEditNotes: true,
+        canAttach: true,
+      }
+    case "aprovada":
+      return {
+        readOnly: false,
+        canEditAll: false,
+        canChangeStatus: true,
+        canEditAssignment: true,
+        canEditItems: false,
+        canEditSpecs: true,
+        canEditNotes: true,
+        canAttach: true,
+      }
+    case "em_andamento":
+    case "aguardando_peca":
+      return {
+        readOnly: false,
+        canEditAll: false,
+        canChangeStatus: true,
+        canEditAssignment: true,
+        canEditItems: true,
+        canEditSpecs: true,
+        canEditNotes: true,
+        canAttach: true,
+      }
+    case "concluida":
+    case "entregue":
+    case "cancelada":
+    default:
+      return {
+        readOnly: true,
+        canEditAll: false,
+        canChangeStatus: false,
+        canEditAssignment: false,
+        canEditItems: false,
+        canEditSpecs: false,
+        canEditNotes: true,
+        canAttach: true,
+      }
+  }
+}
+
 // Retrocesso = target aparece antes do status atual na ordem canônica.
 export function isServiceOrderBackwardTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
   const fromIdx = SERVICE_ORDER_STATUS_ORDER.indexOf(from)
