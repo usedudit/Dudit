@@ -110,14 +110,14 @@ const SaleReceiptA4Preview = ({
                         key={pageIndex}
                         className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
                     >
-                    <ReceiptStoreHeaderA4
-                        partnerName={partnerName}
-                        partnerAvatar={partnerAvatar}
-                        primaryColor={data.primaryColor}
-                        secondaryColor={data.secondaryColor}
-                        title="Comprovante de venda"
-                        subtitle={`Pedido #${data.orderNumber}`}
-                    />
+                        <ReceiptStoreHeaderA4
+                            partnerName={partnerName}
+                            partnerAvatar={partnerAvatar}
+                            primaryColor={data.primaryColor}
+                            secondaryColor={data.secondaryColor}
+                            title="Comprovante de venda"
+                            subtitle={`Pedido #${data.orderNumber}`}
+                        />
 
                         <div className={`flex-1 flex flex-col ${page.type !== "first" ? "pt-8" : ""}`}>
                             {page.type === "first" && (
@@ -285,7 +285,7 @@ const SaleReceiptA4Preview = ({
                                                 <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
                                                     <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Detalhamento das parcelas</p>
                                                     {data.installmentDetails.map((inst, i) => (
-                                                        <div key={i} className="flex items-center justify-between text-xs bg-brand-gray/30 rounded-lg px-3 py-2">
+                                                        <div key={i} className="flex items-center justify-between text-xs bg-brand-gray/30 rounded-lg py-2">
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold text-brand-dark">
                                                                     Parcela {String(inst.number).padStart(2, "0")}/{String(inst.total).padStart(2, "0")}
@@ -344,10 +344,10 @@ const SaleReceiptA4Preview = ({
                             )}
 
                             {!page.hasTotals && <div className="mt-auto" />}
-                            </div>
-
-                            <ReceiptA4Footer primaryColor={data.primaryColor} />
                         </div>
+
+                        <ReceiptA4Footer primaryColor={data.primaryColor} />
+                    </div>
                 ))}
             </div>
         </div>

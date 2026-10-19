@@ -75,7 +75,7 @@ export async function fetchTransactionsExport(
 
       // Meio de pagamento é filtrado em JS após mapeamento (rótulos padrão vs. métodos customizados)
 
-      const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+      const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
       if (startIso) query = query.gte("created_at", startIso)
       if (endIso) query = query.lte("created_at", endIso)
 

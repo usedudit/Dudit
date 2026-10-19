@@ -17,11 +17,18 @@ export type ErpExportModule =
   | "cash-register"
   | "xml-import"
   | "quotes"
+  | "coupons"
+  | "deliveries"
+  | "reviews"
 
 export type BaseExportFilters = {
   storeId?: string | null
   selectedIds?: string[]
   includeAllColumns?: boolean
+  /** Orders/sales only: emits one row per item instead of one row per order. */
+  detail?: boolean
+  /** Partner timezone used to convert calendar-date filters to ISO bounds. */
+  timezone?: string
 }
 
 export type QuotesExportFilters = BaseExportFilters & {
@@ -139,6 +146,28 @@ export type XmlImportExportFilters = BaseExportFilters & {
   status?: string[]
 }
 
+export type CouponsExportFilters = BaseExportFilters & {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  discountType?: string[]
+  applyScope?: string[]
+}
+
+export type DeliveriesExportFilters = BaseExportFilters & {
+  search?: string
+  activeTab?: string
+  status?: string[]
+  datePeriod?: DatePeriodFilterValue
+}
+
+export type ReviewsExportFilters = BaseExportFilters & {
+  search?: string
+  customerId?: string | null
+  rating?: string[]
+  productId?: string | null
+}
+
 export type ErpExportFilters =
   | OrdersExportFilters
   | ProductsExportFilters
@@ -154,17 +183,47 @@ export type ErpExportFilters =
   | CashRegisterExportFilters
   | XmlImportExportFilters
   | QuotesExportFilters
+  | CouponsExportFilters
+  | DeliveriesExportFilters
+  | ReviewsExportFilters
+
+export type ExportColumnType =
+  | "text"
+  | "number"
+  | "currency"
+  | "date"
+  | "datetime"
+  | "percent"
+  | "boolean"
 
 export type ExportColumnDef = {
   header: string
   key: string
   width?: number
+  /** Cell type used to apply Excel number formats and alignment. Defaults to "text". */
+  type?: ExportColumnType
+  /** Adds a SUBTOTAL(109, …) summary cell in the totals row. */
+  total?: boolean
+  /** Overrides the default alignment (numbers right, text left). */
+  align?: "left" | "center" | "right"
 }
 
-export type ExportRow = Record<string, string | number | null | undefined>
+export type ExportRow = Record<string, string | number | boolean | Date | null | undefined>
 
 export type ExportResult = {
   columns: ExportColumnDef[]
   rows: ExportRow[]
   rowCount: number
+  periodLabel?: string
+  filtersLabel?: string
+}
+
+export type ExportMeta = {
+  title: string
+  partnerName?: string
+  documentNumber?: string
+  storeName?: string
+  periodLabel?: string
+  filtersLabel?: string
+  generatedAt?: Date
 }

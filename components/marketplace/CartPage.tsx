@@ -67,6 +67,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     const isActionInProgress = useRef(false)
     const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
     const [cartConflicts, setCartConflicts] = useState<Record<string, string>>({}) // cartItemId → conflicting cartItemId
+    // Avisos que impedem finalizar o pedido: ficam visíveis na tela e levam o
+    // usuário até o item que precisa de ação (remover/desmarcar/remarcar).
+    const [checkoutIssues, setCheckoutIssues] = useState<Array<{ storeKey: string; cartItemId: string; message: string }>>([])
+    const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
@@ -546,6 +550,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             newQty = maxStock
         }
         if (newQty === currentQty) return
+        setCheckoutIssues([])
         isActionInProgress.current = true
         setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: newQty } }))
         setLoading(cartItemId)
@@ -570,6 +575,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const switchVariant = async (cartItemId: string, newVariantId: string) => {
         if (loading || isActionInProgress.current) return
+        setCheckoutIssues([])
         isActionInProgress.current = true
         setLoading(cartItemId)
         try {
@@ -591,6 +597,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const removeItem = async (cartItemId: string) => {
         if (loading || isActionInProgress.current) return
+        setCheckoutIssues([])
         const itemToRemove = Object.values(itemsByPartner)
             .flatMap((partner: any) => partner.items || [])
             .find((item: any) => item.id === cartItemId)
@@ -613,6 +620,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const toggleItemSelection = async (cartItemId: string, currentSelected: boolean) => {
         if (loading || isActionInProgress.current) return
+        setCheckoutIssues([])
         isActionInProgress.current = true
         setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: !currentSelected } }))
         setLoading(cartItemId)
@@ -631,6 +639,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const togglePartnerSelection = async (partnerId: string, items: any[], currentAllSelected: boolean) => {
         if (loading || isActionInProgress.current) return
+        setCheckoutIssues([])
         isActionInProgress.current = true
         const newState = !currentAllSelected
         setLoading(partnerId)
@@ -663,6 +672,15 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         }
     }
 
+    const scrollToCartItem = (cartItemId: string) => {
+        if (typeof document === "undefined") return
+        const target = document.querySelector(`[data-cart-item-id="${cartItemId}"]`)
+        if (!target) return
+        target.scrollIntoView({ behavior: "smooth", block: "center" })
+        setHighlightedItemId(cartItemId)
+        window.setTimeout(() => setHighlightedItemId(prev => prev === cartItemId ? null : prev), 2400)
+    }
+
     const handleOpenCheckout = (storeKey: string) => {
         if (!userId) { router.push("/auth/login?next=/cart"); return }
 
@@ -685,22 +703,30 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
         const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
 
-        // Validação de estoque e disponibilidade dos itens selecionados
+        // Coleta TODOS os impedimentos dos itens selecionados, mostra um aviso
+        // na tela e leva o usuário ao primeiro item que precisa de ação.
+        const issues: Array<{ storeKey: string; cartItemId: string; message: string }> = []
         for (const item of partnerItems) {
             if (isItemOutOfStock(item)) {
-                notifyError(`O item "${getItemName(item)}" está esgotado. Desmarque ou remova-o da sacola para prosseguir.`)
-                return
-            }
-            if (isQuantityExceedingStock(item)) {
+                issues.push({ storeKey, cartItemId: item.id, message: `"${getItemName(item)}" está esgotado. Desmarque ou remova-o da sacola para prosseguir.` })
+            } else if (isQuantityExceedingStock(item)) {
                 const max = getItemMaxStock(item)
-                notifyError(`O item "${getItemName(item)}" possui apenas ${max} unidade(s) disponível(is). Ajuste a quantidade para continuar.`)
-                return
-            }
-            if (item.item_type === "service_booking" && serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) {
-                notifyError(`O serviço "${getItemName(item)}" não está mais disponível no horário selecionado. Remarque ou remova-o da sacola para prosseguir.`)
-                return
+                issues.push({ storeKey, cartItemId: item.id, message: `"${getItemName(item)}" possui apenas ${max} unidade(s) disponível(is). Ajuste a quantidade para continuar.` })
+            } else if (item.item_type === "service_booking" && serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) {
+                issues.push({ storeKey, cartItemId: item.id, message: `O serviço "${getItemName(item)}" não está mais disponível no horário selecionado. Remarque ou remova-o da sacola para prosseguir.` })
+            } else if (item.item_type === "service_booking" && cartConflicts[item.id]) {
+                issues.push({ storeKey, cartItemId: item.id, message: `O serviço "${getItemName(item)}" tem horário conflitante com outro serviço da sacola. Remarque ou remova um deles para prosseguir.` })
             }
         }
+
+        if (issues.length > 0) {
+            setCheckoutIssues(issues)
+            // Garante que a loja esteja expandida para o item existir no DOM.
+            setIsVendorExpanded(prev => ({ ...prev, [storeKey]: true }))
+            requestAnimationFrame(() => requestAnimationFrame(() => scrollToCartItem(issues[0].cartItemId)))
+            return
+        }
+        setCheckoutIssues([])
 
         const partnerId = partnerData.partnerId || storeKey
 
@@ -946,14 +972,41 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     // Aviso quando a loja tem produtos com e sem envio nacional ao mesmo tempo:
     // a transportadora fica indisponível para todo o pedido.
     const renderShippingWarning = (storeKey: string) => {
-        const info = getPartnerShippingAvailability(itemsByPartner[storeKey])
+        const partnerData = itemsByPartner[storeKey]
+        const info = getPartnerShippingAvailability(partnerData)
         if (!info.hasMixedShipping) return null
+        const blockedItems = (partnerData?.products || []).filter((item: any) => {
+            if (!getItemSelected(item)) return false
+            const modes = normalizeFulfillmentModes(item.products?.fulfillment_modes, ["delivery", "pickup"])
+            return !modes.includes("shipping")
+        })
         return (
             <InfoCard
                 title="Envio nacional indisponível para este pedido."
-                message={info.blockedCount === 1
-                    ? "1 item desta loja não aceita envio por transportadora. Remova esse item para usar o envio nacional, ou escolha entrega local/retirada."
-                    : `${info.blockedCount} itens desta loja não aceitam envio por transportadora. Remova esses itens para usar o envio nacional, ou escolha entrega local/retirada.`
+                message={
+                    <div className="space-y-1">
+                        <p>
+                            {info.blockedCount === 1
+                                ? "1 item desta loja não aceita envio por transportadora. Remova esse item para usar o envio nacional, ou escolha entrega local/retirada."
+                                : `${info.blockedCount} itens desta loja não aceitam envio por transportadora. Remova esses itens para usar o envio nacional, ou escolha entrega local/retirada.`}
+                        </p>
+                        {blockedItems.length > 0 && (
+                            <ul className="list-disc list-inside">
+                                {blockedItems.map((item: any) => (
+                                    <li key={item.id}>
+                                        <span>{getItemName(item)}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => scrollToCartItem(item.id)}
+                                            className="ml-1 underline font-medium hover:text-brand-orange"
+                                        >
+                                            Ir para o item
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 }
                 color="orange"
             />
@@ -962,8 +1015,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
         if (hasOnlyServices(partnerData?.items || [])) return 0
+        const settings = partnerData?.deliverySettings
+        // Frete grátis por valor mínimo vale para a entrega própria E para a
+        // transportadora: o vendedor absorve o custo no mesmo limite.
+        const isFreeThreshold = settings?.free_delivery_threshold != null
+            && Number(settings.free_delivery_threshold) > 0
+            && selectedItemsTotal >= Number(settings.free_delivery_threshold)
         const carrierOption = getCarrierSelectedOption(storeKey)
-        if (carrierOption) return Number(carrierOption.price)
+        if (carrierOption) return isFreeThreshold ? 0 : Number(carrierOption.price)
         const quoteState = storeKey ? deliveryQuotes[storeKey] : null
         if (quoteState && !quoteState.loading && !quoteState.error) {
             return Number(quoteState.fee || 0)
@@ -973,9 +1032,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (quoteState && !quoteState.loading && quoteState.error) {
             return 0
         }
-        const settings = partnerData?.deliverySettings
         if (!settings || settings.is_delivery_enabled === false || settings.delivery_payer === "seller") return 0
-        if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
+        if (isFreeThreshold) {
             return 0
         }
         return Number(settings.base_fee || 0)
@@ -1019,9 +1077,23 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (quote?.loading) {
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
         }
+        const settings = partnerData?.deliverySettings
+        const isFreeThreshold = (settings?.free_delivery_threshold != null
+            && Number(settings.free_delivery_threshold) > 0
+            && selectedItemsTotal >= Number(settings.free_delivery_threshold))
+            || Boolean(quote?.breakdown?.isFreeByThreshold)
         const carrierOption = getCarrierSelectedOption(storeKey)
         if (carrierOption) {
-            return formatCurrency(Number(carrierOption.price))
+            const carrierPrice = Number(carrierOption.price)
+            if (isFreeThreshold) {
+                return (
+                    <span className="flex items-center gap-1.5 justify-end">
+                        {carrierPrice > 0 && <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(carrierPrice)} | </span>}
+                        <span className="text-brand-green font-semibold">Grátis</span>
+                    </span>
+                )
+            }
+            return formatCurrency(carrierPrice)
         }
         const carrierQuoteState = storeKey && isOwnQuoteRaio(storeKey) ? carrierQuotes[storeKey] : null
         if (carrierQuoteState?.loading) {
@@ -1033,7 +1105,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 return <span className="text-xs text-red-500 font-normal">{quote.error}</span>
             }
         }
-        const settings = partnerData?.deliverySettings
         if (quote?.breakdown?.deliveryPayer === "seller" || settings?.delivery_payer === "seller") {
             const fee = Number(quote?.breakdown?.originalFee || settings?.base_fee || 0)
             return (
@@ -1046,7 +1117,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (settings?.is_delivery_enabled === false) {
             return settings.is_pickup_enabled !== false ? "Apenas retirada (Grátis)" : "Indisponível"
         }
-        const isFreeThreshold = (settings?.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) || Boolean(quote?.breakdown?.isFreeByThreshold)
         if (isFreeThreshold) {
             const originalFee = Number(quote?.breakdown?.originalFee || 0)
             return (
@@ -1123,6 +1193,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                 const storeObj = data.store
                                     ? { ...data.store, id: data.store.id, short_id: data.store.short_id, slug: data.store.slug, name: data.store.name }
                                     : { ...data.partner, id: data.partner?.store_id || data.partner?.id, short_id: data.partner?.short_id, slug: data.partner?.slug, name: data.partner?.name || sellerName }
+                                const partnerIssues = checkoutIssues.filter(issue => issue.storeKey === storeKey)
 
                                 return (
                                     <Fragment key={storeKey}>
@@ -1189,6 +1260,29 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                         className="mb-4"
                                                                     />
                                                                 ) : null}
+                                                                {partnerIssues.length > 0 && (
+                                                                    <InfoCard
+                                                                        title="Revise os itens para finalizar o pedido"
+                                                                        message={
+                                                                            <ul className="list-disc list-inside space-y-1">
+                                                                                {partnerIssues.map(issue => (
+                                                                                    <li key={issue.cartItemId}>
+                                                                                        <span>{issue.message}</span>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => scrollToCartItem(issue.cartItemId)}
+                                                                                            className="ml-1 underline font-medium hover:text-brand-orange"
+                                                                                        >
+                                                                                            Ir para o item
+                                                                                        </button>
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        }
+                                                                        color="red"
+                                                                        className="mb-4"
+                                                                    />
+                                                                )}
                                                                 {[
                                                                     { title: "Produtos", items: data.products?.length ? data.products : data.items.filter((i: any) => (i.item_type || "product") === "product") },
                                                                     { title: "Serviços", items: data.services || [] },
@@ -1209,7 +1303,11 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     const itemQty = getItemQuantity(item)
 
                                                                     return (
-                                                                        <div key={item.id} className={`lg:pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"}`}>
+                                                                        <div
+                                                                            key={item.id}
+                                                                            data-cart-item-id={item.id}
+                                                                            className={`lg:pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"} ${highlightedItemId === item.id ? "rounded-xl ring-2 ring-brand-orange/60 ring-offset-4 ring-offset-white dark:ring-offset-dark-surface transition-shadow" : ""}`}
+                                                                        >
 
                                                                             {/* Mobile/Tablet Layout (< md) */}
                                                                             {(() => {

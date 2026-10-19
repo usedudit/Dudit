@@ -33,7 +33,7 @@ export async function fetchCustomersExport(
   }
 
   const search = sanitizeSearchTerm(filters.search)
-  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,

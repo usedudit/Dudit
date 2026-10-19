@@ -286,7 +286,10 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       // mp_* status fields are sourced from partner_integrations.
       const partner = item.partners ? withMpPartnerFields(item.partners) : null
       if (partner) {
-        partner.addresses = partnerAddresses[partnerId] || []
+        // Endereços de loja são gravados com store_id (partner_id fica nulo),
+        // então partnerAddresses costuma vir vazio. Sem o endereço da loja o
+        // gerador de URL cai em "/vitrine/..." na sacola. Prioriza a loja.
+        partner.addresses = (store?.addresses?.length ? store.addresses : partnerAddresses[partnerId]) || []
       }
 
       const rawPm = paymentMethods || []

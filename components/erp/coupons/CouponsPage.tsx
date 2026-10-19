@@ -51,6 +51,8 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSearchParams } from "next/navigation"
 import { getTodayYmdSaoPaulo } from "@/lib/utils"
 import { getCustomerByIdAction } from "@/app/actions/erp/customers"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 type FilterState = {
     discountType: string[]
@@ -109,6 +111,9 @@ export default function CouponsPage({
     const canCreateCoupons = canCreate("marketing_coupons")
     const canEditCoupons = canEdit("marketing_coupons")
     const canDeleteCoupons = canDelete("marketing_coupons")
+
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } =
+        useErpExport(planGate ? "free" : "crescer")
 
     const [coupons, setCoupons] = useState<CouponRow[]>(initialCoupons || [])
     const [search, setSearch] = useState("")
@@ -355,6 +360,21 @@ export default function CouponsPage({
         },
         [ensureScopeData, partnerId],
     )
+
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "coupons",
+            format: "xlsx",
+            filters: {
+                storeId: storeId ?? null,
+                search: debouncedSearch,
+                activeTab,
+                discountType: filters.discountType,
+                applyScope: filters.applyScope,
+            },
+        })
+    }, [exportData, partnerId, storeId, debouncedSearch, activeTab, filters.discountType, filters.applyScope])
 
     const refreshCoupons = useCallback(async () => {
         setIsLoadingPage(true)
@@ -828,8 +848,8 @@ export default function CouponsPage({
                                     </div>
 
                                     <div className="flex items-center gap-3">
-                                        <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
-                                            Exportar
+                                        <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                            {isExporting ? "Exportando..." : "Exportar"}
                                         </Button>
                                         <Button onClick={openCreate} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                             Novo cupom
@@ -1021,6 +1041,14 @@ export default function CouponsPage({
             />
 
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text} />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                defaultFormat={columnSelectionModal.defaultFormat}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
+            />
 
             {sharingCoupon && (
                 <ShareModal

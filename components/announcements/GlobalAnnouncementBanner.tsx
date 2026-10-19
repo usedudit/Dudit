@@ -7,6 +7,7 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { AlertTriangleIcon, InfoIcon, ShieldIcon, XIcon, ArrowRightIcon } from "@/lib/icons"
 import type { GlobalAnnouncementConfig } from "@/lib/system/types"
+import { Button } from "../reusable"
 
 interface GlobalAnnouncementBannerProps {
   initialAnnouncement?: GlobalAnnouncementConfig | null
@@ -98,15 +99,11 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -56, opacity: 0 }}
           transition={{ duration: 0.2 }}
-           className={`fixed top-0 left-0 right-0 z-[110] border-b backdrop-blur-md ${bgClasses}`}
+          className={`fixed top-0 left-0 right-0 z-[110] border-b backdrop-blur-md ${bgClasses}`}
         >
-          <div className="w-full max-w-7xl mx-auto px-4 py-2.5 sm:py-3">
+          <div className="w-full max-w-[1400px] mx-auto py-2.5 sm:py-3">
             <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <span className={`shrink-0 p-1.5 rounded-lg border flex items-center justify-center ${iconBg}`}>
-                  <IconComponent className="w-4 h-4" />
-                </span>
-
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                   {announcement.title && (
                     <span className="font-bold tracking-tight shrink-0">
@@ -120,6 +117,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
                   {announcement.link_url && (
                     <Link
                       href={announcement.link_url}
+                      target="_blank"
                       className="inline-flex items-center gap-1 font-bold underline underline-offset-2 hover:opacity-80 transition ml-1 shrink-0 text-white"
                     >
                       {announcement.link_text || "Saiba mais"}
@@ -130,13 +128,9 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
               </div>
 
               {announcement.closable && (
-                <button
-                  onClick={handleDismiss}
-                  aria-label="Fechar aviso"
-                  className="shrink-0 p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
+                <Button variant="filled" onClick={handleDismiss} size="icon" className="hidden lg:flex" aria-label="Fechar aviso">
+                  <XIcon className="w-5 h-5" />
+                </Button>
               )}
             </div>
           </div>

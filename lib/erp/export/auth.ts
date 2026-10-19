@@ -23,6 +23,9 @@ const MODULE_RESOURCE: Record<ErpExportModule, keyof PermissionTemplate> = {
   "cash-register": "orders",
   "xml-import": "products",
   quotes: "quotes",
+  coupons: "coupons",
+  deliveries: "delivery",
+  reviews: "products",
 }
 
 export async function requireErpExportPermission(partnerId: string, module: ErpExportModule) {

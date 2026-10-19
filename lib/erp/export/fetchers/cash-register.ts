@@ -63,7 +63,7 @@ export async function fetchCashRegisterExport(
       const statuses = (filters.status || []).filter(Boolean)
       if (statuses.length > 0) query = query.in("status", statuses)
 
-      const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+      const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
       if (startIso) query = query.gte("opened_at", startIso)
       if (endIso) query = query.lte("opened_at", endIso)
 

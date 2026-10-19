@@ -58,6 +58,7 @@ interface ProcessPaymentRequest {
     finalTotal: number
     carrierServiceId?: number | null
     destinationPostalCode?: string | null
+    destinationCoords?: { lat: number; lng: number } | null
   }
   existingOrderId?: string
   deviceId?: string | null
@@ -443,6 +444,7 @@ async function handler(request: NextRequest) {
         paymentMethod: pmtConfig,
         carrierServiceId: body.checkoutPricing?.carrierServiceId,
         destinationPostalCode: body.checkoutPricing?.destinationPostalCode,
+        destinationCoords: body.checkoutPricing?.destinationCoords || null,
       })
 
       if (!priced.success) {
@@ -497,6 +499,7 @@ async function handler(request: NextRequest) {
           paymentMethod: pmtConfig,
           carrierServiceId: body.checkoutPricing?.carrierServiceId,
           destinationPostalCode: body.checkoutPricing?.destinationPostalCode,
+          destinationCoords: body.checkoutPricing?.destinationCoords || null,
         })
 
         await adminClient

@@ -256,37 +256,3 @@ export async function exportDreToXLSX({
   a.click()
   URL.revokeObjectURL(url)
 }
-
-export function exportDreToCSV({
-  report,
-  regime,
-  startDate,
-  endDate,
-  storeName,
-}: ExportDreExcelParams) {
-  let csv = `RELATÓRIO DE DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)\n`
-  csv += `Empresa: ${report.companyInfo?.partnerName || "Empresa Matriz"};CNPJ/CPF: ${report.companyInfo?.documentNumber || "-"}\n`
-  csv += `Unidade: ${storeName};Regime Contábil: ${regime === "competencia" ? "Competência" : "Caixa"}\n`
-  csv += `Período: ${formatDateBR(startDate)} até ${formatDateBR(endDate)};Gerado em: ${report.companyInfo?.generatedAt || ""}\n\n`
-  csv += "Estrutura / Conta Contábil;Tipo;Período Atual (R$);Análise Vertical (AV %);Período Anterior (R$);Variação Horizontal (AH %)\n"
-
-  Object.values(report.structure).forEach((node) => {
-    csv += `"${node.title}";"${translateNodeType(node.type)}";"${node.amount.toFixed(2).replace(".", ",")}";"${node.verticalPercent.toFixed(2).replace(".", ",")}%";"${(node.previousAmount ?? 0).toFixed(2).replace(".", ",")}";"${(node.horizontalVariation ?? 0).toFixed(2).replace(".", ",")}%"\n`
-    node.items.forEach((item) => {
-      csv += `  "${item.name}";"${translateNodeType("item")}";"${item.amount.toFixed(2).replace(".", ",")}";"${item.verticalPercent.toFixed(2).replace(".", ",")}%";"${(item.previousAmount ?? 0).toFixed(2).replace(".", ",")}";"${(item.horizontalVariation ?? 0).toFixed(2).replace(".", ",")}%"\n`
-    })
-  })
-
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.setAttribute("href", url)
-  link.setAttribute(
-    "download",
-    `DRE_${formatDateBR(startDate).replace(/\//g, "-")}_a_${formatDateBR(endDate).replace(/\//g, "-")}.csv`
-  )
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}

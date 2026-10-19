@@ -17,6 +17,9 @@ export const MODULE_SHEET_NAMES: Record<string, string> = {
   "cash-register": "Controle de Caixa",
   "xml-import": "Importação XML",
   quotes: "Orçamentos",
+  coupons: "Cupons",
+  deliveries: "Entregas",
+  reviews: "Avaliações",
 }
 
 export const MODULE_FILENAME_NAMES: Record<string, string> = {
@@ -35,6 +38,9 @@ export const MODULE_FILENAME_NAMES: Record<string, string> = {
   "cash-register": "controle-caixa",
   "xml-import": "importacao-xml",
   quotes: "orcamentos",
+  coupons: "cupons",
+  deliveries: "entregas",
+  reviews: "avaliacoes",
 }
 
 export async function formatExportFilename(module: string, extension: string, partnerId?: string): Promise<string> {

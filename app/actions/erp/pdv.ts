@@ -1822,6 +1822,14 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         .join(", ");
       const variantText = item.variant_name || item.variantName || null;
       let computedCustomName = item.customName || item.name || undefined;
+      if (
+        variantText &&
+        !String(computedCustomName || "")
+          .toLowerCase()
+          .includes(String(variantText).toLowerCase())
+      ) {
+        computedCustomName = `${computedCustomName || "Produto"} (${variantText})`;
+      }
       if (addonsText) {
         computedCustomName = `${computedCustomName || "Item"} (+ ${addonsText})`;
       }

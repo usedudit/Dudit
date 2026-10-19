@@ -2,8 +2,8 @@
 
 export function exportCSV(filename: string, headers: string[], rows: string[][]) {
   const csv = [
-    headers.join(","),
-    ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+    headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(";"),
+    ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")),
   ].join("\n")
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)

@@ -14,7 +14,7 @@ const PRODUCT_SELECT =
   "id, name, stock_quantity, price, cost_price, is_active, sku, gtin, promotional_price, show_in_marketplace"
 
 const PRODUCT_SELECT_ALL =
-  "id, name, description, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name), brand, brand_id, brand_rel:brands!brand_id(name), product_type, condition, gtin, unit, promotional_price, product_fiscal_profiles(ncm, cest), product_logistics(weight_gross, weight_net, width, height, length)"
+  "id, name, description, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name), brand, brand_id, brand_rel:brands!brand_id(name), product_type, condition, gtin, unit, promotional_price, product_fiscal_profiles(ncm, cest), product_logistics(weight_gross, weight_net, width, height, length), product_variants(variant_name, variant_type, variant_value, sku, stock_quantity, is_active)"
 
 const TAB_STOCK: Record<string, string> = {
   normal: "Normal",

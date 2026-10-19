@@ -1,3 +1,5 @@
+import { TZDate } from "@date-fns/tz"
+import { getDefaultTimezone } from "@/lib/date/tz"
 import { resolveDatePeriodBounds, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import type { OrdersExportFilters } from "./types"
 
@@ -38,11 +40,20 @@ export function sanitizeSearchTerm(value?: string | null, maxLen = 120): string 
     .replace(/[%_]/g, "")
 }
 
-export function resolveExportDateBounds(period?: DatePeriodFilterValue) {
+function ymdToIso(ymd: string, endOfDay: boolean, timezone: string): string {
+  const [year, month, day] = ymd.split("-").map(Number)
+  const zoned = endOfDay
+    ? new TZDate(year, month - 1, day, 23, 59, 59, 999, timezone)
+    : new TZDate(year, month - 1, day, 0, 0, 0, 0, timezone)
+  return new Date(zoned.getTime()).toISOString()
+}
+
+export function resolveExportDateBounds(period?: DatePeriodFilterValue, timezone?: string) {
   if (!period) return { startIso: null as string | null, endIso: null as string | null }
   const { startYmd, endYmd } = resolveDatePeriodBounds(period)
-  const startIso = startYmd ? `${startYmd}T00:00:00-03:00` : null
-  const endIso = endYmd ? `${endYmd}T23:59:59.999-03:00` : null
+  const tz = timezone || getDefaultTimezone()
+  const startIso = startYmd ? ymdToIso(startYmd, false, tz) : null
+  const endIso = endYmd ? ymdToIso(endYmd, true, tz) : null
   return { startIso, endIso }
 }
 

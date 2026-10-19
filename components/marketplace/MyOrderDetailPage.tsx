@@ -1732,7 +1732,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             variant="link"
                                                             className="text-brand-blue hover:text-brand-blue/70"
                                                             onClick={() =>
-                                                                window.open(`/assinaturas?view=${order.recurring_subscription_id}`)
+                                                                window.open(`/assinaturas?tab=assinaturas&view=${order.recurring_subscription_id}`)
                                                             }
                                                             type="button"
                                                         >

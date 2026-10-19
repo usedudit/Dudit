@@ -1370,6 +1370,8 @@ export default function OrderDetailView({
                                     <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                       <img
                                         src={getR2ImageUrl(
+                                          item.product_variants?.variant_options?.image ||
+                                          item.product_variants?.image ||
                                           item.image ||
                                           item.products?.images ||
                                           item.services?.images ||
@@ -2288,7 +2290,7 @@ export default function OrderDetailView({
                                   className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
-                                      `/erp/recorrentes/assinaturas?view=${sourceSubscriptionId}`,
+                                      `/erp/recorrentes/assinaturas?tab=assinaturas&view=${sourceSubscriptionId}`,
                                     )
                                   }
                                   type="button"
@@ -2378,16 +2380,16 @@ export default function OrderDetailView({
                                 left={
                                   <div
                                     className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${order.delivery_status ===
-                                        "delivery_failed"
-                                        ? "bg-brand-red/10 text-brand-red"
-                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                      "delivery_failed"
+                                      ? "bg-brand-red/10 text-brand-red"
+                                      : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
                                       }`}
                                   >
                                     <div
                                       className={`w-2.5 h-2.5 rounded-full ${order.delivery_status ===
-                                          "delivery_failed"
-                                          ? "bg-brand-red"
-                                          : "bg-brand-dark dark:bg-dark-heading"
+                                        "delivery_failed"
+                                        ? "bg-brand-red"
+                                        : "bg-brand-dark dark:bg-dark-heading"
                                         }`}
                                     />
                                   </div>
@@ -2462,7 +2464,7 @@ export default function OrderDetailView({
                                   className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
-                                      `/erp/recorrentes/assinaturas?view=${sourceSubscriptionId}`,
+                                      `/erp/recorrentes/assinaturas?tab=assinaturas&view=${sourceSubscriptionId}`,
                                     )
                                   }
                                   type="button"
@@ -2540,6 +2542,8 @@ export default function OrderDetailView({
                                   <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                     <img
                                       src={getR2ImageUrl(
+                                        item.product_variants?.variant_options?.image ||
+                                        item.product_variants?.image ||
                                         item.image ||
                                         item.products?.images ||
                                         item.services?.images ||

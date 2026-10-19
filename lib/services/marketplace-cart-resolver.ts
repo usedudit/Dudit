@@ -97,7 +97,7 @@ export async function resolveCheckoutCartLines(
   const { data: rows, error } = await supabase
     .from("cart_items")
     .select(`
-      id, user_id, partner_id, item_type, product_id, variant_id, service_id,
+      id, user_id, partner_id, store_id, item_type, product_id, variant_id, service_id,
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
       products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images, cost_price, allow_sell_without_stock, unit),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),

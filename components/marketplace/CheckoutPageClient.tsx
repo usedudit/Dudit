@@ -1067,9 +1067,16 @@ export function CheckoutPageClient() {
         deliveryPlanEnabled &&
         deliveryEnabled,
     )
+    // Serviço a domicílio cobra taxa de deslocamento (entra no deliveryFee
+    // calculado pelo servidor), então também precisa da linha no resumo.
+    const hasCustomerLocationService = Boolean(
+        checkoutContext?.lines?.some((l) => l.lineKind === "service_booking" && l.fulfillmentMode === "customer_location"),
+    )
     // Assinaturas também exibem a linha de frete (o total do servidor já
     // inclui o frete resolvido pela política do plano).
-    const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions) || Boolean(requirements?.hasSubscriptionLines)
+    const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
+        || Boolean(requirements?.hasSubscriptionLines)
+        || hasCustomerLocationService
     const hasConfiguredDeliveryRates = useMemo(() => {
         if (deliveryBreakdown?.hasRatesConfigured !== undefined) {
             return Boolean(deliveryBreakdown.hasRatesConfigured)
@@ -1312,7 +1319,14 @@ export function CheckoutPageClient() {
                                 </p>
                             )}
                         </div>
-                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">{formatCurrency(Number(selectedCarrier.price))}</span>
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
+                            {!deliveryQuoteLoading && summaryDeliveryFee === 0 ? (
+                                <span className="flex items-center gap-1.5">
+                                    <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(selectedCarrier.price))}</span>
+                                    <span className="text-brand-green">Grátis</span>
+                                </span>
+                            ) : formatCurrency(Number(selectedCarrier.price))}
+                        </span>
                     </div>,
                 )
             } else if (selectedAddress) {
@@ -2185,7 +2199,7 @@ export function CheckoutPageClient() {
                 )}
                 {showDeliveryFeeRow && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                        <span>Entrega</span>
+                        <span>{hasCustomerLocationService && !requirements?.showProductFulfillmentOptions && !requirements?.hasSubscriptionLines ? "Deslocamento" : "Entrega"}</span>
                         <span className={(isPickup || (summaryDeliveryFee === 0 && (hasFreeDeliveryCoupon || (subscriptionOnlyCart && !deliveryQuoteLoading) || (deliveryBreakdown as any)?.isFreeByThreshold || deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || (hasConfiguredDeliveryRates && productDeliveryQuoteActive && !deliveryError && Boolean(formData.deliveryAddress))))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                             {isPickup
                                 ? "Grátis"
@@ -2211,10 +2225,16 @@ export function CheckoutPageClient() {
                         </span>
                     </div>
                 )}
-                {showDeliveryFeeRow && !isPickup && summaryDeliveryFee > 0 && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
+                {showDeliveryFeeRow && !isPickup && summaryDeliveryFee > 0 && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || Number((deliveryBreakdown as any).serviceTravelFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
                     <div className="space-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
                         {Number(deliveryBreakdown.baseFee) > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(deliveryBreakdown.baseFee))}</span></div>}
                         {Number(deliveryBreakdown.distanceFee) > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(Number(deliveryBreakdown.distanceFee))}</span></div>}
+                        {Number((deliveryBreakdown as any).serviceTravelFee) > 0 && (
+                            <div className="flex justify-between">
+                                <span>Deslocamento{(deliveryBreakdown as any).serviceTravelDistanceKm != null ? ` (${Number((deliveryBreakdown as any).serviceTravelDistanceKm).toFixed(2)} km)` : ""}</span>
+                                <span>{formatCurrency(Number((deliveryBreakdown as any).serviceTravelFee))}</span>
+                            </div>
+                        )}
                         {deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0 && (
                             <div className="flex justify-between">
                                 <span>Ajuste horário</span>
@@ -2566,9 +2586,22 @@ export function CheckoutPageClient() {
 
     const handleSubmitInternal = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
+        // Preserva o erro já calculado (raio/deslocamento) antes de limpar o
+        // estado: o resumo precisa continuar exibindo o motivo do bloqueio.
+        const existingDeliveryError = deliveryError
         setDeliveryError(null)
         setPaymentError(null)
         setIsLoading(true)
+
+        // Erro de entrega/deslocamento já calculado (ex.: serviço fora do raio
+        // de atendimento): bloqueia antes de qualquer cobrança. Carrinhos com
+        // frete próprio de produto já caem no bloqueio mais abaixo (com o modal
+        // de raio), então aqui cobrimos os fluxos sem cotação de produto.
+        if (existingDeliveryError && !productDeliveryQuoteActive && !(carrierSectionVisible && selectedCarrierServiceId)) {
+            setDeliveryError(existingDeliveryError)
+            setIsLoading(false)
+            return
+        }
 
         if (checkoutContext?.deposit.available && !bypassDepositModalRef.current) {
             setShowDepositChoiceModal(true)
@@ -3438,7 +3471,7 @@ export function CheckoutPageClient() {
                                                         className="mb-4"
                                                     >
                                                         {deliveryError ? (
-                                                            <InfoCard message="Corrija o endereço de entrega ou selecione Retirada no local antes de escolher a forma de pagamento." color="red" />
+                                                            <InfoCard title="Endereço indisponível" message={deliveryError} color="red" />
                                                         ) : (
                                                             <>
                                                                 {!formData.paymentMethod ? (

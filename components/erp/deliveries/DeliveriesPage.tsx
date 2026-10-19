@@ -21,6 +21,8 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { formatDistance } from "@/lib/services/location.service"
 import { toast } from "@/hooks/use-notification"
+import { useErpExport } from "@/hooks/use-erp-export"
+import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
 const CHANGE_STATUS_REASONS = [
     { value: "operational_error", label: "Erro operacional / Clique acidental" },
@@ -161,6 +163,28 @@ export default function DeliveriesPage({
     })
 
     const planGate = propPlanGate
+
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } =
+        useErpExport(planSlug || "free")
+
+    const handleExportDeliveries = useCallback(() => {
+        const statusFilter = filters.status.length
+            ? filters.status
+            : activeTab === "active"
+                ? ["pending", "not_sent", "preparing", "sent", "pickup_available"]
+                : ["delivered", "delivery_failed", "cancelled"]
+
+        void exportData({
+            partnerId,
+            module: "deliveries",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                status: statusFilter,
+                datePeriod: filters.datePeriod,
+            },
+        })
+    }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod, activeTab])
     const isDelivery = initialUserRole === "delivery"
 
     useInfiniteScrollObserver(observerTarget, {
@@ -456,8 +480,8 @@ export default function DeliveriesPage({
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {!isDelivery && (
-                                        <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
-                                            Exportar
+                                        <Button variant="outline" onClick={handleExportDeliveries} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                            {isExporting ? "Exportando..." : "Exportar"}
                                         </Button>
                                     )}
                                     {!isDelivery && (
@@ -789,6 +813,14 @@ export default function DeliveriesPage({
                 filters={filters}
                 setFilters={setFilters}
                 onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
+            />
+
+            <ExportColumnSelectionModal
+                isOpen={columnSelectionModal.isOpen}
+                canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                defaultFormat={columnSelectionModal.defaultFormat}
+                onConfirm={handleColumnConfirm}
+                onClose={closeColumnSelectionModal}
             />
         </>
     )

@@ -68,7 +68,7 @@ export async function fetchQuotesExport(
   filters: QuotesExportFilters,
 ): Promise<import("../types").ExportResult> {
   const search = sanitizeSearchTerm(filters.search).toLowerCase()
-  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
   const includeAllColumns = filters.includeAllColumns === true
   const select = includeAllColumns ? QUOTE_SELECT_ALL : QUOTE_SELECT
 

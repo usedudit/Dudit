@@ -7,6 +7,7 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing-engine"
 import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import {
+  calculateServiceTravelFeeForOrder,
   quoteDeliveryFeeAction,
   resolveDeliverySettingsRow,
   resolveStoreFulfillmentCapabilities,
@@ -330,6 +331,39 @@ export async function priceMarketplaceCartCheckout(
         isFreeByThreshold: true,
         freeDeliveryThreshold,
         freeDeliveryReason: "threshold",
+      }
+    }
+  }
+
+  // Taxa de deslocamento de serviços a domicílio (customer_location). Precisa
+  // entrar no mesmo total do checkout e bloquear quando o endereço está fora do
+  // raio máximo de atendimento configurado pela loja. Sem isso o fluxo de
+  // pagamento (Mercado Pago) finalizava ignorando raio e taxa.
+  const serviceLinesForTravel = resolvedLines.filter(
+    (l) => l.itemType === "service_booking" && (l.fulfillmentMode === "customer_location" || l.lineRequiresDelivery),
+  )
+  if (serviceLinesForTravel.length > 0 && params.deliveryAddress) {
+    const serviceLineForTravel = serviceLinesForTravel.find((l) => l.storeId) || serviceLinesForTravel[0]
+    const serviceTravel = await calculateServiceTravelFeeForOrder({
+      supabase: adminClient,
+      partnerId,
+      storeId: serviceLineForTravel.storeId || targetStoreId,
+      serviceId: serviceLineForTravel.serviceId || null,
+      deliveryAddress: params.deliveryAddress,
+      destinationCoords: params.destinationCoords ?? null,
+      orderSubtotal: subtotal,
+    })
+    if (!serviceTravel.success) {
+      return { success: false, error: serviceTravel.error || "Endereço fora do raio de atendimento deste serviço." }
+    }
+    if (serviceTravel.fee > 0) {
+      deliveryFee = Math.round((deliveryFee + serviceTravel.fee) * 100) / 100
+      deliveryBreakdown = {
+        ...(deliveryBreakdown || {}),
+        serviceTravelFee: serviceTravel.fee,
+        serviceTravelDistanceKm: serviceTravel.distanceKm,
+        serviceTravelOutOfRadius: serviceTravel.outOfRadius,
+        travelFee: serviceTravel.fee,
       }
     }
   }

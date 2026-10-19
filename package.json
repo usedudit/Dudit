@@ -9,7 +9,6 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
     "test": "vitest run",
     "seed:legal": "npx tsx scripts/seed-legal-documents.ts",
     "seed:explore": "npx tsx scripts/seed-explore-redis.ts",

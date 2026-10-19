@@ -19,7 +19,8 @@ const APPOINTMENT_SELECT_ALL = `
   id, partner_id, customer_id, customer_name, service_name,
   start_date, start_time, end_date, end_time, duration_minutes,
   staff_partner_user_id, staff_name, status, price, pricing_unit,
-  paid_amount, sales_channel, payment_status, fulfillment_mode, notes, created_at
+  paid_amount, sales_channel, payment_status, fulfillment_mode, notes, created_at,
+  customers:customer_id(phone, email)
 `
 
 export async function fetchAppointmentsExport(

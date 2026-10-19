@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon } from '@/lib/icons';
+import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon, ExportFileIcon } from '@/lib/icons';
 import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
 import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import Pagination from '@/components/reusable/Pagination';
@@ -23,6 +23,8 @@ import { usePermissions } from '@/lib/permission-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { HorizontalKPICard } from '@/components/erp/dashboard/cards/HorizontalKPICard';
+import { useErpExport } from '@/hooks/use-erp-export';
+import ExportColumnSelectionModal from '@/components/erp/export/ExportColumnSelectionModal';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
@@ -47,6 +49,18 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const { openPlanUpgrade } = usePlanUpgrade();
     const { planSlug } = usePermissions();
+    const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } =
+        useErpExport(planSlug || 'free');
+
+    const handleExportReviews = useCallback(() => {
+        if (!realCustomerId) return;
+        void exportData({
+            partnerId: customer?.partner_id || '',
+            module: 'reviews',
+            format: 'xlsx',
+            filters: { customerId: realCustomerId },
+        });
+    }, [exportData, realCustomerId, customer?.partner_id]);
     const [activeTab, setActiveTab] = useState('General');
     const [isScrolled, setIsScrolled] = useState(false);
     const isMobile = useMediaQuery("(max-width: 767px)");
@@ -756,6 +770,16 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                     <TabsContent value="Review" className="mt-0">
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <div className="flex items-center justify-end mb-4">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={handleExportReviews}
+                                                    disabled={isExporting || !(fetchedReviews && fetchedReviews.length)}
+                                                    leftIcon={<ExportFileIcon size={18} />}
+                                                >
+                                                    {isExporting ? "Exportando..." : "Exportar"}
+                                                </Button>
+                                            </div>
                                             <ReviewsContent reviews={fetchedReviews || []} isLoading={isLoadingReviews} />
                                         </motion.div>
                                     </TabsContent>
@@ -980,6 +1004,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                 />
 
                 <SavingStatusModal isOpen={isDeleting || isArchiving} text={isArchiving ? "Arquivando cliente..." : "Excluindo cliente..."} />
+
+                <ExportColumnSelectionModal
+                    isOpen={columnSelectionModal.isOpen}
+                    canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                    defaultFormat={columnSelectionModal.defaultFormat}
+                    onConfirm={handleColumnConfirm}
+                    onClose={closeColumnSelectionModal}
+                />
             </div >
         </FadeIn>
     );

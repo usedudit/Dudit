@@ -6,7 +6,10 @@ import {
 } from "../filters"
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
+  mapOrderDetailRows,
   mapOrderRow,
+  ORDER_DETAIL_EXPORT_ALL_COLUMNS,
+  ORDER_DETAIL_EXPORT_COLUMNS,
   ORDER_EXPORT_ALL_COLUMNS,
   ORDER_EXPORT_COLUMNS,
 } from "../mappers"
@@ -20,7 +23,7 @@ const ORDER_SELECT = `
   situation, payment_method, payment_breakdown, delivery_status, delivery_type,
   order_source, discount_value, discount_amount, payment_method_discount_amount,
   delivery_fee, additional_costs, total_amount,
-  order_items(product_name, quantity, product_price, subtotal),
+  order_items(product_name, quantity, product_price, subtotal, products(sku)),
   customers:customers(name, email)
 `
 
@@ -30,7 +33,7 @@ const ORDER_SELECT_ALL = `
   discount_value, discount_amount, payment_method_discount_amount,
   payment_method_extra_amount, delivery_fee, additional_costs, total_amount,
   paid_amount, delivery_type, delivery_address, notes,
-  order_items(product_name, quantity, product_price, subtotal),
+  order_items(product_name, quantity, product_price, subtotal, products(sku)),
   customers:customers(name, email)
 `
 
@@ -38,7 +41,7 @@ const SALE_SELECT = `
   id, sale_number, customer_id, created_at, finalized_by_user_id,
   payment_status, status, total_amount, final_amount, discount_amount,
   delivery_fee, paid_amount,
-  sale_items(product_name, quantity, unit_price, subtotal),
+  sale_items(product_name, quantity, unit_price, subtotal, products(sku)),
   customers:customer_id(name)
 `
 
@@ -46,7 +49,7 @@ const SALE_SELECT_ALL = `
   id, sale_number, customer_id, created_at, finalized_by_user_id,
   payment_status, status, total_amount, final_amount, discount_amount,
   delivery_fee, paid_amount, notes, delivery_type, delivery_address,
-  sale_items(product_name, quantity, unit_price, subtotal),
+  sale_items(product_name, quantity, unit_price, subtotal, products(sku)),
   customers:customer_id(name)
 `
 
@@ -75,7 +78,7 @@ function applyOrderFilters(query: any, filters: OrdersExportFilters, partnerId: 
   const situations = resolveOrderSituations(filters)
   if (situations?.length) query = query.in("situation", situations)
 
-  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
   if (startIso) query = query.gte("created_at", startIso)
   if (endIso) query = query.lte("created_at", endIso)
 
@@ -139,7 +142,7 @@ function applySaleFilters(query: any, filters: OrdersExportFilters, partnerId: s
     if (paymentStatuses.length > 0) query = query.in("payment_status", paymentStatuses)
   }
 
-  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
+  const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod, filters.timezone)
   if (startIso) query = query.gte("created_at", startIso)
   if (endIso) query = query.lte("created_at", endIso)
 
@@ -231,6 +234,12 @@ export async function fetchOrdersExport(
   const sellerIds = merged.map((r) => String(r.created_by || r.finalized_by_user_id || ""))
   const sellerNames = await resolveSellerNames(supabase, partnerId, sellerIds)
 
+  if (filters.detail) {
+    const rows = merged.flatMap((r) => mapOrderDetailRows(r, sellerNames, includeAllColumns))
+    const columns = includeAllColumns ? ORDER_DETAIL_EXPORT_ALL_COLUMNS : ORDER_DETAIL_EXPORT_COLUMNS
+    return { columns, rows, rowCount: rows.length }
+  }
+
   const rows = merged.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
   const columns = includeAllColumns ? ORDER_EXPORT_ALL_COLUMNS : ORDER_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }
@@ -281,6 +290,13 @@ export async function fetchSalesExport(
   const sellerIds = saleRows.map((r) => String(r.finalized_by_user_id || ""))
   const sellerNames = await resolveSellerNames(supabase, partnerId, sellerIds)
   const filteredRows = applyOrderRowFilters(saleRows, filters)
+
+  if (filters.detail) {
+    const rows = filteredRows.flatMap((r) => mapOrderDetailRows(r, sellerNames, includeAllColumns))
+    const columns = includeAllColumns ? ORDER_DETAIL_EXPORT_ALL_COLUMNS : ORDER_DETAIL_EXPORT_COLUMNS
+    return { columns, rows, rowCount: rows.length }
+  }
+
   const rows = filteredRows.map((r) => mapOrderRow(r, sellerNames, includeAllColumns))
   const columns = includeAllColumns ? ORDER_EXPORT_ALL_COLUMNS : ORDER_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }

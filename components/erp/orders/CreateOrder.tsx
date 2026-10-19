@@ -648,7 +648,7 @@ export default function CreateOrder({
                         hasDiscount: Number(item.product_price) < Number(item.products?.price || item.product_price),
                         quantity: Number(item.quantity),
                         sortOrder: Number(item.sort_order ?? 0),
-                        image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || item.services?.images?.[0] || null,
+                        image: item.product_variants?.variant_options?.image || item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || item.services?.images?.[0] || null,
                         sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || (item.services ? 'SERVIÇO' : ""),
                         stock: Number(item.product_variants?.stock_available ?? item.product_variants?.stock_quantity ?? item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
                         allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock) || !!item.services || item.line_type === 'service_booking',
