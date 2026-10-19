@@ -1318,7 +1318,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                         <div
                                                                             key={item.id}
                                                                             data-cart-item-id={item.id}
-                                                                            className={`lg:pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"} ${highlightedItemId === item.id ? "rounded-xl ring-2 ring-brand-orange/60 ring-offset-4 ring-offset-white dark:ring-offset-dark-surface transition-shadow" : ""}`}
+                                                                            className={`lg:pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"} ${highlightedItemId === item.id ? "rounded-xl border-brand-orange" : "border-brand-border dark:border-dark-border"}`}
                                                                         >
 
                                                                             {/* Mobile/Tablet Layout (< md) */}

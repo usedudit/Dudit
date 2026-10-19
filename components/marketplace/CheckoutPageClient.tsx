@@ -899,7 +899,7 @@ export function CheckoutPageClient() {
             setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
         }
 
-         // Carrinho só de assinatura: o comprador escolheu o modo de recebimento
+        // Carrinho só de assinatura: o comprador escolheu o modo de recebimento
         // na página do plano (gravado em cart_items.fulfillment_mode). Respeita
         // a escolha em vez de cair no padrão do delivery config da loja.
         const ctxLines = Array.isArray(checkoutContext.lines) ? checkoutContext.lines : []
@@ -909,6 +909,16 @@ export function CheckoutPageClient() {
             if (chosenMode === "pickup" || chosenMode === "delivery") {
                 setFormData((prev) => ({ ...prev, deliveryType: chosenMode }))
             }
+        }
+
+        // Carrinho só de serviços: o atendimento é no estabelecimento (on_site -> pickup)
+        // ou no endereço do cliente (customer_location -> delivery). Se não há atendimento
+        // a domicílio, define como pickup para não ficar com deliveryType = "delivery" indevidamente.
+        const reqs = checkoutContext.requirements
+        const isOnlyServicesInContext = Boolean(reqs?.hasServiceLines) && !reqs?.hasProductLines && !reqs?.hasSubscriptionLines
+        if (isOnlyServicesInContext) {
+            const hasCustomerLoc = ctxLines.some((l: any) => l.lineKind === "service_booking" && l.fulfillmentMode === "customer_location")
+            setFormData((prev) => ({ ...prev, deliveryType: hasCustomerLoc ? "delivery" : "pickup" }))
         }
 
         if (checkoutContext.storefrontPaymentMethods.length > 0) {

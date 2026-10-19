@@ -27,7 +27,7 @@ import {
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { buildDepositCheckoutMeta } from "@/lib/services/marketplace-checkout-amounts"
 import { patchDepositCheckoutOnPayment } from "@/lib/payments/order-financial-state"
-import { quoteDeliveryFeeAction, resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
+import { quoteDeliveryFeeAction, resolveDeliverySettingsRow, calculateServiceTravelFeeForOrder } from "@/app/actions/shared/delivery"
 import {
   quoteCarrierFreightFee,
   extractPostalCodeFromAddress,
@@ -664,7 +664,14 @@ async function handler(request: NextRequest) {
     if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
     if (!existingOrder && !useUnifiedCart) {
-      if (normalizedDeliveryType === "delivery") {
+      const productIds = items.filter(item => !item.variant_id && !item.service_id).map(item => item.id).filter(Boolean)
+      const serviceIds = items.map(item => item.service_id).filter(Boolean) as string[]
+      const variantIds = items.map(item => item.variant_id || item.id).filter(Boolean) as string[]
+      const hasProducts = productIds.length > 0 || variantIds.length > 0
+      const hasOnlyServices = serviceIds.length > 0 && !hasProducts
+
+      const shouldQuoteDelivery = !hasOnlyServices && hasProducts && normalizedDeliveryType === "delivery"
+      if (shouldQuoteDelivery) {
         if (!deliveryAddress?.trim()) {
           return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
         }

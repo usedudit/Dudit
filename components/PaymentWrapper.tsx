@@ -1191,13 +1191,13 @@ export function PaymentWrapper({
                                             const isService = item.itemType === "service" || item.itemType === "service_booking" || !!item.bookingDate || !!item.bookingSummary
                                             const bookingDateFormatted = formatBookingDisplayDate(item.bookingDate)
                                             return (
-                                                <div key={idx} className="flex gap-3.5 items-center justify-between py-2 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0">
+                                                <div key={idx} className="flex gap-3.5 items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-b-0">
                                                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                        <div className="w-12 h-12 bg-white dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                                                        <div className="w-12 h-12 bg-white dark:bg-dark-border/50 border border-brand-border dark:border-dark-border rounded-full flex items-center justify-center shrink-0 overflow-hidden">
                                                             <img
                                                                 src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                 alt={item.name}
-                                                                className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-lg"
+                                                                className="w-full h-full object-contain rounded-full"
                                                             />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
@@ -1304,7 +1304,7 @@ export function PaymentWrapper({
                                                         <img
                                                             src="https://img.dudit.com.br/static/Map.png"
                                                             alt={card.title}
-                                                            className="w-11 h-11 object-cover rounded-xl shrink-0"
+                                                            className="w-11 h-11 object-cover rounded-full shrink-0"
                                                         />
                                                         <div className="min-w-0 flex-1">
                                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">

@@ -7,7 +7,7 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
-import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { quoteDeliveryFeeAction, calculateServiceTravelFeeForOrder } from "@/app/actions/shared/delivery"
 import {
   quoteCarrierFreightFee,
   extractPostalCodeFromAddress,
@@ -113,6 +113,11 @@ async function handler(request: NextRequest) {
     // O partnerId do client é apenas uma alegação. Resolva o parceiro real
     // diretamente no carrinho/produtos/pedido antes de consultar configuração/token MP.
     let partnerId: string | undefined
+    let resolvedCartResult: Awaited<ReturnType<typeof resolveCheckoutCartLinesFresh>> | null = null
+    let hasCartProducts = false
+    let hasCartDeliveryLines = false
+    let hasOnlyServiceLines = false
+    let hasOnlySubscriptionLines = false
     const useUnifiedCart = Boolean(!existingOrder && body.cartItemIds && body.cartItemIds.length > 0)
 
     if (existingOrder) {
@@ -123,6 +128,11 @@ async function handler(request: NextRequest) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
       partnerId = resolved.partnerId
+      resolvedCartResult = resolved
+      hasCartProducts = resolved.hasProducts
+      hasCartDeliveryLines = resolved.hasDeliveryLines
+      hasOnlyServiceLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "service_booking")
+      hasOnlySubscriptionLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "subscription")
     } else {
       const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
       const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
@@ -151,6 +161,10 @@ async function handler(request: NextRequest) {
       } else {
         return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
       }
+      hasCartProducts = productIds.length > 0 || variantIds.length > 0
+      hasOnlyServiceLines = serviceIds.length > 0 && !hasCartProducts
+      hasOnlySubscriptionLines = false
+      hasCartDeliveryLines = hasCartProducts && body.deliveryType === "delivery"
     }
 
     if (!partnerId) {
@@ -266,6 +280,11 @@ async function handler(request: NextRequest) {
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
+      resolvedCartResult = resolved
+      hasCartProducts = resolved.hasProducts
+      hasCartDeliveryLines = resolved.hasDeliveryLines
+      hasOnlyServiceLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "service_booking")
+      hasOnlySubscriptionLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "subscription")
       resolverAdjustedForDeposit = resolved.lines.some(
         (line) => line.itemType === "service_booking" && line.depositAmount != null,
       )
@@ -404,22 +423,19 @@ async function handler(request: NextRequest) {
 
     // ── Central pricing engine (única fonte de verdade) ──────────────────────
     if (!existingOrder) {
-      if (body.deliveryType === "delivery") {
+      const shouldQuoteDelivery = hasOnlySubscriptionLines
+        ? Boolean(body.deliveryAddress) && body.deliveryType === "delivery"
+        : !hasOnlyServiceLines &&
+          (hasCartDeliveryLines || (hasCartProducts && body.deliveryType === "delivery")) &&
+          Boolean(body.deliveryAddress) &&
+          body.deliveryType === "delivery"
+
+      if (shouldQuoteDelivery) {
         if (!body.deliveryAddress?.trim()) {
           return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
         }
-        const deliveryQuote = await quoteDeliveryFeeAction({
-          partnerId,
-          storeId: deliveryStoreId,
-          destinationAddress: body.deliveryAddress,
-          orderSubtotal: totalAmount,
-        })
-        if (!deliveryQuote.success) {
-          // Own delivery has no coverage → fallback to carrier freight (SuperFrete)
-          const carrierServiceId = Number(body.checkoutPricing?.carrierServiceId || 0)
-          if (!carrierServiceId) {
-            return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
-          }
+        const carrierServiceId = Number(body.checkoutPricing?.carrierServiceId || 0)
+        if (carrierServiceId) {
           const cep =
             String(body.checkoutPricing?.destinationPostalCode || "").replace(/\D/g, "") ||
             extractPostalCodeFromAddress(body.deliveryAddress)
@@ -428,12 +444,57 @@ async function handler(request: NextRequest) {
             toPostalCode: cep,
             serviceId: carrierServiceId,
           })
-          if (!carrier.success) {
-            return NextResponse.json({ error: carrier.error }, { status: 400 })
+          if (carrier.success) {
+            deliveryFee = carrier.fee
+          } else {
+            const deliveryQuote = await quoteDeliveryFeeAction({
+              partnerId,
+              storeId: deliveryStoreId,
+              destinationAddress: body.deliveryAddress,
+              orderSubtotal: totalAmount,
+            })
+            if (!deliveryQuote.success) {
+              return NextResponse.json({ error: carrier.error || deliveryQuote.error }, { status: 400 })
+            }
+            deliveryFee = Number(deliveryQuote.fee || 0)
           }
-          deliveryFee = carrier.fee
         } else {
+          const deliveryQuote = await quoteDeliveryFeeAction({
+            partnerId,
+            storeId: deliveryStoreId,
+            destinationAddress: body.deliveryAddress,
+            orderSubtotal: totalAmount,
+          })
+          if (!deliveryQuote.success) {
+            return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+          }
           deliveryFee = Number(deliveryQuote.fee || 0)
+        }
+      }
+
+      // Taxa de deslocamento de serviços a domicílio (customer_location)
+      const serviceLinesForTravel = (resolvedCartResult?.lines || []).filter(
+        (l: any) => l.itemType === "service_booking" && (l.fulfillmentMode === "customer_location" || l.lineRequiresDelivery),
+      )
+      if (serviceLinesForTravel.length > 0) {
+        if (!body.deliveryAddress?.trim()) {
+          return NextResponse.json({ error: "Endereço de atendimento não informado" }, { status: 400 })
+        }
+        const serviceLineForTravel = serviceLinesForTravel.find((l: any) => l.storeId) || serviceLinesForTravel[0]
+        const serviceTravel = await calculateServiceTravelFeeForOrder({
+          supabase: adminClient,
+          partnerId,
+          storeId: serviceLineForTravel.storeId || deliveryStoreId,
+          serviceId: serviceLineForTravel.serviceId || null,
+          deliveryAddress: body.deliveryAddress,
+          destinationCoords: body.checkoutPricing?.destinationCoords ?? null,
+          orderSubtotal: totalAmount,
+        })
+        if (!serviceTravel.success) {
+          return NextResponse.json({ error: serviceTravel.error || "Endereço fora do raio de atendimento deste serviço." }, { status: 400 })
+        }
+        if (serviceTravel.fee > 0) {
+          deliveryFee = Math.round((deliveryFee + serviceTravel.fee) * 100) / 100
         }
       }
 
@@ -480,7 +541,7 @@ async function handler(request: NextRequest) {
       // Delivery fee item for MP display
       if (deliveryFee > 0) {
         preferenceItems.push({
-          title: "Taxa de entrega",
+          title: hasOnlyServiceLines ? "Taxa de deslocamento" : "Taxa de entrega",
           unit_price: deliveryFee,
           quantity: 1,
           currency_id: "BRL",
