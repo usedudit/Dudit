@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@
 import {
   getNotificationsAction,
   getUnreadNotificationCountAction,
+  getUserStoreAccessAction,
   markAllNotificationsReadAction,
   markNotificationsReadAction,
   deleteAllNotificationsAction,
@@ -142,26 +143,38 @@ export function useNotifications() {
 
   const activePartnerId = store?.selectedStore?.partner_id ?? null
 
+  const storeAccessQueryKey = useMemo(
+    () => ["notifications", "store-access", user?.id] as const,
+    [user?.id],
+  )
+
+  const storeAccessQuery = useQuery({
+    queryKey: storeAccessQueryKey,
+    queryFn: async () => {
+      const result = await getUserStoreAccessAction()
+      if ("error" in result) throw new Error(result.error)
+      return result.stores ?? []
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+  })
+
   const erpOptions = useMemo(() => {
+    const access = storeAccessQuery.data ?? []
     const map = new Map<string, { id: string; label: string }>()
-    for (const n of allItems) {
-      const pid = getPartnerId(n)
-      if (!pid) continue
-      if (!map.has(pid)) {
-        const d = (n.data as Record<string, unknown>) || {}
+    for (const a of access) {
+      if (a.partnerId === activePartnerId) continue
+      if (!map.has(a.partnerId)) {
         const label =
-          (d.store_name as string | undefined) ||
-          (d.storeName as string | undefined) ||
-          (d.partner_name as string | undefined) ||
-          (d.partnerName as string | undefined) ||
-          "ERP"
+          a.partnerName || a.storeName || "ERP"
         const truncated =
           label.length > 24 ? `${label.slice(0, 23)}…` : label
-        map.set(pid, { id: pid, label: truncated })
+        map.set(a.partnerId, { id: a.partnerId, label: truncated })
       }
     }
     return Array.from(map.values())
-  }, [allItems, activePartnerId])
+  }, [storeAccessQuery.data, activePartnerId])
 
   const [erpFilter, setErpFilter] = useState<"all" | "current" | string>("all")
 

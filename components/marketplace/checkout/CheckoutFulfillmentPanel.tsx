@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton, ListItem, DefaultModal, Spinner } from "@/components/reusable"
 import { MapPinIcon, ServiceIcon } from "@/lib/icons"
@@ -10,6 +10,7 @@ import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-check
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
 import { IconPlaceholder } from "@/components/reusable"
+import { checkServiceAttendanceAction } from "@/app/actions/shared/delivery"
 
 const fadeVariants = {
   open: { opacity: 1, transition: { duration: 0.2 } },
@@ -97,7 +98,13 @@ export type CheckoutFulfillmentPanelProps = {
   addressProps: AddressBlockProps
   schedulingLines: Array<{ name: string; summary: string | null }>
   lines?: MarketplaceCheckoutDisplayLine[]
-  onFulfillmentModesSave?: (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => Promise<void>
+   onFulfillmentModesSave?: (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => Promise<void>
+   /** Parceiro responsável pelo carrinho (para validar raio de atendimento). */
+   partnerId?: string
+   /** Endereço selecionado pelo cliente (validado contra o raio de atendimento do serviço). */
+   deliveryAddress?: string
+   /** Coordenadas do endereço selecionado (evita geocodificar de novo). */
+   destinationCoords?: { lat: number; lng: number } | null
 }
 
 export function CheckoutFulfillmentPanel({
@@ -121,6 +128,9 @@ export function CheckoutFulfillmentPanel({
   schedulingLines,
   lines = [],
   onFulfillmentModesSave,
+  partnerId = "",
+  deliveryAddress = "",
+  destinationCoords = null,
 }: CheckoutFulfillmentPanelProps) {
   const isPickup = deliveryType === "pickup"
   const canShowLocalDelivery =
@@ -154,6 +164,87 @@ export function CheckoutFulfillmentPanel({
   const [modalDrafts, setModalDrafts] = useState<Record<string, "on_site" | "customer_location">>({})
   const [saving, setSaving] = useState(false)
 
+  // Validação de raio de atendimento por serviço quando "No meu endereço" é
+  // escolhido. Bloqueia a opção caso o endereço esteja fora do raio configurado.
+  const [serviceAttendance, setServiceAttendance] = useState<Record<string, {
+    checked: boolean
+    covered: boolean
+    error: string | null
+    distanceKm: number | null
+  }>>({})
+  const lastValidatedAddressKey = useRef<string | null>(null)
+
+  const validateServiceAddress = useCallback(async (line: MarketplaceCheckoutDisplayLine) => {
+    const lineId = line.lineId
+    setServiceAttendance((prev) => ({
+      ...prev,
+      [lineId]: { checked: false, covered: false, error: null, distanceKm: null },
+    }))
+    if (!deliveryAddress) {
+      setServiceAttendance((prev) => ({
+        ...prev,
+        [lineId]: { checked: true, covered: false, error: "Selecione um endereço de atendimento.", distanceKm: null },
+      }))
+      return false
+    }
+    setServiceAttendance((prev) => ({
+      ...prev,
+      [lineId]: { checked: true, covered: false, error: null, distanceKm: null },
+    }))
+    try {
+      const res = await checkServiceAttendanceAction({
+        partnerId: partnerId || "",
+        storeId: line.storeId || null,
+        serviceId: line.serviceId || null,
+        deliveryAddress,
+        destinationCoords: destinationCoords ?? null,
+      })
+      if (res.success && !res.outOfRadius) {
+        setServiceAttendance((prev) => ({
+          ...prev,
+          [lineId]: { checked: true, covered: true, error: null, distanceKm: res.distanceKm },
+        }))
+        return true
+      }
+      setServiceAttendance((prev) => ({
+        ...prev,
+        [lineId]: {
+          checked: true,
+          covered: false,
+          error: res.success
+            ? "Endereço fora do raio de atendimento deste serviço."
+            : (res.error || "Endereço fora do raio de atendimento deste serviço."),
+          distanceKm: res.success ? res.distanceKm : null,
+        },
+      }))
+      return false
+    } catch {
+      setServiceAttendance((prev) => ({
+        ...prev,
+        [lineId]: { checked: true, covered: false, error: "Não foi possível validar o atendimento neste endereço.", distanceKm: null },
+      }))
+      return false
+    }
+  }, [partnerId, deliveryAddress, destinationCoords])
+
+  // Re-valida serviços marcados como "No meu endereço" quando o endereço muda.
+  useEffect(() => {
+    const addressKey = deliveryAddress ? `${deliveryAddress}` : "__none__"
+    if (addressKey === lastValidatedAddressKey.current) return
+    lastValidatedAddressKey.current = addressKey
+    if (!modalOpen) return
+    void (async () => {
+      for (const line of serviceLines) {
+        const draft = modalDrafts[line.lineId]
+        if (draft === "customer_location") {
+          await validateServiceAddress(line)
+        }
+      }
+    })()
+    // validateServiceAddress is intentionally omitted: it is stable via useCallback deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryAddress, modalOpen, modalDrafts, serviceLines])
+
   const openModal = useCallback(() => {
     const drafts: Record<string, "on_site" | "customer_location"> = {}
     for (const line of serviceLines) {
@@ -163,9 +254,22 @@ export function CheckoutFulfillmentPanel({
     setModalOpen(true)
   }, [serviceLines])
 
-  const handleDraftChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
+  const handleDraftChange = useCallback(async (lineId: string, mode: "on_site" | "customer_location") => {
     setModalDrafts((prev) => ({ ...prev, [lineId]: mode }))
-  }, [])
+    if (mode === "customer_location") {
+      const line = serviceLines.find((l) => l.lineId === lineId)
+      if (line) {
+        const covered = await validateServiceAddress(line)
+        if (!covered) {
+          // Fora do raio / sem endereço: força de volta para o estabelecimento
+          // e mantém o erro visível ao lado da opção.
+          setModalDrafts((prev) => ({ ...prev, [lineId]: "on_site" }))
+        }
+      }
+    } else {
+      setServiceAttendance((prev) => ({ ...prev, [lineId]: { checked: true, covered: false, error: null, distanceKm: null } }))
+    }
+  }, [serviceLines, validateServiceAddress])
 
   const servicesWithChoice = useMemo(
     () => serviceLines.filter((l) => {
@@ -204,14 +308,27 @@ export function CheckoutFulfillmentPanel({
       setModalOpen(false)
       return
     }
+    // Validação final: nenhum "No meu endereço" pode ser salvo fora do raio.
     setSaving(true)
     try {
+      for (const change of changes) {
+        if (change.mode === "customer_location") {
+          const line = serviceLines.find((l) => l.lineId === change.cartItemId)
+          if (line) {
+            const covered = await validateServiceAddress(line)
+            if (!covered) {
+              setModalDrafts((prev) => ({ ...prev, [change.cartItemId]: "on_site" }))
+              return
+            }
+          }
+        }
+      }
       await onFulfillmentModesSave(changes)
       setModalOpen(false)
     } finally {
       setSaving(false)
     }
-  }, [onFulfillmentModesSave, modalDrafts, servicesWithChoice])
+  }, [onFulfillmentModesSave, modalDrafts, servicesWithChoice, serviceLines, validateServiceAddress])
 
   const anyServiceRequiresCustomerAddress = serviceLines.some(
     (l) => l.fulfillmentMode === "customer_location"
@@ -297,7 +414,7 @@ export function CheckoutFulfillmentPanel({
           </AnimatePresence>
 
           {!isPickup && canShowShipping && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
-            <div className="space-y-3">
+    <div className="space-y-6">
               <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
                 Envio nacional (transportadora)
               </p>
@@ -404,7 +521,7 @@ export function CheckoutFulfillmentPanel({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {renderProductsFulfillment()}
       {renderServicesFulfillment()}
       {deliveryError && <InfoCard message={deliveryError} color="red" />}
@@ -450,14 +567,24 @@ export function CheckoutFulfillmentPanel({
                     onChange={() => handleDraftChange(line.lineId, "on_site")}
                   />
                 </div>
-                <div className="w-28 flex justify-center">
-                  <RadioButton
-                    name={`modal-${line.lineId}`}
-                    value="customer_location"
-                    checked={currentDraft === "customer_location"}
-                    onChange={() => handleDraftChange(line.lineId, "customer_location")}
-                  />
-                </div>
+                 <div className="w-28 flex flex-col items-center justify-center">
+                   <RadioButton
+                     name={`modal-${line.lineId}`}
+                     value="customer_location"
+                     checked={currentDraft === "customer_location"}
+                     onChange={() => handleDraftChange(line.lineId, "customer_location")}
+                   />
+                   {serviceAttendance[line.lineId]?.error && (
+                     <p className="text-[10px] text-brand-red text-center mt-1 leading-tight">
+                       {serviceAttendance[line.lineId].error}
+                     </p>
+                   )}
+                   {serviceAttendance[line.lineId]?.distanceKm != null && serviceAttendance[line.lineId]?.covered && (
+                     <p className="text-[10px] text-brand-inactive-text text-center mt-1">
+                       {Number(serviceAttendance[line.lineId].distanceKm).toFixed(2)} km
+                     </p>
+                   )}
+                 </div>
               </div>
             )
           })}

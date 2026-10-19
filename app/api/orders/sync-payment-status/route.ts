@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser, requireOrderAccess } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
+import { captureError } from "@/lib/monitoring/sentry"
 import { revalidateProducts, revalidateMarketplace } from "@/lib/utils/revalidation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { isUuid } from "@/lib/utils/short-id"
@@ -381,7 +382,19 @@ export async function POST(request: NextRequest) {
             })
 
             const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
-            await fulfillMarketplaceOrder(supabaseAdmin, orderId)
+            const fulfillmentResult = await fulfillMarketplaceOrder(supabaseAdmin, orderId, { force: true })
+            if (!fulfillmentResult.success) {
+              SecureLogger.error("Marketplace order fulfillment failed in sync-payment-status", {
+                orderId,
+                fulfillmentError: fulfillmentResult.error,
+                fulfillmentSkipped: fulfillmentResult.skipped,
+              })
+              captureError(new Error(fulfillmentResult.error || "Falha no fulfillment"), {
+                module: "orders",
+                action: "marketplace_fulfillment_sync_status",
+                entityId: orderId,
+              })
+            }
           }
         } catch (txErr: any) {
           SecureLogger.error("Error creating transaction from order", {

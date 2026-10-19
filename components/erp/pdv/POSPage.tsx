@@ -1800,136 +1800,136 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                         />
                                     </FadeIn>
                                 ) : (
-                                <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
-                                    {filteredProducts
-                                        .map((product) => {
-                                            const pr = computeItemDisplayPrice(
-                                                Number(product.price || 0),
-                                                product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null,
-                                                pdvPromotions,
-                                                { productId: product.id, categoryId: product.category?.id || undefined }
-                                            )
-                                            const variantsList = product.product_variants || (product as any).variants || []
-                                            const hasVariants = Array.isArray(variantsList) && variantsList.length > 0
-                                            const rawAddonGroups = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
-                                                ? product.addon_groups
-                                                : (Array.isArray((product as any).technical_specs?.addon_groups) && (product as any).technical_specs.addon_groups.length > 0)
-                                                    ? (product as any).technical_specs.addon_groups
+                                    <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
+                                        {filteredProducts
+                                            .map((product) => {
+                                                const pr = computeItemDisplayPrice(
+                                                    Number(product.price || 0),
+                                                    product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null,
+                                                    pdvPromotions,
+                                                    { productId: product.id, categoryId: product.category?.id || undefined }
+                                                )
+                                                const variantsList = product.product_variants || (product as any).variants || []
+                                                const hasVariants = Array.isArray(variantsList) && variantsList.length > 0
+                                                const rawAddonGroups = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
+                                                    ? product.addon_groups
+                                                    : (Array.isArray((product as any).technical_specs?.addon_groups) && (product as any).technical_specs.addon_groups.length > 0)
+                                                        ? (product as any).technical_specs.addon_groups
+                                                        : []
+                                                const hasAddons = rawAddonGroups.length > 0
+
+                                                const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
+                                                const stock = hasVariants
+                                                    ? variantsList.reduce((sum: number, v: any) => sum + Number(v.stock_available ?? v.stock_quantity ?? v.stock ?? 0), 0)
+                                                    : Number(product.stock_available ?? (product as any).stock_quantity ?? 0)
+                                                const minStock = product.min_stock != null ? Number(product.min_stock) : null
+                                                let stockVariant: "green" | "orange" | "red" = "green"
+                                                if (stock <= 0) {
+                                                    stockVariant = "red"
+                                                } else if (minStock !== null && minStock > 0 && stock <= minStock) {
+                                                    stockVariant = "orange"
+                                                }
+
+                                                const variantPricesList = hasVariants
+                                                    ? variantsList
+                                                        .map((v: any) => {
+                                                            const vp = v.price !== undefined && v.price !== null
+                                                                ? Number(v.price)
+                                                                : Number(product.price || 0) + Number(v.price_adjustment || 0)
+                                                            return vp
+                                                        })
+                                                        .filter((p: number) => !isNaN(p) && p > 0)
                                                     : []
-                                            const hasAddons = rawAddonGroups.length > 0
+                                                const variantPriceRange = variantPricesList.length > 0
+                                                    ? { min: Math.min(...variantPricesList), max: Math.max(...variantPricesList) }
+                                                    : null
 
-                                            const isServiceItem = product.product_type === "service" || product.product_type === "Serviço"
-                                            const stock = hasVariants
-                                                ? variantsList.reduce((sum: number, v: any) => sum + Number(v.stock_available ?? v.stock_quantity ?? v.stock ?? 0), 0)
-                                                : Number(product.stock_available ?? (product as any).stock_quantity ?? 0)
-                                            const minStock = product.min_stock != null ? Number(product.min_stock) : null
-                                            let stockVariant: "green" | "orange" | "red" = "green"
-                                            if (stock <= 0) {
-                                                stockVariant = "red"
-                                            } else if (minStock !== null && minStock > 0 && stock <= minStock) {
-                                                stockVariant = "orange"
-                                            }
+                                                return (
+                                                    <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface flex h-full flex-col">
+                                                        <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
+                                                            <img
+                                                                src={getPrimaryProductDisplayImage(product, "thumbnail")}
+                                                                alt={product.name}
+                                                                className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
+                                                            />
+                                                            {pr.hasDiscount && (
+                                                                <div className="absolute left-2 top-2 z-10">
+                                                                    {pr.badgeVariant === "blue" ? (
+                                                                        <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
+                                                                    ) : (
+                                                                        <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {!isServiceItem && (
+                                                                <div className="absolute right-2 top-2 z-10">
+                                                                    <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap">
+                                                                        {stock}
+                                                                    </Badge>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 flex flex-col">
+                                                            <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
+                                                            {hasVariants && (
+                                                                <p className="text-sm text-brand-inactive-text">{variantsList.length} variação(ões)</p>
+                                                            )}
+                                                            {hasAddons && !hasVariants && (
+                                                                <p className="text-sm text-brand-inactive-text">{rawAddonGroups.length} grupo(s) de complementos</p>
+                                                            )}
 
-                                            const variantPricesList = hasVariants
-                                                ? variantsList
-                                                    .map((v: any) => {
-                                                        const vp = v.price !== undefined && v.price !== null
-                                                            ? Number(v.price)
-                                                            : Number(product.price || 0) + Number(v.price_adjustment || 0)
-                                                        return vp
-                                                    })
-                                                    .filter((p: number) => !isNaN(p) && p > 0)
-                                                : []
-                                            const variantPriceRange = variantPricesList.length > 0
-                                                ? { min: Math.min(...variantPricesList), max: Math.max(...variantPricesList) }
-                                                : null
-
-                                            return (
-                                                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface flex h-full flex-col">
-                                                    <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
-                                                        <img
-                                                            src={getPrimaryProductDisplayImage(product, "thumbnail")}
-                                                            alt={product.name}
-                                                            className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
-                                                        />
-                                                        {pr.hasDiscount && (
-                                                            <div className="absolute left-2 top-2 z-10">
-                                                                {pr.badgeVariant === "blue" ? (
-                                                                    <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
+                                                            {hasVariants && variantPriceRange ? (
+                                                                variantPriceRange.min === variantPriceRange.max ? (
+                                                                    <span className="mt-1 block font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                        {formatCurrency(variantPriceRange.min)}
+                                                                    </span>
                                                                 ) : (
-                                                                    <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        {!isServiceItem && (
-                                                            <div className="absolute right-2 top-2 z-10">
-                                                                <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap">
-                                                                    {stock}
-                                                                </Badge>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 flex flex-col">
-                                                        <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
-                                                        {hasVariants && (
-                                                            <p className="text-sm text-brand-inactive-text">{variantsList.length} variação(ões)</p>
-                                                        )}
-                                                        {hasAddons && !hasVariants && (
-                                                            <p className="text-sm text-brand-inactive-text">{rawAddonGroups.length} grupo(s) de complementos</p>
-                                                        )}
-
-                                                        {hasVariants && variantPriceRange ? (
-                                                            variantPriceRange.min === variantPriceRange.max ? (
-                                                                <span className="mt-1 block font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
-                                                                    {formatCurrency(variantPriceRange.min)}
-                                                                </span>
-                                                            ) : (
-                                                                <div className="mt-1 flex flex-col">
-                                                                    <span className="text-xs text-brand-inactive-text">
-                                                                        De: {formatCurrency(variantPriceRange.min)}
+                                                                    <div className="mt-1 flex flex-col">
+                                                                        <span className="text-xs text-brand-inactive-text">
+                                                                            De: {formatCurrency(variantPriceRange.min)}
+                                                                        </span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                            Até: {formatCurrency(variantPriceRange.max)}
+                                                                        </span>
+                                                                    </div>
+                                                                )
+                                                            ) : pr.referencePrice ? (
+                                                                <div className="flex flex-col gap-0.5 mt-1">
+                                                                    <span className="text-xs text-brand-inactive-text line-through">
+                                                                        {formatCurrency(pr.referencePrice)}
                                                                     </span>
                                                                     <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
-                                                                        Até: {formatCurrency(variantPriceRange.max)}
+                                                                        {formatCurrency(pr.bestPrice)}
                                                                     </span>
                                                                 </div>
-                                                            )
-                                                        ) : pr.referencePrice ? (
-                                                            <div className="flex flex-col gap-0.5 mt-1">
-                                                                <span className="text-xs text-brand-inactive-text line-through">
-                                                                    {formatCurrency(pr.referencePrice)}
-                                                                </span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
-                                                                    {formatCurrency(pr.bestPrice)}
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center mt-1">
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
-                                                                    {formatCurrency(pr.bestPrice)}
-                                                                </span>
-                                                            </div>
-                                                        )}
+                                                            ) : (
+                                                                <div className="flex items-center mt-1">
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                        {formatCurrency(pr.bestPrice)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
 
-                                                        <div className="mt-auto pt-3">
-                                                            <Button
-                                                                variant="outline"
-                                                                className="h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
-                                                                onClick={() => {
-                                                                    if (hasVariants || hasAddons) {
-                                                                        setVariantPickerProduct(product)
-                                                                        return
-                                                                    }
-                                                                    addToCart(product)
-                                                                }}
-                                                            >
-                                                                Adicionar
-                                                            </Button>
+                                                            <div className="mt-auto pt-3">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    className="h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
+                                                                    onClick={() => {
+                                                                        if (hasVariants || hasAddons) {
+                                                                            setVariantPickerProduct(product)
+                                                                            return
+                                                                        }
+                                                                        addToCart(product)
+                                                                    }}
+                                                                >
+                                                                    Adicionar
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )
-                                        })}
-                                </FadeIn>
+                                                )
+                                            })}
+                                    </FadeIn>
                                 )}
                             </AnimatePresence>
 

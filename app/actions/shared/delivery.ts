@@ -704,7 +704,7 @@ export async function upsertServiceAttendanceSettingsAction(input: {
  * distância entre a loja e o endereço de destino do cliente.
  *
  * Reusa o raio/origem ja resolvido via delivery context (originCoords) quando
- * disponível; caso contrário geocodifica o endereco da loja + destino.
+ * disponível; caso contrário geocodifica o enderamento da loja + destino.
  */
 export async function calculateServiceTravelFeeForOrder(input: {
   supabase: any
@@ -766,7 +766,48 @@ export async function calculateServiceTravelFeeForOrder(input: {
       chargedKm: result.chargedKm,
       fee: result.fee,
       maxServiceKm: settings.maxServiceKm,
-      enforceServiceArea: settings.enforceServiceArea,
+       enforceServiceArea: settings.enforceServiceArea,
     },
+  }
+}
+
+/**
+ * Verifica apenas a cobertura de atendimento do serviço (sem cobrar taxa).
+ * Usado pela UI para bloquear "No meu endereço" no modal de forma de
+ * atendimento quando o endereço está fora do raio configurado.
+ */
+export async function checkServiceAttendanceAction(input: {
+  partnerId: string
+  storeId?: string | null
+  serviceId?: string | null
+  deliveryAddress?: string
+  destinationCoords?: { lat: number; lng: number } | null
+}): Promise<{
+  success: true
+  distanceKm: number | null
+  maxServiceKm: number | null
+  fee: number
+  outOfRadius: boolean
+} | { success: false; error: string }> {
+  if (!input.deliveryAddress) {
+    return { success: false, error: "Selecione um endereço para verificar o atendimento." }
+  }
+  const admin = getAdminClient()
+  const res = await calculateServiceTravelFeeForOrder({
+    supabase: admin,
+    partnerId: input.partnerId,
+    storeId: input.storeId ?? null,
+    serviceId: input.serviceId ?? null,
+    deliveryAddress: input.deliveryAddress,
+    destinationCoords: input.destinationCoords ?? null,
+    orderSubtotal: 0,
+  })
+  if (!res.success) return { success: false, error: res.error || "Endereço fora do raio de atendimento deste serviço." }
+  return {
+    success: true,
+    distanceKm: res.distanceKm,
+    maxServiceKm: null,
+    fee: res.fee,
+    outOfRadius: res.outOfRadius,
   }
 }

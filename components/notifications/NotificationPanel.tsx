@@ -107,7 +107,7 @@ export function NotificationPanel({
 
 	if (grouped.length === 0) {
 		return (
-			<>
+			<div className="flex h-full flex-col items-center justify-center">
 				{pushBanner}
 				<IconPlaceholder
 					placeholderType="image"
@@ -116,7 +116,7 @@ export function NotificationPanel({
 					title="Nenhuma notificação por aqui"
 					subtitle="Quando tiver novidades, elas aparecerão aqui"
 				/>
-			</>
+			</div>
 		)
 	}
 
@@ -124,26 +124,22 @@ export function NotificationPanel({
 		<>
 			{pushBanner}
 			{grouped.length > 0 && (
-				<div className="flex-1 overflow-y-auto custom-scrollbar px-2 mt-2 relative">
+			<div className="flex-1 overflow-y-auto custom-scrollbar px-2 mt-2 relative">
 					<div className="flex items-center px-2">
-						{(erpOptions.length > 0 || activePartnerId) && (
-							<Tabs value={erpFilter} onValueChange={onErpFilter} className="flex-1">
-								<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
-									<TabsTrigger value="all">Todos</TabsTrigger>
-									{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
-									{erpOptions.map((opt) => (
-										<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
-											{opt.label}
-										</TabsTrigger>
-									))}
-								</TabsList>
-							</Tabs>
-						)}
+						<Tabs value={erpFilter} onValueChange={onErpFilter} className="flex-1">
+							<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
+								<TabsTrigger value="all">Todos</TabsTrigger>
+								{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
+								{erpOptions.map((opt) => (
+									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
+										{opt.label}
+									</TabsTrigger>
+								))}
+							</TabsList>
+						</Tabs>
 						{(((unreadCount ?? 0) > 0 && onMarkAllAsRead) || onDeleteAll) && (
 							<>
-								{(erpOptions.length > 0 || activePartnerId) && (
-									<div className="border-l border-brand-border dark:border-dark-border h-6 mx-2 shrink-0" />
-								)}
+								<div className="border-l border-brand-border dark:border-dark-border h-6 mx-2 shrink-0" />
 								<ActionsDropdown
 									trigger={
 										<Button variant="ghost" size="sm" className="h-7 w-7 min-w-[28px] p-0">

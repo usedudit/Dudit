@@ -730,6 +730,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
         const partnerId = partnerData.partnerId || storeKey
 
+        // Encaminha a opção de transportadora que o comprador já escolheu nesta
+        // sacola - senão o /checkout reformataria de carregar e selecionaria a
+        // opção mais barata, alterando serviço e valor da etiqueta gerada depois.
+        const cq = carrierQuotes[storeKey]
+        const selectedCarrier = cq?.selectedServiceId
+            ? cq.options.find((o) => o.serviceId === cq.selectedServiceId)
+            : null
+
         const checkoutData = {
             source: "cart",
             partnerId,
@@ -753,7 +761,11 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 quantity: getItemQuantity(item),
                 selectedAddons: item.booking_metadata?.selectedAddons || undefined,
             })),
-            deliverySettings: partnerData.deliverySettings
+            deliverySettings: partnerData.deliverySettings,
+            ...(selectedCarrier ? {
+                carrierServiceId: selectedCarrier.serviceId,
+                carrierServicePrice: selectedCarrier.price,
+            } : {}),
         }
 
         sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))

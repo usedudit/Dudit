@@ -51,6 +51,7 @@ export type MarketplaceCheckoutDisplayLine = {
   originalPrice?: number
   serviceId?: string | null
   productId?: string | null
+  storeId?: string | null
   variantId?: string | null
   selectedAddons?: Array<{
     groupId: string
@@ -87,6 +88,7 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
       bookingMetadata: line.bookingMetadata,
       serviceId: line.serviceId || null,
       productId: line.productId || null,
+      storeId: line.storeId || null,
       variantId: line.variantId || null,
       selectedAddons: line.selectedAddons || null,
       unit: line.unit || null,

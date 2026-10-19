@@ -1632,6 +1632,25 @@ export async function createOrderShippingLabelAction(payload: {
     })
 
     const serviceId = label.service_id || requestedService
+    // Garante que a etiqueta usa exatamente o serviço selecionado no checkout
+    // (nunca outro serviço - ex.: PAC no checkout vira SEDEX no rótulo).
+    if (label.service_id && Number(label.service_id) !== requestedService) {
+      throw new Error(
+        `A transportadora retornou o serviço ${label.service_id}, mas o pedido foi feito com o serviço ${requestedService}. A etiqueta usa sempre o serviço escolhido no checkout.`,
+      )
+    }
+    const checkoutPrice = typeof (order as any)?.delivery_fee === "number" ? Number((order as any).delivery_fee) : 0
+    const labelPrice = typeof label.price === "number" ? label.price : null
+    const priceMismatch = checkoutPrice > 0 && labelPrice != null && Math.abs(checkoutPrice - labelPrice) > 0.01
+
+    // O serviço e o valor cobrados no checkout são a fonte de verdade: a etiqueta
+    // NUNCA deve usar outro serviço ou preço do que o escolhido pelo comprador.
+    if (priceMismatch) {
+      console.warn(
+        `[SuperFrete] Divergência de preço na etiqueta: checkout=R$ ${checkoutPrice.toFixed(2)} ` +
+          `vs SuperFrete=R$ ${labelPrice.toFixed(2)}. label=${label.id} service=${serviceId}`,
+      )
+    }
 
     await supabase.from("order_shipments").insert({
       order_id: payload.orderId,
@@ -1643,12 +1662,19 @@ export async function createOrderShippingLabelAction(payload: {
       service_name: SERVICE_LABELS[serviceId] || SERVICE_LABELS[requestedService] || (order as any)?.delivery_breakdown?.serviceName || null,
       carrier: "SuperFrete",
       external_label_id: label.id,
-      price: typeof label.price === "number" ? label.price : null,
+      price: labelPrice,
       tracking_number: label.tracking || null,
       tracking_url: buildCarrierTrackingUrl(serviceId, label.tracking),
       label_url: label.print?.url || null,
       requested_at: new Date().toISOString(),
-      payload: { service: requestedService, service_id: serviceId, response_status: label.status },
+      payload: {
+        service: requestedService,
+        service_id: serviceId,
+        response_status: label.status,
+        checkout_price: checkoutPrice > 0 ? checkoutPrice : null,
+        label_price: labelPrice,
+        price_mismatch: priceMismatch,
+      },
     })
 
     revalidateOrders(ctx.partnerId)
@@ -1853,10 +1879,10 @@ export async function getOrderCarrierLabelStateAction(payload: { orderId: string
     const [plan, integration, shipmentRes] = await Promise.all([
       getPartnerPlan(ctx.partnerId),
       getSuperFreteIntegration(supabase, ctx.partnerId),
-      supabase
+       supabase
         .from("order_shipments")
         .select(
-          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at, payload",
         )
         .eq("order_id", payload.orderId)
         .eq("partner_id", ctx.partnerId)
@@ -1864,13 +1890,13 @@ export async function getOrderCarrierLabelStateAction(payload: { orderId: string
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-    ])
+     ])
 
     return {
       success: true,
       connected: integration?.status === "connected" && Boolean(integration?.access_token_encrypted),
       planAllowed: hasMinimumPlan(plan?.slug || "free", "escalar"),
-      shipment: (shipmentRes.data as OrderShipmentSummary) || null,
+      shipment: mapShipmentSummary(shipmentRes.data),
     }
   } catch (err: any) {
     captureError(err, {
@@ -1975,6 +2001,9 @@ export interface OrderShipmentSummary {
   carrier: string | null
   external_label_id: string | null
   price: number | null
+  checkout_price: number | null
+  label_price: number | null
+  price_mismatch: boolean
   tracking_number: string | null
   tracking_url: string | null
   label_url: string | null
@@ -1982,6 +2011,39 @@ export interface OrderShipmentSummary {
   paid_at: string | null
   cancelled_at: string | null
   created_at: string
+  payload: Record<string, any> | null
+}
+
+// Deriva os campos de preço a partir do payload gravado (no checkout) para
+// que a UI possa alertar quando o valor cobrado pela SuperFrete difere do
+// valor que o comprador viu no checkout.
+function mapShipmentSummary(row: any | null): OrderShipmentSummary | null {
+  if (!row) return null
+  const p = (row.payload as Record<string, any> | null) || {}
+  const checkoutPrice = typeof p.checkout_price === "number" ? p.checkout_price : null
+  const labelPrice = typeof p.label_price === "number" ? p.label_price : null
+  return {
+    id: row.id,
+    order_id: row.order_id,
+    provider_slug: row.provider_slug,
+    status: row.status,
+    service_code: row.service_code ?? null,
+    service_name: row.service_name ?? null,
+    carrier: row.carrier ?? null,
+    external_label_id: row.external_label_id ?? null,
+    price: typeof row.price === "number" ? row.price : null,
+    checkout_price: checkoutPrice,
+    label_price: labelPrice,
+    price_mismatch: Boolean(p.price_mismatch),
+    tracking_number: row.tracking_number ?? null,
+    tracking_url: row.tracking_url ?? null,
+    label_url: row.label_url ?? null,
+    requested_at: row.requested_at ?? null,
+    paid_at: row.paid_at ?? null,
+    cancelled_at: row.cancelled_at ?? null,
+    created_at: row.created_at,
+    payload: row.payload ?? null,
+  }
 }
 
 export async function getOrderShipmentAction(payload: { orderId: string }): Promise<{
@@ -1999,7 +2061,7 @@ export async function getOrderShipmentAction(payload: { orderId: string }): Prom
     const { data } = await supabase
       .from("order_shipments")
       .select(
-        "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+        "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at, payload",
       )
       .eq("order_id", payload.orderId)
       .eq("partner_id", ctx.partnerId)
@@ -2008,7 +2070,7 @@ export async function getOrderShipmentAction(payload: { orderId: string }): Prom
       .limit(1)
       .maybeSingle()
 
-    return { success: true, shipment: (data as OrderShipmentSummary) || null }
+    return { success: true, shipment: mapShipmentSummary(data) }
   } catch (err: any) {
     captureError(err, {
       module: "shipping",
@@ -2068,7 +2130,7 @@ export async function getReturnShippingStateAction(payload: {
       supabase
         .from("order_shipments")
         .select(
-          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at",
+          "id, order_id, provider_slug, status, service_code, service_name, carrier, external_label_id, price, tracking_number, tracking_url, label_url, requested_at, paid_at, cancelled_at, created_at, payload",
         )
         .eq("return_request_id", payload.returnRequestId)
         .eq("partner_id", ctx.partnerId)
@@ -2103,7 +2165,7 @@ export async function getReturnShippingStateAction(payload: {
 
     return {
       success: true,
-      shipment: (data as OrderShipmentSummary) || null,
+      shipment: mapShipmentSummary(data),
       canGenerate,
       reason,
     }

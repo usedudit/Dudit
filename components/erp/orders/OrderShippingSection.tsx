@@ -376,6 +376,13 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                                 description={formatCurrency(shipment.price)}
                             />
                         )}
+                        {shipment?.price_mismatch && shipment?.checkout_price != null && (
+                            <InfoCard
+                                color="orange"
+                                title="Valor divergente"
+                                message={`O valor cobrado no checkout (R$ ${formatCurrency(shipment.checkout_price)}) difere da etiqueta emitida pela SuperFrete (R$ ${formatCurrency(shipment.price || 0)}). Verifique o serviço selecionado e regenere a etiqueta se necessário.`}
+                            />
+                        )}
                     </div>
 
                     {gate?.balance !== undefined && shippingStatus === "pending" && (

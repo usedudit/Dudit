@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
+import { captureError } from "@/lib/monitoring/sentry"
 import { createHash, randomUUID } from "crypto"
 import { revalidateProducts, revalidateMarketplace, revalidateCart } from "@/lib/utils/revalidation"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
@@ -1385,11 +1386,31 @@ async function handler(request: NextRequest) {
           customer_name: customerName,
           mp_payment_id: String(mpPaymentId),
         })
-
-        const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
-        await fulfillMarketplaceOrder(adminClient, newOrder.id)
       } catch (txErr: any) {
         console.error("Erro ao criar transaction ou incrementar vendas:", txErr.message)
+      }
+
+      try {
+        const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+        const fulfillmentResult = await fulfillMarketplaceOrder(adminClient, newOrder.id, { force: true })
+        if (!fulfillmentResult.success) {
+          SecureLogger.error("Marketplace order fulfillment failed in process-payment", {
+            orderId: newOrder.id,
+            fulfillmentError: fulfillmentResult.error,
+            fulfillmentSkipped: fulfillmentResult.skipped,
+          })
+        }
+      } catch (fulfillErr: any) {
+        SecureLogger.error("Exception during marketplace order fulfillment in process-payment", {
+          orderId: newOrder.id,
+          errorMessage: fulfillErr.message,
+          stack: fulfillErr.stack,
+        })
+        captureError(fulfillErr, {
+          module: "orders",
+          action: "marketplace_fulfillment_process_payment",
+          entityId: newOrder.id,
+        })
       }
     }
 

@@ -568,7 +568,19 @@ export function ServiceDetailsPageClient({
         if (!selectedAddress || !targetPartnerId) return
         let active = true
 
-        async function calculateForAddress() {
+         async function calculateForAddress() {
+            // Só cobra/valida entrega cuando o serviço aceita atendimento a domicílio.
+            // Para serviços apenas "no estabelecimento", cotar o frete de entrega
+            // jogava "fora do raio de entrega" indevidamente.
+            if (!service?.fulfillment_modes?.includes("customer_location")) {
+                setDeliveryError(null)
+                setDeliveryFee(null)
+                setCalculatedAddress(null)
+                setShippingState("initial")
+                setCep("")
+                setDeliveryLoading(false)
+                return
+            }
             setDeliveryLoading(true)
             setDeliveryError(null)
             try {
@@ -630,6 +642,15 @@ export function ServiceDetailsPageClient({
 
         let active = true
         async function calculateForCep() {
+            // Só cotar entrega para serviços que aceitam "no endereço do cliente".
+            if (!service?.fulfillment_modes?.includes("customer_location")) {
+                setDeliveryError(null)
+                setDeliveryFee(null)
+                setCalculatedAddress(null)
+                setShippingState("initial")
+                setDeliveryLoading(false)
+                return
+            }
             setDeliveryLoading(true)
             setDeliveryError(null)
             try {

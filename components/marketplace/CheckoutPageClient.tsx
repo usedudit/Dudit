@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon, PackageIcon } from "@/lib/icons"
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -113,6 +113,8 @@ export interface CheckoutSessionData {
         base_fee: number | string
         is_delivery_enabled: boolean
     }
+    carrierServiceId?: number | null
+    carrierServicePrice?: number | null
 }
 
 interface UserAddress {
@@ -583,6 +585,14 @@ export function CheckoutPageClient() {
         carrierQuoteKeyRef.current = null
         setCarrierError(null)
         setCarrierReason(null)
+        // Limpa o estado de frete próprio/carrier do CEP anterior; sem isso um
+        // "raio"/"A combinar" do CEP anterior ficava travado até o próximo quote
+        // esporadamente falhar, e a taxa não recalculava ao trocar o endereço.
+        setDeliveryError(null)
+        setOwnDeliveryBlocked(false)
+        setDeliveryFee(0)
+        setDeliveryDistanceKm(null)
+        setDeliveryBreakdown(null)
     }, [destinationCep])
 
     // Quote carrier options IN PARALLEL with the own-delivery quote. Antes
@@ -657,7 +667,12 @@ export function CheckoutPageClient() {
         if (carrierQuoteLoading) return
         if (carrierOptions.length > 0) {
             if (selectedCarrierServiceId == null) {
-                handleCarrierSelect(carrierOptions[0])
+                // Prefere o serviço que o comprador já escolheu (sacola ou checkout
+                // anterior) - nunca reseta para a opção mais barata, evitando que a
+                // etiqueta/valor mude no fechamento do pedido.
+                const prefId = sessionData?.carrierServiceId ? Number(sessionData.carrierServiceId) : null
+                const preferred = prefId ? carrierOptions.find(o => o.serviceId === prefId) : null
+                handleCarrierSelect(preferred || carrierOptions[0])
             }
             setShowOutsideRadiusModal(false)
         } else if (carrierError && carrierReason === "no_options") {
@@ -669,7 +684,7 @@ export function CheckoutPageClient() {
         // handleCarrierSelect é recriado a cada render; o efeito só reage ao
         // estado do fluxo de cotação.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deliveryError, carrierQuoteLoading, carrierOptions, carrierError, carrierReason, selectedCarrierServiceId])
+    }, [deliveryError, carrierQuoteLoading, carrierOptions, carrierError, carrierReason, selectedCarrierServiceId, sessionData?.carrierServiceId])
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
 
@@ -1260,7 +1275,7 @@ export function CheckoutPageClient() {
         >
             <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
-                    <FileTextIcon className="h-4 w-4" />
+                    <PackageIcon className="h-4 w-4" />
                 </div>
                 <span className="font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido ({checkoutItemCount})</span>
             </div>
@@ -1311,7 +1326,7 @@ export function CheckoutPageClient() {
                                 {selectedCarrier.companyName ? `${selectedCarrier.companyName} - ${selectedCarrier.serviceName}` : selectedCarrier.serviceName}
                             </p>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                Envio nacional · {formatDeliveryDaysRange(selectedCarrier.deliveryMinDays, selectedCarrier.deliveryMaxDays)}
+                                {formatDeliveryDaysRange(selectedCarrier.deliveryMinDays, selectedCarrier.deliveryMaxDays)}
                             </p>
                             {selectedAddress && (
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
@@ -1936,7 +1951,7 @@ export function CheckoutPageClient() {
                         <img
                             src={imgUrl}
                             alt={bump.name}
-                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                            className="w-full h-full object-contain rounded-full"
                         />
                     }
                     title={bump.name}
@@ -3281,21 +3296,26 @@ export function CheckoutPageClient() {
                                             setPaymentOption("mercadopago")
                                         }
                                     }}
-                                    deliveryPlanEnabled={deliveryPlanEnabled}
-                                    deliveryEnabled={deliveryEnabled}
-                                    pickupEnabled={pickupEnabled}
-                                    shippingEnabled={shippingEnabled}
-                                    partnerAddressLabel={partnerAddressLabel}
-                                    deliveryError={displayDeliveryError}
-                                    carrierOptions={carrierSectionVisible ? carrierOptions : []}
-                                    selectedCarrierServiceId={selectedCarrierServiceId}
-                                    carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
-                                    carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
-                                    onSelectCarrier={handleCarrierSelect}
-                                    deliveryFree={deliveryFree}
-                                    schedulingLines={schedulingLines}
-                                    lines={checkoutContext?.lines || []}
-                                    onFulfillmentModesSave={handleBulkFulfillmentModesSave}
+                                     partnerId={partnerId}
+                                     deliveryPlanEnabled={deliveryPlanEnabled}
+                                     deliveryEnabled={deliveryEnabled}
+                                     pickupEnabled={pickupEnabled}
+                                     shippingEnabled={shippingEnabled}
+                                     partnerAddressLabel={partnerAddressLabel}
+                                     deliveryError={displayDeliveryError}
+                                     carrierOptions={carrierSectionVisible ? carrierOptions : []}
+                                     selectedCarrierServiceId={selectedCarrierServiceId}
+                                     carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
+                                     carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
+                                     onSelectCarrier={handleCarrierSelect}
+                                     deliveryFree={deliveryFree}
+                                     schedulingLines={schedulingLines}
+                                     lines={checkoutContext?.lines || []}
+                                     onFulfillmentModesSave={handleBulkFulfillmentModesSave}
+                                     deliveryAddress={formData.deliveryAddress || ""}
+                                     destinationCoords={selectedAddress?.latitude && selectedAddress?.longitude
+                                         ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                                         : undefined}
                                     addressProps={{
                                         loadingAddresses,
                                         userAddresses,
@@ -3787,18 +3807,16 @@ export function CheckoutPageClient() {
                                     </>
                                 ) : null}
 
-                                <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
+                                <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] bg-white dark:bg-dark-surface border-t dark:border-white/10 flex gap-3">
                                     <Button
-                                        type="button"
                                         variant="outline"
                                         onClick={() => router.back()}
                                         disabled={isLoading}
-                                        className="flex-1 h-12 bg-transparent"
+                                        className="flex-1 h-12"
                                     >
                                         Cancelar
                                     </Button>
                                     <Button
-                                        type="button"
                                         onClick={() => setMobileStep(2)}
                                         disabled={mobileStep1Blocked}
                                         className="flex-1 h-12"

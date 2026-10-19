@@ -106,6 +106,23 @@ export async function deleteAllNotificationsAction() {
   return { success: true as const, deleted }
 }
 
+export async function getUserStoreAccessAction() {
+  await traceServerAction("notifications.getUserStoreAccess")
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" as const, stores: [] }
+
+  const allAccess = await getAllUserStoreAccess(user)
+  return {
+    success: true as const,
+    stores: allAccess.map((a) => ({
+      partnerId: a.partnerId,
+      partnerName: a.partnerName,
+      storeId: a.storeId,
+      storeName: a.storeName,
+    })),
+  }
+}
+
 export async function switchNotificationContextAction(params: {
   partnerId: string
   storeId?: string | null

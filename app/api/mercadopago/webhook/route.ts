@@ -1156,7 +1156,19 @@ async function processWebhookWithRetry(
 
           if (fullOrder && Number(fullOrder.paid_amount || 0) > previousPaidAmount + 0.009) {
             const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
-            await fulfillMarketplaceOrder(supabase, orderId)
+            const fulfillmentResult = await fulfillMarketplaceOrder(supabase, orderId, { force: true })
+            if (!fulfillmentResult.success) {
+              SecureLogger.error("[WEBHOOK] Marketplace order fulfillment failed", {
+                orderId,
+                fulfillmentError: fulfillmentResult.error,
+                fulfillmentSkipped: fulfillmentResult.skipped,
+              })
+              captureError(new Error(fulfillmentResult.error || "Falha no fulfillment"), {
+                module: "orders",
+                action: "marketplace_fulfillment_webhook",
+                entityId: orderId,
+              })
+            }
           }
         }
       } catch (txErr: any) {

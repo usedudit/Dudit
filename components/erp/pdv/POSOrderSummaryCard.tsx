@@ -150,7 +150,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
                 >
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
-                            <FileIcon className="h-4 w-4" />
+                            <PackageIcon className="h-4 w-4" />
                         </div>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido ({itemCount})</span>
                     </div>
