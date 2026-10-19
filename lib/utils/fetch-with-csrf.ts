@@ -2,46 +2,18 @@
  * Helper function to make fetch requests with CSRF token automatically included
  */
 
-let csrfTokenCache: string | null = null
-let csrfTokenPromise: Promise<string> | null = null
+import { fetchCSRFTokenSingleton, clearCSRFTokenCache as clearHookCache } from "@/hooks/use-csrf-token"
 
-/**
- * Get CSRF token (with caching)
- */
 export async function getCSRFToken(): Promise<string> {
-  // Return cached token if available
-  if (csrfTokenCache) {
-    return csrfTokenCache
-  }
-
-  // Return existing promise if already fetching
-  if (csrfTokenPromise) {
-    return csrfTokenPromise
-  }
-
-  // Fetch new token
-  csrfTokenPromise = fetch("/api/csrf-token")
-    .then((response) => response.json())
-    .then((data) => {
-      csrfTokenCache = data.token
-      csrfTokenPromise = null
-      return data.token
-    })
-    .catch((error) => {
-      csrfTokenPromise = null
-      console.error("[CSRF] Error fetching token:", error)
-      throw error
-    })
-
-  return csrfTokenPromise
+  // Delegate to the shared singleton so the token returned here always matches
+  // the one stored in the cookie (both the hook and this fetcher share the same
+  // cache). This prevents "Token CSRF inválido" caused by divergent caches.
+  const token = await fetchCSRFTokenSingleton()
+  return token || ""
 }
 
-/**
- * Clear CSRF token cache (useful after logout or token expiration)
- */
 export function clearCSRFTokenCache() {
-  csrfTokenCache = null
-  csrfTokenPromise = null
+  clearHookCache()
 }
 
 /**

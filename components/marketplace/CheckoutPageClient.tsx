@@ -802,6 +802,24 @@ export function CheckoutPageClient() {
         if (selectedCarrierServiceId == null) return
         setSelectedCarrierServiceId(null)
     }, [carrierSectionVisible, selectedCarrierServiceId])
+
+    // Auto-seleciona a única forma de pagamento disponível para não exigir um
+    // clique desnecessário do comprador (ex.: loja só com Mercado Pago conectado).
+    useEffect(() => {
+        if (paymentOption !== null) return
+        if (isWhatsappFlow) return
+        const mpAvail = Boolean(partnerInfo.mpConnected) && (!isWhatsappFlow || carrierCheckoutEngaged)
+        if (mpAvail && storefrontMethods.length === 0 && !carrierCheckoutEngaged) {
+            setPaymentOption("mercadopago")
+            setFormData((prev) => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+            return
+        }
+        if (storefrontMethods.length === 1 && !partnerInfo.mpConnected && !carrierCheckoutEngaged && !isPickupRequiringOnline) {
+            setPaymentOption("traditional")
+            setFormData((prev) => ({ ...prev, paymentMethod: storefrontMethods[0].id, installments: 1 }))
+        }
+    }, [paymentOption, partnerInfo.mpConnected, storefrontMethods, isWhatsappFlow, carrierCheckoutEngaged, isPickupRequiringOnline])
+
     useEffect(() => {
         if (checkoutContext?.partner?.orderFlow === "whatsapp") {
             // Só força o modo manual quando nada foi escolhido ainda - nunca
@@ -881,7 +899,7 @@ export function CheckoutPageClient() {
             setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
         }
 
-        // Carrinho só de assinatura: o comprador escolheu o modo de recebimento
+         // Carrinho só de assinatura: o comprador escolheu o modo de recebimento
         // na página do plano (gravado em cart_items.fulfillment_mode). Respeita
         // a escolha em vez de cair no padrão do delivery config da loja.
         const ctxLines = Array.isArray(checkoutContext.lines) ? checkoutContext.lines : []

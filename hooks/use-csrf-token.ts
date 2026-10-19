@@ -36,6 +36,14 @@ export function fetchCSRFTokenSingleton(): Promise<string | null> {
 }
 
 /**
+ * Invalidate the CSRF token cache so the next call fetches a fresh token.
+ */
+export function clearCSRFTokenCache(): void {
+  cachedToken = null
+  cachedAt = 0
+}
+
+/**
  * Hook to get CSRF token on the client side.
  * Uses a global singleton cache to avoid duplicate fetches.
  */

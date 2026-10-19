@@ -12,7 +12,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
+import { fetchJSONWithCSRF, clearCSRFTokenCache } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
@@ -517,7 +517,7 @@ export function PaymentWrapper({
             const resolvedFormData = formData.formData || formData
             const deviceId = (window as any).MP_DEVICE_SESSION_ID || null
 
-            const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
+            const doSubmit = async () => await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
                 method: "POST",
                 body: {
                     paymentFormData: resolvedFormData,
@@ -538,19 +538,26 @@ export function PaymentWrapper({
                 },
             })
 
+            let responseData: any
+            try {
+                responseData = await doSubmit()
+            } catch (err: any) {
+                // Retry once with a freshly-fetched CSRF token, in case the
+                // cached token diverged from the cookie (avoids "Token CSRF
+                // inválido ou ausente" from an stale cache after inactivity).
+                const msg = (err?.message || "").toLowerCase()
+                if (msg.includes("csrf") || msg.includes("token")) {
+                    clearCSRFTokenCache()
+                    responseData = await doSubmit()
+                } else {
+                    throw err
+                }
+            }
+            const status = responseData.status
+            const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
+
             if (responseData.orderId) setActualOrderId(responseData.orderId)
             if (responseData.orderNumber) setActualOrderNumber(responseData.orderNumber)
-
-            if (typeof window !== "undefined") {
-                sessionStorage.removeItem("checkout_session")
-            }
-            try {
-                const { invalidateCartCache } = await import("@/hooks/use-cart")
-                invalidateCartCache()
-            } catch { }
-
-            const status = responseData.paymentStatus || responseData.status
-            const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
 
             if (status === "approved") {
                 setPaymentConfirmed(true)
