@@ -586,31 +586,12 @@ export async function recordCommissionPaymentAction(
   const paymentType = isBonus ? "Bônus meta" : "Comissão"
   const notes = isBonus ? "Pagamento manual de bônus de meta." : "Pagamento manual de comissão."
 
-  let contactId: string | null = null
   const { data: profileRow } = await admin
     .from("user_profiles")
     .select("full_name")
     .eq("user_id", seller.user_id)
     .maybeSingle()
   const employeeName = profileRow?.full_name || "Vendedor"
-
-  const { data: existingContact } = await admin
-    .from("transaction_contacts")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("type", "employee")
-    .ilike("name", employeeName)
-    .maybeSingle()
-  if (existingContact?.id) {
-    contactId = existingContact.id
-  } else {
-    const { data: newContact } = await admin
-      .from("transaction_contacts")
-      .insert({ partner_id: partnerId, name: employeeName, type: "employee" })
-      .select("id")
-      .single()
-    if (newContact?.id) contactId = newContact.id
-  }
 
   const now = new Date().toISOString()
   const { data: txData, error: txError } = await admin
@@ -628,10 +609,10 @@ export async function recordCommissionPaymentAction(
       payment_type: paymentType,
       transaction_type: "expense",
       origin: "manual",
-      notes,
+      notes: `${notes} (${employeeName})`,
       account_id: resolvedAccountId,
       seller_partner_user_id: sellerPartnerUserId,
-      contact_id: contactId,
+      contact_id: null,
       contact_type: "employee",
     })
     .select("id")

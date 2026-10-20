@@ -53,6 +53,17 @@ import {
   cancelPendingSettlementsForOrder,
 } from "@/lib/services/transaction.service";
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine";
+import {
+  getOrderDepositSummary,
+  patchDepositCheckoutOnPayment,
+} from "@/lib/payments/order-financial-state";
+import {
+  buildOrderPaymentMethodLabel,
+  hasReceivedAmount,
+  normalizeOrderPaymentBreakdown,
+  sumReceivedAmount,
+  sumReceivedByMethod,
+} from "@/lib/payments/payment-ledger";
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label";
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery";
 import { buildNotificationContent } from "@/lib/notifications/templates";
@@ -438,6 +449,27 @@ function sanitizePaymentBreakdown(
       wantsChange: entry?.wantsChange || undefined,
       payWithAmount:
         entry?.payWithAmount != null ? Number(entry.payWithAmount) : undefined,
+      provider: entry?.provider || null,
+      paymentTypeId: entry?.paymentTypeId || null,
+      paymentStatus: entry?.paymentStatus || null,
+      paymentStatusDetail: entry?.paymentStatusDetail || null,
+      mpPaymentId: entry?.mpPaymentId || null,
+      mpPaymentMethodId: entry?.mpPaymentMethodId || null,
+      paymentKind: entry?.paymentKind || null,
+      netReceivedAmount:
+        entry?.netReceivedAmount != null
+          ? Math.max(0, Number(entry.netReceivedAmount))
+          : undefined,
+      feeDetails: Array.isArray(entry?.feeDetails)
+        ? entry.feeDetails
+        : undefined,
+      installmentAmount:
+        entry?.installmentAmount != null
+          ? Math.max(0, Number(entry.installmentAmount))
+          : undefined,
+      cardLastDigits: entry?.cardLastDigits || null,
+      cardFirstDigits: entry?.cardFirstDigits || null,
+      cardholderName: entry?.cardholderName || null,
     };
   });
 
@@ -601,10 +633,30 @@ async function applyPaymentMethodPricingToTotal(
 function buildPaymentMethodSummary(
   paymentBreakdown: PaymentBreakdownEntry[],
   fallbackMethod?: string | null,
+  options?: {
+    usesDeposit?: boolean;
+    paidAmount?: number;
+    totalAmount?: number;
+  },
 ) {
+  const receivedBreakdown = (paymentBreakdown || []).filter((entry) =>
+    hasReceivedAmount(entry as any),
+  );
+  const source =
+    receivedBreakdown.length > 0 ? receivedBreakdown : paymentBreakdown || [];
+
+  if (options?.usesDeposit) {
+    return buildOrderPaymentMethodLabel(source as any, {
+      fallbackMethod,
+      usesDeposit: true,
+      paidAmount: options.paidAmount,
+      totalAmount: options.totalAmount,
+    });
+  }
+
   const labels = Array.from(
     new Set(
-      paymentBreakdown
+      source
         .map((entry) => normalizePaymentMethodLabel(entry.method))
         .filter(Boolean),
     ),
@@ -1368,48 +1420,29 @@ export async function createFinancialTransactionsForReceivedAmount(
       return;
     }
 
-    const breakdownPromises = newBreakdown.map(async (newEntry, i) => {
-      if (!newEntry?.method) return;
+    const oldByMethod = sumReceivedByMethod(oldBreakdown);
+    const newByMethod = sumReceivedByMethod(newBreakdown);
 
-      const newReceived = Number(
-        newEntry.amount ??
-        newEntry.amountReceived ??
-        newEntry.effectiveAmount ??
-        0,
-      );
+    const breakdownPromises = Array.from(newByMethod.entries()).map(
+      async ([methodKey, newEntry]) => {
+        if (!methodKey || !newEntry?.leg) return;
 
-      const oldEntry =
-        oldBreakdown.find(
-          (old: any) =>
-            old?.method === newEntry.method &&
-            old?.paymentMethodId === newEntry.paymentMethodId,
-        ) || oldBreakdown[i];
+        const oldReceived = oldByMethod.get(methodKey)?.amount || 0;
+        const delta = newEntry.amount - oldReceived;
+        if (delta <= 0.009) return;
 
-      const oldReceived = oldEntry
-        ? Number(
-          oldEntry.amount ??
-          oldEntry.amountReceived ??
-          oldEntry.effectiveAmount ??
-          0,
-        )
-        : 0;
-      const delta = newReceived - oldReceived;
-
-      if (delta > 0.009) {
+        const methodLabel = String(newEntry.leg.method || methodKey);
         const oldFormatted = oldReceived.toFixed(2);
-        const newFormatted = newReceived.toFixed(2);
-        const refNote = `sale-tx:${params.orderNumber}:${newEntry.method}:${oldFormatted}_to_${newFormatted}`;
+        const newFormatted = newEntry.amount.toFixed(2);
+        const refNote = `sale-tx:${params.orderNumber}:${methodLabel}:${oldFormatted}_to_${newFormatted}`;
 
         let legAccountId = params.financeAccountId || null;
-        if (
-          !legAccountId &&
-          newEntry.paymentMethodId &&
-          isUuid(newEntry.paymentMethodId)
-        ) {
+        const paymentMethodId = newEntry.leg.paymentMethodId;
+        if (!legAccountId && paymentMethodId && isUuid(paymentMethodId)) {
           const { data: pm } = await supabase
             .from("payment_methods")
             .select("default_finance_account_id")
-            .eq("id", newEntry.paymentMethodId)
+            .eq("id", paymentMethodId)
             .eq("partner_id", params.partnerId)
             .maybeSingle();
           if (pm?.default_finance_account_id) {
@@ -1417,26 +1450,32 @@ export async function createFinancialTransactionsForReceivedAmount(
           }
         }
 
+        const provider =
+          newEntry.leg.provider ||
+          (String(methodLabel).toLowerCase().includes("mercado pago")
+            ? "Mercado Pago"
+            : null);
+
         await createTransactionFromOrder(supabase, {
           order_number: params.orderNumber,
           partner_id: params.partnerId,
           store_id: params.storeId || null,
           total_amount: delta,
-          payment_method: newEntry.method,
-          payment_provider:
-            params.orderSource === "Marketplace" ||
-              String(newEntry.method).toLowerCase().includes("mercado pago")
-              ? "Mercado Pago"
-              : null,
+          payment_method: methodLabel,
+          payment_provider: provider,
           payment_breakdown: [
             {
-              method: newEntry.method,
+              method: methodLabel,
               amount: delta,
+              amountReceived: delta,
               paymentMethodId:
-                newEntry.paymentMethodId && isUuid(newEntry.paymentMethodId)
-                  ? newEntry.paymentMethodId
+                paymentMethodId && isUuid(paymentMethodId)
+                  ? paymentMethodId
                   : null,
-              installmentNumber: newEntry.installmentNumber || 1,
+              installmentNumber: Number(newEntry.leg.installmentNumber || 1),
+              provider,
+              mpPaymentId: newEntry.leg.mpPaymentId || null,
+              paymentKind: newEntry.leg.paymentKind || null,
             },
           ],
           payment_date: new Date().toISOString(),
@@ -1447,8 +1486,8 @@ export async function createFinancialTransactionsForReceivedAmount(
           reference_note: refNote,
           order_id: params.orderId || null,
         });
-      }
-    });
+      },
+    );
     await Promise.all(breakdownPromises);
   } catch (error) {
     console.error(
@@ -1558,7 +1597,7 @@ async function createRefundTransactionForCancelledOrder(params: {
   const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount);
   if (refundableAmount <= 0.009) return { success: true as const };
 
-  const transactionContactId = await resolveOrCreateTransactionContactByName({
+  const transactionContactId = await resolveTransactionContactByName({
     supabase: params.supabase,
     partnerId: params.partnerId,
     name: params.customerName,
@@ -1629,7 +1668,7 @@ async function restoreCancelledOrderInventory(params: {
   return { success: true as const };
 }
 
-async function resolveOrCreateTransactionContactByName(params: {
+async function resolveTransactionContactByName(params: {
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>;
   partnerId: string;
   name?: string | null;
@@ -1645,6 +1684,7 @@ async function resolveOrCreateTransactionContactByName(params: {
     .eq("partner_id", params.partnerId)
     .eq("type", "customer")
     .ilike("name", normalizedName)
+    .is("deleted_at", null)
     .limit(1)
     .maybeSingle();
 
@@ -1657,31 +1697,7 @@ async function resolveOrCreateTransactionContactByName(params: {
     return null;
   }
 
-  if (existing?.id) return existing.id;
-
-  const { data: created, error: createError } = await params.supabase
-    .from("transaction_contacts")
-    .insert({
-      partner_id: params.partnerId,
-      name: normalizedName,
-      type: "customer",
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (createError) {
-    console.error(
-      "[orders_cancel_refund] failed_to_create_transaction_contact",
-      {
-        partnerId: params.partnerId,
-        name: normalizedName,
-        error: createError,
-      },
-    );
-    return null;
-  }
-
-  return created?.id || null;
+  return existing?.id || null;
 }
 
 async function createRefundTransactionForCancelledOrderSafe(params: {
@@ -1827,7 +1843,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     });
   }
 
-  const transactionContactId = await resolveOrCreateTransactionContactByName({
+  const transactionContactId = await resolveTransactionContactByName({
     supabase: params.supabase,
     partnerId: params.partnerId,
     name: params.customerName,
@@ -5008,6 +5024,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
   paidAmount?: number;
   paymentBreakdown?: any[];
   mpPaymentId?: string;
+  manualBalanceOverride?: boolean;
 }) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
@@ -5021,7 +5038,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     return { error: "Ação inválida para pedidos." };
   }
 
-  await requirePermission(
+  const access = await requirePermission(
     payload.partnerId,
     "orders",
     payload.actionType === "cancel" ? "cancel" : "edit",
@@ -5032,7 +5049,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
   const { data: currentOrders } = await supabase
     .from("orders")
     .select(
-      "id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_source, exchange_return_request_id, order_items(product_id, variant_id, quantity)",
+      "id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, checkout_fulfillment, payment_expires_at, payment_method_discount_amount, payment_method_extra_amount, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_source, exchange_return_request_id, order_items(product_id, variant_id, quantity)",
     )
     .in("id", payload.orderIds)
     .eq("partner_id", payload.partnerId);
@@ -5455,12 +5472,84 @@ export async function updateOrdersStatusInBatchAction(payload: {
     partially_paid: "partially_paid",
   };
 
+  const overrideOrderIds = new Set<string>();
+
   if (payload.actionType === "payment_status") {
     const requestedStatus = paymentStatusMap[payload.statusValue || ""];
     if (!requestedStatus) {
       return {
         error: "Status de pagamento invalido para atualizacao em massa.",
       };
+    }
+
+    const hasIncomingBreakdown =
+      Array.isArray(payload.paymentBreakdown) &&
+      payload.paymentBreakdown.length > 0;
+    const overrideRequested = Boolean(payload.manualBalanceOverride);
+    const roleKey = String(access.roleId || "").toLowerCase();
+    const canOverrideManualBalance = ["owner", "admin", "manager"].includes(
+      roleKey,
+    );
+    if (overrideRequested && !canOverrideManualBalance) {
+      return {
+        error:
+          "Apenas proprietários, administradores e gerentes podem autorizar o recebimento presencial do saldo.",
+      };
+    }
+
+    let manualBalanceEnabled = false;
+    if (hasIncomingBreakdown) {
+      const { data: policyRow, error: policyError } = await supabase
+        .from("partners")
+        .select("deposit_balance_manual_enabled")
+        .eq("id", payload.partnerId)
+        .maybeSingle();
+      if (policyError) {
+        return {
+          error:
+            "Não foi possível validar a configuração de recebimento presencial do saldo.",
+        };
+      }
+      manualBalanceEnabled = Boolean(
+        (policyRow as any)?.deposit_balance_manual_enabled,
+      );
+    }
+
+    if (hasIncomingBreakdown) {
+      const incomingPaid = sumReceivedAmount(payload.paymentBreakdown as any);
+      const incomingPaidAmount =
+        payload.paidAmount !== undefined
+          ? Number(payload.paidAmount)
+          : incomingPaid;
+
+      for (const order of currentOrders || []) {
+        if (order.situation === "cancelled") continue;
+        const summary = getOrderDepositSummary(order as any);
+        if (!summary.usesDeposit) continue;
+
+        const increment = Math.max(
+          0,
+          incomingPaidAmount - Number(order.paid_amount || 0),
+        );
+        if (increment <= 0.009) continue;
+
+        if (!summary.sinalPaid) {
+          return {
+            error: `Pedido ${order.order_number || order.id}: o sinal deve ser pago online pelo checkout.`,
+          };
+        }
+
+        if (summary.remainingBalance <= 0.009) continue;
+
+        if (!manualBalanceEnabled) {
+          if (!overrideRequested) {
+            return {
+              error: `Pedido ${order.order_number || order.id}: o pagamento presencial do saldo está desativado. Ative a configuração ou use o override autorizado.`,
+            };
+          }
+          overrideOrderIds.add(String(order.id));
+        }
+      }
     }
 
     let paymentProcessedCount = 0;
@@ -5527,32 +5616,31 @@ export async function updateOrdersStatusInBatchAction(payload: {
               : 0,
       });
 
-      const validMethodLabels = payload.paymentBreakdown
-        ? Array.from(
-          new Set(
-            payload.paymentBreakdown
-              .map((entry: any) => normalizePaymentMethodLabel(entry.method))
-              .filter((label?: string): label is string => {
-                if (!label) return false;
-                const norm = label.toLowerCase();
-                return (
-                  !norm.includes("não definido") &&
-                  !norm.includes("metodo nao definido") &&
-                  !norm.includes("pendente") &&
-                  !norm.includes("não informado") &&
-                  !norm.includes("nao informado")
-                );
-              }),
-          ),
+      const depositSummaryForOrder = getOrderDepositSummary(order as any);
+      const sanitizedBreakdown = payload.paymentBreakdown
+        ? normalizeOrderPaymentBreakdown(
+          sanitizePaymentBreakdown(payload.paymentBreakdown),
+          paymentState.paidAmount,
         )
-        : [];
-
-      const nextPaymentMethod =
-        validMethodLabels.length > 0
-          ? validMethodLabels.join(", ")
-          : payload.paymentBreakdown
-            ? undefined
-            : undefined;
+        : null;
+      const nextPaymentMethod = sanitizedBreakdown
+        ? buildPaymentMethodSummary(
+          sanitizedBreakdown as PaymentBreakdownEntry[],
+          order.payment_method,
+          {
+            usesDeposit: depositSummaryForOrder.usesDeposit,
+            paidAmount: paymentState.paidAmount,
+            totalAmount: updateTotalAmount,
+          },
+        )
+        : undefined;
+      const nextCheckoutFulfillment = depositSummaryForOrder.usesDeposit
+        ? patchDepositCheckoutOnPayment(
+          order.checkout_fulfillment,
+          paymentState.paidAmount,
+          updateTotalAmount,
+        )
+        : undefined;
 
       const updateFields: Record<string, unknown> = {
         situation: paymentState.situation,
@@ -5560,10 +5648,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
         total_amount: updateTotalAmount,
         payment_method_discount_amount: pmDiscountAmount,
         payment_method_extra_amount: pmExtraAmount,
-        ...(payload.paymentBreakdown
-          ? { payment_breakdown: payload.paymentBreakdown }
+        ...(sanitizedBreakdown
+          ? { payment_breakdown: sanitizedBreakdown }
           : {}),
         ...(nextPaymentMethod ? { payment_method: nextPaymentMethod } : {}),
+        ...(nextCheckoutFulfillment
+          ? { checkout_fulfillment: nextCheckoutFulfillment }
+          : {}),
         ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
       };
 
@@ -5595,7 +5686,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
           ? order.payment_breakdown
           : [];
         const newBreakdown =
-          payload.paymentBreakdown ||
+          sanitizedBreakdown ||
           (paymentState.situation === "paid"
             ? [
               {
@@ -5850,6 +5941,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
               }
               lines.push(line);
             }
+
+            if (overrideOrderIds.has(String(order.id))) {
+              lines.push(
+                "autorizou o recebimento presencial do saldo com override (configuração desativada)",
+              );
+            }
           }
         }
 
@@ -5892,6 +5989,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 oldStatus: getPaymentStatusLabel(order.situation),
                 newStatus: getPaymentStatusLabel(nextPaymentState.situation),
                 statusScope: "payment",
+                ...(overrideOrderIds.has(String(order.id))
+                  ? {
+                    manualBalanceOverride: true,
+                    overrideRole: access.roleId,
+                  }
+                  : {}),
               };
             })()
             : payload.actionType === "delivery_status" && payload.statusValue

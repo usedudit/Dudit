@@ -5,6 +5,7 @@ import {
 } from "@/lib/payments/payment-method";
 import { formatAddressParts, stripCep } from "@/lib/utils/format-address";
 import { cleanOrderNotes } from "@/lib/orders/order-utils";
+import { getLegReceivedAmount } from "@/lib/payments/payment-ledger";
 
 export type SaleReceiptFormat = "thermal" | "thermal-58" | "a4";
 
@@ -309,13 +310,13 @@ export function buildPaymentLinesFromOrder(
     ? order.payment_breakdown
     : [];
   const filtered = breakdown.filter(
-    (e: any) => e?.method && Number(e.amount || 0) > 0.009,
+    (e: any) => e?.method && getLegReceivedAmount(e) > 0.009,
   );
   if (filtered.length > 0) {
     const grouped = groupPaymentMethods(
       filtered.map((e: any) => ({
         method: String(e.method),
-        amount: Number(e.amount || 0),
+        amount: getLegReceivedAmount(e),
         wantsChange: e.wantsChange,
         payWithAmount: e.payWithAmount,
       })),
@@ -367,15 +368,16 @@ export function buildPaymentLinesFromBreakdown(
     ): e is {
       method: string;
       amount?: number;
+      amountReceived?: number;
       wantsChange?: boolean;
       payWithAmount?: number;
-    } => Boolean(e?.method) && Number(e?.amount || 0) > 0.009,
+    } => Boolean(e?.method) && getLegReceivedAmount(e as any) > 0.009,
   );
   if (filtered.length > 0) {
     const grouped = groupPaymentMethods(
       filtered.map((e) => ({
         method: e.method,
-        amount: Number(e.amount || 0),
+        amount: getLegReceivedAmount(e as any),
         wantsChange: e.wantsChange,
         payWithAmount: e.payWithAmount,
       })),

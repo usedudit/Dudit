@@ -6,6 +6,10 @@ import {
   resolveSituationFromPaid,
   type OrderFinancialSnapshot,
 } from "@/lib/payments/order-financial-state"
+import {
+  buildOrderPaymentMethodLabel,
+  hasReceivedAmount,
+} from "@/lib/payments/payment-ledger"
 import { isUuid } from "@/lib/utils/short-id"
 
 const AMOUNT_TOLERANCE = 0.01
@@ -68,11 +72,22 @@ export function buildMpApprovedPaymentUpdate(params: {
     return entry
   })
 
-  const mpLegIndex = oldBreakdown.findIndex(
-    (entry: any) =>
-      String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
-      String(entry?.method || "").toLowerCase().includes("mercado pago"),
-  )
+  const mpLegIndex = (() => {
+    const exactPaymentIndex = oldBreakdown.findIndex(
+      (entry: any) =>
+        params.mpPaymentId &&
+        entry?.mpPaymentId &&
+        String(entry.mpPaymentId) === String(params.mpPaymentId),
+    )
+    if (exactPaymentIndex >= 0) return exactPaymentIndex
+
+    return oldBreakdown.findIndex(
+      (entry: any) =>
+        !hasReceivedAmount(entry) &&
+        (String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
+          String(entry?.method || "").toLowerCase().includes("mercado pago")),
+    )
+  })()
 
   // Split fee_details into feeAmount (mercadopago_fee) and interestAmount (installment_fee)
   let feeAmount = 0
@@ -90,11 +105,20 @@ export function buildMpApprovedPaymentUpdate(params: {
     feeAmount = params.mpTotalFeeAmount ?? 0
   }
 
+  const paymentKind =
+    currentPaid > 0.009
+      ? "balance"
+      : nextPaid < totalAmount - 0.005
+        ? "deposit"
+        : "full"
+
   const mpLeg: Record<string, unknown> = {
     method: params.paymentMethodName,
     amount: chargeAmount,
     effectiveAmount: chargeAmount,
-    amountReceived: params.mpNetReceivedAmount ?? chargeAmount,
+    amountReceived: chargeAmount,
+    netReceivedAmount: params.mpNetReceivedAmount ?? chargeAmount,
+    paymentKind,
     provider: "Mercado Pago",
     adjustmentType: "none",
     adjustmentPercent: 0,
@@ -142,14 +166,21 @@ export function buildMpApprovedPaymentUpdate(params: {
     params.order.checkout_fulfillment ?? null,
     nextPaid,
     totalAmount,
+    params.mpDateApproved || null,
   )
+  const paymentMethodLabel = buildOrderPaymentMethodLabel(payment_breakdown, {
+    fallbackMethod: params.paymentMethodName,
+    usesDeposit: Boolean(checkout_fulfillment?.depositCheckout),
+    paidAmount: nextPaid,
+    totalAmount,
+  })
 
   return {
     situation,
     paid_amount: nextPaid,
     amount_paid: nextPaid,
     payment_breakdown,
-    payment_method: params.paymentMethodName,
+    payment_method: paymentMethodLabel,
     payment_provider: "Mercado Pago",
     mp_payment_id: params.mpPaymentId,
     ...(checkout_fulfillment ? { checkout_fulfillment } : {}),

@@ -28,7 +28,7 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
 
   const { data, error } = await supabase
     .from("partners")
-    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, partner_integrations(provider_slug, status, account_id)")
+    .select("service_deposit_enabled, service_deposit_type, service_deposit_percentage, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id)")
     .eq("id", partnerId)
     .single()
 
@@ -44,6 +44,9 @@ export async function getServiceCheckoutSettingsAction(partnerId: string) {
       depositType: data?.service_deposit_type || "percentage",
       depositPercentage: Number(data?.service_deposit_percentage || 50),
       depositMpEnabled: Boolean(data?.service_deposit_enabled && mpFields.mp_user_id),
+      depositBalanceManualEnabled: Boolean(
+        data?.deposit_balance_manual_enabled,
+      ),
       mpConnected: !!mpFields.mp_user_id,
     },
   }
@@ -54,6 +57,7 @@ export async function updateServiceCheckoutSettingsAction(input: {
   depositEnabled: boolean
   depositPercentage: 10 | 20 | 30 | 50
   depositMpEnabled: boolean
+  depositBalanceManualEnabled?: boolean
 }) {
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
@@ -86,6 +90,9 @@ export async function updateServiceCheckoutSettingsAction(input: {
       service_deposit_enabled: input.depositEnabled,
       service_deposit_type: "percentage",
       service_deposit_percentage: input.depositPercentage,
+      deposit_balance_manual_enabled: Boolean(
+        input.depositEnabled && input.depositBalanceManualEnabled,
+      ),
     })
     .eq("id", input.partnerId)
 

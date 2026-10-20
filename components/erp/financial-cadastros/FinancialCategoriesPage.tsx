@@ -34,6 +34,8 @@ import { type FinanceAccountType } from "@/lib/finance-utils"
 import {
     listAllTransactionContactsAction,
     createTransactionContactAction,
+    updateTransactionContactAction,
+    deleteTransactionContactAction,
     type TransactionContactRow,
 } from "@/app/actions/erp/transaction-contacts"
 import { adjustAccountBalanceViaTransactionAction } from "@/app/actions/erp/transactions"
@@ -92,7 +94,7 @@ function normalizeName(value: string) {
     return value.trim().replace(/\s+/g, " ").toLowerCase()
 }
 
-type FinContactModalType = "supplier" | "service" | "employee" | "partner" | "other"
+type FinContactModalType = "service" | "partner" | "other"
 
 export default function FinancialCategoriesPage({
     initialCategories,
@@ -163,17 +165,25 @@ export default function FinancialCategoriesPage({
 
     const [contactModal, setContactModal] = useState<{
         isOpen: boolean
+        mode: "add" | "edit"
+        id: string | null
         type: FinContactModalType
         name: string
-        description: string
         saving: boolean
     }>({
         isOpen: false,
-        type: "supplier",
+        mode: "add",
+        id: null,
+        type: "service",
         name: "",
-        description: "",
         saving: false,
     })
+
+    const [deleteContactModal, setDeleteContactModal] = useState<{
+        isOpen: boolean
+        contact: Pick<TransactionContactRow, "id" | "name"> | null
+        deleting: boolean
+    }>({ isOpen: false, contact: null, deleting: false })
 
     const [adjustBalanceModal, setAdjustBalanceModal] = useState<{
         open: boolean
@@ -266,9 +276,10 @@ export default function FinancialCategoriesPage({
         if (activeTab === "contacts") {
             setContactModal({
                 isOpen: true,
-                type: "supplier",
+                mode: "add",
+                id: null,
+                type: "service",
                 name: "",
-                description: "",
                 saving: false,
             })
             return
@@ -480,26 +491,41 @@ export default function FinancialCategoriesPage({
             return
         }
         const contactNameKey = normalizeName(contactModal.name)
-        const duplicatedContact = contacts.some((c) => normalizeName(c.name) === contactNameKey && c.type === contactModal.type)
+        const duplicatedContact = contacts.some(
+            (c) =>
+                normalizeName(c.name) === contactNameKey &&
+                c.type === contactModal.type &&
+                c.id !== contactModal.id,
+        )
         if (duplicatedContact) {
             error("Já existe um contato com esse nome para esse tipo.")
             return
         }
         setContactModal((prev) => ({ ...prev, saving: true }))
         try {
-            const result = await createTransactionContactAction({
-                partnerId,
-                name: contactModal.name.trim(),
-                type: contactModal.type,
-                description: contactModal.description.trim() || null,
-            })
+            let result
+            if (contactModal.mode === "edit" && contactModal.id) {
+                result = await updateTransactionContactAction({
+                    partnerId,
+                    id: contactModal.id,
+                    name: contactModal.name.trim(),
+                    type: contactModal.type,
+                })
+            } else {
+                result = await createTransactionContactAction({
+                    partnerId,
+                    name: contactModal.name.trim(),
+                    type: contactModal.type,
+                })
+            }
             if (result.success) {
-                success("Contato criado com sucesso!")
+                success(contactModal.mode === "edit" ? "Contato atualizado com sucesso!" : "Contato criado com sucesso!")
                 setContactModal({
                     isOpen: false,
-                    type: "supplier",
+                    mode: "add",
+                    id: null,
+                    type: "service",
                     name: "",
-                    description: "",
                     saving: false,
                 })
                 const list = await listAllTransactionContactsAction(partnerId)
@@ -511,6 +537,28 @@ export default function FinancialCategoriesPage({
             error("Erro ao processar solicitação")
         } finally {
             setContactModal((prev) => ({ ...prev, saving: false }))
+        }
+    }
+
+    const confirmDeleteContact = async () => {
+        const { contact } = deleteContactModal
+        if (!contact) return
+
+        setDeleteContactModal((prev) => ({ ...prev, deleting: true }))
+        try {
+            const result = await deleteTransactionContactAction(partnerId, contact.id)
+            if (result.success) {
+                success("Contato excluído com sucesso!")
+                setDeleteContactModal({ isOpen: false, contact: null, deleting: false })
+                const list = await listAllTransactionContactsAction(partnerId)
+                if (list.success) setContacts(list.data)
+            } else {
+                error(result.error || "Erro ao excluir")
+            }
+        } catch {
+            error("Erro ao processar solicitação")
+        } finally {
+            setDeleteContactModal((prev) => ({ ...prev, deleting: false }))
         }
     }
 
@@ -644,7 +692,22 @@ export default function FinancialCategoriesPage({
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {(paginatedItems as TransactionContactRow[]).map((item) => (
-                                    <FinancialContactCard key={item.id} item={item} onClick={() => { }} />
+                                    <FinancialContactCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => { }}
+                                        onEdit={() =>
+                                            setContactModal({
+                                                isOpen: true,
+                                                mode: "edit",
+                                                id: item.id,
+                                                type: item.type as FinContactModalType,
+                                                name: item.name,
+                                                saving: false,
+                                            })
+                                        }
+                                        onDelete={() => setDeleteContactModal({ isOpen: true, contact: { id: item.id, name: item.name }, deleting: false })}
+                                    />
                                 ))}
                             </FadeIn>
                         ) : (
@@ -914,9 +977,16 @@ export default function FinancialCategoriesPage({
             <DefaultModal
                 isOpen={contactModal.isOpen}
                 onClose={() =>
-                    setContactModal({ isOpen: false, type: "supplier", name: "", description: "", saving: false })
+                    setContactModal({
+                        isOpen: false,
+                        mode: "add",
+                        id: null,
+                        type: "service",
+                        name: "",
+                        saving: false,
+                    })
                 }
-                title="Novo contato financeiro"
+                title={contactModal.mode === "edit" ? "Editar contato financeiro" : "Novo contato financeiro"}
                 maxWidth="md"
                 footer={
                     <div className="flex justify-end gap-2 w-full">
@@ -925,9 +995,10 @@ export default function FinancialCategoriesPage({
                             onClick={() =>
                                 setContactModal({
                                     isOpen: false,
-                                    type: "supplier",
+                                    mode: "add",
+                                    id: null,
+                                    type: "service",
                                     name: "",
-                                    description: "",
                                     saving: false,
                                 })
                             }
@@ -944,9 +1015,7 @@ export default function FinancialCategoriesPage({
                     <FormDropdown
                         label="Tipo do contato"
                         options={[
-                            { value: "supplier", label: "Fornecedor" },
                             { value: "service", label: "Serviço" },
-                            { value: "employee", label: "Funcionário" },
                             { value: "partner", label: "Parceiro" },
                             { value: "other", label: "Outro" },
                         ]}
@@ -962,15 +1031,18 @@ export default function FinancialCategoriesPage({
                         placeholder="Nome exibido nas transações"
                         maxLength={150}
                     />
-                    <Input
-                        label="Descrição (opcional)"
-                        value={contactModal.description}
-                        onChange={(e) => setContactModal((prev) => ({ ...prev, description: e.target.value }))}
-                        placeholder="Notas internas"
-                        maxLength={150}
-                    />
                 </div>
             </DefaultModal>
+
+            <AlertModal
+                isOpen={deleteContactModal.isOpen}
+                onClose={() => setDeleteContactModal({ isOpen: false, contact: null, deleting: false })}
+                onConfirm={confirmDeleteContact}
+                title="Excluir contato?"
+                message={`O contato "${deleteContactModal.contact?.name}" será excluído. Lançamentos financeiros anteriores continuarão com o nome registrado.`}
+                confirmText="Excluir"
+                isLoading={deleteContactModal.deleting}
+            />
 
             <DefaultModal
                 isOpen={adjustBalanceModal.open}

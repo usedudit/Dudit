@@ -64,6 +64,7 @@ export function PaymentsPage({
     const [depositEnabled, setDepositEnabled] = useState(false)
     const [depositPercentage, setDepositPercentage] = useState("50")
     const [depositMpEnabled, setDepositMpEnabled] = useState(false)
+    const [depositBalanceManualEnabled, setDepositBalanceManualEnabled] = useState(false)
     const [mpConnected, setMpConnected] = useState(!!partner.mp_user_id)
     const [isLoading, setIsLoading] = useState(true)
 
@@ -81,6 +82,9 @@ export function PaymentsPage({
                     setDepositEnabled(svcRes.settings.depositEnabled)
                     setDepositPercentage(String(svcRes.settings.depositPercentage))
                     setDepositMpEnabled(svcRes.settings.depositMpEnabled)
+                    setDepositBalanceManualEnabled(
+                        Boolean(svcRes.settings.depositBalanceManualEnabled),
+                    )
                     setMpConnected(svcRes.settings.mpConnected)
                 }
             } catch {
@@ -119,6 +123,7 @@ export function PaymentsPage({
                 depositEnabled: depositFeatureAllowed ? depositEnabled : false,
                 depositPercentage: Number(depositPercentage) as 10 | 20 | 30 | 50,
                 depositMpEnabled: depositEnabled ? true : depositMpEnabled,
+                depositBalanceManualEnabled,
             })
 
             if (!svcRes.success) {
@@ -305,7 +310,7 @@ export function PaymentsPage({
                                             {!isWhatsAppFlow && depositEnabled && (
                                                 <InfoCard
                                                     color="orange"
-                                                    message="Com sinal obrigatório ativo, o pagamento na retirada/entrega fica indisponível. O checkout aceita apenas Mercado Pago."
+                                                    message="Com sinal obrigatório ativo, o sinal é sempre cobrado online pelo Mercado Pago. O saldo restante só pode ser recebido na retirada/entrega se a opção de pagamento presencial do saldo estiver ativada."
                                                 />
                                             )}
 
@@ -368,13 +373,28 @@ export function PaymentsPage({
                                                     )}
 
                                                     {depositEnabled && (
-                                                        <FormDropdown
-                                                            label="Percentual da entrada"
-                                                            value={depositPercentage}
-                                                            setValue={setDepositPercentage}
-                                                            options={DEPOSIT_OPTIONS}
-                                                            disabled={!depositEnabled || !depositFeatureAllowed}
-                                                        />
+                                                        <>
+                                                            <FormDropdown
+                                                                label="Percentual da entrada"
+                                                                value={depositPercentage}
+                                                                setValue={setDepositPercentage}
+                                                                options={DEPOSIT_OPTIONS}
+                                                                disabled={!depositEnabled || !depositFeatureAllowed}
+                                                            />
+                                                            <div className="flex items-center justify-between gap-4 py-3 border-t border-brand-border dark:border-dark-border">
+                                                                <div>
+                                                                    <p className="font-medium text-brand-dark dark:text-dark-heading">Permitir pagamento presencial do saldo</p>
+                                                                    <p className="text-xs text-brand-inactive-text">
+                                                                        Depois que o sinal for pago, o saldo restante pode ser recebido na retirada/entrega, em dinheiro, cartão ou Pix, inclusive em partes. O sinal continua sempre online.
+                                                                    </p>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={depositBalanceManualEnabled}
+                                                                    onCheckedChange={setDepositBalanceManualEnabled}
+                                                                    disabled={!depositEnabled}
+                                                                />
+                                                            </div>
+                                                        </>
                                                     )}
                                                 </div>
                                             </FormSection>

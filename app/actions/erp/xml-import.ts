@@ -1242,58 +1242,36 @@ export async function confirmImportAction(
         .single()
 
       if (supplier) {
-        // Busca ou cria transaction_contacts para o fornecedor
-        let { data: contact } = await supabase
-          .from("transaction_contacts")
-          .select("id")
-          .eq("partner_id", partnerId)
-          .eq("type", "supplier")
-          .eq("name", supplier.name)
-          .maybeSingle()
+        const supplierLabel = supplier.name || "Fornecedor"
+        const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
+        const hasParcelas = duplicatas.length > 1
+        const baseDescription = (prefix: string) => `${supplierLabel} - NF ${xmlImport.invoice_number || ""} - ${prefix}`
 
-        if (!contact) {
-          const { data: newContact } = await supabase
-            .from("transaction_contacts")
-            .insert({
-              partner_id: partnerId,
-              name: supplier.name,
-              type: "supplier",
-              description: "Fornecedor (importado de XML NF-e)",
-              store_id: storeId,
-            })
-            .select("id")
-            .single()
-          contact = newContact
-        }
-
-        if (contact) {
-          const duplicatas: any[] = (xmlImport.duplicatas as any[]) || []
-          const hasParcelas = duplicatas.length > 1
-          const transactions = hasParcelas
-            ? duplicatas.map((d: any) => ({
+        const transactions = hasParcelas
+          ? duplicatas.map((d: any) => ({
               partner_id: partnerId,
               store_id: storeId,
-              contact_id: contact.id,
+              contact_id: null,
               contact_type: "supplier" as const,
               transaction_type: "expense" as const,
               category: "Compras",
               amount: d.valor,
-              description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
+              description: baseDescription(`Parcela ${d.numero || "1"}`),
               due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
               status: "pending",
               origin: "xml_import",
               reference_note: `xml_import:${xmlImportId}`,
               created_by_user_id: user.id,
             }))
-            : [{
+          : [{
               partner_id: partnerId,
               store_id: storeId,
-              contact_id: contact.id,
+              contact_id: null,
               contact_type: "supplier" as const,
               transaction_type: "expense" as const,
               category: "Compras",
               amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
-              description: `NF ${xmlImport.invoice_number || ""} - À vista`,
+              description: baseDescription("À vista"),
               due_date: duplicatas.length === 1
                 ? (duplicatas[0].vencimento || new Date(Date.now() + 30 * 86400000).toISOString())
                 : new Date(Date.now() + 30 * 86400000).toISOString(),
@@ -1303,33 +1281,32 @@ export async function confirmImportAction(
               created_by_user_id: user.id,
             }]
 
-          const { data: createdTxs, error: txErr } = await supabase.from("transactions").insert(transactions).select("id")
-          if (txErr) {
-            console.error("Erro ao criar contas a pagar:", txErr)
-          } else {
-            console.log(`Contas a pagar criadas: ${transactions.length} transacão(ões)`)
-            if (finalFileKey && createdTxs && createdTxs.length > 0) {
-              try {
-                const admin = getAdminClient()
-                const txAttachments = createdTxs.map((t: any) => ({
-                  transaction_id: t.id,
-                  file_key: finalFileKey,
-                  file_name: finalFileName,
-                  file_type: "application/xml",
-                  file_size: finalFileSize,
-                  uploaded_by: user.id,
-                  file_hash: finalFileHash,
-                }))
-                await admin.from("transaction_attachments").insert(txAttachments)
-              } catch (attErr) {
-                console.error("Erro ao vincular anexo às contas a pagar:", attErr)
-              }
+        const { data: createdTxs, error: txErr } = await supabase.from("transactions").insert(transactions).select("id")
+        if (txErr) {
+          console.error("Erro ao criar contas a pagar:", txErr)
+        } else {
+          console.log(`Contas a pagar criadas: ${transactions.length} transacão(ões)`)
+          if (finalFileKey && createdTxs && createdTxs.length > 0) {
+            try {
+              const admin = getAdminClient()
+              const txAttachments = createdTxs.map((t: any) => ({
+                transaction_id: t.id,
+                file_key: finalFileKey,
+                file_name: finalFileName,
+                file_type: "application/xml",
+                file_size: finalFileSize,
+                uploaded_by: user.id,
+                file_hash: finalFileHash,
+              }))
+              await admin.from("transaction_attachments").insert(txAttachments)
+            } catch (attErr) {
+              console.error("Erro ao vincular anexo às contas a pagar:", attErr)
             }
-            await revalidateTransactions(partnerId)
-            revalidatePath("/erp/contas-a-pagar")
-            revalidatePath("/erp/transacoes")
-            revalidatePath("/erp/importacao-xml")
           }
+          await revalidateTransactions(partnerId)
+          revalidatePath("/erp/contas-a-pagar")
+          revalidatePath("/erp/transacoes")
+          revalidatePath("/erp/importacao-xml")
         }
       }
     }

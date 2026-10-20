@@ -889,7 +889,8 @@ export default function OrderDetailView({
     0,
   );
   const isDepositOrder = Boolean(
-    order?.checkout_fulfillment?.depositCheckout?.payDepositOnly,
+    order?.checkout_fulfillment?.depositCheckout?.payDepositOnly ||
+      order?.checkout_fulfillment?.depositCheckout?.usesDeposit,
   );
   const depositSummary = getOrderDepositSummary(order);
   const hasItemDiscount =
@@ -1737,18 +1738,17 @@ export default function OrderDetailView({
                                           |
                                         </span>
                                         <span
-                                          className={`inline-flex items-center gap-1 font-bold ${depositSummary.depositStatus === "partially_paid" ? "text-brand-green" : "text-brand-orange"}`}
+                                          className={`inline-flex items-center gap-1 font-bold ${depositSummary.sinalPaid ? "text-brand-green" : "text-brand-orange"}`}
                                         >
-                                          {depositSummary.depositStatus ===
-                                            "partially_paid" ? (
-                                            <ClockIcon
-                                              size={14}
-                                              className="shrink-0 text-brand-inactive-text dark:text-dark-body"
-                                            />
-                                          ) : (
+                                          {depositSummary.sinalPaid ? (
                                             <CheckCircleIcon
                                               size={14}
                                               className="shrink-0 text-brand-green"
+                                            />
+                                          ) : (
+                                            <ClockIcon
+                                              size={14}
+                                              className="shrink-0 text-brand-orange"
                                             />
                                           )}
                                         </span>
@@ -2766,10 +2766,29 @@ export default function OrderDetailView({
                                         depositSummary.depositAmount,
                                       )}
                                       <span
-                                        className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.depositStatus === "partially_paid" ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
+                                        className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.sinalPaid ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
                                       >
-                                        {depositSummary.depositStatus ===
-                                          "partially_paid"
+                                        {depositSummary.sinalPaid
+                                          ? "pago"
+                                          : "pendente"}
+                                      </span>
+                                    </span>
+                                  }
+                                />
+                              )}
+
+                              {isDepositOrder && depositSummary.sinalPaid && (
+                                <PaymentRow
+                                  label="Saldo"
+                                  value={
+                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                      {formatCurrency(
+                                        depositSummary.remainingBalance,
+                                      )}
+                                      <span
+                                        className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.remainingBalance <= 0.009 ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
+                                      >
+                                        {depositSummary.remainingBalance <= 0.009
                                           ? "pago"
                                           : "pendente"}
                                       </span>

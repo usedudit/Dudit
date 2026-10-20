@@ -62,6 +62,7 @@ export type PaymentBreakdownEntry = {
   /** @deprecated Use effectiveAmount */
   amount: number;
   amountReceived?: number;
+  netReceivedAmount?: number | null;
   adjustmentType?: string;
   adjustmentPercent?: number;
   adjustmentAmount?: number;
@@ -81,10 +82,13 @@ export type PaymentBreakdownEntry = {
   /** Cash-specific: the amount the customer wants change for (dinheiro recebido para troco) */
   payWithAmount?: number;
   /** Mercado Pago specific fields */
-  provider?: string;
+  provider?: string | null;
   paymentTypeId?: string | null;
   paymentStatus?: string | null;
   paymentStatusDetail?: string | null;
+  mpPaymentId?: string | null;
+  mpPaymentMethodId?: string | null;
+  paymentKind?: "deposit" | "balance" | "full" | string | null;
   feeDetails?: Array<{ type: string; amount: number; feePayer: string }>;
   installmentAmount?: number;
   cardLastDigits?: string | null;

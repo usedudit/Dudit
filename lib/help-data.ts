@@ -5139,28 +5139,28 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
             {
                 id: "contatos-financeiros",
                 title: "Contatos financeiros",
-                description: "Fornecedores, funcionários e outros contatos: como cadastrar e vincular aos lançamentos.",
+                description: "Serviços, parceiros e outros contatos: como cadastrar e vincular aos lançamentos.",
                 slug: "contatos-financeiros",
                 category: "financeiro",
                 content: `
 ## Visão geral
 
-**Contatos financeiros** são as pessoas e empresas com quem você transaciona: **fornecedores**, **funcionários**, **clientes** e **outros**. Vincular o contato ao lançamento permite saber com quem você pagou ou recebeu.
+**Contatos financeiros** são as pessoas e empresas com quem você transaciona. Clientes, fornecedores e funcionários já têm seus próprios módulos no ERP (respectivamente em **Clientes**, **Fornecedores** e **Funcionários**), então os contatos cadastrrados aqui são destinados a tudo o que **não** é um desses três: prestadores de serviço, terceiros/parceiros e outros. Vincular o contato ao lançamento permite saber com quem você pagou ou recebeu.
 
 ## Tipos de contato
 
-- **Fornecedor** - quem te vende produtos, matéria-prima ou serviços (despesas).
-- **Funcionário** - pagamentos de salários, comissões e adiantamentos.
-- **Cliente** - quem compra de você (receitas).
-- **Outro** - demais pessoas ou empresas (ex: sócio, prestador eventual).
+- **Serviço** - prestadores de serviços e contas fixas/assinaturas (água, luz, internet, streaming, etc.).
+- **Parceiro** - terceiros estratégicos ou pessoa física/jurídica com quem transaciona de forma eventual (ex.: tiozão do zap, sócio, contador).
+- **Outro** - demais pessoas ou empresas que não se encaixam acima.
+
+> Clientes, fornecedores e funcionários são selecionados diretamente da lista do respectivo módulo ao lançar uma receita ou despesa — não precisam ser cadastrados como contato financeiro.
 
 ## Como criar um contato
 
 1. No módulo **Financeiro**, acesse **Cadastros > Contatos**.
 2. Clique em **Novo contato**.
-3. Informe o **nome** e o **tipo** (fornecedor, funcionário, cliente ou outro).
-4. Preencha os demais dados opcionais (documento, telefone, e-mail).
-5. Salve. O contato fica disponível nos lançamentos.
+3. Informe o **nome** e o **tipo** (serviço, parceiro ou outro).
+4. Salve. O contato fica disponível nos lançamentos.
 
 ## Quando utilizar
 
@@ -5170,17 +5170,17 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
 
 ## Dicas importantes
 
-- **Reutilize contatos** - o mesmo fornecedor deve ser usado em todos os lançamentos, assim o relatório fica agrupado.
+- **Reutilize contatos** - o mesmo serviço ou terceiro deve ser usado em todos os lançamentos, assim o relatório fica agrupado.
 - **Vincule sempre que possível** - lançamentos sem contato aparecem como "Sem contato" nos relatórios.
-- **Clientes já cadastrados** - clientes do módulo de Clientes podem aparecer automaticamente aqui nas receitas.
+- **Clientes, fornecedores e funcionários** - clientes do módulo de Clientes, fornecedores e funcionários já aparecem automaticamente disponíveis ao vincular a receita/despesa correspondente.
 
 ## Perguntas frequentes
 
 **Preciso cadastrar contato para lançar?**
 Não é obrigatório, mas recomendado para um relatório completo.
 
-**Contato de fornecedor é o mesmo do módulo Clientes?**
-O módulo Financeiro tem contatos próprios para fornecedores, funcionários e outros. Para receitas, você também pode vincular clientes da sua base.
+**Contato de fornecedor é o mesmo do módulo Fornecedores?**
+O cadastro de contatos financeiros agora trabalha apenas com Serviço, Parceiro e Outro. Fornecedores, clientes e funcionários são gerenciados nos módulos específicos e selecionados diretamente ao lançar receitas/despesas.
 
 **Posso ter contatos que nunca lançam?**
 Sim, cadastre à vontade. Eles só aparecem quando usados.

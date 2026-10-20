@@ -1,3 +1,8 @@
+import {
+  normalizeDepositCheckoutMeta,
+  type DepositCheckoutMetaLike,
+} from "@/lib/payments/payment-ledger"
+
 export type OrderFinancialSnapshot = {
   total_amount?: number | null
   paid_amount?: number | null
@@ -46,7 +51,7 @@ export function resolveSituationFromPaid(paidAmount: number, totalAmount: number
 }
 
 /** Deposit metadata stored in checkout_fulfillment.depositCheckout (no new tables). */
-export type DepositCheckoutMeta = {
+export type DepositCheckoutMeta = DepositCheckoutMetaLike & {
   usesDeposit?: boolean
   payDepositOnly?: boolean
   depositAmount?: number
@@ -56,7 +61,7 @@ export type DepositCheckoutMeta = {
   initialChargeAmount?: number
   remainingAfterDeposit?: number
   remainingBalance?: number
-  depositStatus?: "pending" | "paid" | "partially_paid" | "not_required"
+  depositStatus?: "pending" | "paid" | "partially_paid" | "not_required" | "expired"
   paymentProvider?: string
   mpInitialPayment?: boolean
 }
@@ -66,18 +71,23 @@ export type OrderDepositSummary = {
   depositAmount: number
   depositPercent: number
   depositStatus: "pending" | "partially_paid" | "paid" | "not_required" | "expired"
+  balanceStatus: "pending" | "partially_paid" | "paid" | "not_required"
+  sinalPaid: boolean
   fullOrderTotal: number
   paidAmount: number
   remainingBalance: number
   initialChargeAmount: number
+  balanceAmount: number
   payDepositOnly: boolean
   paymentProvider: string | null
+  depositPaidAt: string | null
+  balancePaidAt: string | null
 }
 
 export const DEPOSIT_STATUS_LABELS: Record<string, string> = {
   pending: "Sinal pendente",
   partially_paid: "Sinal pago - saldo pendente",
-  paid: "Quitado",
+  paid: "Sinal pago - pedido quitado",
   not_required: "Sem sinal",
   expired: "Sinal expirado",
 };
@@ -85,52 +95,56 @@ export const DEPOSIT_STATUS_LABELS: Record<string, string> = {
 /** Returns true when the sinal is still actionable (can generate/pay it). */
 export function canPaySinal(depositSummary: OrderDepositSummary | null): boolean {
   if (!depositSummary?.usesDeposit) return false;
-  return depositSummary.depositStatus === "pending";
+  return !depositSummary.sinalPaid && depositSummary.depositStatus === "pending";
 }
 
 /** Returns true when the sinal row should be displayed (pending or paid). */
 export function shouldShowSinal(depositSummary: OrderDepositSummary | null): boolean {
-  if (!depositSummary?.usesDeposit || depositSummary.depositAmount <= 0.009) return false;
-  const status = depositSummary.depositStatus;
-  return status === "pending" || status === "partially_paid";
+  return Boolean(
+    depositSummary?.usesDeposit && depositSummary.depositAmount > 0.009,
+  );
 }
 
 export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepositSummary {
-  const meta = getDepositCheckoutMeta(order.checkout_fulfillment ?? null)
-  const fullOrderTotal = Number(meta.fullOrderTotal ?? order.total_amount ?? 0)
+  const rawMeta = getDepositCheckoutMeta(order.checkout_fulfillment ?? null)
   const paidAmount = getOrderPaidAmount(order)
-  const remainingBalance = Math.max(0, fullOrderTotal - paidAmount)
+  const isExpired = Boolean(
+    order.payment_expires_at &&
+      new Date(order.payment_expires_at) < new Date() &&
+      paidAmount <= 0.009,
+  )
+  const normalized = normalizeDepositCheckoutMeta(
+    rawMeta,
+    getOrderTotalAmount(order),
+    paidAmount,
+    { expired: isExpired },
+  )
+  const meta = normalized ?? rawMeta
   const usesDeposit = Boolean(meta.usesDeposit || meta.payDepositOnly)
-
-  let depositStatus: OrderDepositSummary["depositStatus"] = "not_required"
-  if (usesDeposit) {
-    const isExpired = order.payment_expires_at && new Date(order.payment_expires_at) < new Date() && paidAmount <= 0.009
-    if (isExpired) {
-      depositStatus = "expired"
-    } else if (meta.depositStatus === "paid" || meta.depositStatus === "partially_paid") {
-      // Sinal was actually paid/confirmed via MP webhook - trust meta.depositStatus
-      if (paidAmount >= fullOrderTotal - 0.005) {
-        depositStatus = "paid"
-      } else {
-        depositStatus = "partially_paid"
-      }
-    } else {
-      // Sinal not confirmed paid via MP yet - regardless of other payments on the order
-      depositStatus = "pending"
-    }
-  }
 
   return {
     usesDeposit,
     depositAmount: Number(meta.depositAmount ?? meta.serviceDepositAmount ?? 0),
     depositPercent: Number(meta.depositPercent ?? 0),
-    depositStatus,
-    fullOrderTotal,
+    depositStatus: usesDeposit
+      ? ((meta.depositStatus as OrderDepositSummary["depositStatus"]) || "pending")
+      : "not_required",
+    balanceStatus: usesDeposit
+      ? ((meta.balanceStatus as OrderDepositSummary["balanceStatus"]) || "not_required")
+      : "not_required",
+    sinalPaid: Boolean(meta.sinalPaid),
+    fullOrderTotal: Number(meta.fullOrderTotal ?? getOrderTotalAmount(order)),
     paidAmount,
-    remainingBalance,
+    remainingBalance: Math.max(
+      0,
+      Number(meta.remainingBalance ?? getOrderRemainingBalance(order)),
+    ),
     initialChargeAmount: Number(meta.initialChargeAmount ?? 0),
+    balanceAmount: Number(meta.balanceAmount ?? 0),
     payDepositOnly: Boolean(meta.payDepositOnly),
-    paymentProvider: meta.paymentProvider ?? null,
+    paymentProvider: (meta.paymentProvider as string | undefined) ?? null,
+    depositPaidAt: (meta.depositPaidAt as string | undefined) ?? null,
+    balancePaidAt: (meta.balancePaidAt as string | undefined) ?? null,
   }
 }
 
@@ -148,39 +162,22 @@ export function patchDepositCheckoutOnPayment(
   checkoutFulfillment: Record<string, unknown> | null | undefined,
   paidAmount: number,
   totalAmount: number,
+  paidAt?: string | null,
 ): Record<string, unknown> | null | undefined {
   if (!checkoutFulfillment) return checkoutFulfillment
   const meta = getDepositCheckoutMeta(checkoutFulfillment)
   if (!meta.usesDeposit && !meta.payDepositOnly) return checkoutFulfillment
 
-  const paid = Math.max(0, Number(paidAmount || 0))
-  const total = Math.max(0, Number(totalAmount || 0))
-  const initialCharge = Number(meta.initialChargeAmount || 0)
-  const remainingBalance = Math.max(0, total - paid)
-
-  let depositStatus: DepositCheckoutMeta["depositStatus"] = "pending"
-  if (initialCharge > 0) {
-    // Sinal is an atomic MP charge - only "paid" when paid covers the initial charge
-    if (paid >= initialCharge - 0.005) {
-      depositStatus = "paid"
-    } else {
-      depositStatus = "pending"
-    }
-  } else {
-    if (paid >= total - 0.005 && total > 0.005) {
-      depositStatus = "paid"
-    } else if (paid > 0.005) {
-      depositStatus = "partially_paid"
-    }
-  }
+  const normalized = normalizeDepositCheckoutMeta(meta, totalAmount, paidAmount, {
+    nowIso: paidAt || new Date().toISOString(),
+  })
+  if (!normalized) return checkoutFulfillment
 
   return {
     ...checkoutFulfillment,
     depositCheckout: {
-      ...meta,
-      remainingBalance,
-      remainingAfterDeposit: remainingBalance,
-      depositStatus,
+      ...normalized,
+      lastPaymentAt: paidAt || new Date().toISOString(),
     },
   }
 }
@@ -191,9 +188,12 @@ export function getExpectedMpChargeAmount(order: OrderFinancialSnapshot): number
   if (paidAmount > 0.009) {
     return getOrderRemainingBalance(order)
   }
-  const meta = getDepositCheckoutMeta(order.checkout_fulfillment ?? null)
-  if (meta.initialChargeAmount != null && Number(meta.initialChargeAmount) > 0.009) {
-    return Number(meta.initialChargeAmount)
+  const depositSummary = getOrderDepositSummary(order)
+  if (
+    depositSummary.usesDeposit &&
+    depositSummary.initialChargeAmount > 0.009
+  ) {
+    return depositSummary.initialChargeAmount
   }
   return getOrderTotalAmount(order)
 }

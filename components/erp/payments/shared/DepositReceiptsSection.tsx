@@ -24,7 +24,7 @@ export function DepositReceiptsSection({ legs, orderNumber, onSyncMp, syncing = 
   return (
     <div className="space-y-3">
       <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-        Recebimentos confirmados{orderNumber ? ` · Sinal - ${orderNumber}` : ""}
+        Recebimentos confirmados{orderNumber ? ` - ${orderNumber}` : ""}
       </h4>
       {receivedLegs.map((entry, index) => {
         const received = Number(entry.amountReceived || 0)

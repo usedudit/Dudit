@@ -6,6 +6,7 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { MERCADOPAGO_PROVIDER } from "@/lib/services/payments/mercadopago-integration"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
+import { hasReceivedAmount } from "@/lib/payments/payment-ledger"
 import { captureError } from "@/lib/monitoring/sentry"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -838,7 +839,9 @@ async function processWebhookWithRetry(
       method: paymentMethodName,
       amount: Number(paymentInfo.transaction_amount || 0),
       effectiveAmount: Number(paymentInfo.transaction_amount || 0),
-      amountReceived: paymentInfo.transaction_details?.net_received_amount ?? Number(paymentInfo.transaction_amount || 0),
+      amountReceived: Number(paymentInfo.transaction_amount || 0),
+      netReceivedAmount: paymentInfo.transaction_details?.net_received_amount ?? Number(paymentInfo.transaction_amount || 0),
+      paymentKind: Number(orderData.paid_amount || 0) > 0.009 ? "balance" : "deposit",
       provider: "Mercado Pago",
       adjustmentType: "none",
       adjustmentPercent: 0,
@@ -874,11 +877,21 @@ async function processWebhookWithRetry(
       }
       return entry
     })
-    const mpLegIndex = oldBreakdown.findIndex(
-      (entry: any) =>
-        String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
-        String(entry?.method || "").toLowerCase().includes("mercado pago"),
-    )
+    const mpLegIndex = (() => {
+      const exactPaymentIndex = oldBreakdown.findIndex(
+        (entry: any) =>
+          entry?.mpPaymentId &&
+          String(entry.mpPaymentId) === String(paymentId),
+      )
+      if (exactPaymentIndex >= 0) return exactPaymentIndex
+
+      return oldBreakdown.findIndex(
+        (entry: any) =>
+          !hasReceivedAmount(entry) &&
+          (String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
+            String(entry?.method || "").toLowerCase().includes("mercado pago")),
+      )
+    })()
     const payment_breakdown =
       mpLegIndex >= 0
         ? oldBreakdown.map((entry: any, i: number) => (i === mpLegIndex ? { ...entry, ...mpLeg } : entry))

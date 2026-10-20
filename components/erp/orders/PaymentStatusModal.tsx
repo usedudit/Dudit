@@ -8,6 +8,7 @@ import {
   Spinner,
   Input,
   Badge,
+  AlertModal,
 } from "@/components/reusable";
 import {
   CheckCircleIcon,
@@ -22,6 +23,11 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/use-toast";
 import { updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders";
+import { getDepositBalanceManualPolicyAction } from "@/app/actions/erp/deposit-balance-policy";
+import {
+  findReceivableLegIndex,
+  normalizeOrderPaymentBreakdown,
+} from "@/lib/payments/payment-ledger";
 import {
   FINANCIAL_FREEZE_INFO_MESSAGE,
   getOrderDepositSummary,
@@ -90,14 +96,13 @@ function normalizeBreakdown(order: any): PaymentBreakdownLeg[] {
     Array.isArray(order.payment_breakdown) &&
     order.payment_breakdown.length > 0
   ) {
-    const paidAmount = Number(order.paid_amount ?? 0);
-    return order.payment_breakdown.map((leg: any) => {
-      const legReceived = Number(leg.amountReceived ?? 0);
-      if (legReceived > paidAmount + 0.01) {
-        return { ...leg, amountReceived: 0 };
-      }
-      return leg;
-    });
+    const normalized = normalizeOrderPaymentBreakdown(
+      order.payment_breakdown,
+      Number(order.paid_amount ?? order.paidAmount ?? 0),
+    );
+    if (normalized.length > 0) {
+      return normalized as PaymentBreakdownLeg[];
+    }
   }
   return [
     {
@@ -157,9 +162,7 @@ const TransactionReceiptContent = ({
                 {formatCurrency(depositSummary.initialChargeAmount)}
                 <span className="text-xs font-normal text-brand-inactive-text ml-1">
                   (
-                  {depositSummary.depositStatus === "partially_paid"
-                    ? "pago"
-                    : "pendente"}
+                  {depositSummary.sinalPaid ? "pago" : "pendente"}
                   )
                 </span>
               </span>
@@ -249,6 +252,14 @@ export default function PaymentStatusModal({
   } | null>(null);
   const [copiedMp, setCopiedMp] = useState(false);
   const [showMpPixModal, setShowMpPixModal] = useState(false);
+  const [manualPolicy, setManualPolicy] = useState<{
+    loaded: boolean;
+    enabled: boolean;
+    canOverride: boolean;
+    role: string | null;
+  }>({ loaded: false, enabled: false, canOverride: false, role: null });
+  const [showOverrideConfirm, setShowOverrideConfirm] = useState(false);
+  const [overrideEnabled, setOverrideEnabled] = useState(false);
   const loading = paymentStatus === "processing";
 
   useEffect(() => {
@@ -264,6 +275,14 @@ export default function PaymentStatusModal({
       setMpPaymentData(null);
       setCopiedMp(false);
       setShowMpPixModal(false);
+      setManualPolicy({
+        loaded: false,
+        enabled: false,
+        canOverride: false,
+        role: null,
+      });
+      setShowOverrideConfirm(false);
+      setOverrideEnabled(false);
       const id = setTimeout(() => setIsAnimating(true), 50);
       return () => clearTimeout(id);
     } else {
@@ -303,6 +322,35 @@ export default function PaymentStatusModal({
       return p.includes("mercado pago") || m.includes("mercado pago");
     }),
   );
+
+  useEffect(() => {
+    if (!isOpen || !depositSummary?.usesDeposit) return;
+    let cancelled = false;
+
+    getDepositBalanceManualPolicyAction(partnerId)
+      .then((result) => {
+        if (cancelled) return;
+        setManualPolicy({
+          loaded: true,
+          enabled: Boolean(result.enabled),
+          canOverride: Boolean(result.canOverride),
+          role: result.role || null,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setManualPolicy({
+          loaded: true,
+          enabled: false,
+          canOverride: false,
+          role: null,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, partnerId, depositSummary?.usesDeposit, targetOrder?.id]);
 
   useEffect(() => {
     if (!isOpen || !targetOrder) return;
@@ -520,13 +568,43 @@ export default function PaymentStatusModal({
 
   const isFullyPaid =
     targetOrder?.situation === "paid" || totalRemaining <= 0.009;
+  const mustPaySinalOnline = Boolean(
+    depositSummary?.usesDeposit && !depositSummary.sinalPaid,
+  );
+  const manualBalanceAllowed =
+    !depositSummary?.usesDeposit ||
+    (depositSummary.sinalPaid &&
+      (manualPolicy.enabled || overrideEnabled));
+  const isManualBalanceOverride = Boolean(
+    depositSummary?.usesDeposit &&
+      depositSummary.sinalPaid &&
+      !manualPolicy.enabled &&
+      overrideEnabled,
+  );
 
   const handleSubmit = async () => {
     const targetOrderId = targetOrder.id || targetOrder.originalId;
     if (isFullyPaid) {
       toast({
         title: "Aviso",
-        description: "Este pedido já está pago.",
+        description: "Este pedido jǭ estǭ pago.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (mustPaySinalOnline) {
+      toast({
+        title: "Sinal online obrigatório",
+        description: "O sinal deve ser pago online pelo checkout.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!manualBalanceAllowed) {
+      toast({
+        title: "Recebimento presencial desativado",
+        description:
+          "Ative a configuração de saldo presencial ou use o override autorizado.",
         variant: "warning",
       });
       return;
@@ -548,24 +626,25 @@ export default function PaymentStatusModal({
           pendingLeg.amountReceived ?? pendingLeg.amount ?? 0,
         );
 
-        for (const leg of updatedBreakdown) {
-          if (
-            leg.method === pendingLeg.method ||
-            (leg.paymentMethodId &&
-              leg.paymentMethodId === pendingLeg.paymentMethodId)
-          ) {
-            const legCapacity = Math.max(
-              0,
-              Number(leg.amount || 0) - Number(leg.amountReceived || 0),
-            );
-            if (legCapacity > 0.009 && legRemaining > 0.009) {
-              const toAdd = Math.min(legCapacity, legRemaining);
-              leg.amountReceived = Number(
-                (Number(leg.amountReceived || 0) + toAdd).toFixed(2),
-              );
-              legRemaining -= toAdd;
-            }
-          }
+        while (legRemaining > 0.009) {
+          const legIndex = findReceivableLegIndex(
+            updatedBreakdown as any,
+            pendingLeg as any,
+          );
+          if (legIndex < 0) break;
+
+          const leg = updatedBreakdown[legIndex];
+          const legCapacity = Math.max(
+            0,
+            Number(leg.amount || 0) - Number(leg.amountReceived || 0),
+          );
+          if (legCapacity <= 0.009) break;
+
+          const toAdd = Math.min(legCapacity, legRemaining);
+          leg.amountReceived = Number(
+            (Number(leg.amountReceived || 0) + toAdd).toFixed(2),
+          );
+          legRemaining = Number((legRemaining - toAdd).toFixed(2));
         }
 
         if (legRemaining > 0.009) {
@@ -643,6 +722,7 @@ export default function PaymentStatusModal({
         statusValue: nextSituation,
         paidAmount: nextPaidAmount,
         paymentBreakdown: finalBreakdown,
+        manualBalanceOverride: isManualBalanceOverride || undefined,
       });
 
       if (res.success) {
@@ -790,9 +870,46 @@ export default function PaymentStatusModal({
                     {wantsChange && payWithAmount !== null && (
                       <InfoCard
                         color="blue"
-                        message={`Necessário ter ${formatCurrency(cashChangeAmount)} de troco para uma transação de ${formatCurrency(payWithAmount)}.`}
+                        message={`Necessǭrio ter ${formatCurrency(cashChangeAmount)} de troco para uma transa��ǜo de ${formatCurrency(payWithAmount)}.`}
                       />
                     )}
+                    {mustPaySinalOnline && (
+                      <InfoCard
+                        color="blue"
+                        title="Sinal online obrigatório"
+                        message="O sinal deve ser pago online pelo checkout via Mercado Pago. O saldo restante só pode ser recebido depois da confirmação do sinal."
+                      />
+                    )}
+                    {depositSummary?.usesDeposit &&
+                      depositSummary.sinalPaid &&
+                      !isFullyPaid &&
+                      manualPolicy.loaded &&
+                      !manualPolicy.enabled && (
+                        <InfoCard
+                          color={overrideEnabled ? "blue" : "orange"}
+                          title={
+                            overrideEnabled
+                              ? "Override autorizado"
+                              : "Pagamento presencial do saldo desativado"
+                          }
+                          message={
+                            overrideEnabled
+                              ? "O recebimento presencial do saldo será registrado com override e ficará registrado no histórico do pedido."
+                              : "Ative “Permitir pagamento presencial do saldo” nas configurações de pagamento ou use um override autorizado para registrar o recebimento no local."
+                          }
+                          rightElement={
+                            manualPolicy.canOverride && !overrideEnabled ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowOverrideConfirm(true)}
+                              >
+                                Autorizar
+                              </Button>
+                            ) : undefined
+                          }
+                        />
+                      )}
                   </div>
 
                   {isMpOrder && !isFullyPaid && canPaySinal(depositSummary) && (
@@ -1068,7 +1185,9 @@ export default function PaymentStatusModal({
                     syncing={syncing}
                   />
 
-                  {!isFullyPaid && totalRemaining > 0.009 ? (
+                  {!isFullyPaid &&
+                  totalRemaining > 0.009 &&
+                  manualBalanceAllowed ? (
                     <BalancePaymentCollector
                       partnerId={partnerId}
                       remainingBalance={totalRemaining}
@@ -1314,11 +1433,25 @@ export default function PaymentStatusModal({
             ""
           }
           amount={mpPaymentData.chargeAmount || totalRemaining}
-          subtitle={`Sinal${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}`}
+          subtitle={`${depositSummary?.sinalPaid ? "Saldo" : "Sinal"}${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}`}
           onVerifyPayment={handleSyncMpPayment}
           isVerifying={syncing}
         />
       )}
+
+      <AlertModal
+        isOpen={showOverrideConfirm}
+        onClose={() => setShowOverrideConfirm(false)}
+        onConfirm={() => {
+          setOverrideEnabled(true);
+          setShowOverrideConfirm(false);
+        }}
+        variant="warning"
+        title="Autorizar recebimento presencial?"
+        message="A configuração de pagamento presencial do saldo está desativada. Ao continuar, o recebimento será registrado com override e ficará no histórico do pedido com o seu usuário."
+        confirmText="Autorizar e continuar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

@@ -818,7 +818,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
-    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
+    const isDepositOrder = Boolean(
+        order?.checkout_fulfillment?.depositCheckout?.payDepositOnly ||
+        order?.checkout_fulfillment?.depositCheckout?.usesDeposit,
+    );
     const depositSummary = isDepositOrder ? getOrderDepositSummary(order) : null;
     const statusConfig = getStatusConfig(order.situation, depositSummary);
     const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
@@ -927,13 +930,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isPixPayment = isExchangeOrder || paymentMethodKey.includes("pix") || paymentMethodKey.includes("bank_transfer");
     const isBoletoPayment = paymentMethodKey.includes("boleto") || paymentMethodKey.includes("bolbradesco") || paymentMethodKey.includes("ticket");
     const hasUnspecifiedMpCharge = paymentMethodKey.includes("mercado pago");
-    const isPaymentExpired = Boolean(order.payment_expires_at && new Date(order.payment_expires_at) < new Date());
+    const isPaymentExpired = Boolean(
+        order.situation !== "partially_paid" &&
+        order.payment_expires_at &&
+        new Date(order.payment_expires_at) < new Date(),
+    );
     const hasMpChargeEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.some((entry: any) => String(entry?.provider || "").toLowerCase().includes("mercado pago"))
         : false;
     const isMpManagedOrder = isMercadoPago || hasMpChargeEntry || order.payment_provider === "Mercado Pago";
     const canRetryPayment =
-        (order.situation === "pending" || order.situation === "payment_failed") &&
+        (order.situation === "pending" || order.situation === "payment_failed" || order.situation === "partially_paid") &&
         isMpManagedOrder &&
         !isPendingExchangeShortfall &&
         !isPaymentExpired &&
@@ -973,6 +980,25 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const renderPaymentExpirationCard = () => {
         if (isPendingExchangeShortfall) return null;
+        if (
+            order.situation === "partially_paid" &&
+            depositSummary?.sinalPaid &&
+            depositSummary.remainingBalance > 0.009 &&
+            canRetryPayment
+        ) {
+            return (
+                <InfoCard
+                    message={`Sinal confirmado. Falta pagar ${formatCurrency(depositSummary.remainingBalance)} do saldo para concluir o pedido.`}
+                    color="orange"
+                    rightElement={
+                        <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                            {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
+                            Pagar saldo
+                        </Button>
+                    }
+                />
+            );
+        }
         if (!order.payment_expires_at) return null;
         if (order.situation !== "pending" && order.situation !== "payment_failed") return null;
         if (!isMpManagedOrder) return null;
@@ -1991,7 +2017,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     }
                                                     description={
                                                         <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                            {depositSummary!.depositStatus === "partially_paid" ? "pago" : "pendente"}
+                                                            {depositSummary!.sinalPaid ? "pago" : "pendente"}
                                                         </span>
                                                     }
                                                     className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
@@ -2002,6 +2028,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     }
                                                 />
                                             )}
+                                            {shouldShowSinal(depositSummary) &&
+                                                depositSummary!.sinalPaid && (
+                                                    <ListItem
+                                                        icon={PaymentIconEl}
+                                                        title={
+                                                            <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                                {`Saldo - ${formatCurrency(depositSummary!.remainingBalance)}`}
+                                                            </span>
+                                                        }
+                                                        description={
+                                                            <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
+                                                                {depositSummary!.remainingBalance <= 0.009 ? "pago" : "pendente"}
+                                                            </span>
+                                                        }
+                                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                        right={
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(depositSummary!.remainingBalance)}
+                                                            </span>
+                                                        }
+                                                    />
+                                                )}
                                             {!isDepositOrder && (
                                                 <ListItem
                                                     icon={PaymentIconEl}
