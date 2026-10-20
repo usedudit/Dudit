@@ -504,12 +504,17 @@ export async function createTransactionFromOrder(
             mercadoPagoAccountPromise,
             defaultSalesAccountPromise,
         ])
-        const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
-
+        const defaultAccountId = explicitAccountId || defaultSalesAccountId
+        const mpWalletAccountId = mercadoPagoAccountId || explicitAccountId || defaultSalesAccountId
         const paymentRowId = await resolveOrCreatePaymentRow(supabase, orderData, entries)
 
         for (const [index, entry] of entries.entries()) {
             if (!(entry.gross > 0.009)) continue
+
+            // Mercado Pago recebimentos devem sempre ir para a conta gateway de
+            // integração MP, independentemente de finance_account_id bancário/cash
+            // que eventualmente foi atrelado ao pedido no checkout.
+            const accountId = entry.isMercadoPago ? mpWalletAccountId : defaultAccountId
 
             const baseRef = orderData.reference_note || `sale-tx:${orderData.order_number}:${index}`
             const recognitionRef = `${baseRef}:recognition`

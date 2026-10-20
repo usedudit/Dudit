@@ -1456,6 +1456,22 @@ export async function createFinancialTransactionsForReceivedAmount(
             ? "Mercado Pago"
             : null);
 
+        // Recebimentos via Mercado Pago devem ir para a conta gateway MP,
+        // mesmo quando o pedido tinha finance_account_id bancário/cash.
+        const isMpProvider = String(provider || "")
+          .toLowerCase()
+          .includes("mercado pago");
+        if (!legAccountId && isMpProvider) {
+          const { resolveMarketplaceOrderFinanceAccountId } = await import(
+            "@/app/actions/erp/finance-accounts"
+          );
+          legAccountId = await resolveMarketplaceOrderFinanceAccountId(
+            supabase,
+            params.partnerId,
+            true,
+          );
+        }
+
         await createTransactionFromOrder(supabase, {
           order_number: params.orderNumber,
           partner_id: params.partnerId,
@@ -5693,6 +5709,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 method: order.payment_method || "Dinheiro",
                 amount: order.total_amount,
                 amountReceived: order.total_amount,
+                provider: order.payment_provider || null,
               },
             ]
             : [
@@ -5700,6 +5717,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 method: order.payment_method || "Dinheiro",
                 amount: order.total_amount,
                 amountReceived: paymentState.paidAmount,
+                provider: order.payment_provider || null,
               },
             ]);
         await createFinancialTransactionsForReceivedAmount(supabase, {

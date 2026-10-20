@@ -1477,7 +1477,7 @@ export function ExplorarPageClient({
             : null
 
         const imageUrl = isStore
-            ? (sellerLogoUrl || partner?.banner_url || "https://img.dudit.com.br/static/Placeholder.png")
+            ? (sellerLogoUrl || "https://img.dudit.com.br/static/Placeholder.png")
             : getPrimaryProductDisplayImage(item)
 
         return (
@@ -1487,8 +1487,15 @@ export function ExplorarPageClient({
                 prefetch={false}
                 className="group grid grid-cols-[100px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
             >
-                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
-                    <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
+                    {isStore && !sellerLogoUrl ? (
+                        <UserProfileImage
+                            fullName={sellerName}
+                            className="w-16 h-16"
+                        />
+                    ) : (
+                        <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                    )}
                 </div>
                 <div className="min-w-0 py-1">
                     {isStore ? (

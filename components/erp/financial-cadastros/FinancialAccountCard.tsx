@@ -115,24 +115,26 @@ const FinancialAccountCard = React.memo(
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo atual</span>
-                        <span className={`text-[14px] font-bold ${current === null
-                            ? "text-brand-dark dark:text-dark-heading"
-                            : current > 0
-                                ? "text-brand-green"
-                                : current < 0
-                                    ? "text-brand-red"
-                                    : "text-brand-dark dark:text-dark-heading"
-                            }`}>
-                            {current === null ? "-" : formatCurrency(current)}
-                        </span>
-                    </div>
+                    <div className="flex justify-between items-end gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo atual</span>
+                            <span className={`text-[14px] font-bold ${current === null
+                                ? "text-brand-dark dark:text-dark-heading"
+                                : current > 0
+                                    ? "text-brand-green"
+                                    : current < 0
+                                        ? "text-brand-red"
+                                        : "text-brand-dark dark:text-dark-heading"
+                                }`}>
+                                {current === null ? "-" : formatCurrency(current)}
+                            </span>
+                        </div>
 
-                    <div className="shrink-0 self-end" onClick={(e) => e.stopPropagation()}>
-                        <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
-                            <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
-                        </ActionsDropdown>
+                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
+                                <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
+                            </ActionsDropdown>
+                        </div>
                     </div>
                 </div>
             </motion.div>

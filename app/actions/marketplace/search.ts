@@ -1013,7 +1013,7 @@ async function searchMarketplaceByCity(
     let partnerDetailsQuery = supabase
         .from("stores")
         .select(`
-            id, partner_id, name, slug, description, logo_url, banner_url,
+            id, short_id, partner_id, name, slug, description, logo_url, banner_url,
             rating, created_at,
             addresses!store_id!inner(city, state, neighborhood, latitude, longitude),
             partners!inner(
