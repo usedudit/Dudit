@@ -273,7 +273,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                 <img
                                                     src={getR2ImageUrl(item.image, "thumbnail")}
-                                                    className="w-full h-full object-cover rounded-xl"
+                                                    className="w-full h-full object-cover rounded-full"
                                                     alt={item.name}
                                                     onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
                                             </div>
@@ -1066,7 +1066,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                         <img
                                             src={getR2ImageUrl(item.image, "thumbnail")}
-                                            className="w-full h-full object-cover rounded-xl"
+                                            className="w-full h-full object-cover rounded-full"
                                             alt={item.name}
                                             onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
                                     </div>

@@ -26,6 +26,8 @@ interface PreferenceRequest {
     quantity: number
     variant_id?: string
     service_id?: string
+    itemType?: string | null
+    fulfillmentMode?: string | null
   }>
   products?: Array<{
     id: string
@@ -34,6 +36,8 @@ interface PreferenceRequest {
     quantity: number
     variant_id?: string
     service_id?: string
+    itemType?: string | null
+    fulfillmentMode?: string | null
   }>
   partnerId?: string
   storeId?: string
@@ -58,6 +62,7 @@ interface PreferenceRequest {
     finalTotal: number
     carrierServiceId?: number | null
     destinationPostalCode?: string | null
+    destinationCoords?: { lat: number; lng: number } | null
   }
 }
 
@@ -86,6 +91,11 @@ async function handler(request: NextRequest) {
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Nenhum produto fornecido" }, { status: 400 })
     }
+
+    const isServiceItem = (item: { service_id?: string; itemType?: string | null }) =>
+      Boolean(item.service_id) || item.itemType === "service" || item.itemType === "service_booking"
+    const resolveServiceId = (item: { id: string; service_id?: string; itemType?: string | null }) =>
+      item.service_id || (isServiceItem(item) ? item.id : null)
 
     const rawExistingOrderId = body.existingOrderId || body.orderId
     const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
@@ -134,9 +144,9 @@ async function handler(request: NextRequest) {
       hasOnlyServiceLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "service_booking")
       hasOnlySubscriptionLines = resolved.lines.length > 0 && resolved.lines.every((l) => l.itemType === "subscription")
     } else {
-      const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
-      const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
-      const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
+      const productIds = items.filter(i => !isServiceItem(i) && !i.variant_id).map(i => i.id).filter(Boolean)
+      const serviceIds = items.map(i => resolveServiceId(i)).filter(Boolean) as string[]
+      const variantIds = items.filter(i => !isServiceItem(i)).map(i => i.variant_id || i.id).filter(Boolean) as string[]
       const [productsRes, variantsRes, servicesRes] = await Promise.all([
         adminClient.from("products").select("id, partner_id").in("id", productIds),
         adminClient.from("product_variants").select("id, products!inner(partner_id)").in("id", variantIds),
@@ -146,8 +156,12 @@ async function handler(request: NextRequest) {
       const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
       const servicesMap = new Map<string, any>(servicesRes.data?.map((s: any) => [s.id, s]))
       const resolvedPartnerIds = items.map(item => {
+        if (isServiceItem(item)) {
+          const serviceId = resolveServiceId(item)
+          return serviceId ? servicesMap.get(serviceId)?.partner_id : undefined
+        }
         const variant = item.variant_id ? variantsMap.get(item.variant_id) : variantsMap.get(item.id)
-        return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id || (item.service_id ? servicesMap.get(item.service_id)?.partner_id : undefined)
+        return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id
       })
 
       const uniquePartners = new Set(resolvedPartnerIds.filter(Boolean))
@@ -324,9 +338,9 @@ async function handler(request: NextRequest) {
           : 0
       }
     } else {
-      const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
-      const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
-      const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
+      const productIds = items.filter(i => !isServiceItem(i) && !i.variant_id).map(i => i.id).filter(Boolean)
+      const serviceIds = items.map(i => resolveServiceId(i)).filter(Boolean) as string[]
+      const variantIds = items.filter(i => !isServiceItem(i)).map(i => i.variant_id || i.id).filter(Boolean) as string[]
 
       const [productsRes, variantsRes, servicesRes] = await Promise.all([
         adminClient
@@ -359,7 +373,8 @@ async function handler(request: NextRequest) {
         let resolvedName: string
 
         const variant = item.variant_id ? variantsMap.get(item.variant_id) : (variantsMap.get(item.id) || null)
-        const service = item.service_id ? servicesMap.get(item.service_id) : null
+        const serviceId = resolveServiceId(item)
+        const service = serviceId ? servicesMap.get(serviceId) : null
 
         if (service) {
           const basePrice = Number(service.price)
@@ -418,7 +433,10 @@ async function handler(request: NextRequest) {
         })
       }
 
-      couponItems = items.map(i => ({ productId: i.id }))
+      couponItems = items.map(i => {
+        const serviceId = resolveServiceId(i)
+        return serviceId ? { productId: null, serviceId } : { productId: i.id, serviceId: null }
+      })
     }
 
     // ── Central pricing engine (única fonte de verdade) ──────────────────────

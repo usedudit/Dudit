@@ -1378,7 +1378,7 @@ export default function OrderDetailView({
                                           null,
                                           "thumbnail",
                                         )}
-                                        className="w-full h-full object-cover rounded-xl"
+                                        className="w-full h-full object-cover rounded-full"
                                         alt={item.product_name}
                                         onError={(e: any) => {
                                           e.target.src =
@@ -2550,7 +2550,7 @@ export default function OrderDetailView({
                                         null,
                                         "thumbnail",
                                       )}
-                                      className="w-full h-full object-cover rounded-xl"
+                                      className="w-full h-full object-cover rounded-full"
                                       alt={item.product_name}
                                       onError={(e: any) => {
                                         e.target.src =

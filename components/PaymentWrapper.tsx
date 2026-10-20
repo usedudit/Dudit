@@ -373,6 +373,7 @@ export function PaymentWrapper({
                     body: {
                         products: orderDetails.items.map(p => ({
                             id: p.id, name: p.name, price: p.price, quantity: p.quantity, variant_id: p.variant_id, service_id: (p as any).service_id,
+                            itemType: p.itemType || null, fulfillmentMode: p.fulfillmentMode || null,
                         })),
                         partnerId,
                         buyerId,

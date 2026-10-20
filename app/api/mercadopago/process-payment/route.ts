@@ -37,7 +37,7 @@ const isDev = process.env.NODE_ENV === "development"
 
 interface ProcessPaymentRequest {
   paymentFormData: any
-  items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string; service_id?: string }>
+  items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string; service_id?: string; itemType?: string | null; fulfillmentMode?: string | null }>
   partnerId: string
   buyerId: string
   storeId?: string
@@ -64,6 +64,11 @@ interface ProcessPaymentRequest {
   existingOrderId?: string
   deviceId?: string | null
 }
+
+const isServiceItem = (item: { service_id?: string; itemType?: string | null }) =>
+  Boolean(item.service_id) || item.itemType === "service" || item.itemType === "service_booking"
+const resolveServiceId = (item: { id: string; service_id?: string; itemType?: string | null }) =>
+  item.service_id || (isServiceItem(item) ? item.id : null)
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
 const moneyOrZero = (value: unknown) => {
@@ -358,7 +363,10 @@ async function handler(request: NextRequest) {
     let paymentMethodDiscountAmount = 0
     let paymentMethodExtraAmount = 0
     const validatedItems: Array<{
-      product_id: string
+      product_id: string | null
+      service_id?: string | null
+      line_type?: string | null
+      fulfillment_mode?: string | null
       variant_id: string | null
       product_name: string
       product_price: number
@@ -558,6 +566,9 @@ async function handler(request: NextRequest) {
         if (!row.product_id) continue
         validatedItems.push({
           product_id: row.product_id as string,
+          service_id: (row.service_id as string) || null,
+          line_type: (row.line_type as string) || null,
+          fulfillment_mode: (row.fulfillment_mode as string) || null,
           variant_id: (row.variant_id as string) || null,
           product_name: String(row.product_name || "Item"),
           product_price: Number(row.product_price || 0),
@@ -580,15 +591,42 @@ async function handler(request: NextRequest) {
       }
 
       // Primeiro tentar buscar como variante se houver ID de variante
-      let resolvedProductId = item.id
+      let resolvedProductId: string | null = item.id
+      let resolvedServiceId: string | null = null
+      let resolvedLineType: string | null = null
+      const resolvedFulfillmentMode = item.fulfillmentMode || null
       let resolvedPrice: number
       let resolvedStock: number
       let resolvedPartnerId: string
+      let resolvedName: string = item.name
       let resolvedVariantId: string | null = null
 
       let allowSellWithoutStock = false
 
-      if (item.variant_id) {
+      if (isServiceItem(item)) {
+        const serviceId = resolveServiceId(item)
+        const { data: service } = await adminClient
+          .from("services")
+          .select("id, price, promotional_price, partner_id, name")
+          .eq("id", serviceId as string)
+          .single()
+
+        if (!service) {
+          SecureLogger.warn("Service not found during payment", { serviceId })
+          return NextResponse.json({ error: `Serviço ${serviceId} não encontrado` }, { status: 400 })
+        }
+
+        const basePrice = Number(service.price)
+        const promoPrice = service.promotional_price ? Number(service.promotional_price) : 0
+        resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+        resolvedStock = Number.MAX_SAFE_INTEGER
+        resolvedPartnerId = service.partner_id
+        resolvedName = service.name
+        resolvedProductId = null
+        resolvedServiceId = service.id
+        resolvedLineType = "service_booking"
+        allowSellWithoutStock = true
+      } else if (item.variant_id) {
         if (isDev) console.log("Validating variant with ID:", item.variant_id)
         const { data: variant } = await adminClient
           .from("product_variants")
@@ -652,8 +690,11 @@ async function handler(request: NextRequest) {
 
       validatedItems.push({
         product_id: resolvedProductId,
+        service_id: resolvedServiceId,
+        line_type: resolvedLineType,
+        fulfillment_mode: resolvedFulfillmentMode,
         variant_id: resolvedVariantId,
-        product_name: item.name,
+        product_name: resolvedName || item.name,
         product_price: resolvedPrice,
         quantity: item.quantity,
       })
@@ -664,9 +705,9 @@ async function handler(request: NextRequest) {
     if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
     if (!existingOrder && !useUnifiedCart) {
-      const productIds = items.filter(item => !item.variant_id && !item.service_id).map(item => item.id).filter(Boolean)
-      const serviceIds = items.map(item => item.service_id).filter(Boolean) as string[]
-      const variantIds = items.map(item => item.variant_id || item.id).filter(Boolean) as string[]
+      const productIds = items.filter(item => !isServiceItem(item) && !item.variant_id).map(item => item.id).filter(Boolean)
+      const serviceIds = items.map(item => resolveServiceId(item)).filter(Boolean) as string[]
+      const variantIds = items.filter(item => !isServiceItem(item)).map(item => item.variant_id || item.id).filter(Boolean) as string[]
       const hasProducts = productIds.length > 0 || variantIds.length > 0
       const hasOnlyServices = serviceIds.length > 0 && !hasProducts
 
@@ -713,6 +754,7 @@ async function handler(request: NextRequest) {
       // ── Build pricing items from validated items ──────────────────────────
       const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = validatedItems.map((v) => ({
         productId: v.product_id,
+        serviceId: v.service_id ?? null,
         unitPrice: v.product_price,
         quantity: v.quantity,
       }))
@@ -726,7 +768,7 @@ async function handler(request: NextRequest) {
           customerId: buyerId,
           subtotal: totalAmount,
           shippingCost: deliveryFee,
-          items: validatedItems.map(i => ({ productId: i.product_id })),
+          items: validatedItems.map(i => ({ productId: i.product_id, serviceId: i.service_id ?? null })),
         }, adminClient)
 
         if (couponResult.valid) {
@@ -786,18 +828,23 @@ async function handler(request: NextRequest) {
 
       orderItemsForInsert = validatedItems.map((item) => ({
         product_id: item.product_id,
+        service_id: item.service_id ?? null,
+        line_type: item.line_type ?? null,
+        fulfillment_mode: item.fulfillment_mode ?? null,
         variant_id: item.variant_id,
         product_name: item.product_name,
         product_price: item.product_price,
         quantity: item.quantity,
         subtotal: item.product_price * item.quantity,
       }))
-      reserveItems = validatedItems.map((item) => ({
-        product_id: item.product_id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-      }))
-      productIdsForCache = [...new Set(validatedItems.map((i) => i.product_id))]
+      reserveItems = validatedItems
+        .filter((item) => Boolean(item.product_id))
+        .map((item) => ({
+          product_id: item.product_id as string,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+        }))
+      productIdsForCache = [...new Set(validatedItems.map((i) => i.product_id).filter((id): id is string => Boolean(id)))]
     }
 
     // SEGURANÇA: Validar que o total do servidor coincide com o snapshot do frontend
@@ -1015,7 +1062,7 @@ async function handler(request: NextRequest) {
       ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData.payment_method_id}_${isRetry ? Date.now() : Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
       : useUnifiedCart
         ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
-        : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
+        : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: (i.product_id || i.service_id) as string, quantity: i.quantity })))
 
     // Processar requisição via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
     const paymentResult = await createMercadoPagoPayment({

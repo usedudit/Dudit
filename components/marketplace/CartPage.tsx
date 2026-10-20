@@ -22,7 +22,7 @@ import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
-import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { quoteDeliveryFeeAction, checkServiceAttendanceAction } from "@/app/actions/shared/delivery"
 import { quoteCarrierFreightAction, type CarrierFreightOption } from "@/app/actions/marketplace/carrier-shipping"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
@@ -89,6 +89,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     })
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null; isOutsideRadius?: boolean }>>({})
+    // Deslocamento para serviços prestados no endereço do cliente.
+    const [serviceTravelQuotes, setServiceTravelQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; loading: boolean; error: string | null; outOfRadius: boolean }>>({})
+    const serviceTravelSeqRef = useRef<Record<string, number>>({})
     // Carrier freight (SuperFrete) - fallback when own delivery radius has no coverage
     const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
     const deliveryQuoteSeqRef = useRef<Record<string, number>>({})
@@ -215,6 +218,42 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     const hasOnlyServices = (items: any[]) => {
         const selected = (items || []).filter((item: any) => getItemSelected(item))
         return selected.length > 0 && selected.every((item: any) => item.item_type === "service_booking")
+    }
+
+    const getCustomerLocationService = (items: any[]) => {
+        return (items || []).find((item: any) => {
+            if (!getItemSelected(item) || item.item_type !== "service_booking") return false
+            if (item.fulfillment_mode) return item.fulfillment_mode === "customer_location"
+            const modes = Array.isArray(item.services?.fulfillment_modes) ? item.services.fulfillment_modes : []
+            if (modes.length === 0) return false
+            return !modes.includes("on_site") && modes.includes("customer_location")
+        })
+    }
+
+    const getServiceTravelFee = (storeKey?: string) => {
+        if (!storeKey) return 0
+        const quote = serviceTravelQuotes[storeKey]
+        if (!quote || quote.loading || quote.outOfRadius || quote.error) return 0
+        return Number(quote.fee || 0)
+    }
+
+    const getServiceTravelLabel = (storeKey: string) => {
+        const quote = serviceTravelQuotes[storeKey]
+        if (!quote) {
+            return selectedAddress
+                ? <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
+                : <span className="text-xs text-brand-inactive-text dark:text-dark-body">A combinar</span>
+        }
+        if (quote.loading) {
+            return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
+        }
+        if (quote.outOfRadius || quote.error) {
+            return <span className="text-xs text-brand-inactive-text dark:text-dark-body">A combinar</span>
+        }
+        if (quote.fee > 0) {
+            return <span className="text-brand-green font-semibold">{formatCurrency(quote.fee)}</span>
+        }
+        return <span className="text-brand-green font-semibold">Grátis</span>
     }
 
     const renderPromoBanners = (storeKey: string, partnerItemsTotal: number) => {
@@ -774,17 +813,18 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     // Trigger quote delivery per partner whenever items selection, totals or address change
     useEffect(() => {
-        if (!selectedAddress) return
+        if (!selectedAddress) {
+            setServiceTravelQuotes((prev) => (Object.keys(prev).length > 0 ? {} : prev))
+            return
+        }
         const addressStr = `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.complement ? `, ${selectedAddress.complement}` : ""} - ${selectedAddress.neighborhood}, ${selectedAddress.city} - ${selectedAddress.state}, ${selectedAddress.zip_code}`
 
         const timer = setTimeout(() => {
             Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
                 const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
                 const isServicesOnly = hasOnlyServices(data.items || [])
-                if (isServicesOnly || partnerItemsTotal <= 0) {
-                    // Só serviços (ou nada selecionado): não cota frete próprio nem transportadora.
-                    // Limpa estado antigo - senão um erro "raio" de quando havia produtos
-                    // selecionados permaneceria e dispararia a cotação de transportadora.
+                if (isServicesOnly) {
+                    // Só serviços: não cota frete próprio nem transportadora.
                     deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
                     delete carrierFetchedKeysRef.current[storeKey]
                     setDeliveryQuotes(prev => {
@@ -794,6 +834,88 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                         return next
                     })
                     setCarrierQuotes(prev => {
+                        if (!(storeKey in prev)) return prev
+                        const next = { ...prev }
+                        delete next[storeKey]
+                        return next
+                    })
+
+                    const travelItem = partnerItemsTotal > 0 ? getCustomerLocationService(data.items) : null
+                    if (!travelItem) {
+                        setServiceTravelQuotes(prev => {
+                            if (!(storeKey in prev)) return prev
+                            const next = { ...prev }
+                            delete next[storeKey]
+                            return next
+                        })
+                        return
+                    }
+
+                    const targetPartnerId = data.partnerId || data.partner?.id || storeKey
+                    const targetStoreId = travelItem.store_id || data.storeId || data.store?.id || null
+                    serviceTravelSeqRef.current[storeKey] = (serviceTravelSeqRef.current[storeKey] || 0) + 1
+                    const travelSeq = serviceTravelSeqRef.current[storeKey]
+
+                    setServiceTravelQuotes(prev => ({
+                        ...prev,
+                        [storeKey]: { fee: 0, distanceKm: null, loading: true, error: null, outOfRadius: false },
+                    }))
+
+                    const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
+                        ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                        : null
+
+                    checkServiceAttendanceAction({
+                        partnerId: targetPartnerId,
+                        storeId: targetStoreId,
+                        serviceId: travelItem.service_id || null,
+                        deliveryAddress: addressStr,
+                        destinationCoords,
+                    }).then(res => {
+                        if (serviceTravelSeqRef.current[storeKey] !== travelSeq) return
+                        if (res.success) {
+                            setServiceTravelQuotes(prev => ({
+                                ...prev,
+                                [storeKey]: {
+                                    fee: res.outOfRadius ? 0 : Number(res.fee || 0),
+                                    distanceKm: res.distanceKm,
+                                    loading: false,
+                                    error: null,
+                                    outOfRadius: res.outOfRadius,
+                                },
+                            }))
+                        } else {
+                            setServiceTravelQuotes(prev => ({
+                                ...prev,
+                                [storeKey]: { fee: 0, distanceKm: null, loading: false, error: res.error || "A combinar", outOfRadius: true },
+                            }))
+                        }
+                    }).catch(() => {
+                        if (serviceTravelSeqRef.current[storeKey] !== travelSeq) return
+                        setServiceTravelQuotes(prev => ({
+                            ...prev,
+                            [storeKey]: { fee: 0, distanceKm: null, loading: false, error: "A combinar", outOfRadius: true },
+                        }))
+                    })
+                    return
+                }
+
+                if (partnerItemsTotal <= 0) {
+                    deliveryQuoteSeqRef.current[storeKey] = (deliveryQuoteSeqRef.current[storeKey] || 0) + 1
+                    delete carrierFetchedKeysRef.current[storeKey]
+                    setDeliveryQuotes(prev => {
+                        if (!(storeKey in prev)) return prev
+                        const next = { ...prev }
+                        delete next[storeKey]
+                        return next
+                    })
+                    setCarrierQuotes(prev => {
+                        if (!(storeKey in prev)) return prev
+                        const next = { ...prev }
+                        delete next[storeKey]
+                        return next
+                    })
+                    setServiceTravelQuotes(prev => {
                         if (!(storeKey in prev)) return prev
                         const next = { ...prev }
                         delete next[storeKey]
@@ -1026,7 +1148,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     }
 
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
-        if (hasOnlyServices(partnerData?.items || [])) return 0
+        if (hasOnlyServices(partnerData?.items || [])) {
+            return getCustomerLocationService(partnerData?.items || []) ? getServiceTravelFee(storeKey) : 0
+        }
         const settings = partnerData?.deliverySettings
         // Frete grátis por valor mínimo vale para a entrega própria E para a
         // transportadora: o vendedor absorve o custo no mesmo limite.
@@ -1084,7 +1208,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             }))
 
     const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
-        if (hasOnlyServices(partnerData?.items || [])) return null
+        if (hasOnlyServices(partnerData?.items || [])) {
+            if (!storeKey || !getCustomerLocationService(partnerData?.items || [])) return null
+            return getServiceTravelLabel(storeKey)
+        }
         const quote = storeKey ? deliveryQuotes[storeKey] : null
         if (quote?.loading) {
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
@@ -1753,7 +1880,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     </div>
                                                                     {getDeliveryLabel(data, partnerItemsTotal, storeKey) !== null && (
                                                                         <div className="flex justify-between items-center text-sm">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">{hasOnlyServices(data.items) ? "Deslocamento" : "Entrega"}</span>
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
@@ -1805,7 +1932,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     </div>
                                                                     {getDeliveryLabel(data, partnerItemsTotal, storeKey) !== null && (
                                                                         <div className="flex justify-between items-center text-sm font-medium">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">{hasOnlyServices(data.items) ? "Deslocamento" : "Entrega"}</span>
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}

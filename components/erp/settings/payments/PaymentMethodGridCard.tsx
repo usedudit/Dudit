@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox, Tooltip } from "@/components/reusable"
-import { CreditCardIcon, MoneyIcon, QRCodeIcon } from "@/lib/icons"
+import { CreditCardIcon, MoneyIcon, QRCodeIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { PaymentMethodListItem, getPaymentTypeLabel } from "./PaymentMethodListRow"
 
@@ -69,9 +69,7 @@ const PaymentMethodGridCard = React.memo(
                                 </Tooltip>
                                 {method.is_online_default && (
                                     <Tooltip text="Método padrão para checkout online">
-                                        <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5 scale-90 shrink-0">
-                                            Padrão
-                                        </Badge>
+                                        <Badge variant="blue" icon={<StarIcon />} className="whitespace-nowrap scale-90 shrink-0" />
                                     </Tooltip>
                                 )}
                             </div>

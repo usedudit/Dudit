@@ -294,7 +294,7 @@ export function PaymentsPage({
 
                                 <TabsContent value="configuracoes" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
                                             {isWhatsAppFlow && (
                                                 <InfoCard
                                                     color="orange"

@@ -420,6 +420,12 @@ export function CheckoutPageClient() {
                     })
                     return updated
                 })
+                setDeliveryError((prev) => {
+                    if (!prev) return prev
+                    const normalized = prev.toLowerCase()
+                    if (normalized.includes("atendimento") || normalized.includes("raio")) return null
+                    return prev
+                })
             } else {
                 notifyError("Erro", result.error || "Não foi possível salvar as formas de atendimento.")
             }
@@ -462,7 +468,7 @@ export function CheckoutPageClient() {
         ? `${selectedAddress.id}:${selectedAddress.latitude ?? ""}:${selectedAddress.longitude ?? ""}:${selectedAddress.zip_code ?? ""}`
         : ""
     const checkoutContextKey = checkoutContext
-        ? `${checkoutContext.store?.id || ""}:${checkoutContext.partner?.id || ""}:${checkoutContext.deposit?.percent ?? ""}:${checkoutContext.deposit?.available ? 1 : 0}:${checkoutContext.lines?.length ?? 0}`
+        ? `${checkoutContext.store?.id || ""}:${checkoutContext.partner?.id || ""}:${checkoutContext.deposit?.percent ?? ""}:${checkoutContext.deposit?.available ? 1 : 0}:${(checkoutContext.lines || []).map((line) => `${line.lineId}:${line.fulfillmentMode || ""}`).join("|")}`
         : ""
     const [showAddressForm, setShowAddressForm] = useState(false)
     const [addressFormError, setAddressFormError] = useState<string | null>(null)
@@ -1586,6 +1592,7 @@ export function CheckoutPageClient() {
                     depositAvailable,
                     selectedCarrierServiceId || null,
                     destinationCep || null,
+                    checkoutContextKey,
                 ])
                 const cachedAmounts = checkoutAmountsCache.get(amountsCacheKey)
                 if (cachedAmounts) {
@@ -1613,6 +1620,7 @@ export function CheckoutPageClient() {
                         depositAvailable,
                         carrierServiceId: selectedCarrierServiceId || undefined,
                         destinationPostalCode: destinationCep || undefined,
+                        cacheVariant: checkoutContextKey,
                     })
                     if (!active) return
                     if (result.success) {
@@ -2943,10 +2951,13 @@ export function CheckoutPageClient() {
                         }
                     })
                 }
+                const isServiceSession = sessionData?.itemType === "service" || sessionData?.source === "service"
                 return products.map((p) => {
                     const matchedLine = checkoutContext?.lines?.find(
                         (l) => l.lineId === p.id || (p as any).cartItemId === l.lineId,
                     )
+                    const resolvedServiceId = matchedLine?.serviceId
+                        || (isServiceSession ? ((p as any).serviceId || p.id) : undefined)
                     return {
                         id: p.id,
                         name: p.name,
@@ -2955,16 +2966,16 @@ export function CheckoutPageClient() {
                         image: p.image || matchedLine?.imageUrl || "",
                         variant_id: p.variant || matchedLine?.variantId || "",
                         variant_name: matchedLine?.variantName || undefined,
-                        service_id: matchedLine?.serviceId || undefined,
+                        service_id: resolvedServiceId,
                         unit: p.unit || (matchedLine as any)?.unit || null,
-                        itemType: matchedLine?.lineKind || sessionData?.itemType || "product",
+                        itemType: matchedLine?.lineKind || (isServiceSession ? "service_booking" : "product"),
                         bookingDate: matchedLine?.bookingMetadata?.date || null,
                         bookingTime: matchedLine?.bookingMetadata?.time || null,
                         staffName: matchedLine?.bookingMetadata?.staffName || null,
                         bookingSummary: matchedLine?.bookingSummary || null,
                         fulfillmentMode:
                             matchedLine?.fulfillmentMode ||
-                            (formData.deliveryType === "delivery" ? "delivery" : "pickup"),
+                            (isServiceSession ? "on_site" : (formData.deliveryType === "delivery" ? "delivery" : "pickup")),
                     }
                 })
             }

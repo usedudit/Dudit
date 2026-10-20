@@ -99,15 +99,15 @@ const FinancialAccountCard = React.memo(
                     </div>
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex gap-3 items-end justify-between">
-                    <div className="flex gap-6 items-end">
+                <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                    <div className="grid gap-4 grid-cols-2">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Criado em</span>
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
                                 {new Date(item.created_at).toLocaleDateString()}
                             </span>
                         </div>
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 items-end min-w-0">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo inicial</span>
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
                                 {formatCurrency(initial)}
@@ -115,27 +115,24 @@ const FinancialAccountCard = React.memo(
                         </div>
                     </div>
 
-                    <div className="flex items-end gap-3">
-                        <div className="flex flex-col gap-0.5 text-right">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo atual</span>
-                            <span className={`text-[13px] font-bold ${
-                                current === null
-                                    ? "text-brand-dark dark:text-dark-heading"
-                                    : current > 0
-                                    ? "text-brand-green"
-                                    : current < 0
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo atual</span>
+                        <span className={`text-[14px] font-bold ${current === null
+                            ? "text-brand-dark dark:text-dark-heading"
+                            : current > 0
+                                ? "text-brand-green"
+                                : current < 0
                                     ? "text-brand-red"
                                     : "text-brand-dark dark:text-dark-heading"
                             }`}>
-                                {current === null ? "-" : formatCurrency(current)}
-                            </span>
-                        </div>
+                            {current === null ? "-" : formatCurrency(current)}
+                        </span>
+                    </div>
 
-                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
-                                <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
-                            </ActionsDropdown>
-                        </div>
+                    <div className="shrink-0 self-end" onClick={(e) => e.stopPropagation()}>
+                        <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
+                            <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
+                        </ActionsDropdown>
                     </div>
                 </div>
             </motion.div>

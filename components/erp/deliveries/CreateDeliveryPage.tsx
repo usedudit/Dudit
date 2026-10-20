@@ -1127,7 +1127,7 @@ export default function CreateDeliveryPage({
                                                                 <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                                     <img
                                                                         src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        className="w-full h-full object-cover rounded-full"
                                                                         alt={item.product_name || "Produto sem nome"}
                                                                         onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
                                                                     />

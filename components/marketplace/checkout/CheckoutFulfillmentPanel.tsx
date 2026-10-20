@@ -262,8 +262,12 @@ export function CheckoutFulfillmentPanel({
         const covered = await validateServiceAddress(line)
         if (!covered) {
           // Fora do raio / sem endereço: força de volta para o estabelecimento
-          // e mantém o erro visível ao lado da opção.
+          // e limpa o aviso - a opção "No meu endereço" não fica mais marcada.
           setModalDrafts((prev) => ({ ...prev, [lineId]: "on_site" }))
+          setServiceAttendance((prev) => ({
+            ...prev,
+            [lineId]: { checked: true, covered: false, error: null, distanceKm: null },
+          }))
         }
       }
     } else {
@@ -318,6 +322,10 @@ export function CheckoutFulfillmentPanel({
             const covered = await validateServiceAddress(line)
             if (!covered) {
               setModalDrafts((prev) => ({ ...prev, [change.cartItemId]: "on_site" }))
+              setServiceAttendance((prev) => ({
+                ...prev,
+                [change.cartItemId]: { checked: true, covered: false, error: null, distanceKm: null },
+              }))
               return
             }
           }

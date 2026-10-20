@@ -72,7 +72,7 @@ const QuoteItem = ({ image, name, sku, qty, price, total, unit }: any) => (
         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
             <img
                 src={image}
-                className="w-full h-full object-cover rounded-xl"
+                className="w-full h-full object-cover rounded-full"
                 alt={name}
                 onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
             />

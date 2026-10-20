@@ -56,6 +56,8 @@ export async function computeMarketplaceCheckoutAmounts(
     /** Selected carrier freight service (SuperFrete) when own delivery has no coverage */
     carrierServiceId?: number | null
     destinationPostalCode?: string | null
+    /** Changes when service fulfillment modes change; invalidates the cache. */
+    cacheVariant?: string | null
   },
 ): Promise<{ success: true; data: MarketplaceCheckoutAmounts } | { success: false; error: string }> {
   const serviceCartIds = params.cartItemIds
@@ -73,6 +75,7 @@ export async function computeMarketplaceCheckoutAmounts(
     params.depositAvailable,
     params.carrierServiceId || null,
     params.destinationPostalCode || null,
+    params.cacheVariant || null,
   ])
   const cached = checkoutAmountsServerCache.get(cacheKey)
   if (cached && Date.now() - cached.at <= CHECKOUT_AMOUNTS_CACHE_TTL_MS) {

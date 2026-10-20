@@ -417,7 +417,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                     <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                                         <img
                                                                             src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                            className="w-full h-full object-cover rounded-xl"
+                                                                            className="w-full h-full object-cover rounded-full"
                                                                             alt={item.title}
                                                                             onError={(e: any) => {
                                                                                 e.target.src = "https://img.dudit.com.br/static/Placeholder.png"

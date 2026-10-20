@@ -15,6 +15,8 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
   depositAvailable: boolean
   carrierServiceId?: number | null
   destinationPostalCode?: string | null
+  /** Muda quando a forma de atendimento dos serviços muda; invalida o cache. */
+  cacheVariant?: string | null
 }) {
   const user = await requireUser()
 
@@ -35,5 +37,6 @@ export async function getMarketplaceCheckoutAmountsAction(input: {
     depositAvailable: input.depositAvailable,
     carrierServiceId: input.carrierServiceId,
     destinationPostalCode: input.destinationPostalCode,
+    cacheVariant: input.cacheVariant,
   })
 }
