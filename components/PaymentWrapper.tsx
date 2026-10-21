@@ -212,6 +212,11 @@ export function PaymentWrapper({
         return ""
     }, [actualOrderNumber, orderNumber, actualOrderId, orderId])
 
+    const resolvedExistingOrderId = useMemo(() => {
+        const id = actualOrderId || orderId
+        return id && !id.startsWith("temp-") ? id : undefined
+    }, [actualOrderId, orderId])
+
     useEffect(() => {
         const targetOrderId = actualOrderId || orderId
         if (!actualOrderNumber && targetOrderId && !targetOrderId.startsWith("temp-") && (!orderNumber || !isValidOrderNumber(orderNumber))) {
@@ -385,7 +390,7 @@ export function PaymentWrapper({
                         payDepositOnly,
                         storeId: orderDetails.storeId || undefined,
                         checkoutPricing: orderDetails.checkoutPricing,
-                        existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
+                        existingOrderId: resolvedExistingOrderId,
                     },
                 })
             } catch (err: any) {
@@ -535,7 +540,7 @@ export function PaymentWrapper({
                     payDepositOnly,
                     storeId: orderDetails.storeId || undefined,
                     checkoutPricing: orderDetails.checkoutPricing,
-                    existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
+                    existingOrderId: resolvedExistingOrderId,
                 },
             })
 

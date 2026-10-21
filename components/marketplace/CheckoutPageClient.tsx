@@ -17,7 +17,7 @@ import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
-import { checkoutCartAction, bulkUpdateFulfillmentModesAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
+import { checkoutCartAction, bulkUpdateFulfillmentModesAction, deleteCartItemsAction, type MarketplaceCheckoutDestinationAddress } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction, addBumpProductToCartAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { trackEvent } from "@/lib/analytics"
@@ -33,6 +33,7 @@ import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
 import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
+import { CheckoutErrorScreen } from "@/components/marketplace/checkout/CheckoutErrorScreen"
 import BottomSheet from "@/components/BottomSheet"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
@@ -42,6 +43,46 @@ import { quoteCarrierFreightAction } from "@/app/actions/marketplace/carrier-shi
 import { extractPostalCodeFromAddress } from "@/lib/services/shipping/postal-code"
 import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
 import type { MarketplaceCheckoutAmounts } from "@/lib/services/marketplace-checkout-amounts"
+
+// Reconstrói o endereço estruturado a partir da string montada por
+// buildAddressString (`rua, número[, complemento] - bairro, cidade - UF, CEP`).
+// Usado só como fallback quando não há um endereço selecionado; o snapshot
+// garante que a etiqueta use exatamente o endereço preenchido no checkout.
+function parseCheckoutAddressString(raw: string): MarketplaceCheckoutDestinationAddress | null {
+    const text = String(raw || "").trim()
+    if (!text) return null
+    const zipMatch = text.match(/\d{5}-?\d{3}/)
+    const postalCode = zipMatch ? zipMatch[0].replace(/\D/g, "") : ""
+    if (!postalCode) return null
+    const withoutZip = zipMatch ? text.replace(zipMatch[0], "") : text
+    const parts = withoutZip.split(",").map((part) => part.trim()).filter(Boolean)
+    if (parts.length < 2) return null
+
+    const street = parts[0] || ""
+    const cityStatePart = parts[parts.length - 1] || ""
+    const cityState = cityStatePart.split("-").map((part) => part.trim()).filter(Boolean)
+    const state = cityState.length >= 2 ? cityState[cityState.length - 1] : ""
+    const city = cityState.length >= 2 ? cityState.slice(0, -1).join("-").trim() : cityStatePart
+
+    const middle = parts.slice(1, parts.length - 1).join(", ")
+    const dashIndex = middle.lastIndexOf(" - ")
+    const numberPart = dashIndex >= 0 ? middle.slice(0, dashIndex) : middle
+    const district = dashIndex >= 0 ? middle.slice(dashIndex + 3).trim() : ""
+    const numberBits = numberPart.split(",").map((part) => part.trim()).filter(Boolean)
+    const number = numberBits[0] || ""
+    const complement = numberBits.slice(1).join(", ")
+
+    if (!street || !city || !state) return null
+    return {
+        street,
+        number: number || null,
+        complement: complement || null,
+        district: district || null,
+        city,
+        state: state.toUpperCase(),
+        postalCode,
+    }
+}
 
 // Cache em memória (client) dos totais do checkout. Server Actions não são
 // deduplicadas pelo React, então alternar entrega/retirada ou voltar a um
@@ -339,6 +380,7 @@ export function CheckoutPageClient() {
     const [isLoading, setIsLoading] = useState(false)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [paymentError, setPaymentError] = useState<string | null>(null)
+    const [checkoutError, setCheckoutError] = useState<string | null>(null)
     const [refreshTrigger, setRefreshTrigger] = useState(0)
 
     const products = sessionData?.products || []
@@ -799,6 +841,10 @@ export function CheckoutPageClient() {
     // - a seção de transportadora mostra o estado de cálculo.
     const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
     const displayDeliveryError = carrierSectionVisible && carrierResolving ? null : deliveryError
+    const activeCheckoutError = checkoutError
+        || displayDeliveryError
+        || paymentError
+        || (!checkoutContext && contextError ? contextError : null)
     // Frete próprio voltou a cobrir o endereço (ou nunca saiu dele) → desfaz a
     // seleção de transportadora. Sem isso ela "grudava" após um momento de
     // indisponibilidade e o pedido seguia por transportadora mesmo com entrega
@@ -1864,6 +1910,21 @@ export function CheckoutPageClient() {
                 : checkoutFullTotal - checkoutDeliveryFee + (checkoutAmounts.couponDiscountAmount || 0))
             : contextTotalSubtotal
 
+        const destinationAddressSnapshot: MarketplaceCheckoutDestinationAddress | null =
+            formData.deliveryType === "delivery"
+                ? (selectedAddress
+                    ? {
+                        street: selectedAddress.street || "",
+                        number: selectedAddress.number || null,
+                        complement: selectedAddress.complement || null,
+                        district: selectedAddress.neighborhood || null,
+                        city: selectedAddress.city || "",
+                        state: selectedAddress.state || "",
+                        postalCode: (selectedAddress.zip_code || "").replace(/\D/g, "") || null,
+                    }
+                    : parseCheckoutAddressString(formData.deliveryAddress))
+                : null
+
         return {
             subtotal: snapshotSubtotal,
             couponDiscount: checkoutAmounts?.couponDiscountAmount ?? couponDiscount,
@@ -1876,6 +1937,7 @@ export function CheckoutPageClient() {
             carrierServiceId: selectedCarrierServiceId,
             destinationPostalCode: destinationCep || null,
             destinationCoords: destinationCoords || null,
+            destinationAddress: destinationAddressSnapshot,
         }
     }, [
         couponDiscount,
@@ -1896,6 +1958,9 @@ export function CheckoutPageClient() {
         contextTotalSubtotal,
         selectedCarrierServiceId,
         destinationCep,
+        selectedAddress,
+        formData.deliveryType,
+        formData.deliveryAddress,
     ])
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
@@ -2642,6 +2707,7 @@ export function CheckoutPageClient() {
         const existingDeliveryError = deliveryError
         setDeliveryError(null)
         setPaymentError(null)
+        setCheckoutError(null)
         setIsLoading(true)
 
         // Erro de entrega/deslocamento já calculado (ex.: serviço fora do raio
@@ -3189,6 +3255,7 @@ export function CheckoutPageClient() {
             const msg = err.message || "Erro ao processar pedido"
             const systemKeywords = ["rls", "database", "server", "banco", "tabela", "processar pedido", "conexão"]
             const isSystemError = systemKeywords.some(key => msg.toLowerCase().includes(key))
+            setCheckoutError(msg)
 
             if (isSystemError) {
                 notifyError("Erro do Sistema", msg)
@@ -3241,6 +3308,24 @@ export function CheckoutPageClient() {
             <div className="min-h-screen flex items-center justify-center bg-white dark:bg-dark-surface">
                 <Spinner size={32} />
             </div>
+        )
+    }
+
+    if (activeCheckoutError) {
+        return (
+            <CheckoutErrorScreen
+                message={activeCheckoutError}
+                onRetry={() => {
+                    setCheckoutError(null)
+                    setDeliveryError(null)
+                    setPaymentError(null)
+                    if (window.history.length > 1) {
+                        router.back()
+                        return
+                    }
+                    setRefreshTrigger((prev) => prev + 1)
+                }}
+            />
         )
     }
 

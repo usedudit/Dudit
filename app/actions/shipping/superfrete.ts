@@ -1146,11 +1146,19 @@ function parseDeliveryAddressString(raw: string): Partial<ResolvedShippingAddres
     city = parts[parts.length - 1]
     cityStateIndex = parts.length - 1
   }
-  const middle = parts.slice(1, cityStateIndex)
-  const number = middle.find((m) => /^\d+/.test(m)) || ""
-  const district = middle.find((m) => m !== number && !/^\d+$/.test(m)) || ""
+  // O meio pode ser "123, Apto 4 - Centro" (com complemento) ou "123 - Centro"
+  // (sem complemento). Separa o bairro pelo último " - " e depois número de
+  // complemento pelas vírgulas.
+  const middle = parts.slice(1, cityStateIndex).join(", ")
+  const dashIndex = middle.lastIndexOf(" - ")
+  const numberAndComplement = dashIndex >= 0 ? middle.slice(0, dashIndex) : middle
+  const districtFromMiddle = dashIndex >= 0 ? middle.slice(dashIndex + 3).trim() : ""
+  const middleParts = numberAndComplement.split(",").map((part) => part.trim()).filter(Boolean)
+  const number = middleParts.find((m) => /^\d+/.test(m)) || ""
+  const complement = middleParts.filter((m) => m !== number).join(", ")
+  const district = districtFromMiddle || middleParts.find((m) => m !== number && !/^\d+$/.test(m)) || ""
 
-  return { address, number, district, city, state_abbr: state, postal_code: postalCode }
+  return { address, number, complement, district, city, state_abbr: state, postal_code: postalCode }
 }
 
 async function loadShippingOrderContext(orderId: string, partnerId: string) {
@@ -1269,17 +1277,6 @@ async function resolveDestinationAddress(
   order: any,
 ): Promise<ResolvedShippingAddress | null> {
   const customerIds = [order.buyer_id, order.customer_id].filter(Boolean)
-  let row: any = null
-  if (customerIds.length > 0) {
-    const { data } = await supabase
-      .from("addresses")
-      .select("*")
-      .in("customer_id", customerIds)
-      .order("is_default", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    row = data
-  }
 
   let customer: any = null
   for (const id of customerIds) {
@@ -1320,19 +1317,53 @@ async function resolveDestinationAddress(
     }
   }
 
-  const parsed = row
-    ? {
-      address: row.street || "",
-      number: row.number || undefined,
-      complement: row.complement || undefined,
-      district: row.neighborhood || "",
-      city: row.city || "",
-      state_abbr: (row.state || "").toUpperCase(),
-      postal_code: (row.zip_code || "").replace(/\D/g, ""),
-    }
-    : parseDeliveryAddressString(order.delivery_address || "")
+  // O endereço do CHECKOUT é a fonte da verdade. A etiqueta precisa do mesmo
+  // destino/CEP cotados - antes o endereço salvo do cliente era usado primeiro,
+  // então a etiqueta saía para outra CEP e a SuperFrete recalculava outro preço.
+  const breakdown = ((order as any)?.delivery_breakdown as Record<string, any> | null) || {}
+  const structured = (breakdown.destinationAddress as Record<string, any> | null) || null
+  const checkoutPostalCode = String(breakdown.toPostalCode || "").replace(/\D/g, "")
+  const parsedString = parseDeliveryAddressString(order.delivery_address || "") || null
 
-  if (!parsed || !parsed.address || !parsed.city || !parsed.state_abbr || !parsed.postal_code) {
+  const fromCheckout = {
+    address: String(structured?.street || parsedString?.address || ""),
+    number: structured?.number || parsedString?.number || undefined,
+    complement: structured?.complement || parsedString?.complement || undefined,
+    district: String(structured?.district || parsedString?.district || ""),
+    city: String(structured?.city || parsedString?.city || ""),
+    state_abbr: String(structured?.state || parsedString?.state_abbr || "").toUpperCase(),
+    postal_code:
+      checkoutPostalCode
+      || String(structured?.postalCode || "").replace(/\D/g, "")
+      || String(parsedString?.postal_code || "").replace(/\D/g, ""),
+  }
+
+  // Só busca o endereço salvo quando faltar algo no checkout (ex.: bairro).
+  const needsSavedAddress =
+    !fromCheckout.address || !fromCheckout.city || !fromCheckout.state_abbr || !fromCheckout.postal_code || !fromCheckout.district
+  let savedRow: any = null
+  if (needsSavedAddress && customerIds.length > 0) {
+    const { data } = await supabase
+      .from("addresses")
+      .select("*")
+      .in("customer_id", customerIds)
+      .order("is_default", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    savedRow = data
+  }
+
+  const destination = {
+    address: fromCheckout.address || String(savedRow?.street || ""),
+    number: fromCheckout.number || savedRow?.number || undefined,
+    complement: fromCheckout.complement || savedRow?.complement || undefined,
+    district: fromCheckout.district || String(savedRow?.neighborhood || ""),
+    city: fromCheckout.city || String(savedRow?.city || ""),
+    state_abbr: (fromCheckout.state_abbr || String(savedRow?.state || "")).toUpperCase(),
+    postal_code: fromCheckout.postal_code || String(savedRow?.zip_code || "").replace(/\D/g, ""),
+  }
+
+  if (!destination.address || !destination.city || !destination.state_abbr || !destination.postal_code) {
     return null
   }
 
@@ -1343,13 +1374,14 @@ async function resolveDestinationAddress(
   return {
     name: nameCandidates[0] || "Destinatário",
     nameCandidates,
-    address: parsed.address,
-    number: parsed.number,
-    complement: parsed.complement,
-    district: parsed.district || "",
-    city: parsed.city,
-    state_abbr: parsed.state_abbr,
-    postal_code: parsed.postal_code,
+    address: destination.address,
+    number: destination.number,
+    complement: destination.complement,
+    // A API exige bairro; usa "NA" quando não houver (mesma regra da doc).
+    district: destination.district || "NA",
+    city: destination.city,
+    state_abbr: destination.state_abbr,
+    postal_code: destination.postal_code,
     email: customer?.email || undefined,
     phone: customer?.phone || undefined,
     document: customerDocument,
@@ -1541,6 +1573,9 @@ export async function createOrderShippingLabelAction(payload: {
 }): Promise<{
   success: true
   label: { id: string; price: number; status: string; serviceId: number }
+  priceMismatch: boolean
+  checkoutPrice: number
+  labelPrice: number | null
 } | { success: false; error: string; code?: "missing_document" }> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   const user = await requireUser()
@@ -1687,6 +1722,9 @@ export async function createOrderShippingLabelAction(payload: {
         status: label.status,
         serviceId,
       },
+      priceMismatch,
+      checkoutPrice,
+      labelPrice,
     }
   } catch (err: any) {
     console.error(

@@ -1475,7 +1475,10 @@ async function handler(request: NextRequest) {
     }
     revalidateMarketplace()
 
-    if (!existingOrderId && cartItemIds && cartItemIds.length > 0) {
+    const paymentCreatedSuccessfully = ["approved", "pending", "in_process"].includes(
+      String(paymentStatus || "").toLowerCase(),
+    )
+    if (paymentCreatedSuccessfully && cartItemIds && cartItemIds.length > 0) {
       const { error: deleteError } = await adminClient.from("cart_items").delete().in("id", cartItemIds).eq("user_id", buyerId)
 
       if (deleteError) {

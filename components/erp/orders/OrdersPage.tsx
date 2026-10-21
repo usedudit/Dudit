@@ -677,7 +677,7 @@ export default function OrdersPage({
         return { Todos, Pendente, Pago, Enviado, Cancelado }
     }, [effectiveOrders])
 
-    const handleExport = useCallback((detail = false) => {
+    const handleExport = useCallback(() => {
         void exportData({
             partnerId,
             module: "orders",
@@ -694,7 +694,6 @@ export default function OrdersPage({
                 totalMin: filters.totalRange.min,
                 totalMax: filters.totalRange.max,
                 datePeriod: filters.datePeriod,
-                detail,
             },
         })
     }, [exportData, partnerId, selectedStore?.id, debouncedSearch, activeTab, filters])
@@ -1306,10 +1305,6 @@ export default function OrdersPage({
                                     <Button variant="outline" onClick={() => handleExport()} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                         {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
-                                    <Button variant="outline" onClick={() => handleExport(true)} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
-                                        Detalhado
-                                    </Button>
-
                                     <Button onClick={handleAddOrder} leftIcon={<PlusIcon size={18} />} >
                                         Novo pedido
                                     </Button>
@@ -1813,6 +1808,8 @@ export default function OrdersPage({
             <ExportColumnSelectionModal
                 isOpen={columnSelectionModal.isOpen}
                 canExportAllColumns={columnSelectionModal.canExportAllColumns}
+                supportDetail={columnSelectionModal.supportDetail}
+                defaultDetail={columnSelectionModal.defaultDetail}
                 onConfirm={handleColumnConfirm}
                 onClose={closeColumnSelectionModal}
             />

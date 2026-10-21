@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader, Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader, Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, SidebarCard } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
@@ -1972,9 +1972,7 @@ export default function CreateOrder({
                             {!isPaidOrder && (
                                 <TabsContent value="payment" className="xl:hidden mt-0">
                                     <FadeIn key="payment">
-                                        <div className="bg-white dark:bg-dark-surface flex flex-col gap-6">
-                                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
-
+                                        <SidebarCard title="Pagamento" hasSeparator hasTopStrip>
                                             {(() => {
                                                 const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
                                                 const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
@@ -2212,7 +2210,7 @@ export default function CreateOrder({
                                                     </div>
                                                 );
                                             })()}
-                                        </div>
+                                        </SidebarCard>
                                     </FadeIn>
                                 </TabsContent>
                             )}

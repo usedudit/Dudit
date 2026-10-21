@@ -75,6 +75,12 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                     toast.success(`Etiqueta criada por ${formatCurrency(res.label.price)}.`)
                     toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
                 }
+                if (res.priceMismatch) {
+                    toast.warning(
+                        "Valor divergente na etiqueta",
+                        `O checkout cobrou ${formatCurrency(res.checkoutPrice)} e a SuperFrete emitiu por ${formatCurrency(res.labelPrice || 0)}.`,
+                    )
+                }
                 await refresh()
             } else if (res.code === "missing_document") {
                 setDocModalOpen(true)

@@ -137,7 +137,11 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                         setQuotesError("Nenhuma opção de frete encontrada.")
                         setSelectedService(null)
                     } else {
-                        setSelectedService(Number(res.quotes[0]?.id) || null)
+                        // Pedido fechado por transportadora: nunca pré-seleciona a
+                        // opção mais barata (podia virar PAC quando o checkout foi
+                        // SEDEX). Exige escolha explícita do lojista nesse caso.
+                        const autoSelect = order?.delivery_breakdown?.source !== "superfrete"
+                        setSelectedService(autoSelect ? (Number(res.quotes[0]?.id) || null) : null)
                     }
                 } else {
                     setQuoteOptions([])
@@ -157,7 +161,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
         return () => {
             active = false
         }
-    }, [needsQuoteSelection, shipmentLoaded, gateLoaded, orderId])
+    }, [needsQuoteSelection, shipmentLoaded, gateLoaded, orderId, order?.delivery_breakdown?.source])
 
     const handleCreate = async () => {
         setCreating(true)
@@ -181,6 +185,12 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 } else {
                     toast.success(`Etiqueta criada por ${formatCurrency(res.label.price)}.`)
                     toast.error(payRes.error || "Erro ao pagar a etiqueta. Clique em Pagar etiqueta para concluir.")
+                }
+                if (res.priceMismatch) {
+                    toast.warning(
+                        "Valor divergente na etiqueta",
+                        `O checkout cobrou ${formatCurrency(res.checkoutPrice)} e a SuperFrete emitiu por ${formatCurrency(res.labelPrice || 0)}.`,
+                    )
                 }
                 await refresh()
             } else if (res.code === "missing_document") {

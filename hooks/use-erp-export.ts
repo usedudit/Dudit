@@ -31,7 +31,9 @@ interface ColumnSelectionModalState {
   totalCount: number
   selectedIds: string[]
   defaultFormat: ErpExportFormat
-  onConfirm: (includeAllColumns: boolean, format: ErpExportFormat) => void
+  supportDetail: boolean
+  defaultDetail: boolean
+  onConfirm: (includeAllColumns: boolean, format: ErpExportFormat, detail: boolean) => void
 }
 
 interface SelectionModalState {
@@ -49,6 +51,8 @@ export function useErpExport(planSlug: string = "free") {
   const [columnSelectionModalState, setColumnSelectionModalState] = useState<ColumnSelectionModalState | null>(null)
 
   const canExportAllColumns = hasMinimumPlan(planSlug, "crescer")
+
+  const supportsDetail = (module?: string) => module === "orders" || module === "sales"
 
   const doExport = useCallback(
     async (input: ExportERPInput) => {
@@ -84,11 +88,13 @@ export function useErpExport(planSlug: string = "free") {
   )
 
   const exportData = useCallback(
-    (input: ExportERPInput, opts?: UseErpExportOptions) => {
+     (input: ExportERPInput, opts?: UseErpExportOptions) => {
       const selectedIds = opts?.selectedIds
       const totalCount = opts?.totalCount ?? 0
       const selectedCount = selectedIds?.size ?? 0
       const defaultFormat: ErpExportFormat = input.format === "csv" ? "csv" : "xlsx"
+      const supportDetail = supportsDetail(input.module)
+      const defaultDetail = Boolean((input.filters as Record<string, unknown>)?.detail)
 
       if (selectedCount > 0 && selectedCount < totalCount) {
         setColumnSelectionModalState({
@@ -98,12 +104,14 @@ export function useErpExport(planSlug: string = "free") {
           totalCount,
           selectedIds: Array.from(selectedIds!),
           defaultFormat,
-          onConfirm: (includeAllColumns: boolean, format: ErpExportFormat) => {
+          supportDetail,
+          defaultDetail,
+          onConfirm: (includeAllColumns: boolean, format: ErpExportFormat, detail: boolean) => {
             setColumnSelectionModalState(null)
             const inputWithColumns = {
               ...input,
               format,
-              filters: { ...input.filters, includeAllColumns },
+              filters: { ...input.filters, includeAllColumns, detail },
             }
             setSelectionModalState({
               isOpen: true,
@@ -122,12 +130,14 @@ export function useErpExport(planSlug: string = "free") {
           totalCount,
           selectedIds: Array.from(selectedIds || []),
           defaultFormat,
-          onConfirm: (includeAllColumns: boolean, format: ErpExportFormat) => {
+          supportDetail,
+          defaultDetail,
+          onConfirm: (includeAllColumns: boolean, format: ErpExportFormat, detail: boolean) => {
             setColumnSelectionModalState(null)
             void doExport({
               ...input,
               format,
-              filters: { ...input.filters, includeAllColumns },
+              filters: { ...input.filters, includeAllColumns, detail },
             })
           },
         })
@@ -141,10 +151,10 @@ export function useErpExport(planSlug: string = "free") {
   }, [])
 
   const handleColumnConfirm = useCallback(
-    (includeAllColumns: boolean, format: ErpExportFormat) => {
+    (includeAllColumns: boolean, format: ErpExportFormat, detail: boolean = false) => {
       if (!columnSelectionModalState) return
       const { onConfirm } = columnSelectionModalState
-      onConfirm(includeAllColumns, format)
+      onConfirm(includeAllColumns, format, detail)
     },
     [columnSelectionModalState],
   )
@@ -171,7 +181,9 @@ export function useErpExport(planSlug: string = "free") {
     () => ({
       isOpen: columnSelectionModalState?.isOpen ?? false,
       canExportAllColumns,
+      supportDetail: columnSelectionModalState?.supportDetail ?? false,
       defaultFormat: columnSelectionModalState?.defaultFormat ?? ("xlsx" as ErpExportFormat),
+      defaultDetail: columnSelectionModalState?.defaultDetail ?? false,
     }),
     [columnSelectionModalState, canExportAllColumns],
   )

@@ -52,6 +52,16 @@ export type MarketplaceCartPageData = {
   userAddresses: any[]
 }
 
+export type MarketplaceCheckoutDestinationAddress = {
+  street: string
+  number?: string | null
+  complement?: string | null
+  district?: string | null
+  city: string
+  state: string
+  postalCode?: string | null
+}
+
 export type MarketplaceCheckoutPricingSnapshot = {
   subtotal: number
   couponDiscount: number
@@ -65,6 +75,8 @@ export type MarketplaceCheckoutPricingSnapshot = {
   carrierServiceId?: number | null
   destinationPostalCode?: string | null
   destinationCoords?: { lat: number; lng: number } | null
+  /** Endereço exato preenchido no checkout - a etiqueta deve usá-lo, não o endereço salvo do cliente */
+  destinationAddress?: MarketplaceCheckoutDestinationAddress | null
 }
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -72,6 +84,29 @@ const moneyOrZero = (value: unknown) => {
   const n = Number(value || 0)
   if (!Number.isFinite(n)) return 0
   return Math.max(0, roundMoney(n))
+}
+
+function normalizeCheckoutDestinationAddress(input: unknown): MarketplaceCheckoutDestinationAddress | null {
+  if (!input || typeof input !== "object") return null
+  const raw = input as Record<string, unknown>
+  const clean = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : "")
+  const street = clean(raw.street)
+  const city = clean(raw.city)
+  const state = clean(raw.state)
+  const postalCode = String(raw.postalCode ?? "").replace(/\D/g, "")
+  if (!street || !city || !state || postalCode.length !== 8) return null
+  const number = clean(raw.number)
+  const complement = clean(raw.complement)
+  const district = clean(raw.district)
+  return {
+    street,
+    number: number || null,
+    complement: complement || null,
+    district: district || null,
+    city,
+    state: state.toUpperCase(),
+    postalCode,
+  }
 }
 
 function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPricingSnapshot> | null) {
@@ -87,6 +122,7 @@ function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPri
     finalTotal: moneyOrZero(input.finalTotal),
     carrierServiceId: typeof input.carrierServiceId === "number" && Number.isFinite(input.carrierServiceId) ? Number(input.carrierServiceId) : null,
     destinationPostalCode: typeof input.destinationPostalCode === "string" ? input.destinationPostalCode : null,
+    destinationAddress: normalizeCheckoutDestinationAddress(input.destinationAddress),
   }
   const expected = roundMoney(
     snapshot.subtotal
@@ -1411,6 +1447,16 @@ export async function checkoutCartAction(
   const normalizedSnapshot = normalizeCheckoutPricingSnapshot(checkoutPricingSnapshot)
   if (checkoutPricingSnapshot && !normalizedSnapshot) {
     return { error: "Os valores do checkout não conferem. Atualize a página e tente novamente." }
+  }
+
+  // Congela o endereço exato do checkout junto do frete: a etiqueta usa este
+  // snapshot (rua/número/bairro/cidade/UF/CEP) em vez de recalcular pelo
+  // endereço salvo do cliente, garantindo mesmo destino e mesmo preço cotados.
+  if (deliveryBreakdown && normalizedSnapshot?.destinationAddress) {
+    deliveryBreakdown = {
+      ...deliveryBreakdown,
+      destinationAddress: normalizedSnapshot.destinationAddress,
+    }
   }
 
   // When deposit is active, the client snapshot may have been computed before the deposit
