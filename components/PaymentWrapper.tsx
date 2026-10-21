@@ -554,7 +554,7 @@ export function PaymentWrapper({
                     throw err
                 }
             }
-            const status = responseData.status
+            const status = responseData.paymentStatus || responseData.status
             const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
 
             if (responseData.orderId) setActualOrderId(responseData.orderId)

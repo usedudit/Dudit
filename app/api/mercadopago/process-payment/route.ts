@@ -1494,6 +1494,7 @@ async function handler(request: NextRequest) {
       orderId: newOrder.id,
       orderNumber: newOrder.order_number,
       paymentStatus: paymentStatus === "approved" ? "approved" : paymentStatus,
+      status: paymentStatus === "approved" ? "approved" : paymentStatus,
       paymentMethod: paymentFormData.payment_method_id,
       statusDetail: mpPaymentResponse.status_detail ?? null,
       pixData: pixData,

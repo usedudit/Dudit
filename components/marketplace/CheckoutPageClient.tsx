@@ -2294,7 +2294,7 @@ export function CheckoutPageClient() {
                         )}
                     </div>
                 )}
-                {isPickup && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
+                {isPickup && Boolean(requirements?.hasProductLines) && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                     <InfoCard color="orange" message={`Retirada ${getReadyDayLabel(preparationEstimate)} entre ${pickupStartLabel} e ${pickupEndLabel}`} />
                 )}
                 {paymentOption === "traditional" && paymentPreviewLoading && (
