@@ -351,13 +351,22 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                         ? "/erp/servicos?create=true"
                         : "/erp/inicio"
 
+                // Wait for the Turnstile token instead of sending a request that
+                // would be rejected with `captcha_failed`.
+                const captchaToken = turnstileToken ?? (await turnstileRef.current?.getToken()) ?? null
+                if (!captchaToken) {
+                    setError("Não foi possível concluir a verificação de segurança. Aguarde alguns segundos e tente novamente.")
+                    return
+                }
+                setTurnstileToken(captchaToken)
+
                 const { data: signUp, error: signErr } = await supabase.auth.signUp({
                     email: cleanEmail,
                     password,
                     options: {
                         data: { full_name: sellerName },
                         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-                        captchaToken: turnstileToken || undefined,
+                        captchaToken,
                     },
                 })
                 if (signErr) {

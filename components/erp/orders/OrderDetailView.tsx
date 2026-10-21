@@ -230,6 +230,7 @@ interface OrderDetailViewProps {
   onCancelOrder: (order: any) => void;
   onOpenNotes: (order: any) => void;
   initialOrder?: any;
+  initialTab?: string;
 }
 
 export default function OrderDetailView({
@@ -242,6 +243,7 @@ export default function OrderDetailView({
   onCancelOrder,
   onOpenNotes,
   initialOrder,
+  initialTab,
 }: OrderDetailViewProps) {
   const { role, canRbac, planSlug } = usePermissions();
   const { selectedStore } = useStore();
@@ -255,7 +257,12 @@ export default function OrderDetailView({
   );
   const [order, setOrder] = useState<any>(initialOrder || null);
   const [loading, setLoading] = useState(!initialOrder);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState(initialTab || "summary");
+
+  useEffect(() => {
+    if (!initialTab) return;
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -992,7 +999,7 @@ export default function OrderDetailView({
     if (status === "delivery_failed") {
       finalLabel = isPickup
         ? "Retirada não realizada"
-        : "Entrega não realizada";
+        : "Falha na entrega";
     }
 
     if (hasOnlyServices) {

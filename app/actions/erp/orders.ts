@@ -68,6 +68,7 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label";
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery";
 import { buildNotificationContent } from "@/lib/notifications/templates";
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities";
+import { cancelCarrierLabelForOrder } from "@/lib/services/shipping/superfrete-label-cancel";
 import { getCachedErpPage } from "@/lib/data/erp-page-cache";
 import { requireAdminScope } from "@/lib/auth/admin-authorization";
 import { adminAuditLog } from "@/lib/admin/audit";
@@ -5075,11 +5076,39 @@ export async function updateOrdersStatusInBatchAction(payload: {
   }
 
   if (payload.actionType === "cancel") {
+    const cancelReason = payload.cancelReason?.trim() || "";
+    if (!cancelReason) {
+      return { error: "Informe o motivo do cancelamento do pedido." };
+    }
     const ordersToCancel = (currentOrders || []).filter(
       (o: any) => o.situation !== "cancelled",
     );
     if (ordersToCancel.length === 0) {
       return { error: "Nenhum pedido válido foi encontrado para cancelar." };
+    }
+
+    const carrierShipmentsByOrderId = new Map<string, any>();
+    try {
+      const { data: carrierShipments } = await supabase
+        .from("order_shipments")
+        .select("id, order_id, status, external_label_id, tracking_number, kind")
+        .in(
+          "order_id",
+          ordersToCancel.map((o: any) => o.id),
+        )
+        .eq("partner_id", payload.partnerId)
+        .neq("kind", "return");
+      for (const shipment of carrierShipments || []) {
+        if (!shipment?.order_id) continue;
+        if (!carrierShipmentsByOrderId.has(String(shipment.order_id))) {
+          carrierShipmentsByOrderId.set(String(shipment.order_id), shipment);
+        }
+      }
+    } catch (shipmentError) {
+      console.error(
+        "[orders_cancel_carrier_shipments] error:",
+        shipmentError,
+      );
     }
 
     const creatorUserIds = Array.from(
@@ -5151,6 +5180,45 @@ export async function updateOrdersStatusInBatchAction(payload: {
       }
 
       const orderWarnings: string[] = [];
+      const orderLabel = order.order_number || order.id;
+
+      const carrierShipment = carrierShipmentsByOrderId.get(String(order.id)) || null;
+      let labelCancelled = false;
+
+      const carrierLabelPromise = (async () => {
+        if (!carrierShipment?.external_label_id) return;
+        try {
+          const result = await cancelCarrierLabelForOrder({
+            partnerId: payload.partnerId,
+            orderId: order.id,
+            labelId: String(carrierShipment.external_label_id),
+            reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
+            currentStatus: carrierShipment.status,
+          });
+          if (result.success) {
+            labelCancelled = true;
+            return;
+          }
+          orderWarnings.push(
+            `Pedido ${orderLabel}: cancelado, mas a etiqueta da transportadora não foi cancelada (${result.error})`,
+          );
+        } catch (err) {
+          console.error("[orders_cancel_carrier_label] error:", err);
+          orderWarnings.push(
+            `Pedido ${orderLabel}: cancelado, mas não foi possível cancelar a etiqueta da transportadora`,
+          );
+        }
+      })();
+
+      const ownDeliveryAlreadyDispatched = !carrierShipment
+        && ["sent", "delivered", "delivery_failed"].includes(
+          String(order.delivery_status || "").toLowerCase(),
+        );
+      if (ownDeliveryAlreadyDispatched) {
+        orderWarnings.push(
+          `Pedido ${orderLabel}: a entrega própria já estava em andamento. Para troca ou devolução, abra o pedido e solicite o retorno.`,
+        );
+      }
 
       const appointmentsSyncPromise =
         syncCancelledOrderAppointmentsAndTransactions(supabase, order.id, {
@@ -5334,12 +5402,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
         stockPromise,
         refundPromise,
         commissionsGoalsPromise,
+        carrierLabelPromise,
       ]);
 
       return {
         success: true,
         order,
         stockWasRestoredOnCancel,
+        labelCancelled,
         warning: orderWarnings.join(" | "),
       };
     };
@@ -5372,12 +5442,15 @@ export async function updateOrdersStatusInBatchAction(payload: {
       // Log de auditoria consolidado (1 evento por pedido)
       try {
         await Promise.allSettled(
-          successfulOrders.map(({ order, stockWasRestoredOnCancel }) => {
+          successfulOrders.map(({ order, stockWasRestoredOnCancel, labelCancelled }) => {
             const lines: string[] = ["cancelou o pedido"];
             if (payload.cancelReason?.trim()) {
               lines.push(
                 `informou motivo do cancelamento: ${payload.cancelReason.trim()}`,
               );
+            }
+            if (labelCancelled) {
+              lines.push("cancelou a etiqueta da transportadora");
             }
             if (payload.restoreStock && order.inventory_deducted) {
               lines.push("restaurou o estoque dos itens do pedido");

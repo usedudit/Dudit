@@ -107,7 +107,7 @@ export const getExecutionBadge = (status: string) => {
 }
 
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex justify-between items-center text-sm gap-4 py-2.5 border-b border-brand-border/40 dark:border-dark-border/40 last:border-0">
+  <div className="flex justify-between items-center text-sm gap-4 py-2.5 border-b border-brand-border dark:border-dark-border last:border-0">
     <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
     <div className="text-right font-semibold text-brand-dark dark:text-dark-heading">{value}</div>
   </div>
@@ -741,7 +741,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                           return (
                             <div
                               key={item.id}
-                              className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                              className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border dark:border-dark-border last:border-b-0"
                             >
                               {content}
                             </div>
@@ -753,7 +753,7 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                             key={item.id}
                             href={itemUrl}
                             prefetch={false}
-                            className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                            className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border dark:border-dark-border last:border-b-0"
                           >
                             {content}
                           </Link>
@@ -851,6 +851,15 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
 
               {/* Right column: resumo + ações */}
               <div className="lg:col-span-4 lg:pl-12 lg:border-l border-brand-border dark:border-dark-border space-y-6">
+                {isClosed && (
+                  <InfoCard message={
+                    sub.status === "cancelled"
+                      ? "Assinatura cancelada. Não há novas cobranças e os valores não mudam mais."
+                      : "Assinatura encerrada. Não há novas cobranças e os valores não mudam mais."
+                  }
+                  />
+                )}
+
                 <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
                   <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                     Resumo da Assinatura
@@ -984,15 +993,6 @@ export function MySubscriptionDetailPage({ subscription: sub, onBack, onUpdate, 
                       </div>
                     )}
                   </div>
-                )}
-
-                {isClosed && (
-                  <InfoCard message={
-                    sub.status === "cancelled"
-                      ? "Assinatura cancelada. Não há novas cobranças e os valores não mudam mais."
-                      : "Assinatura encerrada. Não há novas cobranças e os valores não mudam mais."
-                  }
-                  />
                 )}
               </div>
             </div>

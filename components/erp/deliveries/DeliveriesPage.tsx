@@ -1,22 +1,24 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, PackageIcon, SearchIcon, TruckIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction } from "@/app/actions/erp/deliveries"
+import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction, getERPCarrierDeliveriesPageAction, getERPCarrierDeliveriesEnabledAction, type ERPCarrierDeliveryListCursor } from "@/app/actions/erp/deliveries"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
+import CarrierDeliveryBoard from "./CarrierDeliveryBoard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { formatDistance } from "@/lib/services/location.service"
@@ -69,6 +71,7 @@ export default function DeliveriesPage({
     userRole?: string
 }) {
     const searchParams = useSearchParams()
+    const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
 
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -105,6 +108,8 @@ export default function DeliveriesPage({
     const [viewMode, setViewMode] = useState<"kanban">("kanban")
 
     const [activeTab, setActiveTabState] = useState<"active" | "closed">("active")
+    const [mode, setMode] = useState<"deliveries" | "carriers">("deliveries")
+    const [carrierEnabled, setCarrierEnabled] = useState(false)
 
     // Sync search with URL searchParams
     useEffect(() => {
@@ -162,6 +167,24 @@ export default function DeliveriesPage({
         dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
     })
 
+    const carrierQueryKey = useMemo(() => ["erp", "carrier-deliveries", partnerId] as const, [partnerId])
+    const {
+        items: carrierShipments,
+        isLoading: carrierLoading,
+        isFetchingNextPage: carrierFetchingNextPage,
+        hasNextPage: carrierHasNextPage,
+        fetchNextPage: fetchCarrierNextPage,
+    } = useInfiniteList<any, ERPCarrierDeliveryListCursor>({
+        queryKey: carrierQueryKey,
+        enabled: mode === "carriers",
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPCarrierDeliveriesPageAction(partnerId, { cursor, limit: 25 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar envios.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
+    })
+
     const planGate = propPlanGate
 
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } =
@@ -196,6 +219,17 @@ export default function DeliveriesPage({
         threshold: 0,
     })
 
+    const carrierObserverTarget = useRef<HTMLDivElement>(null)
+
+    useInfiniteScrollObserver(carrierObserverTarget, {
+        enabled: mode === "carriers",
+        hasNextPage: !!carrierHasNextPage,
+        isFetchingNextPage: carrierFetchingNextPage,
+        fetchNextPage: () => fetchCarrierNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
     const checkScroll = () => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
@@ -218,6 +252,17 @@ export default function DeliveriesPage({
             const res = await getERPDeliveryPlanAccessAction(partnerId)
             if (!mounted) return
             if (res.success) setPlanSlug(String(res.planSlug || "free"))
+        }
+        run()
+        return () => { mounted = false }
+    }, [partnerId])
+
+    useEffect(() => {
+        let mounted = true
+        const run = async () => {
+            const res = await getERPCarrierDeliveriesEnabledAction(partnerId)
+            if (!mounted) return
+            if (res.success) setCarrierEnabled(Boolean(res.enabled))
         }
         run()
         return () => { mounted = false }
@@ -370,6 +415,26 @@ export default function DeliveriesPage({
         return mapped.slice(start, start + 100)
     }, [mapped, page])
 
+    const filteredCarrierShipments = useMemo(() => {
+        const term = debouncedSearch.toLowerCase().trim()
+        const list = carrierShipments || []
+        if (!term) return list
+        return list.filter((shipment: any) => {
+            const haystack = [
+                shipment.orderNumber,
+                shipment.customerName,
+                shipment.customerAddress,
+                shipment.trackingNumber,
+                shipment.carrierName,
+                shipment.serviceName,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+            return haystack.includes(term)
+        })
+    }, [carrierShipments, debouncedSearch])
+
     const executeStatusChange = async (deliveryId: string, nextStatus: string, reason?: string) => {
         setStatusOverrides(prev => ({ ...prev, [deliveryId]: nextStatus }))
         const res = await updateERPDeliveryStatusAction({
@@ -476,15 +541,19 @@ export default function DeliveriesPage({
                             <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                                 <div className="flex flex-col gap-2 pt-1">
                                     <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Entregas</h1>
-                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        {mode === "carriers"
+                                            ? "Acompanhe os envios atendidos por transportadora."
+                                            : "Gerencie as entregas vinculadas aos pedidos."}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {!isDelivery && (
+                                    {mode === "deliveries" && !isDelivery && (
                                         <Button variant="outline" onClick={handleExportDeliveries} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                             {isExporting ? "Exportando..." : "Exportar"}
                                         </Button>
                                     )}
-                                    {!isDelivery && (
+                                    {mode === "deliveries" && !isDelivery && (
                                         <Button
                                             variant="outline"
                                             onClick={loadSuggestions}
@@ -494,7 +563,7 @@ export default function DeliveriesPage({
                                             Gerar sugestões
                                         </Button>
                                     )}
-                                    {!isDelivery && (
+                                    {mode === "deliveries" && !isDelivery && (
                                         <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                             Nova entrega
                                         </Button>
@@ -502,6 +571,50 @@ export default function DeliveriesPage({
                                 </div>
                             </div>
 
+                            <div className="mb-4 flex-none px-4 md:px-8">
+                                <Tabs
+                                    value={mode}
+                                    onValueChange={(val) => setMode(val as "deliveries" | "carriers")}
+                                >
+                                    <TabsList className="px-0">
+                                        <TabsTrigger value="deliveries" icon={TruckIcon}>
+                                            Entregas
+                                        </TabsTrigger>
+                                        {carrierEnabled && (
+                                            <TabsTrigger value="carriers" icon={PackageIcon}>
+                                                Transportadora
+                                            </TabsTrigger>
+                                        )}
+                                    </TabsList>
+                                </Tabs>
+                            </div>
+
+                            {mode === "carriers" ? (
+                                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                                    <div className="mb-4">
+                                        <Input
+                                            name="search"
+                                            placeholder="Buscar por pedido, cliente ou rastreio..."
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            variant="full-rounded"
+                                            label=""
+                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                        />
+                                    </div>
+                                    <CarrierDeliveryBoard
+                                        shipments={filteredCarrierShipments}
+                                        isLoading={carrierLoading}
+                                        onOpenOrder={(orderId) => {
+                                            router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
+                                        }}
+                                    />
+                                    {carrierHasNextPage ? (
+                                        <div ref={carrierObserverTarget} className="h-12 w-full shrink-0" aria-hidden />
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <>
                             <DeliveryPageControls
                                 activeTab={activeTab}
                                 onActiveTabChange={setActiveTab}
@@ -566,6 +679,8 @@ export default function DeliveriesPage({
                                 </AnimatePresence>
                                 {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                             </div>
+                                </>
+                            )}
                         </div>
                     </FadeIn>
                 )}

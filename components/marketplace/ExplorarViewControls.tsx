@@ -1,11 +1,9 @@
 "use client"
 
 import { Button, Badge } from "@/components/reusable"
-import { GridIcon, ListIcon, FilterIcon } from "@/lib/icons"
+import { FilterIcon } from "@/lib/icons"
 import { X, ListOrdered } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-
-type ViewMode = "grid" | "list"
 
 interface ActiveFilterChip {
     key: string
@@ -15,8 +13,6 @@ interface ActiveFilterChip {
 }
 
 interface ExplorarViewControlsProps {
-    viewMode: ViewMode
-    onViewModeChange: (mode: ViewMode) => void
     onOpenFilters: () => void
     onOpenSort: () => void
     hasActiveFilters: boolean
@@ -24,8 +20,6 @@ interface ExplorarViewControlsProps {
 }
 
 export function ExplorarViewControls({
-    viewMode,
-    onViewModeChange,
     onOpenFilters,
     onOpenSort,
     hasActiveFilters,
@@ -85,32 +79,6 @@ export function ExplorarViewControls({
                             ))}
                         </AnimatePresence>
                     </div>
-                </div>
-            </div>
-
-            <div className="hidden lg:flex items-center shrink-0">
-                {/* View toggle - ERP Style */}
-                <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-1 h-[42px] shrink-0">
-                    <button
-                        onClick={() => onViewModeChange("list")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
-                            ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                            : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
-                            }`}
-                        title="Vista em lista"
-                    >
-                        <ListIcon className="w-[18px] h-[18px]" />
-                    </button>
-                    <button
-                        onClick={() => onViewModeChange("grid")}
-                        className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
-                            ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                            : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
-                            }`}
-                        title="Vista em grade"
-                    >
-                        <GridIcon className="w-[18px] h-[18px]" />
-                    </button>
                 </div>
             </div>
         </div>

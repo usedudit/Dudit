@@ -1242,6 +1242,30 @@ export async function processReturnRequestAction(input: unknown) {
             if (updateOrderError) {
                 console.error("[processReturnRequest] Error updating order to cancelled:", updateOrderError)
             } else {
+                // Cancelamento aprovado: a etiqueta da transportadora (ainda não
+                // postada) é cancelada junto para não ficar órfã.
+                try {
+                    const { data: shipments } = await supabase
+                        .from("order_shipments")
+                        .select("id, external_label_id, status")
+                        .eq("order_id", request.order_id)
+                        .neq("kind", "return")
+
+                    for (const shipment of shipments || []) {
+                        if (!shipment?.external_label_id) continue
+                        const { cancelCarrierLabelForOrder } = await import("@/lib/services/shipping/superfrete-label-cancel")
+                        await cancelCarrierLabelForOrder({
+                            partnerId: request.partner_id,
+                            orderId: request.order_id,
+                            labelId: String(shipment.external_label_id),
+                            reason: "Cancelamento aprovado pelo lojista",
+                            currentStatus: shipment.status,
+                        })
+                    }
+                } catch (labelErr) {
+                    console.error("[processReturnRequest] Error cancelling carrier label:", labelErr)
+                }
+
                 await syncCancelledOrderAppointmentsAndTransactions(supabase, request.order_id)
                 await logAuditEvent({
                     partnerId: request.partner_id,

@@ -323,7 +323,7 @@ Supabase — que **estava desativado** e foi **ativado em 17/10/2026**.
    > aparecia no login. `Non-Interactive` some o checkbox mas mantém o badge.
    > Só `Invisible` some tudo.
    >
-   > ⚠️ **Invisible não roda sozinho:** o token só é gerado via `turnstile.execute()`.
+   > ⚠️ **Invisible NÃO roda sozinho:** o token só é gerado via `turnstile.execute()`.
    > Por isso o código foi ajustado (`components/reusable/Turnstile.tsx`):
    > - `appearance = "interaction-only"` + `execution = "execute"` no `render`;
    > - **auto-`execute()` no mount** (token pronto antes do submit);
@@ -344,6 +344,38 @@ Supabase — que **estava desativado** e foi **ativado em 17/10/2026**.
    > `app/institucional/privacidade/page.tsx` (§3.1, com link para
    > `https://www.cloudflare.com/pt-br/turnstile-privacy-policy/`). Precisa estar
    > **no ar** (deploy) para valer.
+   >
+   > ⚠️ **Correção de 18/10/2026 — `execution: "execute"` causava `captcha_failed`:**
+   > a doc da Cloudflare diz que `render` (default) *"runs the challenge
+   > automatically after calling the render() function... ensuring the token is
+   > ready when the visitor submits data"*. Usar `execution: "execute"` **desliga**
+   > a auto-execução, e um `execute()` manual disparado no mesmo tick do `render()`
+   > roda antes do widget ficar pronto → o token não chega no 1º submit → erro no
+   > login ("preciso esperar e tentar de novo"). **Corrigido:** volta para
+   > `execution = "render"` (auto) + **rede de segurança**:
+   > - `TurnstileRef.getToken(): Promise<string | null>` — devolve o token atual
+   >   ou **aguarda** o desafio terminar (fallback: força `execute()` em 4s,
+   >   timeout em 15s);
+   > - `AuthView` / `PartnerWizard` chamam `ensureCaptchaToken()` **antes** de
+   >   qualquer `signIn`/`signUp`/`resetPasswordForEmail` → se não houver token,
+   >   mostra erro amigável em vez de disparar uma request fadada.
+   >
+   > **Modos de widget (doc Cloudflare):**
+   > | Modo | Comportamento |
+   > |---|---|
+   > | `Managed` (default) | Escolhe automaticamente entre non-interativo ou checkbox, conforme o risco do visitante. |
+   > | `Non-Interactive` | Mostra o widget com spinner; **nunca** pede interação. |
+   > | `Invisible` | Roda 100% em background, **sem** widget e **sem** indicador. Exige referenciar o Adendo de Privacidade. |
+   >
+   > `appearance: "interaction-only"` só afeta os modos **visíveis** (Managed /
+   > Non-Interactive) — "o widget só aparece quando for necessária interação".
+   > Em `Invisible` o widget nunca aparece, qualquer que seja o `appearance`.
+   >
+   > ⚠️ **Trade-off do modo `Invisible`:** como o visitante nunca pode interagir,
+   > se a Cloudflare decidir que precisa de interação o desafio falha e o
+   > login dá `captcha_failed` (sem botão pra clicar). O modo **Managed** (com
+   > `appearance: "interaction-only"`) é o melhor equilíbrio: invisível para ~99%
+   > dos visitantes, mas com **fallback de checkbox** se ela suspeitar do bot.
 5. **Produção (Railway):** garantir `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e
    `TURNSTILE_SECRET`. (O site key tem fallback hardcoded no componente, mas
    conferir é recomendado.)

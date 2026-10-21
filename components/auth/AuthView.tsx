@@ -84,6 +84,21 @@ export default function AuthView({
         turnstileRef.current?.reset()
     }, [mode])
 
+    /**
+     * Returns a valid Turnstile token, waiting for the challenge to finish when
+     * it is not ready yet. The Supabase Auth CAPTCHA rejects requests without a
+     * token with `captcha_failed`, so waiting is better than failing.
+     */
+    const ensureCaptchaToken = async (): Promise<string | null> => {
+        if (turnstileToken) return turnstileToken
+        const token = await turnstileRef.current?.getToken()
+        if (token) {
+            setTurnstileToken(token)
+            return token
+        }
+        return null
+    }
+
     // Update mode if initialMode prop changes (e.g. from query params)
     useEffect(() => {
         if (initialMode) {
@@ -165,6 +180,15 @@ export default function AuthView({
         try {
             const cleanEmail = email.trim().toLowerCase()
 
+            // The Turnstile challenge runs in the background. Wait for the token
+            // instead of sending a request that would fail with `captcha_failed`.
+            const captchaToken = await ensureCaptchaToken()
+            if (!captchaToken) {
+                setError("Não foi possível concluir a verificação de segurança. Aguarde alguns segundos e tente novamente.")
+                setIsLoading(false)
+                return
+            }
+
             if (mode === "signup") {
                 if (calculatePasswordScore(password) < 2) throw new Error("A senha deve ser média ou forte.")
 
@@ -175,7 +199,7 @@ export default function AuthView({
                     options: {
                         data: { full_name: generateNameFromEmail(cleanEmail) },
                         emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`,
-                        captchaToken: turnstileToken || undefined,
+                        captchaToken,
                     },
                 })
                 if (error) {
@@ -224,7 +248,7 @@ export default function AuthView({
                     email: cleanEmail,
                     password,
                     options: {
-                        captchaToken: turnstileToken || undefined,
+                        captchaToken,
                     },
                 })
 
@@ -302,11 +326,18 @@ export default function AuthView({
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             const recoveryClient = getPasswordRecoveryClient()
 
+            const captchaToken = await ensureCaptchaToken()
+            if (!captchaToken) {
+                setError("Não foi possível concluir a verificação de segurança. Aguarde alguns segundos e tente novamente.")
+                setIsLoading(false)
+                return
+            }
+
             await recoveryClient.auth.signOut({ scope: "local" })
 
             const { error } = await recoveryClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
                 redirectTo: `${origin}/auth/update-password`,
-                captchaToken: turnstileToken || undefined,
+                captchaToken,
             })
             if (error) {
                 console.error("[AUTH RESET PASSWORD ERROR]", error)

@@ -2,12 +2,15 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, DatePicker, FormDropdown, FormSection, Input, SidebarCard, TimePicker } from "@/components/reusable"
+import { Button, DatePicker, FormDropdown, FormSection, Input, SidebarCard, TimePicker } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { formatDeliveryDaysRange } from "@/lib/utils/formatters"
+import { formatCurrency } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { TruckIcon } from "@/lib/icons"
 
 const formatDateString = (dateStr: string) => {
@@ -50,6 +53,10 @@ interface AddressTabProps {
     originalDeliveryStatus?: string
     isMarketplaceLocked?: boolean
     isPaidOrder?: boolean
+    isCarrierDelivery?: boolean
+    deliveryBreakdown?: Record<string, any> | null
+    existingCarrierShipment?: Record<string, any> | null
+    onOpenCarrierShippingSheet?: () => void
     role?: string
     /** Painel admin: libera endereço/entrega mesmo após entrega/pagamento. */
     adminContext?: boolean
@@ -88,13 +95,30 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     originalDeliveryStatus = 'not_sent',
     isMarketplaceLocked = false,
     isPaidOrder = false,
+    isCarrierDelivery = false,
+    deliveryBreakdown = null,
+    existingCarrierShipment = null,
+    onOpenCarrierShippingSheet,
     role = "OPERATOR",
     adminContext = false,
 }) => {
     const { canRbac } = usePermissions()
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryStatus)
+    const showDispatchFields = deliveryMethod === "pickup"
+        || ["sent", "delivered", "delivery_failed"].includes(deliveryStatus)
+    const carrier = (deliveryBreakdown || {}) as Record<string, any>
+    const carrierName = [carrier.companyName, carrier.serviceName].filter(Boolean).join(" - ")
+        || carrier.carrier
+        || "Transportadora"
+    const carrierFee = Number(carrier.originalFee ?? carrier.deliveryFee ?? 0)
+    const carrierTrackingUrl = String(existingCarrierShipment?.tracking_url || "")
+    const carrierTrackingNumber = String(existingCarrierShipment?.tracking_number || "")
+    const canReQuoteCarrier = isCarrierDelivery && !isPaidOrder && !existingCarrierShipment && Boolean(onOpenCarrierShippingSheet)
+    // Com etiqueta já gerada, o endereço não pode mais mudar: a etiqueta
+    // impressa aponta para o endereço original.
+    const isAddressReadOnly = isPaidOrder || (isCarrierDelivery && Boolean(existingCarrierShipment))
 
-    const isAddressLocked = isPaidOrder || !canRbac("orders.edit")
+    const isAddressLocked = isAddressReadOnly || !canRbac("orders.edit")
     const isDeliveryLocked =
         (!adminContext && originalDeliveryStatus === 'delivered') || !canRbac("orders.edit")
 
@@ -110,7 +134,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 flex flex-col gap-8">
                     <FormSection title="Endereço de Entrega">
-                        {isPaidOrder ? (
+                        {isAddressReadOnly ? (
                             <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
                                 <InfoRow label="CEP" value={cep || "-"} />
                                 <InfoRow label="Rua/Avenida" value={street || "-"} />
@@ -171,6 +195,11 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         disabled={isAddressLocked}
                                     />
                                 </div>
+                                {isCarrierDelivery && !existingCarrierShipment && (
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Ao alterar o endereço, refaça a cotação da transportadora para atualizar o frete.
+                                    </p>
+                                )}
                             </div>
                         )}
                     </FormSection>
@@ -178,12 +207,56 @@ export const AddressTab: React.FC<AddressTabProps> = ({
 
                 <div className="lg:col-span-4 flex flex-col gap-8 lg:border-l lg:border-brand-border lg:pl-12 dark:lg:border-dark-border">
                     <SidebarCard hasSeparator hasTopStrip title="Informações da Entrega">
-                        {isPaidOrder ? (
+                        {isCarrierDelivery ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={getCarrierBrandIcon(carrier.companyName, carrier.serviceName, existingCarrierShipment?.carrier, carrier.carrier)}
+                                        alt={carrierName}
+                                        className="h-8 w-8 rounded object-contain"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{carrierName}</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            {formatDeliveryDaysRange(carrier.deliveryMinDays, carrier.deliveryMaxDays)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <InfoRow label="Valor" value={formatCurrency(carrierFee)} />
+                                {carrierTrackingNumber && carrierTrackingUrl && (
+                                    <InfoRow
+                                        label="Rastreio"
+                                        value={
+                                            <a
+                                                href={carrierTrackingUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-xs font-bold text-brand-dark underline dark:text-dark-heading"
+                                            >
+                                                {carrierTrackingNumber}
+                                            </a>
+                                        }
+                                    />
+                                )}
+                                {canReQuoteCarrier && (
+                                    <Button variant="outline" size="sm" className="w-full" onClick={onOpenCarrierShippingSheet}>
+                                        Alterar transportadora
+                                    </Button>
+                                )}
+                            </div>
+                        ) : isPaidOrder ? (
                             <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
-                                <InfoRow label="Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Sem entregador (não atribuído)"} />
+                                <InfoRow label="Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Entrega própria"} />
                                 <InfoRow label="Status" value={selectedStatusMeta.label} />
-                                <InfoRow label="Data de saída" value={formatDateString(deliveryDate)} />
-                                <InfoRow label="Horário de saída" value={deliveryTime || "-"} />
+                                {showDispatchFields && (
+                                    <>
+                                        <InfoRow label="Data de saída" value={formatDateString(deliveryDate)} />
+                                        <InfoRow label="Horário de saída" value={deliveryTime || "-"} />
+                                    </>
+                                )}
+                                {!showDispatchFields && (
+                                    <InfoRow label="Saída" value="Será registrada ao enviar" />
+                                )}
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4">
@@ -191,7 +264,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     label="Entregador"
                                     value={selectedDeliveryPersonId || "none"}
                                     setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
-                                    options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
+                                    options={[{ value: "none", label: "Entrega própria" }, ...deliveryPeopleOptions]}
                                     actionItem={onOpenDeliveryDriverSheet ? {
                                         label: "Entregadores Dudit",
                                         icon: <TruckIcon size={16} />,
@@ -206,22 +279,29 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     options={deliveryStatusOptions}
                                     disabled={isDeliveryLocked}
                                 />
-                                <DatePicker
-                                    label="Data de saída"
-                                    dataField="deliveryDate"
-                                    value={deliveryDate}
-                                    onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
-                                    placeholder="Selecione a data"
-                                    disabled={isDeliveryLocked}
-                                />
-                                <TimePicker
-                                    label="Horário de saída"
-                                    dataField="deliveryTime"
-                                    value={deliveryTime}
-                                    onChange={setDeliveryTime}
-                                    placeholder="Selecione o horário"
-                                    disabled={isDeliveryLocked}
-                                />
+                                {showDispatchFields && (
+                                    <>
+                                        <DatePicker
+                                            label="Data de saída"
+                                            dataField="deliveryDate"
+                                            value={deliveryDate}
+                                            onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
+                                            placeholder="Selecione a data"
+                                            disabled={isDeliveryLocked}
+                                        />
+                                        <TimePicker
+                                            label="Horário de saída"
+                                            dataField="deliveryTime"
+                                            value={deliveryTime}
+                                            onChange={setDeliveryTime}
+                                            placeholder="Selecione o horário"
+                                            disabled={isDeliveryLocked}
+                                        />
+                                    </>
+                                )}
+                                {!showDispatchFields && (
+                                    <InfoRow label="Saída" value="Será registrada ao enviar" />
+                                )}
                             </div>
                         )}
                     </SidebarCard>

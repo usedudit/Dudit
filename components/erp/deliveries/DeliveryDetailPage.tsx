@@ -714,14 +714,12 @@ export default function DeliveryDetailPage({
                         value={selectedNewStatus}
                         setValue={setSelectedNewStatus}
                         options={[
-                            { value: 'pending', label: 'Pendente' },
-                            { value: 'not_sent', label: 'Não Enviado' },
-                            { value: 'preparing', label: 'Preparando' },
-                            { value: 'pickup_available', label: 'Disponível para Retirada' },
+                            { value: 'not_sent', label: 'Não enviado' },
+                            { value: 'preparing', label: 'Em preparação' },
                             { value: 'sent', label: 'Enviado' },
                             { value: 'delivered', label: 'Entregue' },
-                            { value: 'delivery_failed', label: 'Falha na Entrega' },
-                            { value: 'cancelled', label: 'Cancelado' }
+                            { value: 'delivery_failed', label: 'Falha na entrega' },
+                            { value: 'cancelled', label: 'Cancelada' }
                         ]}
                     />
                 </div>
@@ -774,14 +772,12 @@ export default function DeliveryDetailPage({
                             value={orderNewStatus}
                             setValue={setOrderNewStatus}
                             options={[
-                                { value: 'pending', label: 'Pendente' },
-                                { value: 'not_sent', label: 'Não Enviado' },
-                                { value: 'preparing', label: 'Preparando' },
-                                { value: 'pickup_available', label: 'Disponível para Retirada' },
+                                { value: 'not_sent', label: 'Não enviado' },
+                                { value: 'preparing', label: 'Em preparação' },
                                 { value: 'sent', label: 'Enviado' },
                                 { value: 'delivered', label: 'Entregue' },
-                                { value: 'delivery_failed', label: 'Falha na Entrega' },
-                                { value: 'cancelled', label: 'Cancelado' }
+                                { value: 'delivery_failed', label: 'Falha na entrega' },
+                                { value: 'cancelled', label: 'Cancelada' }
                             ]}
                         />
                     </div>

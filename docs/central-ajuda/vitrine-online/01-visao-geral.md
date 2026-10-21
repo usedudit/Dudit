@@ -20,6 +20,22 @@ Um produto pode aparecer em diferentes lugares da Vitrine Online, e cada local u
 
 O ranqueamento é **dinâmico**: ele acompanha o desempenho do catálogo ao longo do tempo. Um produto que hoje está em destaque pode subir ou descer conforme o comportamento dos clientes muda.
 
+## Filtros da vitrine da loja
+
+Na página da sua loja, o cliente pode refinar o que está vendo com os mesmos filtros da página Explorar:
+
+| Filtro | Onde aparece |
+| :--- | :--- |
+| **Tipo** | Alterna entre Produtos, Serviços e Assinaturas |
+| **Preço** | Preço mínimo e máximo |
+| **Condição** | Novo ou Usado/Desapego (apenas em produtos) |
+| **Avaliação** | 4+ ou 4,5+ estrelas |
+| **Em promoção** | Apenas itens com desconto ativo |
+| **Marca** | Filtra por marca (apenas em produtos) |
+| **Ordenar** | Relevância, menor/maior preço, mais recentes, melhor avaliados |
+
+> [i] Todos os filtros aplicados ficam na URL da página: o cliente pode copiar o link do navegador para mostrar exatamente a mesma lista para outra pessoa, e o botão "voltar" do navegador desfaz o último filtro.
+
 ## Fatores que influenciam a posição
 
 Vários fatores são considerados em conjunto para definir a posição de um produto. Nenhum fator isolado garante o topo - o equilíbrio entre eles é o que importa:

@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react
 export interface TurnstileRef {
   reset: () => void
   execute: () => void
+  getToken: () => Promise<string | null>
   getResponse: () => string | undefined
   getWidgetId: () => string | null
 }
@@ -75,8 +76,13 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
     cdata,
     theme = "auto",
     size = "normal",
+    // "interaction-only" keeps the widget hidden for legitimate visitors and only
+    // shows it when Cloudflare actually needs an interaction. Invisible widgets are
+    // never shown regardless of this setting.
     appearance = "interaction-only",
-    execution = "execute",
+    // "render" (Cloudflare's default) runs the challenge in the background right
+    // after render(), so the token is ready by the time the user submits.
+    execution = "render",
     onSuccess,
     onError,
     onExpire,
@@ -87,6 +93,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
+  const tokenWaitersRef = useRef<Array<(token: string | null) => void>>([])
 
   // Callbacks refs to avoid stale closures
   const onSuccessRef = useRef(onSuccess)
@@ -99,23 +106,33 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
     onExpireRef.current = onExpire
   }, [onSuccess, onError, onExpire])
 
+  // Resolves every pending getToken() waiter.
+  const settleWaiters = (token: string | null) => {
+    if (tokenWaitersRef.current.length === 0) return
+    const waiters = tokenWaitersRef.current
+    tokenWaitersRef.current = []
+    waiters.forEach((resolve) => resolve(token))
+  }
+
+  // Re-arms the challenge so a fresh token is produced after a failed attempt.
+  const rearmChallenge = () => {
+    if (!widgetIdRef.current || typeof window === "undefined" || !(window as any).turnstile) return
+    const id = widgetIdRef.current
+    setTimeout(() => {
+      try {
+        ;(window as any).turnstile?.execute(id)
+      } catch (err) {
+        console.warn("[TURNSTILE] Failed to re-arm challenge:", err)
+      }
+    }, 0)
+  }
+
   useImperativeHandle(ref, () => ({
     reset: () => {
       if (widgetIdRef.current && typeof window !== "undefined" && (window as any).turnstile) {
         try {
           ;(window as any).turnstile.reset(widgetIdRef.current)
-          // In "execute" mode the widget does not run on its own after a reset,
-          // so we re-run it (deferred) to produce a fresh token.
-          if (execution === "execute") {
-            const id = widgetIdRef.current
-            setTimeout(() => {
-              try {
-                ;(window as any).turnstile?.execute(id)
-              } catch (err) {
-                console.warn("[TURNSTILE] Failed to re-execute after reset:", err)
-              }
-            }, 0)
-          }
+          rearmChallenge()
         } catch (err) {
           console.warn("[TURNSTILE] Failed to reset widget:", err)
         }
@@ -129,6 +146,58 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
           console.warn("[TURNSTILE] Failed to execute widget:", err)
         }
       }
+    },
+    /**
+     * Returns a valid token, waiting for the challenge to finish if needed.
+     * This avoids firing an auth request that is guaranteed to fail with
+     * `captcha_failed` because the token was not ready yet.
+     */
+    getToken: () => {
+      if (typeof window === "undefined" || !(window as any).turnstile || !widgetIdRef.current) {
+        return Promise.resolve<string | null>(null)
+      }
+
+      const current = (window as any).turnstile.getResponse(widgetIdRef.current)
+      if (current) return Promise.resolve<string>(current)
+
+      return new Promise<string | null>((resolve) => {
+        let settled = false
+        let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+        let timeoutTimer: ReturnType<typeof setTimeout> | undefined
+
+        const finish = (token: string | null) => {
+          if (settled) return
+          settled = true
+          if (fallbackTimer) clearTimeout(fallbackTimer)
+          if (timeoutTimer) clearTimeout(timeoutTimer)
+          const index = tokenWaitersRef.current.indexOf(finish)
+          if (index >= 0) tokenWaitersRef.current.splice(index, 1)
+          resolve(token)
+        }
+
+        tokenWaitersRef.current.push(finish)
+
+        // Manual execution mode: the challenge only runs when requested.
+        if (execution === "execute") {
+          try {
+            ;(window as any).turnstile.execute(widgetIdRef.current)
+          } catch (err) {
+            console.warn("[TURNSTILE] Failed to execute widget:", err)
+          }
+        } else {
+          // Auto execution mode: if the widget did not produce a token on its own,
+          // force the challenge to run.
+          fallbackTimer = setTimeout(() => {
+            try {
+              ;(window as any).turnstile?.execute(widgetIdRef.current)
+            } catch (err) {
+              console.warn("[TURNSTILE] Failed to force challenge execution:", err)
+            }
+          }, 4000)
+        }
+
+        timeoutTimer = setTimeout(() => finish(null), 15000)
+      })
     },
     getResponse: () => {
       if (widgetIdRef.current && typeof window !== "undefined" && (window as any).turnstile) {
@@ -178,58 +247,45 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
             appearance,
             execution,
             callback: (token: string) => {
+              settleWaiters(token)
               if (isMountedRef.current) {
                 onSuccessRef.current?.(token)
               }
             },
             "error-callback": (error: any) => {
               console.warn("[TURNSTILE] Error reported by Cloudflare:", error)
+              settleWaiters(null)
               if (isMountedRef.current) {
                 onErrorRef.current?.(error)
               }
             },
             "expired-callback": () => {
+              settleWaiters(null)
               if (isMountedRef.current) {
                 onExpireRef.current?.()
               }
-              // Tokens expire (~5min). Re-run (deferred) so a fresh token is ready.
-              if (execution === "execute") {
-                const id = widgetIdRef.current
-                setTimeout(() => {
-                  try {
-                    turnstile.execute(id)
-                  } catch (err) {
-                    console.warn("[TURNSTILE] Failed to re-execute after expiry:", err)
-                  }
-                }, 0)
-              }
+              // Tokens expire after 5 minutes. Produce a fresh one right away.
+              rearmChallenge()
             },
           })
 
           widgetIdRef.current = widgetId
-
-          // In "execute" mode (used for Invisible widgets) the widget does not run
-          // on its own, so we trigger it on mount to have the token ready.
-          if (execution === "execute") {
-            try {
-              turnstile.execute(widgetId)
-            } catch (err) {
-              console.warn("[TURNSTILE] Failed to auto-execute widget on mount:", err)
-            }
-          }
         } catch (renderError) {
           console.error("[TURNSTILE] Render error:", renderError)
+          settleWaiters(null)
           onErrorRef.current?.(renderError)
         }
       })
       .catch((scriptError) => {
         console.error("[TURNSTILE] Failed to load script:", scriptError)
+        settleWaiters(null)
         onErrorRef.current?.(scriptError)
       })
 
     return () => {
       isCancelled = true
       isMountedRef.current = false
+      settleWaiters(null)
       if (widgetIdRef.current && typeof window !== "undefined" && (window as any).turnstile) {
         try {
           ;(window as any).turnstile.remove(widgetIdRef.current)

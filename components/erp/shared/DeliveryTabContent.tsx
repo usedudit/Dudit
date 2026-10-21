@@ -7,11 +7,14 @@ import {
 } from "@/lib/icons"
 import { FormSection, ListItem, Badge, Button, DefaultModal, SidebarCard } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
+import DeliveryAddressCard from "@/components/erp/shared/DeliveryAddressCard"
 import { formatDayMonth, formatTime, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
+import { CARRIER_STATUS_LABELS } from "@/lib/orders/carrier-status"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import DuditDriverDetailsModal from "@/components/erp/deliveries/DuditDriverDetailsModal"
 import { DuditPlatformDriver } from "@/components/erp/deliveries/types"
+import type { AddressParts } from "@/lib/utils/format-address"
 
 export interface CarrierShipment {
     id?: string
@@ -33,15 +36,13 @@ export interface CarrierInfo {
     breakdown?: any
 }
 
-const CARRIER_STATUS_LABELS: Record<string, string> = {
-    pending: "Aguardando pagamento da etiqueta",
-    released: "Aguardando postagem",
-    posted: "Postado",
-    in_transit: "Em trânsito",
-    delivered: "Entregue",
-    cancelled: "Envio cancelado",
-    failed: "Falha no envio",
-}
+export {
+    CARRIER_STATUS_LABELS,
+    CARRIER_STATUS_VARIANTS,
+    getCarrierStatusLabel,
+    getCarrierStatusVariant,
+} from "@/lib/orders/carrier-status"
+
 
 export function getOutboundCarrierShipment(order: any): CarrierShipment | null {
     const list: CarrierShipment[] = Array.isArray(order?.order_shipments)
@@ -54,6 +55,24 @@ export function getOutboundCarrierShipment(order: any): CarrierShipment | null {
 
 export function isCarrierDeliveryOrder(order: any): boolean {
     return order?.delivery_breakdown?.source === "superfrete" || !!getOutboundCarrierShipment(order)
+}
+
+function buildAddressPartsFromBreakdown(raw: any): AddressParts | null {
+    if (!raw || typeof raw !== "object") return null
+    const street = String(raw.street || "").trim()
+    const city = String(raw.city || "").trim()
+    const state = String(raw.state || raw.uf || "").trim()
+    const postalCode = String(raw.postalCode || raw.zip_code || raw.zipCode || "").trim()
+    if (!street || !city || !state) return null
+    return {
+        street,
+        number: raw.number || null,
+        complement: raw.complement || null,
+        neighborhood: raw.district || raw.neighborhood || null,
+        city,
+        state,
+        zip_code: postalCode || null,
+    }
 }
 
 function inferCarrierCompany(service?: string | null): string | null {
@@ -811,6 +830,13 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
 
     const content = (
         <div className="space-y-3">
+            {order.delivery_address && !isPickup && (
+                <DeliveryAddressCard
+                    name={order.customer_name || order.customer?.name || null}
+                    rawAddress={order.delivery_address}
+                    address={buildAddressPartsFromBreakdown(order.delivery_breakdown?.destinationAddress)}
+                />
+            )}
             <DetailRow label="Tipo de entrega" value={getFulfillmentType()} />
             {carrier && <DetailRow label="Serviço" value={getCarrierTitle(carrier)} />}
             {carrier?.breakdown &&
@@ -825,16 +851,6 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
                 )}
             {carrier?.shipment?.tracking_number && (
                 <DetailRow label="Código de rastreamento" value={carrier.shipment.tracking_number} />
-            )}
-            {order.delivery_address && !isPickup && (
-                <DetailRow
-                    label="Endereço"
-                    value={
-                        <span className="text-sm truncate inline-block max-w-[200px]">
-                            {order.delivery_address}
-                        </span>
-                    }
-                />
             )}
             {deliveryNumber && (
                 <DetailRow label="Nº Entrega" value={`#${deliveryNumber}`} />

@@ -6,8 +6,14 @@ import { helpCategories } from "@/lib/help-data"
 export const revalidate = 86400
 
 const CATEGORY_SLUGS = [
+    // Produtos
     "alimentacao", "casa", "tecnologia", "moda-e-beleza", "saude",
     "automotivo", "pets", "servicos", "outros",
+    // Serviços
+    "reformas-e-manutencao", "assistencia-tecnica", "beleza-e-estetica",
+    "fretes-e-profissionais", "outros-servicos",
+    // Lojas / vitrines
+    "varejo", "construcao-e-casa", "profissional-consultoria", "educacao",
 ]
 
 const ESTADOS = [

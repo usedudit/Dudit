@@ -40,7 +40,7 @@ type CreateDeliveryPayload = {
   deliveryPersonId?: string | null
   platformDriverId?: string | null
   status: DeliveryStatusValue
-  startedAt: string
+  startedAt?: string
   notes?: string
 }
 
@@ -1324,19 +1324,22 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     const orderIds = Array.from(new Set(payload.orderIds || [])).filter(Boolean)
     if (orderIds.length === 0) return { success: false as const, error: "Selecione ao menos um pedido válido." }
-    if (!payload.startedAt) return { success: false as const, error: "Informe data e hora de saída." }
     const planCheck = await enforceDeliveryPlanAccess(payload.partnerId, orderIds.length)
     if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
 
     const { data: selectedOrders, error: orderError } = await supabase
       .from("orders")
-      .select("id, partner_id, delivery_fee, total_amount, delivery_address, buyer_id")
+      .select("id, partner_id, delivery_fee, total_amount, delivery_address, buyer_id, delivery_breakdown, order_shipments(id, kind)")
       .in("id", orderIds)
       .eq("partner_id", payload.partnerId)
       .order("created_at", { ascending: false })
 
     if (orderError || !selectedOrders || selectedOrders.length !== orderIds.length) {
       return { success: false as const, error: "Um ou mais pedidos não foram encontrados para esta loja." }
+    }
+
+    if ((selectedOrders || []).some((ord: any) => isCarrierBoundOrder(ord))) {
+      return { success: false as const, error: "Pedidos com transportadora não entram no fluxo de entrega própria." }
     }
 
     const { data: alreadyAssigned } = await supabase
@@ -1409,6 +1412,9 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     }
 
     const status = normalizeDeliveryStatus(payload.status)
+    const startedAt = payload.startedAt?.trim() ? payload.startedAt : null
+    const nowIso = new Date().toISOString()
+    const terminalAt = startedAt || nowIso
 
     const { data: previousPendingLinks } = await supabase
       .from("delivery_orders")
@@ -1435,10 +1441,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         status,
         distance_km: distanceKm,
         estimated_duration_minutes: estimatedDurationMinutes,
-        started_at: payload.startedAt,
-        departure_time: payload.startedAt,
-        delivered_at: status === "delivered" ? payload.startedAt : null,
-        completed_at: ["delivered", "cancelled", "delivery_failed"].includes(status) ? payload.startedAt : null,
+        started_at: startedAt,
+        departure_time: startedAt,
+        delivered_at: status === "delivered" ? terminalAt : null,
+        completed_at: ["delivered", "cancelled", "delivery_failed"].includes(status) ? terminalAt : null,
         notes: sanitizeNotes(payload.notes),
       }
 
@@ -1468,10 +1474,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         status,
         distance_km: distanceKm,
         estimated_duration_minutes: estimatedDurationMinutes,
-        started_at: payload.startedAt,
-        departure_time: payload.startedAt,
-        delivered_at: status === "delivered" ? payload.startedAt : null,
-        completed_at: status === "delivered" ? payload.startedAt : null,
+        started_at: startedAt,
+        departure_time: startedAt,
+        delivered_at: status === "delivered" ? terminalAt : null,
+        completed_at: ["delivered", "cancelled", "delivery_failed"].includes(status) ? terminalAt : null,
         created_at: new Date().toISOString(),
         notes: sanitizeNotes(payload.notes),
         delivery_number: deliveryNumber,
@@ -1530,7 +1536,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       order_id: orderId,
       position: idx + 1,
       status: status === "delivered" ? "delivered" : "pending",
-      delivered_at: status === "delivered" ? payload.startedAt : null,
+      delivered_at: status === "delivered" ? terminalAt : null,
     }))
 
     const { error: linkError } = await getAdminClient().from("delivery_orders").insert(linkRows)
@@ -1544,15 +1550,15 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     // Order-level timestamps & delivery_status (best-effort; do not block)
     try {
       const orderPatch: Record<string, unknown> = {
-        delivery_status: status,
+        delivery_status: status === "pending" ? "not_sent" : status,
       }
-      if (status === "sent") {
-        orderPatch.delivery_departure_at = payload.startedAt
+      if (status === "sent" && startedAt) {
+        orderPatch.delivery_departure_at = startedAt
       }
       if (status === "delivered") {
-        orderPatch.delivery_departure_at = payload.startedAt
-        orderPatch.delivery_arrived_at = payload.startedAt
-        orderPatch.delivery_completed_at = payload.startedAt
+        orderPatch.delivery_departure_at = startedAt
+        orderPatch.delivery_arrived_at = terminalAt
+        orderPatch.delivery_completed_at = terminalAt
       }
       await supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", payload.partnerId)
     } catch (err) {
@@ -1676,7 +1682,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               position,
               status,
               delivered_at,
-              orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
+              orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_breakdown, order_shipments(id, kind))
             )
           `)
             .eq("partner_id", partnerId)
@@ -1689,7 +1695,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             .limit(fetchLimit)
 
           if (error) throw error
-          const rows = data || []
+          const rows = (data || []).filter((row: any) => {
+            const links = Array.isArray(row.delivery_orders) ? row.delivery_orders : []
+            return !links.some((link: any) => isCarrierBoundOrder(link?.orders))
+          })
 
           const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
           const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
@@ -1857,7 +1866,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         position,
         status,
         delivered_at,
-        orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
+        orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source, delivery_breakdown, order_shipments(id, kind))
       )
     `)
       .eq("partner_id", partnerId)
@@ -1910,7 +1919,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       .limit(fetchLimit)
 
     if (error) throw error
-    let rows = data || []
+    let rows = (data || []).filter((row: any) => {
+      const links = Array.isArray(row.delivery_orders) ? row.delivery_orders : []
+      return !links.some((link: any) => isCarrierBoundOrder(link?.orders))
+    })
 
     rows = rows.filter((row: any) => {
       const isPersonMatch = validDeliveryPersonIds.includes(String(row.delivery_person_id || ""))
@@ -2513,7 +2525,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     if (orderIds.length > 0) {
       const orderPatch: Record<string, unknown> = {
-        delivery_status: nextStatus,
+        delivery_status: nextStatus === "pending" ? "not_sent" : nextStatus,
       }
       if (nextStatus === "sent") {
         orderPatch.delivery_departure_at = nowIso
@@ -2844,7 +2856,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     // Sync order-level delivery status & timestamps
     try {
       const orderPatch: Record<string, unknown> = {
-        delivery_status: nextStatus,
+        delivery_status: nextStatus === "pending" ? "not_sent" : nextStatus,
       }
       if (nextStatus === "sent") {
         orderPatch.delivery_departure_at = startedAt
@@ -2986,7 +2998,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   }
 
   const orderPatch: Record<string, unknown> = {
-    delivery_status: nextStatus,
+    delivery_status: nextStatus === "pending" ? "not_sent" : nextStatus,
   }
   if (nextStatus === "sent") {
     orderPatch.delivery_departure_at = nowIso
@@ -3097,4 +3109,165 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   revalidateDeliveryDashboard(params.partnerId)
   return { success: true as const, deliveryStatus: resultingDeliveryStatus }
+}
+
+export type ERPCarrierDeliveryListCursor = { createdAt: string; id: string }
+
+/**
+ * Indica se o parceiro tem integração com transportadora configurada.
+ * Usado para exibir (ou não) a aba "Transportadora" em Entregas.
+ */
+export async function getERPCarrierDeliveriesEnabledAction(
+  partnerId: string
+): Promise<{ success: true; enabled: boolean } | { success: false; error: string }> {
+  try {
+    await requireUser()
+    await requireActivePartnerContext(partnerId)
+    const supabase = getAdminClient()
+    const { data } = await supabase
+      .from("partner_integrations")
+      .select("id, status, access_token_encrypted")
+      .eq("partner_id", partnerId)
+      .eq("provider_slug", "superfrete")
+      .maybeSingle()
+    const enabled = Boolean(data?.access_token_encrypted)
+    return { success: true, enabled }
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Erro ao verificar integração de transportadora." }
+  }
+}
+
+/**
+ * Lista pedidos atendidos por transportadora (SuperFrete) para a aba
+ * "Transportadora" da página de Entregas.
+ */
+export async function getERPCarrierDeliveriesPageAction(
+  partnerId: string,
+  options?: { cursor?: ERPCarrierDeliveryListCursor | null; limit?: number }
+): Promise<
+  | {
+    success: true
+    items: any[]
+    nextCursor: ERPCarrierDeliveryListCursor | null
+    hasMore: boolean
+  }
+  | { success: false; error: string }
+> {
+  try {
+    const user = await requireUser()
+    if (!user) return { success: false, error: "Não autenticado." }
+    await requireActivePartnerContext(partnerId)
+
+    const orderListCheck = await checkPermission(partnerId, "orders", "list")
+    if (!orderListCheck.allowed) {
+      return { success: false, error: "Sem permissão para listar pedidos." }
+    }
+
+    const supabase = getAdminClient()
+    const cursor = options?.cursor ?? null
+    const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || DEFAULT_PAGE_SIZE))))
+    const fetchLimit = limit + 1
+
+    let q = supabase
+      .from("orders")
+      .select(`
+        id,
+        order_number,
+        customer_name,
+        buyer_id,
+        delivery_address,
+        delivery_fee,
+        total_amount,
+        delivery_status,
+        delivery_breakdown,
+        situation,
+        order_source,
+        created_at,
+        order_shipments(
+          id,
+          status,
+          carrier,
+          provider_slug,
+          service_code,
+          service_name,
+          tracking_number,
+          tracking_url,
+          label_url,
+          external_label_id,
+          price,
+          kind,
+          created_at,
+          updated_at,
+          paid_at,
+          delivered_at,
+          cancelled_at
+        )
+      `)
+      .eq("partner_id", partnerId)
+      .eq("delivery_type", "delivery")
+      .or("delivery_breakdown->>source.eq.superfrete")
+
+    if (cursor) q = q.or(buildKeysetFilter(cursor))
+
+    const { data, error } = await q
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(fetchLimit)
+
+    if (error) throw error
+
+    // O filtro por JSONB no banco já restringe aos pedidos de transportadora;
+    // a checagem em JS cobre pedidos antigos com etiqueta e sem breakdown.
+    const rows = (data || []).filter((row: any) => {
+      const breakdown = row.delivery_breakdown as any
+      const isCarrierBreakdown = breakdown?.source === "superfrete"
+      const hasShipment = (row.order_shipments || []).some((s: any) => s?.kind !== "return")
+      return isCarrierBreakdown || hasShipment
+    })
+
+    const hasMore = rows.length > limit
+    const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+      const shipments = (row.order_shipments || [])
+        .filter((s: any) => s?.kind !== "return")
+        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      const shipment = shipments[0] || null
+      const breakdown = (row.delivery_breakdown || {}) as Record<string, any>
+
+      return {
+        id: row.id,
+        orderId: row.id,
+        orderNumber: row.order_number || `#${String(row.id).slice(0, 8).toUpperCase()}`,
+        customerName: row.customer_name || "Consumidor final",
+        customerAddress: row.delivery_address || "",
+        totalAmount: Number(row.total_amount || 0),
+        deliveryFee: Number(row.delivery_fee || 0),
+        orderSource: row.order_source || "Manual",
+        situation: row.situation || "pending",
+        orderStatus: row.delivery_status || "not_sent",
+        carrierStatus: shipment?.status || "awaiting_label",
+        carrierName: breakdown.companyName || shipment?.carrier || breakdown.carrier || "Transportadora",
+        serviceName: breakdown.serviceName || shipment?.service_name || null,
+        serviceCode: shipment?.service_code || null,
+        deliveryMinDays: breakdown.deliveryMinDays ?? null,
+        deliveryMaxDays: breakdown.deliveryMaxDays ?? null,
+        price: shipment?.price != null ? Number(shipment.price) : Number(breakdown.originalFee || 0),
+        trackingNumber: shipment?.tracking_number || null,
+        trackingUrl: shipment?.tracking_url || null,
+        labelUrl: shipment?.label_url || null,
+        externalLabelId: shipment?.external_label_id || null,
+        hasLabel: Boolean(shipment?.external_label_id),
+        createdAt: row.created_at || null,
+        createdAtMs: new Date(row.created_at || 0).getTime(),
+      }
+    })
+
+    const last = items[items.length - 1]
+    const nextCursor = hasMore && last?.createdAt
+      ? { createdAt: String(last.createdAt), id: String(last.id) }
+      : null
+
+    return { success: true, items, nextCursor, hasMore }
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Erro ao carregar envios da transportadora." }
+  }
 }

@@ -1,12 +1,10 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import type { LocationContext } from "@/lib/utils/location-label"
-import { getLocationLabel } from "@/lib/utils/location-label"
 import { IconPlaceholder, DefaultModal, SkeletonLoader, ListItem, Input, RadioButton, Button } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
@@ -14,16 +12,13 @@ import {
     MapPin,
     Check,
 } from "lucide-react"
-import Link from "next/link"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
-import { getProductDisplayImages, getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { StarIcon, ClockIcon, SearchIcon, XIcon } from "@/lib/icons"
-import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
+import { getProductDisplayImages } from "@/lib/utils/product-display-images"
+import { SearchIcon, XIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
@@ -37,7 +32,30 @@ import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
 import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP } from "./explorar-constants"
-import type { SortOption, ViewMode } from "./explorar-constants"
+import type { SortOption } from "./explorar-constants"
+import {
+    DELIVERY_OPTIONS,
+    EMPTY_FILTER_STATE,
+    LOJA_SEM_CATEGORIA,
+    OUTROS_CATEGORY,
+    getItemDistanceKm,
+    getItemRating,
+    isItemUncategorized,
+    isPromoItem,
+    itemMatchesCategory,
+    matchesConditionFilter,
+    matchesDeliveryFilter,
+    matchesDistanceFilter,
+    matchesPriceRange,
+    matchesRatingFilter,
+    matchesShippingFilter,
+    mergeCategoryLists,
+    parseFiltersFromParams,
+    serializeFiltersToParams,
+    type CategoryLists,
+    type DeliveryFilter,
+    type ExploreFilterState,
+} from "./explorar-filters"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 import { trackEvent } from "@/lib/analytics"
@@ -170,7 +188,6 @@ export function ExplorarPageClient({
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [dbServiceCategories, setDbServiceCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
     const [dbPartnerCategories, setDbPartnerCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
-    const [viewMode, setViewMode] = useState<ViewMode>("grid")
 
     const locationContext = useMemo<LocationContext | null>(() => {
         const currentCity = selectedCitySlug || pathCity || null
@@ -229,7 +246,6 @@ export function ExplorarPageClient({
     // Modal states
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-    const [activeTab, setActiveTab] = useState<"filtros" | "ordenar">("filtros")
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
     const [isMobileScrolled, setIsMobileScrolled] = useState(false)
@@ -270,6 +286,24 @@ export function ExplorarPageClient({
     const [maxPrice, setMaxPrice] = useState<number | string>("")
     const [selectedCondition, setSelectedCondition] = useState<string>("")
     const [onlyShipping, setOnlyShipping] = useState(false)
+    const [minRating, setMinRating] = useState<number | null>(null)
+    const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("")
+    const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null)
+    const [showcaseOnly, setShowcaseOnly] = useState(false)
+
+    // Estado consolidado dos filtros (usado na URL, nos chips e na aplicação).
+    const filterState: ExploreFilterState = useMemo(() => ({
+        categories: selectedCategories,
+        minPrice,
+        maxPrice,
+        promoOn,
+        condition: selectedCondition,
+        shipping: onlyShipping,
+        minRating,
+        delivery: deliveryFilter,
+        maxDistanceKm,
+        showcaseOnly,
+    }), [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly])
 
     const isFirstMountParamsRef = useRef(true)
     const prevParamsKeyRef = useRef("")
@@ -313,7 +347,7 @@ export function ExplorarPageClient({
         searchQ: string,
         typeStr: string,
         sectionVal?: string | null,
-        forceFullNavigation = false
+        overrides?: Partial<ExploreFilterState> & { sortBy?: SortOption }
     ) => {
         const queryParams = new URLSearchParams()
         if (searchQ) queryParams.set("q", searchQ)
@@ -323,6 +357,14 @@ export function ExplorarPageClient({
         if (sVal) {
             queryParams.set("section", sVal)
         }
+
+        // Filtros ativos vão para a URL: o link fica compartilhável e o botão
+        // voltar do navegador volta ao estado anterior dos filtros.
+        const filtersToPersist: ExploreFilterState = { ...filterState, ...(overrides ?? {}) }
+        serializeFiltersToParams(filtersToPersist, queryParams)
+
+        const sortToPersist = overrides?.sortBy ?? sortBy
+        if (sortToPersist && sortToPersist !== "relevancia") queryParams.set("ord", sortToPersist)
 
         const queryStr = queryParams.toString()
         const queryPart = queryStr ? `?${queryStr}` : ""
@@ -350,6 +392,26 @@ export function ExplorarPageClient({
     }
 
     // Handles browser Back/Forward navigation syncing path params and searchParams back to component state
+    const VALID_SORT_OPTIONS: SortOption[] = ["relevancia", "preco_menor", "preco_maior", "recentes", "avaliacao", "distancia"]
+
+    // Aplica os filtros vindos da URL (compartilhamento de link / botão voltar).
+    const applyFiltersFromUrl = useCallback((urlParams: URLSearchParams) => {
+        const parsed = parseFiltersFromParams(urlParams)
+        setMinPrice(parsed.minPrice)
+        setMaxPrice(parsed.maxPrice)
+        setPromoOn(parsed.promoOn)
+        setSelectedCondition(parsed.condition)
+        setOnlyShipping(parsed.shipping)
+        setMinRating(parsed.minRating)
+        setDeliveryFilter(parsed.delivery)
+        setMaxDistanceKm(parsed.maxDistanceKm)
+        setShowcaseOnly(parsed.showcaseOnly)
+
+        const ord = urlParams.get("ord") as SortOption | null
+        setSortBy(ord && VALID_SORT_OPTIONS.includes(ord) ? ord : "relevancia")
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     useEffect(() => {
         const urlType = searchParams.get("type") || "tudo"
         setCurrentType(urlType as any)
@@ -382,6 +444,8 @@ export function ExplorarPageClient({
 
         setSelectedCategories(nextCats)
 
+        applyFiltersFromUrl(new URLSearchParams(searchParams.toString()))
+
         const currentFilterKey = `${urlType}:${urlSection || ""}:${urlCity || ""}:${nextCats.join(",")}`
         if (isFirstMountParamsRef.current) {
             isFirstMountParamsRef.current = false
@@ -390,7 +454,7 @@ export function ExplorarPageClient({
             prevParamsKeyRef.current = currentFilterKey
             triggerFilterLoading()
         }
-    }, [searchParams, params, triggerFilterLoading])
+    }, [searchParams, params, triggerFilterLoading, applyFiltersFromUrl])
 
     // Popstate listener to guarantee 0ms responsive Back/Forward sync with window.history.pushState
     useEffect(() => {
@@ -418,11 +482,13 @@ export function ExplorarPageClient({
             } else {
                 setSelectedCategories([])
             }
+
+            applyFiltersFromUrl(url.searchParams)
         }
 
         window.addEventListener("popstate", onPopState)
         return () => window.removeEventListener("popstate", onPopState)
-    }, [triggerFilterLoading])
+    }, [triggerFilterLoading, applyFiltersFromUrl])
 
 
 
@@ -605,9 +671,15 @@ export function ExplorarPageClient({
         return rawItems.map((item: any) => {
             const itemType = normalizeItemType(item)
             if (itemType === "loja") {
+                // Vitrine sem categoria cadastrada chega do servidor com o rótulo
+                // "Loja Parceira" - limpamos para o card não mostrar uma
+                // categoria falsa (e para o filtro "Outros" pegar a loja).
+                const rawCategory = typeof item?.category === "string" ? item.category : null
+                const hasCategory = !!rawCategory && rawCategory !== LOJA_SEM_CATEGORIA
                 return {
                     ...item,
                     itemType,
+                    category: hasCategory ? rawCategory : null,
                 }
             }
             const images = getProductDisplayImages(item)
@@ -623,6 +695,32 @@ export function ExplorarPageClient({
             }
         })
     }, [rawItems])
+
+    const productCategories = useMemo(
+        () => (dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES),
+        [dbCategories]
+    )
+
+    // Listas de categorias por tipo de item (usadas para saber se um item
+    // tem categoria conhecida e, portanto, se entra ou não no filtro "Outros").
+    const categoryLists: CategoryLists = useMemo(() => ({
+        products: productCategories,
+        services: dbServiceCategories,
+        partners: dbPartnerCategories,
+    }), [productCategories, dbServiceCategories, dbPartnerCategories])
+
+    const isUncategorized = useCallback(
+        (item: any) => isItemUncategorized(item, categoryLists),
+        [categoryLists]
+    )
+
+    // A categoria selecionada também vale para as vitrines em destaque.
+    const matchesSelectedCategory = useCallback((item: any) => {
+        if (selectedCategories.length === 0) return true
+        const activeCat = selectedCategories[0]
+        if (activeCat === OUTROS_CATEGORY) return isUncategorized(item)
+        return itemMatchesCategory(item, activeCat)
+    }, [selectedCategories, isUncategorized])
 
     const { vitrinesDestaque, dataToFilter } = useMemo(() => {
         if (currentType === 'vitrines') {
@@ -684,7 +782,11 @@ export function ExplorarPageClient({
         }
 
         if (currentType === 'tudo') {
-            const vitrines = normalizedInitialResults.filter(r => r.itemType === 'loja')
+            // As vitrines em destaque também respeitam a categoria selecionada
+            // (inclusive "Outros", que mostra as lojas sem categoria).
+            const vitrines = normalizedInitialResults
+                .filter(r => r.itemType === 'loja')
+                .filter(matchesSelectedCategory)
             const sortedVitrines = [...vitrines]
                 .sort((a, b) => (b.rating || 0) - (a.rating || 0))
                 .slice(0, 20)
@@ -694,138 +796,100 @@ export function ExplorarPageClient({
 
         const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
         return { vitrinesDestaque: [], dataToFilter: list }
-    }, [normalizedInitialResults, currentType])
+    }, [normalizedInitialResults, currentType, matchesSelectedCategory])
 
-    const matchCategory = (itemCategory: string | null, catName: string) => {
-        if (!itemCategory) return false
-        const categoryStr = typeof itemCategory === 'string' ? itemCategory : String(itemCategory || "")
-        if (!categoryStr) return false
-        const normalize = (s: string) => s
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/&/g, "e")
-            .replace(/[-_]+/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-        const normItem = normalize(categoryStr)
-        const normTarget = normalize(catName)
-        if (normItem === normTarget) return true
-        // Fallback: check if one contains the other (for subcategory variations)
-        // Only if the difference isn't too large (avoid false positives like "casa" matching "casa & utilidades")
-        const lenDiff = Math.abs(normItem.length - normTarget.length)
-        if (lenDiff <= 8 && (normItem.includes(normTarget) || normTarget.includes(normItem))) {
-            return true
-        }
-        return false
-    }
-
-    const getItemCategoryNames = (item: any) => {
-        return [
-            item?.category,
-            item?.subcategoryName,
-            item?.subcategory,
-            item?.marketplace_category?.name,
-            item?.marketplace_category?.parent?.name,
-            item?.service_categories?.name,
-        ].filter(Boolean) as string[]
-    }
-
-    const itemMatchesCategory = (item: any, catName: string) => {
-        return getItemCategoryNames(item).some((name) => matchCategory(name, catName))
-    }
-
-    const productCategories = useMemo(
-        () => (dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES),
-        [dbCategories]
-    )
-
+    // Categorias oferecidas no filtro. Em "Tudo" mostramos a união das três
+    // listas (produtos + serviços + lojas), sem duplicar nomes.
     const filterCategoriesList = useMemo(() => {
         if (currentType === "servicos") return dbServiceCategories
         if (currentType === "vitrines" || currentType === "negocios") return dbPartnerCategories
-        return productCategories
+        if (currentType === "produtos") return productCategories
+        return mergeCategoryLists([productCategories, dbServiceCategories, dbPartnerCategories])
     }, [currentType, dbServiceCategories, dbPartnerCategories, productCategories])
-
-    const isStandardCategory = useCallback((catName: string) => {
-        return filterCategoriesList.some(cat => matchCategory(catName, cat.name))
-    }, [filterCategoriesList])
 
     const activeCategoriesList = useMemo(() => {
         const all = [...filterCategoriesList]
-        const hasOutros = dataToFilter.some(p => {
-            if (p.itemType === 'loja') return false
-            const itemCat = p.category
-            return !itemCat || !isStandardCategory(itemCat)
-        })
-        if (hasOutros && !all.some(c => c.name === "Outros")) {
-            all.push({ name: "Outros", icon_url: null })
+        // As categorias vêm do banco via client-side fetch. Enquanto não
+        // carregaram, não faz sentido oferecer "Outros" (a lista viria só com
+        // ele e pareceria errada no primeiro paint).
+        if (filterCategoriesList.length === 0) return all
+        const hasOutros = dataToFilter.some(isUncategorized)
+        if (hasOutros && !all.some(c => c.name === OUTROS_CATEGORY)) {
+            all.push({ name: OUTROS_CATEGORY, icon_url: null })
         }
         return all
-    }, [filterCategoriesList, dataToFilter, isStandardCategory])
+    }, [filterCategoriesList, dataToFilter, isUncategorized])
 
     const categoryCircles = useMemo(
         () => (currentType === "tudo" ? CATEGORY_GROUPS : activeCategoriesList),
         [currentType, activeCategoriesList]
     )
 
-    const outrosItems = useMemo(() => {
-        return dataToFilter.filter(p => {
-            if (p.itemType === 'loja') return false
-            const itemCat = p.category
-            return !itemCat || !isStandardCategory(itemCat)
-        }).slice(0, 20)
-    }, [dataToFilter, isStandardCategory])
-
     // In-memory filters for advanced filters (aplicados às listas local e distante)
     const applyBrowseFilters = useCallback((source: any[], opts?: { preserveOrder?: boolean }) => {
         let filtered = [...source]
         if (selectedCategories.length > 0) {
             const activeCat = selectedCategories[0]
-            if (activeCat === "Outros") {
-                filtered = filtered.filter((p) => {
-                    if (p.itemType === 'loja') return false
-                    return !p.category || !isStandardCategory(p.category)
-                })
+            if (activeCat === OUTROS_CATEGORY) {
+                // "Outros" = tudo que está sem categoria (inclui vitrines sem
+                // categoria cadastrada) + itens explicitamente em "Outros".
+                filtered = filtered.filter(isUncategorized)
             } else {
-                filtered = filtered.filter((p) => {
-                    return itemMatchesCategory(p, activeCat)
-                })
+                filtered = filtered.filter((p) => itemMatchesCategory(p, activeCat))
             }
         }
-        if (minPrice) filtered = filtered.filter((p) => p.price && p.price >= Number(minPrice))
-        if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number(maxPrice))
-        if (promoOn) filtered = filtered.filter((p) => p.originalPrice !== undefined)
+
+        // Preço: vitrines não têm preço próprio e itens "sob consulta" não são
+        // descartados (antes eles sumiam da listagem inteira).
+        const min = minPrice ? Number(minPrice) : null
+        const max = maxPrice ? Number(maxPrice) : null
+        if (min !== null || max !== null) {
+            filtered = filtered.filter((p) => matchesPriceRange(p, min, max))
+        }
+
+        // Promoção: só produtos/serviços tem promoção - vitrines não são
+        // eliminadas pelo filtro (antes a lista de lojas ficava vazia).
+        if (promoOn) {
+            filtered = filtered.filter((p) => p.itemType === 'loja' ? true : isPromoItem(p))
+        }
 
         // Filtragem por Condição (Novos / Usados / Desapegos)
         if (selectedCondition) {
-            if (selectedCondition === "novo") {
-                filtered = filtered.filter(p => {
-                    if (p.itemType !== 'produto') return true
-                    const c = (p.condition || p.condicao || "Novo").toLowerCase()
-                    return c === "novo" || c === "new"
-                })
-            } else if (selectedCondition === "usado") {
-                filtered = filtered.filter(p => {
-                    if (p.itemType !== 'produto') return true
-                    const c = (p.condition || p.condicao || "Novo").toLowerCase()
-                    return c !== "novo" && c !== "new"
-                })
-            }
+            filtered = filtered.filter((p) => matchesConditionFilter(p, selectedCondition))
         }
 
         // Filtragem por Envio nacional (transportadora)
         if (onlyShipping) {
+            filtered = filtered.filter((p) => matchesShippingFilter(p))
+        }
+
+        // Avaliação mínima
+        if (minRating) {
+            filtered = filtered.filter((p) => matchesRatingFilter(p, minRating))
+        }
+
+        // Entrega (com entrega / somente retirada / entrega grátis)
+        if (deliveryFilter) {
+            filtered = filtered.filter((p) => matchesDeliveryFilter(p, deliveryFilter))
+        }
+
+        // Raio de distância
+        if (maxDistanceKm) {
+            filtered = filtered.filter((p) => matchesDistanceFilter(p, maxDistanceKm, userCoords))
+        }
+
+        // Vitrine online ativa
+        if (showcaseOnly) {
             filtered = filtered.filter((p) => {
-                if (p.itemType !== 'produto') return true
-                const modes = p.fulfillment_modes || p.fulfillmentModes || []
-                return Array.isArray(modes) && modes.includes("shipping")
+                if (p.itemType !== 'loja') return false
+                return p.is_showcase_active !== false && p.partners?.is_showcase_active !== false
             })
         }
 
         // Filtragem por Seção
         if (selectedSection) {
             if (selectedSection === "promos") {
-                filtered = filtered.filter(p => p.itemType === 'produto' && p.originalPrice !== undefined && p.originalPrice > p.price)
+                filtered = filtered.filter(p => p.itemType === 'produto' && isPromoItem(p))
             } else if (selectedSection === "best-rated") {
                 filtered = filtered.filter(p => p.itemType === 'produto' && (p.rating ?? 0) >= 4.8)
             } else if (selectedSection === "best-sellers") {
@@ -840,6 +904,14 @@ export function ExplorarPageClient({
             filtered.sort((a, b) => (b.price || 0) - (a.price || 0))
         } else if (sortBy === "recentes") {
             filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        } else if (sortBy === "avaliacao") {
+            filtered.sort((a, b) => getItemRating(b) - getItemRating(a))
+        } else if (sortBy === "distancia") {
+            filtered.sort((a, b) => {
+                const da = getItemDistanceKm(a, userCoords) ?? Number.POSITIVE_INFINITY
+                const db = getItemDistanceKm(b, userCoords) ?? Number.POSITIVE_INFINITY
+                return da - db
+            })
         } else if (opts?.preserveOrder) {
             // Mantém a ordem já definida pelo ranking/distance do servidor (ex.: itens distantes)
             return filtered
@@ -849,7 +921,7 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, sortBy, selectedSection, isStandardCategory])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, selectedSection, isUncategorized, userCoords])
 
     const filteredResults = useMemo(
         () => applyBrowseFilters(dataToFilter),
@@ -876,31 +948,15 @@ export function ExplorarPageClient({
         if (minPrice || maxPrice) count++
         if (promoOn) count++
         if (selectedCondition) count++
+        if (onlyShipping) count++
+        if (minRating) count++
+        if (deliveryFilter) count++
+        if (maxDistanceKm) count++
+        if (showcaseOnly) count++
         if (sortBy !== "relevancia") count++
         if (currentType !== "tudo") count++
         return count
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType])
-
-    const categoryShowcases = useMemo(() => {
-        if (selectedCategories.length === 0) return []
-        const activeCat = selectedCategories[0]
-        if (activeCat === "Outros") return []
-        return normalizedInitialResults.filter(
-            r => r.itemType === 'loja' && itemMatchesCategory(r, activeCat)
-        )
-    }, [normalizedInitialResults, selectedCategories])
-
-    const categoryOffers = useMemo(() => {
-        if (selectedCategories.length === 0) return []
-        return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price)
-    }, [filteredResults, selectedCategories])
-
-    const promoProducts = useMemo(() => {
-        if (currentType !== 'produtos' && currentType !== 'em-oferta') return []
-        return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price).slice(0, 20)
-    }, [filteredResults, currentType])
-
-    const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && !selectedSection && rawItems.length > 0
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType])
 
     const pageMode = useMemo((): PageMode => {
         if (query || (currentType !== 'tudo' && currentType !== 'em-alta' && currentType !== 'novos-anunciados')) return "search"
@@ -908,6 +964,14 @@ export function ExplorarPageClient({
         if (selectedCategories.length > 0) return "category"
         return "sections"
     }, [query, currentType, selectedSection, selectedCategories])
+
+    const filterConfig = useMemo(() => {
+        return getFilterConfig(selectedSection, pageMode, currentType)
+    }, [selectedSection, pageMode, currentType])
+
+    const contextualSortOptions = useMemo(() => {
+        return getSortOptionsForMode(pageMode, selectedSection, currentType)
+    }, [pageMode, selectedSection, currentType])
 
     const isCategoryMode = pageMode === "category" && selectedCategories.length === 1
     const categoryName = isCategoryMode ? selectedCategories[0] : null
@@ -925,36 +989,36 @@ export function ExplorarPageClient({
         const normCategory = normalize(categoryName)
         const subs = new Set<string>()
         dataToFilter.forEach(item => {
-            if (itemMatchesCategory(item, categoryName) && item.subcategoryName) {
+            if (matchesSelectedCategory(item) && item.subcategoryName) {
                 if (normalize(item.subcategoryName) !== normCategory) {
                     subs.add(item.subcategoryName)
                 }
             }
         })
         return [...subs].sort()
-    }, [isCategoryMode, categoryName, dataToFilter])
+    }, [isCategoryMode, categoryName, dataToFilter, matchesSelectedCategory])
 
     const categoryPromos = useMemo(() => {
         if (!isCategoryMode) return []
         return dataToFilter
-            .filter(item => itemMatchesCategory(item, categoryName!) && item.originalPrice !== undefined && item.originalPrice > item.price)
+            .filter(item => matchesSelectedCategory(item) && isPromoItem(item))
             .slice(0, 20)
-    }, [isCategoryMode, categoryName, dataToFilter])
+    }, [isCategoryMode, dataToFilter, matchesSelectedCategory])
 
     const categoryTopRated = useMemo(() => {
         if (!isCategoryMode) return []
         return dataToFilter
-            .filter(item => itemMatchesCategory(item, categoryName!) && (item.rating ?? 0) > 0)
+            .filter(item => matchesSelectedCategory(item) && (item.rating ?? 0) > 0)
             .sort((a, b) => (b.rating || 0) - (a.rating || 0))
             .slice(0, 20)
-    }, [isCategoryMode, categoryName, dataToFilter])
+    }, [isCategoryMode, dataToFilter, matchesSelectedCategory])
 
     const categoryStores = useMemo(() => {
         if (!isCategoryMode) return []
         return normalizedInitialResults
-            .filter(r => r.itemType === 'loja' && itemMatchesCategory(r, categoryName!))
+            .filter(r => r.itemType === 'loja' && matchesSelectedCategory(r))
             .slice(0, 20)
-    }, [isCategoryMode, categoryName, normalizedInitialResults])
+    }, [isCategoryMode, matchesSelectedCategory, normalizedInitialResults])
 
     const showCategoryDiscoverySections = isCategoryMode && (subcategoriesList.length > 0 || categoryPromos.length > 0 || categoryTopRated.length > 0 || categoryStores.length > 0)
 
@@ -1000,7 +1064,7 @@ export function ExplorarPageClient({
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
-        updateUrl(citySlug, selectedCategories, query, currentType, selectedSection, true)
+        updateUrl(citySlug, selectedCategories, query, currentType, selectedSection)
     }
 
     // Filter cities list by search input
@@ -1264,6 +1328,27 @@ export function ExplorarPageClient({
         }
     }, [demandTerm, selectedDemandType, selectedCitySlug])
 
+    /**
+     * Aplica um patch nos filtros (usado pelos chips de filtro ativo e pelo
+     * botão de ordenação) mantendo a URL sincronizada - assim o link
+     * compartilhado e o botão "voltar" refletem o que está na tela.
+     */
+    const patchFilters = (patch: Partial<ExploreFilterState> & { sortBy?: SortOption }) => {
+        triggerFilterLoading()
+        if (patch.categories) setSelectedCategories(patch.categories)
+        if ("minPrice" in patch) setMinPrice(patch.minPrice as number | string)
+        if ("maxPrice" in patch) setMaxPrice(patch.maxPrice as number | string)
+        if ("promoOn" in patch) setPromoOn(patch.promoOn === true)
+        if ("condition" in patch) setSelectedCondition(patch.condition || "")
+        if ("shipping" in patch) setOnlyShipping(patch.shipping === true)
+        if ("minRating" in patch) setMinRating(patch.minRating ?? null)
+        if ("delivery" in patch) setDeliveryFilter(patch.delivery || "")
+        if ("maxDistanceKm" in patch) setMaxDistanceKm(patch.maxDistanceKm ?? null)
+        if ("showcaseOnly" in patch) setShowcaseOnly(patch.showcaseOnly === true)
+        if (patch.sortBy) setSortBy(patch.sortBy)
+        updateUrl(selectedCitySlug, patch.categories ?? selectedCategories, query, currentType, selectedSection, patch)
+    }
+
     const clearFilters = () => {
         triggerFilterLoading()
         setSelectedCategories([])
@@ -1272,9 +1357,13 @@ export function ExplorarPageClient({
         setPromoOn(false)
         setSelectedCondition("")
         setOnlyShipping(false)
+        setMinRating(null)
+        setDeliveryFilter("")
+        setMaxDistanceKm(null)
+        setShowcaseOnly(false)
         setSortBy("relevancia")
         setCurrentType("tudo")
-        updateUrl(selectedCitySlug, [], query, "tudo")
+        updateUrl(selectedCitySlug, [], query, "tudo", selectedSection, { ...EMPTY_FILTER_STATE, sortBy: "relevancia" })
     }
 
     const applyFilters = (filters: {
@@ -1285,6 +1374,10 @@ export function ExplorarPageClient({
         promoOn: boolean
         condition?: string
         shipping?: boolean
+        minRating?: number | null
+        delivery?: DeliveryFilter
+        maxDistanceKm?: number | null
+        showcaseOnly?: boolean
     }) => {
         triggerFilterLoading()
         setCurrentType(filters.type as any)
@@ -1294,7 +1387,22 @@ export function ExplorarPageClient({
         setPromoOn(filters.promoOn)
         setSelectedCondition(filters.condition || "")
         setOnlyShipping(filters.shipping === true)
-        updateUrl(selectedCitySlug, filters.categories, query, filters.type, selectedSection)
+        setMinRating(filters.minRating ?? null)
+        setDeliveryFilter(filters.delivery || "")
+        setMaxDistanceKm(filters.maxDistanceKm ?? null)
+        setShowcaseOnly(filters.showcaseOnly === true)
+        updateUrl(selectedCitySlug, filters.categories, query, filters.type, selectedSection, {
+            categories: filters.categories,
+            minPrice: filters.minPrice,
+            maxPrice: filters.maxPrice,
+            promoOn: filters.promoOn,
+            condition: filters.condition || "",
+            shipping: filters.shipping === true,
+            minRating: filters.minRating ?? null,
+            delivery: filters.delivery || "",
+            maxDistanceKm: filters.maxDistanceKm ?? null,
+            showcaseOnly: filters.showcaseOnly === true,
+        })
     }
 
     const typeOptions = [
@@ -1302,13 +1410,7 @@ export function ExplorarPageClient({
         { value: "produtos", label: "Produtos" },
         { value: "servicos", label: "Serviços" },
         { value: "vitrines", label: "Lojas" },
-    ]
-
-    const sortOptions: { value: SortOption; label: string }[] = [
-        { value: "relevancia", label: "Relevancia" },
-        { value: "preco_menor", label: "Menor preco" },
-        { value: "preco_maior", label: "Maior preco" },
-        { value: "recentes", label: "Mais recentes" },
+        { value: "planos", label: "Assinaturas" },
     ]
 
     const activeFilterChips = useMemo(() => {
@@ -1333,11 +1435,7 @@ export function ExplorarPageClient({
                 key: "price",
                 label: "Preço",
                 value,
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setMinPrice("")
-                    setMaxPrice("")
-                },
+                onRemove: () => patchFilters({ minPrice: "", maxPrice: "" }),
             })
         }
         if (promoOn) {
@@ -1345,10 +1443,7 @@ export function ExplorarPageClient({
                 key: "promo",
                 label: "Promoção",
                 value: "Ativo",
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setPromoOn(false)
-                },
+                onRemove: () => patchFilters({ promoOn: false }),
             })
         }
         if (selectedCondition) {
@@ -1356,10 +1451,7 @@ export function ExplorarPageClient({
                 key: "condition",
                 label: "Condição",
                 value: selectedCondition === "novo" ? "Apenas Novos" : "Usados / Desapegos",
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setSelectedCondition("")
-                },
+                onRemove: () => patchFilters({ condition: "" }),
             })
         }
         if (onlyShipping) {
@@ -1367,22 +1459,49 @@ export function ExplorarPageClient({
                 key: "shipping",
                 label: "Envio nacional",
                 value: "Ativo",
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setOnlyShipping(false)
-                },
+                onRemove: () => patchFilters({ shipping: false }),
+            })
+        }
+        if (minRating) {
+            chips.push({
+                key: "rating",
+                label: "Avaliação",
+                value: `${String(minRating).replace(".", ",")}+`,
+                onRemove: () => patchFilters({ minRating: null }),
+            })
+        }
+        if (deliveryFilter) {
+            const deliveryLabel = DELIVERY_OPTIONS.find(o => o.value === deliveryFilter)?.label || deliveryFilter
+            chips.push({
+                key: "delivery",
+                label: "Entrega",
+                value: deliveryLabel,
+                onRemove: () => patchFilters({ delivery: "" }),
+            })
+        }
+        if (maxDistanceKm) {
+            chips.push({
+                key: "distance",
+                label: "Distância",
+                value: `Até ${maxDistanceKm} km`,
+                onRemove: () => patchFilters({ maxDistanceKm: null }),
+            })
+        }
+        if (showcaseOnly) {
+            chips.push({
+                key: "showcase",
+                label: "Vitrine",
+                value: "Online ativa",
+                onRemove: () => patchFilters({ showcaseOnly: false }),
             })
         }
         if (sortBy !== "relevancia") {
-            const sortLabel = sortOptions.find(o => o.value === sortBy)?.label || sortBy
+            const sortLabel = contextualSortOptions.find(o => o.value === sortBy)?.label || sortBy
             chips.push({
                 key: "sort",
                 label: "Ordenar",
                 value: sortLabel,
-                onRemove: () => {
-                    triggerFilterLoading()
-                    setSortBy("relevancia")
-                },
+                onRemove: () => patchFilters({ sortBy: "relevancia" }),
             })
         }
         if (currentType !== "tudo") {
@@ -1399,7 +1518,8 @@ export function ExplorarPageClient({
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, sortBy, currentType, selectedCitySlug, query, resolveCategoryName, triggerFilterLoading])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType, selectedCitySlug, selectedSection, query, resolveCategoryName, triggerFilterLoading, contextualSortOptions])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1408,260 +1528,13 @@ export function ExplorarPageClient({
         return getProductUrl(item, item.partners)
     }
 
-    const renderListRow = (item: any, locationOnly = false) => {
-        const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-        const isStore = item.itemType === "loja"
-        const showPrice = !isStore && item.show_price_in_store !== false
-        const sellerName = partner?.store_name || item.name || ""
-        const sellerLogoRaw = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
-        const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw, "thumb") : null
-        const locationLabel = getLocationLabel(partner, locationContext, { full: locationOnly })
-
-        // Resolve distance & delivery estimates
-        const storeLat = partner?.latitude ?? item.latitude ?? (item as any).addresses?.[0]?.latitude ?? null
-        const storeLng = partner?.longitude ?? item.longitude ?? (item as any).addresses?.[0]?.longitude ?? null
-
-        let distanceKm: number | null = null
-        if (partner?.distance_km != null && typeof partner.distance_km === "number") {
-            distanceKm = partner.distance_km
-        } else if (item.distance_km != null && typeof item.distance_km === "number") {
-            distanceKm = item.distance_km
-        } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
-            distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
-        }
-
-        const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || item.distance_km_formatted || null)
-
-        const rawDeliverySettings = partner?.delivery_settings || item.delivery_settings || null
-        const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
-        const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
-        const hasProducts = isStore
-            ? (item.has_products !== false && partner?.has_products !== false && item.type !== "services_only" && partner?.business_type !== "services")
-            : (item.itemType === "produto")
-
-        const showDeliveryTime = isDeliveryEnabled && hasProducts
-
-        // Check if seller is outside the delivery radius
-        const maxDeliveryKmRaw = deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm
-        const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
-        const outOfRadius = isDeliveryEnabled
-            && hasProducts
-            && distanceKm != null
-            && maxDeliveryKm != null
-            && maxDeliveryKm > 0
-            && distanceKm > maxDeliveryKm
-
-        const deliveryTime = (showDeliveryTime && !outOfRadius)
-            ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : ((item.delivery_time_formatted || partner?.delivery_time_formatted) ? formatAverageDeliveryTimeFromRange(item.delivery_time_formatted || partner?.delivery_time_formatted) : null))
-            : null
-
-        const rawFee = outOfRadius ? null : (estimateDeliveryFeeLabel({
-            distanceKm,
-            baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
-            includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
-            extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
-            maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
-            isDeliveryEnabled,
-            deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-        }) || partner?.delivery_fee_formatted || item.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
-
-        const isFreeDelivery = rawFee ? (rawFee.toLowerCase().includes("grátis") || rawFee.toLowerCase().includes("gratis")) : false
-        const deliveryFeeLabel = outOfRadius
-            ? null
-            : (isStore
-                ? rawFee
-                : (isFreeDelivery ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis") : rawFee))
-
-        const serviceDuration = item.itemType === "servico"
-            ? formatServiceDuration(item.duration_minutes ?? item.durationMinutes ?? item.duration)
-            : null
-
-        const imageUrl = isStore
-            ? (sellerLogoUrl || "https://img.dudit.com.br/static/Placeholder.png")
-            : getPrimaryProductDisplayImage(item)
-
-        return (
-            <Link
-                key={`${item.itemType}-${item.id}`}
-                href={getItemUrl(item)}
-                prefetch={false}
-                className="group grid grid-cols-[100px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
-            >
-                <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center">
-                    {isStore && !sellerLogoUrl ? (
-                        <UserProfileImage
-                            fullName={sellerName}
-                            className="w-16 h-16"
-                        />
-                    ) : (
-                        <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-                    )}
-                </div>
-                <div className="min-w-0 py-1">
-                    {isStore ? (
-                        <>
-                            <div className="flex items-center gap-2">
-                                <h3 className="line-clamp-2 text-base font-bold text-brand-dark dark:text-dark-heading sm:text-lg">{item.name}</h3>
-                                {(item.rating ?? 0) > 0 && (
-                                    <span className="flex items-center gap-1 text-xs font-bold text-brand-dark dark:text-dark-heading shrink-0">
-                                        <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                        {Number(item.rating).toFixed(1)}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="mt-1 flex items-center gap-1.5 text-[12px] md:text-[13px] text-brand-inactive-text dark:text-dark-body truncate">
-                                {(item.category || item.subcategoryName) && (
-                                    <span className="font-medium shrink-0">{item.subcategoryName || item.category}</span>
-                                )}
-                                {locationContext?.scope === "country" && locationLabel ? (
-                                    <>
-                                        {(item.category || item.subcategoryName) && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
-                                        <span className="shrink-0">{locationLabel}</span>
-                                    </>
-                                ) : locationOnly ? (
-                                    locationLabel ? (
-                                        <>
-                                            {(item.category || item.subcategoryName) && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
-                                            <span className="shrink-0">{locationLabel}</span>
-                                        </>
-                                    ) : null
-                                ) : (
-                                    <>
-                                        {(item.category || item.subcategoryName) && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
-                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                                        )}
-                                        {locationLabel && (
-                                            <>
-                                                <span className="shrink-0">{locationLabel}</span>
-                                                {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
-                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                                                )}
-                                            </>
-                                        )}
-                                        {deliveryTime && (
-                                            <>
-                                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
-                                                {(distanceLabel || deliveryFeeLabel) && (
-                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                                                )}
-                                            </>
-                                        )}
-                                        {distanceLabel && (
-                                            <>
-                                                <span className="shrink-0">{distanceLabel}</span>
-                                                {deliveryFeeLabel && (
-                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                                                )}
-                                            </>
-                                        )}
-                                        {deliveryFeeLabel && (
-                                            <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
-                                                {deliveryFeeLabel}
-                                            </span>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <h3 className="line-clamp-2 text-sm md:text-[15px] font-normal text-brand-dark dark:text-dark-heading sm:max-w-full">{item.name}</h3>
-                            <div className="flex justify-between items-center mt-1">
-                                <div className="flex flex-col">
-                                    {showPrice ? (
-                                        <div className="flex items-baseline gap-2">
-                                            {item.originalPrice && <span className="text-xs text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(item.originalPrice)}</span>}
-                                            <span className="text-base font-bold text-brand-dark dark:text-dark-heading leading-tight">{formatCurrency(item.price || 0)}</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">Preco sob consulta</span>
-                                    )}
-                                </div>
-                                {(item.rating ?? 0) > 0 && (
-                                    <div className="flex items-center gap-0.5 shrink-0">
-                                        <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading">{Number(item.rating).toFixed(1)}</span>
-                                    </div>
-                                )}
-                            </div>
-                            {sellerName && (
-                                <>
-                                    <div className="border-t border-gray-100 dark:border-dark-border my-2" />
-                                    <div className="flex items-center gap-2 pt-0.5">
-                                        <UserProfileImage
-                                            fullName={sellerName}
-                                            imageUrl={sellerLogoUrl}
-                                            className="w-7 h-7 shrink-0"
-                                        />
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-semibold truncate leading-tight">
-                                                {sellerName}
-                                            </p>
-                                            {locationOnly ? (
-                                                locationLabel ? (
-                                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                                        <span className="shrink-0">{locationLabel}</span>
-                                                    </div>
-                                                ) : null
-                                            ) : item.itemType === "servico" ? (
-                                                serviceDuration ? (
-                                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
-                                                    </div>
-                                                ) : null
-                                            ) : (
-                                                <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                                    {deliveryTime && (
-                                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
-                                                    )}
-                                                    {deliveryTime && (distanceLabel || deliveryFeeLabel || locationLabel) && (
-                                                        <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
-                                                    )}
-                                                    {distanceLabel ? (
-                                                        <span className="shrink-0">{distanceLabel}</span>
-                                                    ) : locationLabel ? (
-                                                        <span className="shrink-0">{locationLabel}</span>
-                                                    ) : null}
-                                                    {(distanceLabel || (!deliveryTime && locationLabel)) && deliveryFeeLabel && (
-                                                        <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
-                                                    )}
-                                                    {deliveryFeeLabel ? (
-                                                        <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
-                                                            {deliveryFeeLabel}
-                                                        </span>
-                                                    ) : !deliveryTime && !distanceLabel && !locationLabel ? (
-                                                        <span>Pronta entrega</span>
-                                                    ) : null}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </>
-                    )}
-                </div>
-            </Link>
-        )
-    }
-
-    const filterConfig = useMemo(() => {
-        return getFilterConfig(selectedSection, pageMode, currentType)
-    }, [selectedSection, pageMode, currentType])
-
-    const contextualSortOptions = useMemo(() => {
-        return getSortOptionsForMode(pageMode, selectedSection, currentType)
-    }, [pageMode, selectedSection, currentType])
-
     useEffect(() => {
         if (!contextualSortOptions.some(o => o.value === sortBy)) {
             setSortBy("relevancia")
         }
-    }, [currentType])
+    }, [contextualSortOptions, sortBy])
 
     const renderListingItem = (item: any) => {
-        if (viewMode === "list") return renderListRow(item)
-
         if (item.itemType === 'loja') {
             return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
@@ -1669,8 +1542,6 @@ export function ExplorarPageClient({
     }
 
     const renderDistantItem = (item: any) => {
-        if (viewMode === "list") return renderListRow(item, true)
-
         if (item.itemType === 'loja') {
             return <VitrineCard key={`loja-dist-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={false} preferCityLabel locationOnly locationContext={locationContext} className="w-full [content-visibility:auto] [contain-intrinsic-size:auto_360px]" />
         }
@@ -1931,16 +1802,12 @@ export function ExplorarPageClient({
                                         router.back()
                                     }
                                 }}
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
                             />
                         )}
 
-                        {/* Filtros / Ordenar / Lista-Grid - fixos logo abaixo do título */}
+                        {/* Filtros / Ordenar - fixos logo abaixo do título */}
                         {!isLandingPage && (
                             <ExplorarViewControls
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
                                 onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
                                 onOpenSort={() => setIsSortBottomSheetOpen(true)}
                                 hasActiveFilters={activeFiltersCount > 0}
@@ -2062,16 +1929,13 @@ export function ExplorarPageClient({
                                     )}
 
                                     {filteredResults.length > 0 ? (
-                                        <div className={viewMode === "grid"
-                                            ? `grid ${currentType === 'vitrines' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`
-                                            : "mt-4"
-                                        }>
+                                        <div className={`grid ${currentType === 'vitrines' || currentType === 'negocios' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6 mt-4`}>
                                             {filteredResults.map((item) => renderListingItem(item))}
 
                                             {hasNextPage && (
                                                 <div
                                                     ref={observerTarget}
-                                                    className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
+                                                    className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
                                                 >
                                                     {isFetchingNextPage ? (
                                                         <div className="flex flex-col items-center gap-2">
@@ -2121,10 +1985,7 @@ export function ExplorarPageClient({
                                             {moreDistantSellers.length > 0 && (currentType === 'tudo' || currentType === 'vitrines' || currentType === 'negocios') && (
                                                 <>
                                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
-                                                    <div className={viewMode === "grid"
-                                                        ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6"
-                                                        : ""
-                                                    }>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
                                                         {moreDistantSellers.map((vitrine) => renderDistantItem(vitrine))}
                                                     </div>
                                                 </>
@@ -2134,10 +1995,7 @@ export function ExplorarPageClient({
                                                 <>
                                                     {moreDistantSellers.length > 0 && <div className="h-px bg-brand-border dark:border-dark-border my-4" />}
                                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Produtos e serviços</h3>
-                                                    <div className={viewMode === "grid"
-                                                        ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6"
-                                                        : ""
-                                                    }>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
                                                         {filteredDistant.map((item) => renderDistantItem(item))}
                                                     </div>
                                                 </>
@@ -2179,12 +2037,11 @@ export function ExplorarPageClient({
                 maxPrice={maxPrice}
                 promoOn={promoOn}
                 shipping={onlyShipping}
-                typeOptions={[
-                    { value: "tudo", label: "Tudo" },
-                    { value: "produtos", label: "Produtos" },
-                    { value: "servicos", label: "Serviços" },
-                    { value: "vitrines", label: "Lojas" },
-                ]}
+                minRating={minRating}
+                delivery={deliveryFilter}
+                maxDistanceKm={maxDistanceKm}
+                showcaseOnly={showcaseOnly}
+                typeOptions={typeOptions}
                 productCategories={productCategories}
                 serviceCategories={dbServiceCategories}
                 partnerCategories={dbPartnerCategories}
@@ -2196,8 +2053,7 @@ export function ExplorarPageClient({
                 onClose={() => setIsSortBottomSheetOpen(false)}
                 sortBy={sortBy as any}
                 onSortChange={(val) => {
-                    triggerFilterLoading()
-                    setSortBy(val as any)
+                    patchFilters({ sortBy: val as SortOption })
                 }}
                 sortOptions={contextualSortOptions}
             />

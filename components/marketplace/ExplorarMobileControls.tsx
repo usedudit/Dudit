@@ -9,6 +9,8 @@ interface ExplorarMobileControlsProps {
     onOpenFilters: () => void
     onOpenSort: () => void
     isVisible?: boolean
+    /** Classe de posicionamento vertical (padrão: top-[52px]). */
+    topClassName?: string
 }
 
 export function ExplorarMobileControls({
@@ -16,10 +18,11 @@ export function ExplorarMobileControls({
     onOpenFilters,
     onOpenSort,
     isVisible = true,
+    topClassName = "top-[52px]",
 }: ExplorarMobileControlsProps) {
     return (
         <div
-            className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2 transition-all duration-200 ${
+            className={`lg:hidden fixed ${topClassName} left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2 transition-all duration-200 ${
                 isVisible
                     ? "opacity-100 translate-y-0 pointer-events-auto"
                     : "opacity-0 -translate-y-2 pointer-events-none"

@@ -3,19 +3,21 @@
 import { useState, useEffect, useMemo } from "react"
 import Portal from "@/components/Portal"
 import { Button, Input } from "@/components/reusable"
-import { Check, MapPin } from "lucide-react"
+import { Check, MapPin, Star } from "lucide-react"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
+import {
+    CONDITION_OPTIONS,
+    DELIVERY_OPTIONS,
+    DISTANCE_OPTIONS,
+    RATING_OPTIONS,
+    type DeliveryFilter,
+    type ExploreFilterState,
+} from "./explorar-filters"
 import { motion, AnimatePresence, useMotionValue } from "framer-motion"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss"
-
-const CONDITION_FILTER_OPTIONS = [
-    { value: "", label: "Todos os estados" },
-    { value: "novo", label: "Apenas Novos" },
-    { value: "usado", label: "Usados / Desapegos" },
-]
 
 export interface AppliedFilters {
     type: string
@@ -25,6 +27,12 @@ export interface AppliedFilters {
     promoOn: boolean
     condition?: string
     shipping?: boolean
+    minRating?: number | null
+    delivery?: DeliveryFilter
+    maxDistanceKm?: number | null
+    showcaseOnly?: boolean
+    brands?: string[]
+    selectedBrands?: string[]
 }
 
 interface ExplorarFiltersBottomSheetProps {
@@ -48,6 +56,26 @@ interface ExplorarFiltersBottomSheetProps {
     shipping?: boolean
     userProfile?: any
     filterConfig?: FilterConfig
+    minRating?: number | null
+    delivery?: DeliveryFilter
+    maxDistanceKm?: number | null
+    showcaseOnly?: boolean
+    brands?: string[]
+    selectedBrands?: string[]
+    /** Tipos (do filtro "Tipo") para os quais o filtro de marca se aplica. */
+    brandTypes?: string[]
+}
+
+const DEFAULT_FILTER_CONFIG: FilterConfig = {
+    showType: true,
+    showCategory: true,
+    showPrice: true,
+    showSort: true,
+    showPromo: true,
+    showShipping: true,
+    showCondition: true,
+    showRating: true,
+    showBrands: false,
 }
 
 export function ExplorarFiltersBottomSheet({
@@ -69,7 +97,14 @@ export function ExplorarFiltersBottomSheet({
     serviceCategories,
     partnerCategories,
     shipping,
-    filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true },
+    filterConfig = DEFAULT_FILTER_CONFIG,
+    minRating = null,
+    delivery = "",
+    maxDistanceKm = null,
+    showcaseOnly = false,
+    brands = [],
+    selectedBrands = [],
+    brandTypes = [],
 }: ExplorarFiltersBottomSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
@@ -97,6 +132,11 @@ export function ExplorarFiltersBottomSheet({
     const [draftPromo, setDraftPromo] = useState(promoOn)
     const [draftCondition, setDraftCondition] = useState(selectedCondition || "")
     const [draftShipping, setDraftShipping] = useState(shipping === true)
+    const [draftMinRating, setDraftMinRating] = useState<number | null>(minRating)
+    const [draftDelivery, setDraftDelivery] = useState<DeliveryFilter>(delivery)
+    const [draftMaxDistance, setDraftMaxDistance] = useState<number | null>(maxDistanceKm)
+    const [draftShowcaseOnly, setDraftShowcaseOnly] = useState(showcaseOnly)
+    const [draftBrands, setDraftBrands] = useState<string[]>(selectedBrands)
 
     useEffect(() => {
         if (!isOpen) return
@@ -107,21 +147,50 @@ export function ExplorarFiltersBottomSheet({
         setDraftPromo(promoOn)
         setDraftCondition(selectedCondition || "")
         setDraftShipping(shipping === true)
-        // eslint-disable-next-line react/hooks/exhaustive-deps
+        setDraftMinRating(minRating)
+        setDraftDelivery(delivery)
+        setDraftMaxDistance(maxDistanceKm)
+        setDraftShowcaseOnly(showcaseOnly)
+        setDraftBrands(selectedBrands)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
-    const hasDraftFilters = (typeOptions.length > 0 && draftType !== "tudo")
+    // Mantém o rascunho do tipo sincronizado quando ele muda por fora
+    // (ex.: pelo menu lateral da vitrine do vendedor) com o painel aberto.
+    useEffect(() => {
+        if (!isOpen) return
+        setDraftType(currentType)
+    }, [currentType, isOpen])
+
+    const hasDraftFilters = (typeOptions.length > 0 && draftType !== currentType)
         || draftCategories.length > 0
         || !!draftMinPrice
         || !!draftMaxPrice
         || draftPromo
         || !!draftCondition
         || draftShipping
+        || !!draftMinRating
+        || !!draftDelivery
+        || !!draftMaxDistance
+        || draftShowcaseOnly
+        || draftBrands.length > 0
 
     const draftCategoryList = useMemo(() => {
         if (draftType === "servicos") return serviceCategories
         if (draftType === "vitrines" || draftType === "negocios") return partnerCategories
-        return productCategories
+        if (draftType === "produtos") return productCategories
+        // "Tudo": união das três listas (produtos + serviços + lojas)
+        const seen = new Set<string>()
+        const merged: { name: string; icon_url: string | null }[] = []
+        for (const list of [productCategories, serviceCategories, partnerCategories]) {
+            for (const cat of list) {
+                const key = cat.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+                if (!key || seen.has(key)) continue
+                seen.add(key)
+                merged.push(cat)
+            }
+        }
+        return merged
     }, [draftType, productCategories, serviceCategories, partnerCategories])
 
     const handleApply = () => {
@@ -133,6 +202,11 @@ export function ExplorarFiltersBottomSheet({
             promoOn: draftPromo,
             condition: draftCondition,
             shipping: draftShipping,
+            minRating: draftMinRating,
+            delivery: draftDelivery,
+            maxDistanceKm: draftMaxDistance,
+            showcaseOnly: draftShowcaseOnly,
+            brands: draftBrands,
         })
         onClose()
     }
@@ -150,6 +224,18 @@ export function ExplorarFiltersBottomSheet({
     const handleToggleCategory = (cat: string) => {
         setDraftCategories(prev => prev.includes(cat) ? [] : [cat])
     }
+
+    const isStoreMode = draftType === "vitrines" || draftType === "negocios"
+
+    const optionRowClass = (selected: boolean) => `flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${selected
+        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
+        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
+        }`
+
+    const checkboxRowClass = (selected: boolean) => `flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${selected
+        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
+        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
+        }`
 
     const bodySections = (
         <>
@@ -183,10 +269,7 @@ export function ExplorarFiltersBottomSheet({
                             <button
                                 key={option.value}
                                 onClick={() => handleTypeSelect(option.value)}
-                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftType === option.value
-                                    ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
-                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
-                                    }`}
+                                className={optionRowClass(draftType === option.value)}
                             >
                                 <span>{option.label}</span>
                                 {draftType === option.value && (
@@ -199,18 +282,15 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Condition Section */}
-            {draftType !== "servicos" && draftType !== "vitrines" && (
+            {filterConfig.showCondition !== false && draftType !== "servicos" && draftType !== "vitrines" && draftType !== "negocios" && (
                 <section>
                     <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Condição</h4>
                     <div className="space-y-2">
-                        {CONDITION_FILTER_OPTIONS.map((option) => (
+                        {CONDITION_OPTIONS.map((option) => (
                             <button
                                 key={option.value}
                                 onClick={() => setDraftCondition(option.value)}
-                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftCondition === option.value
-                                    ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
-                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
-                                    }`}
+                                className={optionRowClass(draftCondition === option.value)}
                             >
                                 <span>{option.label}</span>
                                 {draftCondition === option.value && (
@@ -225,7 +305,17 @@ export function ExplorarFiltersBottomSheet({
             {/* Categories Section */}
             {filterConfig.showCategory !== false && draftCategoryList.length > 0 && (
                 <section>
-                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Categorias</h4>
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Categorias</h4>
+                        {draftCategories.length > 0 && (
+                            <button
+                                onClick={() => setDraftCategories([])}
+                                className="text-xs font-semibold text-brand-green hover:underline"
+                            >
+                                Limpar
+                            </button>
+                        )}
+                    </div>
                     <div className="space-y-2">
                         {draftCategoryList.map((cat) => {
                             const isSelected = draftCategories.includes(cat.name)
@@ -233,10 +323,7 @@ export function ExplorarFiltersBottomSheet({
                                 <button
                                     key={cat.name}
                                     onClick={() => handleToggleCategory(cat.name)}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
-                                        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
-                                        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
-                                        }`}
+                                    className={checkboxRowClass(isSelected)}
                                 >
                                     <span
                                         className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
@@ -265,6 +352,37 @@ export function ExplorarFiltersBottomSheet({
                 </section>
             )}
 
+            {/* Brand Section */}
+            {filterConfig.showBrands !== false && brands.length > 0 && (brandTypes.length === 0 || brandTypes.includes(draftType)) && (
+                <section>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Marca</h4>
+                    <div className="space-y-2">
+                        {brands.map((brand) => {
+                            const isSelected = draftBrands.includes(brand)
+                            return (
+                                <button
+                                    key={brand}
+                                    onClick={() => setDraftBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand])}
+                                    className={checkboxRowClass(isSelected)}
+                                >
+                                    <span
+                                        className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${isSelected
+                                            ? "border-brand-green bg-brand-green"
+                                            : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
+                                            }`}
+                                    >
+                                        {isSelected && (
+                                            <Check className="h-3.5 w-3.5 text-white" />
+                                        )}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate">{brand}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </section>
+            )}
+
             {/* Price Section */}
             {filterConfig.showPrice !== false && (
                 <section>
@@ -274,18 +392,111 @@ export function ExplorarFiltersBottomSheet({
                             value={draftMinPrice}
                             onChange={(e) => setDraftMinPrice(e.target.value)}
                             inputMode="decimal"
-                            placeholder="Min."
+                            placeholder="Mín."
                             className="h-10 text-sm"
                         />
                         <Input
                             value={draftMaxPrice}
                             onChange={(e) => setDraftMaxPrice(e.target.value)}
                             inputMode="decimal"
-                            placeholder="Max."
+                            placeholder="Máx."
                             className="h-10 text-sm"
                         />
                     </div>
                 </section>
+            )}
+
+            {/* Rating Section */}
+            {filterConfig.showRating !== false && (
+                <section>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Avaliação</h4>
+                    <div className="space-y-2">
+                        {RATING_OPTIONS.map((option) => {
+                            const isSelected = (draftMinRating || 0) === option.value
+                            return (
+                                <button
+                                    key={option.value}
+                                    onClick={() => setDraftMinRating(option.value > 0 ? option.value : null)}
+                                    className={optionRowClass(isSelected)}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {option.value > 0 && <Star className="h-4 w-4 text-brand-green fill-brand-green" />}
+                                        {option.label}
+                                    </span>
+                                    {isSelected && (
+                                        <Check className="h-4 w-4" />
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </section>
+            )}
+
+            {/* Store filters (entrega / raio / vitrine ativa) */}
+            {filterConfig.showStoreFilters !== false && isStoreMode && (
+                <>
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Entrega</h4>
+                        <div className="space-y-2">
+                            {DELIVERY_OPTIONS.map((option) => {
+                                const isSelected = draftDelivery === option.value
+                                return (
+                                    <button
+                                        key={option.value || "todas"}
+                                        onClick={() => setDraftDelivery(option.value)}
+                                        className={optionRowClass(isSelected)}
+                                    >
+                                        <span>{option.label}</span>
+                                        {isSelected && (
+                                            <Check className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </section>
+
+                    <section>
+                        <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Distância</h4>
+                        <div className="space-y-2">
+                            {DISTANCE_OPTIONS.map((option) => {
+                                const isSelected = (draftMaxDistance || 0) === option.value
+                                return (
+                                    <button
+                                        key={option.value || "qualquer"}
+                                        onClick={() => setDraftMaxDistance(option.value > 0 ? option.value : null)}
+                                        className={optionRowClass(isSelected)}
+                                    >
+                                        <span>{option.label}</span>
+                                        {isSelected && (
+                                            <Check className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </section>
+
+                    <section>
+                        <button
+                            onClick={() => setDraftShowcaseOnly(!draftShowcaseOnly)}
+                            className={checkboxRowClass(draftShowcaseOnly)}
+                        >
+                            <span
+                                className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftShowcaseOnly
+                                    ? "border-brand-green bg-brand-green"
+                                    : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
+                                    }`}
+                            >
+                                {draftShowcaseOnly && (
+                                    <Check className="h-3.5 w-3.5 text-white" />
+                                )}
+                            </span>
+                            Vitrine online ativa
+                        </button>
+                    </section>
+                </>
             )}
 
             {/* Promo Section */}
@@ -293,10 +504,7 @@ export function ExplorarFiltersBottomSheet({
                 <section>
                     <button
                         onClick={() => setDraftPromo(!draftPromo)}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftPromo
-                            ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
-                            : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
-                            }`}
+                        className={checkboxRowClass(draftPromo)}
                     >
                         <span
                             className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftPromo
@@ -314,27 +522,26 @@ export function ExplorarFiltersBottomSheet({
             )}
 
             {/* Envio nacional Section */}
-            <section>
-                <button
-                    onClick={() => setDraftShipping(!draftShipping)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftShipping
-                        ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
-                        : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
-                        }`}
-                >
-                    <span
-                        className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftShipping
-                            ? "border-brand-green bg-brand-green"
-                            : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
-                            }`}
+            {filterConfig.showShipping !== false && (
+                <section>
+                    <button
+                        onClick={() => setDraftShipping(!draftShipping)}
+                        className={checkboxRowClass(draftShipping)}
                     >
-                        {draftShipping && (
-                            <Check className="h-3.5 w-3.5 text-white" />
-                        )}
-                    </span>
-                    Envio nacional
-                </button>
-            </section>
+                        <span
+                            className={`flex h-4 w-4 items-center justify-center rounded border shrink-0 ${draftShipping
+                                ? "border-brand-green bg-brand-green"
+                                : "border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface"
+                                }`}
+                        >
+                            {draftShipping && (
+                                <Check className="h-3.5 w-3.5 text-white" />
+                            )}
+                        </span>
+                        Envio nacional
+                    </button>
+                </section>
+            )}
         </>
     )
 

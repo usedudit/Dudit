@@ -360,7 +360,7 @@ const getClientTimelineSteps = (order: any) => {
         // 5. Pedido retirado / Pedido entregue
         let finalLabel = isPickup ? "Pedido retirado" : "Pedido entregue";
         if (order.delivery_status === "delivery_failed") {
-            finalLabel = isPickup ? "Retirada não realizada" : "Não entregue";
+            finalLabel = isPickup ? "Retirada não realizada" : "Falha na entrega";
         }
         steps.push({
             label: finalLabel,
@@ -646,7 +646,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (step.label === "Pedido retirado") changeLines = ["O pedido foi retirado na loja."];
             else if (step.label === "Concluído") changeLines = ["O serviço foi concluído."];
             else if (step.label === "Cancelado") changeLines = ["O pedido foi cancelado."];
-            else if (step.label === "Não entregue" || step.label === "Entrega não realizada" || step.label === "Retirada não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
+            else if (step.label === "Falha na entrega" || step.label === "Não entregue" || step.label === "Entrega não realizada" || step.label === "Retirada não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
             else changeLines = ["Etapa concluída."];
         }
 

@@ -1,4 +1,10 @@
+/**
+ * Slugs de categoria válidos no caminho /explorar/{cidade}/{categoria}.
+ * Inclui as categorias de produtos, de serviços e de lojas (vitrines) - sem
+ * elas, um link de vitrine por categoria cairia em 404.
+ */
 export const CATEGORY_SLUG_MAP: { [key: string]: string } = {
+    // Produtos
     "alimentacao": "Alimentação",
     "casa": "Casa",
     "tecnologia": "Tecnologia",
@@ -7,7 +13,18 @@ export const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "automotivo": "Automotivo",
     "pets": "Pets",
     "servicos": "Serviços",
-    "outros": "Outros"
+    "outros": "Outros",
+    // Serviços
+    "reformas-e-manutencao": "Reformas e Manutenção",
+    "assistencia-tecnica": "Assistência Técnica",
+    "beleza-e-estetica": "Beleza e Estética",
+    "fretes-e-profissionais": "Fretes e Profissionais",
+    "outros-servicos": "Outros Serviços",
+    // Lojas / vitrines
+    "varejo": "Varejo",
+    "construcao-e-casa": "Construção e Casa",
+    "profissional-consultoria": "Profissional / Consultoria",
+    "educacao": "Educação",
 }
 
 export const CATEGORY_GRADIENTS: Record<string, string> = {
@@ -107,5 +124,10 @@ export const ESTADO_MAP: Record<string, string> = {
     sc: "Santa Catarina", sp: "São Paulo", se: "Sergipe", to: "Tocantins",
 }
 
-export type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
-export type ViewMode = "grid" | "list"
+export type SortOption =
+    | "relevancia"
+    | "preco_menor"
+    | "preco_maior"
+    | "recentes"
+    | "avaliacao"
+    | "distancia"

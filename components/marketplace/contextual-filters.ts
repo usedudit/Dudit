@@ -7,6 +7,16 @@ export interface FilterConfig {
     showPrice?: boolean
     showSort?: boolean
     showPromo?: boolean
+    /** Envio nacional (transportadora) - faz sentido só para produtos. */
+    showShipping?: boolean
+    /** Avaliação mínima (nota) - vale para produtos, serviços e lojas. */
+    showRating?: boolean
+    /** Filtros exclusivos de vitrines (entrega, raio, vitrine online ativa). */
+    showStoreFilters?: boolean
+    /** Condição (novo/usado) - faz sentido só para produtos. */
+    showCondition?: boolean
+    /** Marca - usado apenas dentro da vitrine do vendedor. */
+    showBrands?: boolean
 }
 
 export type PageMode = "sections" | "category" | "section-detail" | "search"
@@ -146,48 +156,59 @@ export function getFilterConfig(sectionId: string | null, pageMode: PageMode, cu
         base = SECTION_FILTERS.default.config
     }
 
-    if (currentType === "vitrines") {
-        return { ...base, showPrice: false, showPromo: false }
+    if (currentType === "vitrines" || currentType === "negocios") {
+        return {
+            ...base,
+            showPrice: false,
+            showPromo: false,
+            showShipping: false,
+            showCondition: false,
+            showRating: true,
+            showStoreFilters: true,
+        }
     }
 
     if (currentType === "servicos") {
-        return { ...base, showPromo: false }
+        return { ...base, showPromo: false, showShipping: false, showCondition: false, showRating: true }
     }
 
-    return base
+    if (currentType === "planos") {
+        return { ...base, showShipping: false, showCondition: false, showRating: true }
+    }
+
+    return { ...base, showShipping: base.showShipping !== false, showCondition: base.showCondition !== false, showRating: true }
 }
 
 export function getSortOptionsForMode(pageMode: PageMode, sectionId?: string | null, currentType?: string): { value: SortOption; label: string }[] {
-    if (currentType === "vitrines") {
+    if (currentType === "vitrines" || currentType === "negocios") {
         return [
             { value: "relevancia" as SortOption, label: "Relevância" },
-            { value: "recentes" as SortOption, label: "Mais Recentes" },
+            { value: "recentes" as SortOption, label: "Mais recentes" },
+            { value: "avaliacao" as SortOption, label: "Melhor avaliados" },
+            { value: "distancia" as SortOption, label: "Mais próximos" },
         ]
     }
 
     if (currentType === "servicos") {
         return [
             { value: "relevancia" as SortOption, label: "Relevância" },
-            { value: "preco_menor" as SortOption, label: "Menor Preço" },
-            { value: "preco_maior" as SortOption, label: "Maior Preço" },
-            { value: "recentes" as SortOption, label: "Mais Recentes" },
+            { value: "preco_menor" as SortOption, label: "Menor preço" },
+            { value: "preco_maior" as SortOption, label: "Maior preço" },
+            { value: "recentes" as SortOption, label: "Mais recentes" },
+            { value: "avaliacao" as SortOption, label: "Melhor avaliados" },
         ]
     }
 
     const base = [
         { value: "relevancia" as SortOption, label: "Relevância" },
-        { value: "preco_menor" as SortOption, label: "Menor Preço" },
-        { value: "preco_maior" as SortOption, label: "Maior Preço" },
-        { value: "recentes" as SortOption, label: "Mais Recentes" },
+        { value: "preco_menor" as SortOption, label: "Menor preço" },
+        { value: "preco_maior" as SortOption, label: "Maior preço" },
+        { value: "recentes" as SortOption, label: "Mais recentes" },
+        { value: "avaliacao" as SortOption, label: "Melhor avaliados" },
     ]
 
     if (pageMode === "category" || sectionId === "topRated") {
-        return [
-            { value: "relevancia" as SortOption, label: "Relevância" },
-            { value: "preco_menor" as SortOption, label: "Menor Preço" },
-            { value: "preco_maior" as SortOption, label: "Maior Preço" },
-            { value: "recentes" as SortOption, label: "Mais Recentes" },
-        ]
+        return base
     }
 
     return base

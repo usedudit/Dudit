@@ -31,6 +31,7 @@ import {
 } from "@/lib/services/shipping/superfrete"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { cancelCarrierLabelForOrder } from "@/lib/services/shipping/superfrete-label-cancel"
 
 const SUPERFRETE_WEBHOOK_URL = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL}/api/shipping/superfrete/webhook`
 import {
@@ -1005,38 +1006,25 @@ export async function cancelSuperFreteLabelAction(payload: {
   if (!ctx) return { success: false, error: "Contexto de ERP não encontrado" }
   await requirePartnerAccessWithPermission(payload.partnerId, "orders", "edit", user)
 
-  const supabase = getAdminClient()
+  const result = await cancelCarrierLabelForOrder({
+    partnerId: payload.partnerId,
+    orderId: payload.orderId,
+    labelId: payload.labelId,
+    reason: payload.reason,
+  })
 
-  const integration = await getSuperFreteIntegration(supabase, payload.partnerId)
-  const client = createClientFromIntegration(integration)
-
-  if (!client) {
-    return { success: false, error: "SuperFrete não conectado." }
-  }
-
-  try {
-    await client.cancelOrder(payload.labelId, payload.reason)
-
-    await supabase
-      .from("order_shipments")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq("partner_id", payload.partnerId)
-      .eq("external_label_id", payload.labelId)
-
-    revalidateOrders(payload.partnerId)
-
-    return { success: true }
-  } catch (err: any) {
-    captureError(err, {
+  if (!result.success) {
+    captureError(new Error(result.error), {
       module: "shipping",
       action: "cancel_label_superfrete",
       partnerId: payload.partnerId,
     })
-    return { success: false, error: err?.message || "Erro ao cancelar etiqueta." }
+    return { success: false, error: result.error }
   }
+
+  revalidateOrders(payload.partnerId)
+
+  return { success: true }
 }
 
 export async function printSuperFreteLabelAction(payload: {

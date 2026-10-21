@@ -95,6 +95,30 @@ export async function checkAndExpireOrder(
     return { expired: false, reason: `update_failed: ${updateError.message}` }
   }
 
+  // Pedidos expirados podem ter etiqueta de transportadora gerada e não paga.
+  // O cancelamento da etiqueta evita etiqueta órfã e devolve o valor.
+  try {
+    const { data: shipments } = await client
+      .from("order_shipments")
+      .select("id, external_label_id, status")
+      .eq("order_id", orderId)
+      .neq("kind", "return")
+
+    for (const shipment of shipments || []) {
+      if (!shipment?.external_label_id) continue
+      const { cancelCarrierLabelForOrder } = await import("@/lib/services/shipping/superfrete-label-cancel")
+      await cancelCarrierLabelForOrder({
+        partnerId: order.partner_id,
+        orderId,
+        labelId: String(shipment.external_label_id),
+        reason: "Pedido cancelado por expiração do prazo de pagamento",
+        currentStatus: shipment.status,
+      })
+    }
+  } catch (labelErr) {
+    console.error("[order-expiration] Error cancelling carrier label:", labelErr)
+  }
+
   const { data: orderItems } = await client
     .from("order_items")
     .select("product_id, variant_id, quantity")

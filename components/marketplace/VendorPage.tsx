@@ -19,6 +19,7 @@ import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hou
 import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange } from "@/lib/services/location.service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
+import { SlidersHorizontal } from "lucide-react"
 import BottomSheet from "@/components/BottomSheet"
 import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard, RadioButton, FormDropdown } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
@@ -26,6 +27,18 @@ import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/uti
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
+import { ExplorarViewControls } from "./ExplorarViewControls"
+import type { SortOption } from "./explorar-constants"
+import {
+    isPromoItem,
+    matchesBrandFilter,
+    matchesConditionFilter,
+    matchesPriceRange,
+    matchesRatingFilter,
+    parseFiltersFromParams,
+    serializeFiltersToParams,
+    type ExploreFilterState,
+} from "./explorar-filters"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
@@ -33,6 +46,8 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
 import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
 import { buildVendorLocationPopupHtml } from "@/lib/map/mapbox-popup"
+
+type VendorContext = "produtos" | "servicos" | "planos"
 
 interface VendorPageClientProps {
     partner: any
@@ -880,6 +895,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
+
+    // Tipo de catálogo na URL (?contexto=produtos|servicos|planos)
+    const contextParam: VendorContext = activeContext === "Servicos" ? "servicos" : activeContext === "Planos" ? "planos" : "produtos"
     const [categoryView, setCategoryView] = useState<string | null>(() => {
         if (initialCategory) return initialCategory
         if (typeof window !== "undefined") {
@@ -913,11 +931,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")
     const [isCategorySearchOpen, setIsCategorySearchOpen] = useState(false)
-    const [categorySortBy, setCategorySortBy] = useState<"relevancia" | "preco_menor" | "preco_maior" | "recentes">("relevancia")
+    const [categorySortBy, setCategorySortBy] = useState<SortOption>("relevancia")
     const [categoryMinPrice, setCategoryMinPrice] = useState("")
     const [categoryMaxPrice, setCategoryMaxPrice] = useState("")
     const [categoryPromoOn, setCategoryPromoOn] = useState(false)
     const [categorySelectedBrands, setCategorySelectedBrands] = useState<string[]>([])
+    const [categoryCondition, setCategoryCondition] = useState("")
+    const [categoryMinRating, setCategoryMinRating] = useState<number | null>(null)
     const [isCategoryFiltersOpen, setIsCategoryFiltersOpen] = useState(false)
     const [isCategorySortOpen, setIsCategorySortOpen] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
@@ -993,11 +1013,58 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [partner.banner_url, partnerRawImage, partner.storeName])
 
     const hasPlans = plans && plans.length > 0
+
+    /**
+     * Normaliza um item da vitrine para o mesmo formato dos cards e dos
+     * filtros da Explorar (itemType, price, originalPrice, partners...).
+     * Assim os filtros funcionam igual nas duas páginas.
+     */
+    const normalizeVendorItem = useCallback((item: any) => {
+        const rawType = item?.itemType || item?._itemType
+        const itemType = rawType || (activeContext === "Servicos" ? "servico" : activeContext === "Planos" ? "plano" : "produto")
+        return normalizeItemForCard({ ...item, itemType }, partner)
+    }, [activeContext, partner])
+
     const currentItems = activeContext === "Produtos" ? displayProducts : (activeContext === "Servicos" ? services : plans)
+
+    const contextItems = useMemo(() => {
+        return (currentItems || []).map(item => normalizeVendorItem(item))
+    }, [currentItems, normalizeVendorItem])
+
+    // Filtros (mesma lógica da página Explorar)
+    const applyVendorFilters = useCallback((items: any[]) => {
+        let filtered = items
+        if (categoryPromoOn) filtered = filtered.filter(isPromoItem)
+        if (categorySelectedBrands.length > 0) filtered = filtered.filter(item => matchesBrandFilter(item, categorySelectedBrands))
+        if (categoryCondition) filtered = filtered.filter(item => matchesConditionFilter(item, categoryCondition))
+        if (categoryMinRating) filtered = filtered.filter(item => matchesRatingFilter(item, categoryMinRating))
+        const min = categoryMinPrice ? Number(String(categoryMinPrice).replace(",", ".")) : null
+        const max = categoryMaxPrice ? Number(String(categoryMaxPrice).replace(",", ".")) : null
+        if (min !== null || max !== null) {
+            filtered = filtered.filter(item => matchesPriceRange(item, min, max))
+        }
+        return filtered
+    }, [categoryPromoOn, categorySelectedBrands, categoryCondition, categoryMinRating, categoryMinPrice, categoryMaxPrice])
+
+    const sortVendorItems = useCallback((items: any[]) => {
+        const sorted = [...items]
+        switch (categorySortBy) {
+            case "preco_menor": sorted.sort((a, b) => (a.price || 0) - (b.price || 0)); break
+            case "preco_maior": sorted.sort((a, b) => (b.price || 0) - (a.price || 0)); break
+            case "recentes": sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); break
+            case "avaliacao": sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break
+            case "relevancia":
+            default:
+                return sortByVendorRelevance(sorted)
+        }
+        return sorted
+    }, [categorySortBy])
+
     const filteredItems = useMemo(() => {
         const search = searchValue.trim().toLowerCase()
-        return currentItems.filter(item => !search || item.name?.toLowerCase().includes(search))
-    }, [currentItems, searchValue])
+        const searched = contextItems.filter(item => !search || item.name?.toLowerCase().includes(search))
+        return applyVendorFilters(searched)
+    }, [contextItems, searchValue, applyVendorFilters])
 
     const groupedItems = useMemo(() => {
         const map = new Map<string, any[]>()
@@ -1008,9 +1075,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return Array.from(map.entries()).map(([name, items]) => ({
             name,
             id: categoryId(name),
-            items: sortByVendorRelevance(items),
+            items: sortVendorItems(items),
         }))
-    }, [filteredItems])
+    }, [filteredItems, sortVendorItems])
 
     const allTabs = useMemo(() => [
         { id: "todos", label: "Todos" },
@@ -1034,6 +1101,39 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         [categoryView, isCampaignView, activeCampaignPromo, groupedItems]
     )
 
+    // ── Filtros na URL (link compartilhável + botão voltar) ─────────────────
+    const vendorFilterState: ExploreFilterState = useMemo(() => ({
+        categories: [],
+        minPrice: categoryMinPrice,
+        maxPrice: categoryMaxPrice,
+        promoOn: categoryPromoOn,
+        condition: categoryCondition,
+        shipping: false,
+        minRating: categoryMinRating,
+        delivery: "",
+        maxDistanceKm: null,
+        showcaseOnly: false,
+        brands: categorySelectedBrands,
+    }), [categoryMinPrice, categoryMaxPrice, categoryPromoOn, categoryCondition, categoryMinRating, categorySelectedBrands])
+
+    const applyFiltersFromUrl = useCallback((urlParams: URLSearchParams) => {
+        const parsed = parseFiltersFromParams(urlParams)
+        setCategoryMinPrice(parsed.minPrice === "" ? "" : String(parsed.minPrice))
+        setCategoryMaxPrice(parsed.maxPrice === "" ? "" : String(parsed.maxPrice))
+        setCategoryPromoOn(parsed.promoOn)
+        setCategoryCondition(parsed.condition)
+        setCategoryMinRating(parsed.minRating)
+        setCategorySelectedBrands(parsed.brands || [])
+        const ord = urlParams.get("ord") as SortOption | null
+        setCategorySortBy(ord || "relevancia")
+
+        // Tipo de catálogo (?contexto=)
+        const ctx = urlParams.get("contexto")
+        if (ctx === "servicos") setActiveContext("Servicos")
+        else if (ctx === "planos") setActiveContext("Planos")
+        else if (ctx === "produtos") setActiveContext("Produtos")
+    }, [])
+
     // ── Instant 0ms popstate synchronization for browser Back / Forward ─────
     useEffect(() => {
         const handlePopState = () => {
@@ -1043,6 +1143,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             categoryViewRef.current = cat
             setCategoryView(cat)
             setActiveTag(cat || "todos")
+            applyFiltersFromUrl(params)
             if (cat) {
                 setActiveSection("products")
                 setTimeout(scrollToProducts, 0)
@@ -1050,7 +1151,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
-    }, [])
+    }, [applyFiltersFromUrl])
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
@@ -1062,7 +1163,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             setActiveSection("products")
             setTimeout(scrollToProducts, 0)
         }
-    }, [initialCategory])
+        // Filtros que vieram na URL (link compartilhado)
+        applyFiltersFromUrl(params)
+    }, [initialCategory, applyFiltersFromUrl])
 
     useEffect(() => {
         let ticking = false
@@ -1118,11 +1221,28 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [updateTabsScrollState, allTabs.length])
 
     const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.storeName), [partner.phone, partner.storeName])
-    const updateCategoryUrl = useCallback((tag: string | null, push: boolean = true) => {
+    const updateCategoryUrl = useCallback((
+        tag: string | null,
+        push: boolean = true,
+        overrides?: Partial<ExploreFilterState> & { sortBy?: SortOption; context?: VendorContext }
+    ) => {
         if (typeof window === "undefined") return
         const params = new URLSearchParams(window.location.search)
         if (tag) params.set("categoria", tag)
         else params.delete("categoria")
+
+        // Filtros ativos vão para a URL (link compartilhável + botão voltar)
+        const filtersToPersist: ExploreFilterState = { ...vendorFilterState, ...(overrides ?? {}) }
+        serializeFiltersToParams(filtersToPersist, params)
+        const sortToPersist = overrides?.sortBy ?? categorySortBy
+        if (sortToPersist && sortToPersist !== "relevancia") params.set("ord", sortToPersist)
+        else params.delete("ord")
+
+        // Tipo de catálogo (produtos/serviços/assinaturas)
+        const contextToPersist = overrides?.context ?? contextParam
+        if (contextToPersist && contextToPersist !== "produtos") params.set("contexto", contextToPersist)
+        else params.delete("contexto")
+
         const query = params.toString()
         const targetUrl = query ? `${pathname}?${query}` : pathname
         const currentUrl = `${window.location.pathname}${window.location.search}`
@@ -1134,7 +1254,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         } else {
             window.history.replaceState(window.history.state, "", targetUrl)
         }
-    }, [pathname])
+    }, [pathname, vendorFilterState, categorySortBy, contextParam])
     const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })
 
     useEffect(() => {
@@ -1155,12 +1275,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         setActiveSection("products")
         setCategorySearchValue("")
         setIsCategorySearchOpen(false)
-        setCategorySortBy("relevancia")
-        setCategoryMinPrice("")
-        setCategoryMaxPrice("")
-        setCategoryPromoOn(false)
-        setCategorySelectedBrands([])
         setActiveTag(tag || "todos")
+        // Os filtros ativos são mantidos ao trocar de categoria (como na
+        // Explorar) - o usuário vê o chip ativo e pode remover quando quiser.
 
         if (tag) {
             categoryViewRef.current = tag
@@ -1201,34 +1318,37 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const categoryItems = useMemo(() => {
         if (!categoryView) return []
+        const search = categorySearchValue.trim().toLowerCase()
+        const matchesSearch = (item: any) => !search || item.name?.toLowerCase().includes(search)
+
         if (isCampaignView && activeCampaignPromo) {
             const promoItems: any[] = []
             if (products) {
                 products.forEach(p => {
                     if (isItemInPromotion(p, activeCampaignPromo, "produto")) {
-                        promoItems.push({ ...p, _itemType: "produto" })
+                        promoItems.push(normalizeVendorItem({ ...p, _itemType: "produto" }))
                     }
                 })
             }
             if (services) {
                 services.forEach(s => {
                     if (isItemInPromotion(s, activeCampaignPromo, "servico")) {
-                        promoItems.push({ ...s, _itemType: "servico" })
+                        promoItems.push(normalizeVendorItem({ ...s, _itemType: "servico" }))
                     }
                 })
             }
-            return promoItems.filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
+            return applyVendorFilters(promoItems).filter(matchesSearch)
         }
 
-        return (groupedItems.find(group => group.id === categoryView)?.items || [])
-            .filter(item => !categorySearchValue.trim() || item.name?.toLowerCase().includes(categorySearchValue.trim().toLowerCase()))
-    }, [categoryView, isCampaignView, activeCampaignPromo, products, services, categorySearchValue, groupedItems])
+        // groupedItems já vem filtrado pelos filtros da página
+        return (groupedItems.find(group => group.id === categoryView)?.items || []).filter(matchesSearch)
+    }, [categoryView, isCampaignView, activeCampaignPromo, products, services, categorySearchValue, groupedItems, applyVendorFilters, normalizeVendorItem])
 
     const categoryAvailableBrands = useMemo(() => {
         const brands = new Set<string>()
-        categoryItems.forEach(item => { if (item.brand) brands.add(item.brand) })
+        contextItems.forEach(item => { if (item.brand) brands.add(item.brand) })
         return Array.from(brands)
-    }, [categoryItems])
+    }, [contextItems])
 
     const categoryActiveFiltersCount = useMemo(() => {
         let count = 0
@@ -1236,28 +1356,160 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         if (categoryMinPrice || categoryMaxPrice) count++
         if (categoryPromoOn) count++
         if (categorySelectedBrands.length > 0) count++
+        if (categoryCondition) count++
+        if (categoryMinRating) count++
         return count
-    }, [categorySortBy, categoryMinPrice, categoryMaxPrice, categoryPromoOn, categorySelectedBrands])
+    }, [categorySortBy, categoryMinPrice, categoryMaxPrice, categoryPromoOn, categorySelectedBrands, categoryCondition, categoryMinRating])
 
     const categoryFilteredItems = useMemo(() => {
-        let items = categoryItems
-        if (categoryPromoOn) items = items.filter(item => item.promotional_price)
-        if (categorySelectedBrands.length > 0) items = items.filter(item => categorySelectedBrands.includes(item.brand))
-        const min = parseFloat(categoryMinPrice)
-        const max = parseFloat(categoryMaxPrice)
-        if (!isNaN(min)) items = items.filter(item => (item.promotional_price || item.price || 0) >= min)
-        if (!isNaN(max)) items = items.filter(item => (item.promotional_price || item.price || 0) <= max)
-        const sorted = [...items]
-        switch (categorySortBy) {
-            case "preco_menor": sorted.sort((a, b) => (a.promotional_price || a.price || 0) - (b.promotional_price || b.price || 0)); break
-            case "preco_maior": sorted.sort((a, b) => (b.promotional_price || b.price || 0) - (a.promotional_price || a.price || 0)); break
-            case "recentes": sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); break
-            case "relevancia":
-            default:
-                return sortByVendorRelevance(sorted)
+        return sortVendorItems(categoryItems)
+    }, [categoryItems, sortVendorItems])
+
+    // ── Controles de filtro (mesma experiência da página Explorar) ───────────
+    const vendorSortOptions = useMemo(() => ([
+        { value: "relevancia" as SortOption, label: "Relevância" },
+        { value: "preco_menor" as SortOption, label: "Menor preço" },
+        { value: "preco_maior" as SortOption, label: "Maior preço" },
+        { value: "recentes" as SortOption, label: "Mais recentes" },
+        { value: "avaliacao" as SortOption, label: "Melhor avaliados" },
+    ]), [])
+
+    const vendorTypeOptions = useMemo(() => {
+        const options = [{ value: "Produtos", label: "Produtos" }]
+        if ((services || []).length > 0) options.push({ value: "Servicos", label: "Serviços" })
+        if (hasPlans) options.push({ value: "Planos", label: "Assinaturas" })
+        return options
+    }, [services, hasPlans])
+
+    const vendorFilterConfig = useMemo(() => ({
+        showType: true,
+        showCategory: false,
+        showPrice: true,
+        showPromo: activeContext !== "Planos",
+        showCondition: activeContext === "Produtos",
+        showRating: true,
+        showShipping: false,
+        showStoreFilters: false,
+        showBrands: activeContext === "Produtos" && categoryAvailableBrands.length > 0,
+    }), [activeContext, categoryAvailableBrands.length])
+
+    /**
+     * Atualiza um filtro (ou a ordenação) e mantém a URL sincronizada.
+     */
+    const patchVendorFilters = useCallback((patch: Partial<ExploreFilterState> & { sortBy?: SortOption; context?: VendorContext }) => {
+        if ("minPrice" in patch) setCategoryMinPrice(patch.minPrice === "" || patch.minPrice === undefined ? "" : String(patch.minPrice))
+        if ("maxPrice" in patch) setCategoryMaxPrice(patch.maxPrice === "" || patch.maxPrice === undefined ? "" : String(patch.maxPrice))
+        if ("promoOn" in patch) setCategoryPromoOn(patch.promoOn === true)
+        if ("condition" in patch) setCategoryCondition(patch.condition || "")
+        if ("minRating" in patch) setCategoryMinRating(patch.minRating ?? null)
+        if ("brands" in patch) setCategorySelectedBrands(patch.brands || [])
+        if (patch.sortBy) setCategorySortBy(patch.sortBy)
+        updateCategoryUrl(categoryViewRef.current, true, patch)
+    }, [updateCategoryUrl])
+
+    const clearVendorFilters = useCallback(() => {
+        patchVendorFilters({
+            minPrice: "",
+            maxPrice: "",
+            promoOn: false,
+            condition: "",
+            minRating: null,
+            brands: [],
+            sortBy: "relevancia",
+        })
+    }, [patchVendorFilters])
+
+    const vendorFilterChips = useMemo(() => {
+        const chips: { key: string; label: string; value: string; onRemove: () => void }[] = []
+        if (categoryMinPrice || categoryMaxPrice) {
+            let value = ""
+            if (categoryMinPrice && categoryMaxPrice) value = `${formatCurrency(Number(categoryMinPrice))} - ${formatCurrency(Number(categoryMaxPrice))}`
+            else if (categoryMinPrice) value = `> ${formatCurrency(Number(categoryMinPrice))}`
+            else value = `< ${formatCurrency(Number(categoryMaxPrice))}`
+            chips.push({
+                key: "price",
+                label: "Preço",
+                value,
+                onRemove: () => patchVendorFilters({ minPrice: "", maxPrice: "" }),
+            })
         }
-        return sorted
-    }, [categoryItems, categoryPromoOn, categorySelectedBrands, categoryMinPrice, categoryMaxPrice, categorySortBy])
+        if (categoryPromoOn) {
+            chips.push({
+                key: "promo",
+                label: "Promoção",
+                value: "Ativo",
+                onRemove: () => patchVendorFilters({ promoOn: false }),
+            })
+        }
+        if (categoryCondition) {
+            chips.push({
+                key: "condition",
+                label: "Condição",
+                value: categoryCondition === "novo" ? "Apenas Novos" : "Usados / Desapegos",
+                onRemove: () => patchVendorFilters({ condition: "" }),
+            })
+        }
+        if (categoryMinRating) {
+            chips.push({
+                key: "rating",
+                label: "Avaliação",
+                value: `${String(categoryMinRating).replace(".", ",")}+`,
+                onRemove: () => patchVendorFilters({ minRating: null }),
+            })
+        }
+        if (categorySelectedBrands.length > 0) {
+            chips.push({
+                key: "brands",
+                label: "Marca",
+                value: categorySelectedBrands.join(", "),
+                onRemove: () => patchVendorFilters({ brands: [] }),
+            })
+        }
+        if (categorySortBy !== "relevancia") {
+            chips.push({
+                key: "sort",
+                label: "Ordenar",
+                value: vendorSortOptions.find(o => o.value === categorySortBy)?.label || categorySortBy,
+                onRemove: () => patchVendorFilters({ sortBy: "relevancia" }),
+            })
+        }
+        return chips
+    }, [categoryMinPrice, categoryMaxPrice, categoryPromoOn, categoryCondition, categoryMinRating, categorySelectedBrands, categorySortBy, patchVendorFilters, vendorSortOptions])
+
+    /**
+     * Troca o tipo do catálogo (Produtos / Serviços / Assinaturas).
+     * Filtros que não se aplicam ao novo tipo são removidos junto.
+     */
+    const switchContext = useCallback((next: "Produtos" | "Servicos" | "Planos") => {
+        setActiveContext(next)
+        setActiveSection("products")
+        setActiveTag("todos")
+        categoryViewRef.current = null
+        setCategoryView(null)
+
+        const patch: Partial<ExploreFilterState> & { sortBy?: SortOption; context?: VendorContext } = {}
+        if (next !== "Produtos") {
+            patch.brands = []
+            patch.condition = ""
+            setCategorySelectedBrands([])
+            setCategoryCondition("")
+        }
+        if (next === "Planos") {
+            patch.promoOn = false
+            setCategoryPromoOn(false)
+        }
+        patch.context = next === "Servicos" ? "servicos" : next === "Planos" ? "planos" : "produtos"
+        updateCategoryUrl(null, false, patch)
+    }, [updateCategoryUrl])
+
+    const renderFilterControls = () => (
+        <ExplorarViewControls
+            onOpenFilters={() => setIsCategoryFiltersOpen(true)}
+            onOpenSort={() => setIsCategorySortOpen(true)}
+            hasActiveFilters={categoryActiveFiltersCount > 0}
+            activeFilterChips={vendorFilterChips}
+        />
+    )
 
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
@@ -1362,7 +1614,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </div>
 
-            {categoryView && (
+            {categoryView && (contextItems.length > 0) && (
                 <div className="lg:hidden">
                     <ExplorarMobileControls
                         activeFiltersCount={categoryActiveFiltersCount}
@@ -1425,6 +1677,19 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
 
                     <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <button
+                        onClick={() => setIsCategoryFiltersOpen(true)}
+                        className="h-8 px-2.5 shrink-0 flex items-center gap-1.5 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading active:bg-gray-100 dark:active:bg-dark-border transition-colors relative"
+                        title="Filtros"
+                    >
+                        <SlidersHorizontal className="w-[15px] h-[15px]" />
+                        <span className="text-[12px] font-semibold">Filtros</span>
+                        {categoryActiveFiltersCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-green text-white text-[10px] font-bold flex items-center justify-center">
+                                {categoryActiveFiltersCount}
+                            </span>
+                        )}
+                    </button>
                     <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[32px] shrink-0">
                         <button
                             onClick={() => setViewMode("list")}
@@ -1472,6 +1737,18 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         ))}
                     </div>
                     <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <button
+                        onClick={() => setIsCategoryFiltersOpen(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white relative"
+                        title="Filtros"
+                    >
+                        <SlidersHorizontal className="w-[15px] h-[15px]" />
+                        {categoryActiveFiltersCount > 0 && (
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-brand-green text-white text-[9px] font-bold flex items-center justify-center">
+                                {categoryActiveFiltersCount}
+                            </span>
+                        )}
+                    </button>
                     <div className="flex items-center bg-white/10 border border-white/20 rounded-full p-0.5 h-[30px] shrink-0">
                         <button
                             onClick={() => setViewMode("list")}
@@ -1499,89 +1776,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20 items-start">
                 <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white dark:bg-dark-surface self-start">
-                    {categoryView ? (
-                        <div className="border-r border-gray-100 dark:border-dark-border pr-5">
-                            <div className="sticky top-[128px] space-y-6 py-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
-                                    {categoryActiveFiltersCount > 0 && (
-                                        <button
-                                            onClick={() => {
-                                                setCategorySortBy("relevancia")
-                                                setCategoryMinPrice("")
-                                                setCategoryMaxPrice("")
-                                                setCategoryPromoOn(false)
-                                                setCategorySelectedBrands([])
-                                            }}
-                                            className="text-xs font-bold text-brand-green hover:underline"
-                                        >
-                                            Limpar
-                                        </button>
-                                    )}
-                                </div>
-                                <Separator className="my-0" />
-                                <section>
-                                    <FormDropdown
-                                        label="Ordenar"
-                                        options={[
-                                            { value: "relevancia", label: "Relevância" },
-                                            { value: "preco_menor", label: "Menor Preço" },
-                                            { value: "preco_maior", label: "Maior Preço" },
-                                            { value: "recentes", label: "Mais Recentes" },
-                                        ]}
-                                        value={categorySortBy}
-                                        setValue={(v) => setCategorySortBy(v as any)}
-                                    />
-                                </section>
-                                <section>
-                                    <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Preço</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <MoneyInput
-                                            value={categoryMinPrice}
-                                            onChange={(v) => setCategoryMinPrice(String(v))}
-                                            placeholder="Mín."
-                                            className="h-10"
-                                        />
-                                        <MoneyInput
-                                            value={categoryMaxPrice}
-                                            onChange={(v) => setCategoryMaxPrice(String(v))}
-                                            placeholder="Máx."
-                                            className="h-10"
-                                        />
-                                    </div>
-                                </section>
-                                <section>
-                                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
-                                        <Checkbox
-                                            checked={categoryPromoOn}
-                                            onChange={() => setCategoryPromoOn(!categoryPromoOn)}
-                                        />
-                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Em promoção</span>
-                                    </label>
-                                </section>
-                                {categoryAvailableBrands.length > 0 && (
-                                    <section>
-                                        <h3 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Marca</h3>
-                                        <div className="space-y-2">
-                                            {categoryAvailableBrands.map(brand => (
-                                                <label key={brand} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors">
-                                                    <Checkbox
-                                                        checked={categorySelectedBrands.includes(brand)}
-                                                        onChange={() => {
-                                                            setCategorySelectedBrands(prev =>
-                                                                prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
-                                                            )
-                                                        }}
-                                                    />
-                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{brand}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
                         <div>
                             <div className="mb-8">
                                 <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Sobre {partner.storeName}</h3>
@@ -1602,18 +1796,18 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <div className="mb-8 border-t border-brand-border pt-6">
                                     <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Catálogo</h3>
                                     <div className="flex flex-col gap-1">
-                                        <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                        <button onClick={() => switchContext("Produtos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                             <span>Produtos</span>
                                             {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                         </button>
                                         {services.length > 0 && (
-                                            <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <button onClick={() => switchContext("Servicos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Serviços</span>
                                                 {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
                                         )}
                                         {hasPlans && (
-                                            <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <button onClick={() => switchContext("Planos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
                                                 <span>Assinaturas</span>
                                                 {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
                                             </button>
@@ -1636,7 +1830,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 ))}
                             </div>
                         </div>
-                    )}
                 </aside>
 
                 <main id="vendor-products" className="flex-1 min-w-0 w-full lg:w-auto px-5 lg:px-0 scroll-mt-[170px]">
@@ -1658,6 +1851,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">{categoryFilteredItems.length} resultado{categoryFilteredItems.length !== 1 ? "s" : ""} encontrado{categoryFilteredItems.length !== 1 ? "s" : ""}</p>
                                         </div>
                                     </div>
+                                    {renderFilterControls()}
                                     {categoryFilteredItems.length > 0 ? (
                                         viewMode === "list" ? (
                                             <div className="flex flex-col mt-4">
@@ -1692,6 +1886,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </section>
                             ) : (
                                 <>
+                                    {renderFilterControls()}
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
 
                                     {/* Seção de Ofertas Relâmpago / Campanhas - mostra no máximo UMA */}
@@ -1834,7 +2029,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         ...(services.length > 0 ? [{ value: "Servicos", label: "Serviços" }] : []),
                         ...(hasPlans ? [{ value: "Planos", label: "Assinaturas" }] : [])
                     ].map((opt, i, arr) => (
-                        <div key={opt.value} onClick={() => { setActiveContext(opt.value as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
+                        <div key={opt.value} onClick={() => { switchContext(opt.value as "Produtos" | "Servicos" | "Planos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                             <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
                             <RadioButton name="activeContext" value={opt.value} checked={activeContext === opt.value} onChange={() => { }} />
                         </div>
@@ -1893,49 +2088,51 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 isOpen={isCategoryFiltersOpen}
                 onClose={() => setIsCategoryFiltersOpen(false)}
                 onApply={(filters) => {
-                    setCategoryMinPrice(String(filters.minPrice || ""))
-                    setCategoryMaxPrice(String(filters.maxPrice || ""))
-                    setCategoryPromoOn(filters.promoOn)
+                    // Troca de tipo (produtos/serviços/assinaturas)
+                    const typeChanged = !!filters.type && filters.type !== activeContext
+                    const nextContext: VendorContext | undefined = typeChanged
+                        ? (filters.type === "Servicos" ? "servicos" : filters.type === "Planos" ? "planos" : "produtos")
+                        : undefined
+                    if (typeChanged) {
+                        switchContext(filters.type as "Produtos" | "Servicos" | "Planos")
+                    }
+                    patchVendorFilters({
+                        minPrice: filters.minPrice === undefined ? "" : String(filters.minPrice || ""),
+                        maxPrice: filters.maxPrice === undefined ? "" : String(filters.maxPrice || ""),
+                        promoOn: typeChanged && filters.type === "Planos" ? false : filters.promoOn,
+                        condition: typeChanged ? "" : (filters.condition || ""),
+                        minRating: filters.minRating ?? null,
+                        brands: typeChanged ? [] : (filters.brands || []),
+                        context: nextContext,
+                    })
                 }}
-                onClear={() => {
-                    setCategorySortBy("relevancia")
-                    setCategoryMinPrice("")
-                    setCategoryMaxPrice("")
-                    setCategoryPromoOn(false)
-                    setCategorySelectedBrands([])
-                }}
+                onClear={clearVendorFilters}
                 selectedCitySlug={null}
                 formatCitySlug={(s) => s}
                 onCitySelect={() => { }}
-                currentType={activeContext === "Produtos" ? "produtos" : activeContext === "Servicos" ? "servicos" : "planos"}
+                currentType={activeContext}
                 selectedCategories={[]}
+                selectedCondition={categoryCondition}
                 minPrice={categoryMinPrice}
                 maxPrice={categoryMaxPrice}
                 promoOn={categoryPromoOn}
-                typeOptions={[]}
+                typeOptions={vendorTypeOptions}
                 productCategories={[]}
                 serviceCategories={[]}
                 partnerCategories={[]}
-                filterConfig={{
-                    showType: false,
-                    showCategory: false,
-                    showPrice: true,
-                    showSort: false,
-                    showPromo: true,
-                }}
+                minRating={categoryMinRating}
+                brands={categoryAvailableBrands}
+                selectedBrands={categorySelectedBrands}
+                brandTypes={["Produtos"]}
+                filterConfig={vendorFilterConfig}
             />
 
             <ExplorarSortBottomSheet
                 isOpen={isCategorySortOpen}
                 onClose={() => setIsCategorySortOpen(false)}
                 sortBy={categorySortBy as any}
-                onSortChange={(val) => setCategorySortBy(val as any)}
-                sortOptions={[
-                    { value: "relevancia", label: "Relevância" },
-                    { value: "preco_menor", label: "Menor Preço" },
-                    { value: "preco_maior", label: "Maior Preço" },
-                    { value: "recentes", label: "Mais Recentes" },
-                ]}
+                onSortChange={(val) => patchVendorFilters({ sortBy: val as SortOption })}
+                sortOptions={vendorSortOptions}
             />
         </div>
     )

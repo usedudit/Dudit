@@ -61,11 +61,11 @@ export default async function VendorPage({
   searchParams,
 }: {
   params: Promise<{ slug: string; cidadeUf: string; id: string }>
-  searchParams?: Promise<{ categoria?: string }>
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
   const resolvedSearchParams = await searchParams
-  const initialCategory = resolvedSearchParams?.categoria
+  const initialCategory = typeof resolvedSearchParams?.categoria === "string" ? resolvedSearchParams.categoria : undefined
 
   const store = await getCachedStoreById(id)
 
@@ -82,7 +82,15 @@ export default async function VendorPage({
   const currentPath = `/${currentCidadeUf}/${currentSlug}/v/${id}`
 
   if (currentPath !== canonicalUrl) {
-    redirect(canonicalUrl)
+    // Preserva categoria e filtros no redirecionamento para a URL canônica
+    // (sem isso, o link compartilhado com filtros perderia tudo).
+    const preserved = new URLSearchParams()
+    for (const key of ["categoria", "contexto", "preco_min", "preco_max", "promo", "cond", "avaliacao", "ord", "marca"]) {
+      const value = resolvedSearchParams?.[key]
+      if (typeof value === "string" && value) preserved.set(key, value)
+    }
+    const preservedQuery = preserved.toString()
+    redirect(preservedQuery ? `${canonicalUrl}?${preservedQuery}` : canonicalUrl)
   }
 
   const [user, products, services, reviews, statsBase, plan, plansRes] = await Promise.all([

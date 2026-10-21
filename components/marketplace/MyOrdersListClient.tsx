@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
+import { canonicalDeliveryStatus } from "@/lib/orders/status";
 
 const ORDERS_PER_PAGE = 10
 
@@ -250,11 +251,12 @@ export function MyOrdersListClient({
             if (order.situation === "pending" || order.situation === "payment_failed") {
                 counts.pending++;
             } else if (order.situation === "paid") {
-                if (order.delivery_status === "pending" || order.delivery_status === "preparing") {
+                const deliveryStatus = canonicalDeliveryStatus(order.delivery_status);
+                if (deliveryStatus === "not_sent" || deliveryStatus === "preparing") {
                     counts.preparing++;
-                } else if (order.delivery_status === "sent") {
+                } else if (deliveryStatus === "sent") {
                     counts.sent++;
-                } else if (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") {
+                } else if (deliveryStatus === "delivered" || deliveryStatus === "pickup_available") {
                     counts.delivered++;
                 }
                 // paid but no delivery_status match → falls into "todos" only
@@ -274,7 +276,8 @@ export function MyOrdersListClient({
                 return order.situation === "pending" || order.situation === "payment_failed";
             }
             if (activeTab === "preparing") {
-                return order.situation === "paid" && (order.delivery_status === "pending" || order.delivery_status === "preparing");
+                const deliveryStatus = canonicalDeliveryStatus(order.delivery_status);
+                return order.situation === "paid" && (deliveryStatus === "not_sent" || deliveryStatus === "preparing");
             }
             if (activeTab === "sent") {
                 return order.situation === "paid" && order.delivery_status === "sent";

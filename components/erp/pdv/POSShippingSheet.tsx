@@ -78,6 +78,10 @@ interface POSShippingSheetProps {
         breakdown?: Record<string, unknown> | null
         deliveryAddress?: ShippingAddress
     }) => void
+    /** Força a exibição da seção de transportadora (edição de pedido já carrier). */
+    preferCarrier?: boolean
+    /** Serviço de transportadora pré-selecionado. */
+    initialCarrierServiceId?: number | null
 }
 
 export default function POSShippingSheet({
@@ -92,6 +96,8 @@ export default function POSShippingSheet({
     orderSubtotal,
     onCreateAddress,
     onApply,
+    preferCarrier = false,
+    initialCarrierServiceId = null,
 }: POSShippingSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
@@ -216,8 +222,9 @@ export default function POSShippingSheet({
     const orderSubtotalNumber = Number(orderSubtotal || 0)
 
     // A seção de transportadora só vale quando o frete próprio não cobre
-    // (fora do raio ou erro de cotação).
-    const carrierSectionVisible = Boolean(outsideRadiusWarning || deliveryError)
+    // (fora do raio ou erro de cotação). Na edição de um pedido já
+    // transportadora, ela aparece sempre para permitir trocar o serviço.
+    const carrierSectionVisible = Boolean(outsideRadiusWarning || deliveryError || preferCarrier)
     const effectiveCarrierOption = carrierSectionVisible && carrierOptions.length > 0
         ? (carrierOptions.find((o) => o.serviceId === selectedCarrierServiceId) || carrierOptions[0])
         : null
@@ -331,6 +338,10 @@ export default function POSShippingSheet({
                     if (res.success && res.options.length > 0) {
                         setCarrierOptions(res.options)
                         setCarrierError(null)
+                        if (initialCarrierServiceId != null) {
+                            const match = res.options.find((o) => o.serviceId === initialCarrierServiceId)
+                            setSelectedCarrierServiceId(match ? match.serviceId : res.options[0].serviceId)
+                        }
                     } else {
                         setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este CEP.")
                     }

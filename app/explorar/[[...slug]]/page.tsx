@@ -17,24 +17,12 @@ import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 import { QueryClient, dehydrate } from "@tanstack/react-query"
 import { HydrationBoundary } from "@tanstack/react-query"
 import { cookies } from "next/headers"
-import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS, ESTADO_MAP } from "@/components/marketplace/explorar-constants"
+import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS, ESTADO_MAP, CATEGORY_SLUG_MAP } from "@/components/marketplace/explorar-constants"
 import { FormSection } from "@/components/reusable/FormSection"
 import { ListItem } from "@/components/reusable/ListItem"
 import { notFound } from "next/navigation"
 import { isValidCitySlug } from "@/lib/validation/city"
 import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
-
-const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-    "alimentacao": "Alimentação",
-    "casa": "Casa",
-    "tecnologia": "Tecnologia",
-    "moda-e-beleza": "Moda e Beleza",
-    "saude": "Saúde",
-    "automotivo": "Automotivo",
-    "pets": "Pets",
-    "servicos": "Serviços",
-    "outros": "Outros"
-}
 
 function isValidLocationSlug(slug: string): boolean {
     if (!slug) return false
@@ -320,6 +308,11 @@ export default async function ExplorarPage({
         || type !== "tudo"
         || !!section
         || typeof resolvedSearchParams.categoria === "string"
+        // Filtros aplicados (preço, promoção, avaliação, raio...) também são
+        // "intenção de busca": sem isso, um link compartilhado com filtros
+        // cairia na landing page e perderia tudo o que o usuário escolheu.
+        || ["preco_min", "preco_max", "promo", "cond", "envio", "avaliacao", "entrega", "raio", "vitrine", "ord"]
+            .some((key) => resolvedSearchParams[key] !== undefined)
 
     const normalizeCityToSlug = (city: string, state: string) => {
         const normCity = city
@@ -466,7 +459,11 @@ export default async function ExplorarPage({
     const cidade = !isStateRoute ? firstSlug : ""
 
     const categorySlug = slug[1] || ""
-    const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
+    const categoriaFromPath = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
+    // A categoria também pode vir pela query (?categoria=xxx) - nesse caso o
+    // servidor precisa repassá-la para o cliente já filtrar no primeiro paint.
+    const categoriaFromQuery = typeof resolvedSearchParams.categoria === "string" ? resolvedSearchParams.categoria : ""
+    const categoria = categoriaFromPath || categoriaFromQuery
 
     const serverFetchType = type
 

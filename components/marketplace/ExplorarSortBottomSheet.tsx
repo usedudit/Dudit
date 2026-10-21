@@ -2,8 +2,7 @@
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Check } from "lucide-react"
-
-type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
+import type { SortOption } from "./explorar-constants"
 
 interface ExplorarSortBottomSheetProps {
     isOpen: boolean

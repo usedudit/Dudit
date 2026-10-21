@@ -62,6 +62,7 @@ import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/B
 import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS, getDeliveryStatusLabel, canonicalDeliveryStatus, DELIVERY_STATUS_FILTER_OPTIONS, getFulfillmentModeLabel } from "@/lib/orders/status"
+import { getCarrierStatusLabel, getCarrierStatusVariant, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { CARRIER_SHIPMENT_STATUS_OPTIONS } from "@/lib/services/shipping/superfrete"
@@ -119,6 +120,7 @@ interface Order {
     delivery_breakdown?: any;
     order_shipments?: any[];
     isCarrierDelivery?: boolean;
+    carrier_status?: string | null;
 }
 
 interface FilterState {
@@ -241,6 +243,8 @@ export default function OrdersPage({
 }) {
     const { toast } = useToast()
     const router = useRouter()
+    const [initialDetailTab, setInitialDetailTab] = useState<string | undefined>(undefined)
+
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
     const hasEscalarPlan = hasMinimumPlan(planSlug, "escalar")
@@ -289,6 +293,18 @@ export default function OrdersPage({
         search, setSearch, debouncedSearch,
         afterMutation, queryClient,
     } = entityPage
+
+    useEffect(() => {
+        if (!entityState.isOpen || entityState.action !== 'view' || !entityState.entityId) return
+        if (typeof window === "undefined") return
+        const tabFromUrl = new URLSearchParams(window.location.search).get("tab") || undefined
+        setInitialDetailTab(tabFromUrl)
+        if (tabFromUrl) {
+            const url = new URL(window.location.href)
+            url.searchParams.delete("tab")
+            window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+        }
+    }, [entityState.isOpen, entityState.action, entityState.entityId])
 
     // State
     const [activeTab, setActiveTab] = useState<"Todos" | "Pendente" | "Pago" | "Enviado" | "Cancelado">("Todos")
@@ -515,6 +531,26 @@ export default function OrdersPage({
                     ? (o.delivery_breakdown as any)
                     : null
                 const isCarrierDelivery = Boolean(carrierBreakdown) || shipments.length > 0
+                const latestShipment = shipments[0] || null
+                const carrierStatus = isCarrierDelivery
+                    ? (latestShipment?.status || "awaiting_label")
+                    : null
+                const carrierStatusLabel = carrierStatus
+                    ? getCarrierStatusLabel(carrierStatus)
+                    : null
+                const carrierStatusVariant = carrierStatus
+                    ? getCarrierStatusVariant(carrierStatus)
+                    : null
+                const carrierStatusIconMap: Record<string, React.ReactNode> = {
+                    awaiting_label: <ClockIcon size={12} />,
+                    pending: <ClockIcon size={12} />,
+                    released: <ClockIcon size={12} />,
+                    posted: <DeliverySentIcon size={12} />,
+                    in_transit: <DeliverySentIcon size={12} />,
+                    delivered: <CheckCircleIcon size={12} />,
+                    cancelled: <BlockedIcon size={12} />,
+                    failed: <DeliveryFailedIcon size={12} />,
+                }
 
                 return {
                     originalId: o.id,
@@ -525,9 +561,15 @@ export default function OrdersPage({
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
                     statusIcon: statusInfo.icon,
-                    deliveryStatusLabel: getDeliveryStatusLabelForType(o.delivery_status, deliveryType),
-                    deliveryStatusColor: deliveryInfo.variant,
-                    deliveryStatusIcon: deliveryIconMap[o.delivery_status || "not_sent"] || <BlockedIcon size={12} />,
+                    deliveryStatusLabel: carrierStatusLabel
+                        ? carrierStatusLabel
+                        : getDeliveryStatusLabelForType(o.delivery_status, deliveryType),
+                    deliveryStatusColor: carrierStatusVariant
+                        ? carrierStatusVariant
+                        : deliveryInfo.variant,
+                    deliveryStatusIcon: carrierStatus
+                        ? (carrierStatusIconMap[carrierStatus] || <BlockedIcon size={12} />)
+                        : (deliveryIconMap[o.delivery_status || "not_sent"] || <BlockedIcon size={12} />),
                     carrierBrandIcon: isCarrierDelivery
                         ? getCarrierBrandIcon(
                             carrierBreakdown?.companyName,
@@ -565,6 +607,7 @@ export default function OrdersPage({
                     delivery_breakdown: (o.delivery_breakdown as any) || null,
                     order_shipments: shipments,
                     isCarrierDelivery,
+                    carrier_status: carrierStatus,
                 }
             })
             .filter((o: Order) => {
@@ -587,7 +630,11 @@ export default function OrdersPage({
                 const channelFilterMatch = filters.channel.length === 0 || filters.channel.includes(o.order_source)
                 const deliveryStatusMatch =
                     filters.deliveryStatus.length === 0 ||
-                    filters.deliveryStatus.includes(canonicalDeliveryStatus(o.delivery_status))
+                    filters.deliveryStatus.includes(
+                        o.carrier_status
+                            ? getDeliveryStatusForCarrier(o.carrier_status)
+                            : canonicalDeliveryStatus(o.delivery_status)
+                    )
                 const deliveryTypeMatch =
                     filters.deliveryType.length === 0 ||
                     filters.deliveryType.includes(o.delivery_type || "delivery")
@@ -1248,6 +1295,7 @@ export default function OrdersPage({
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
                             initialOrder={currentEntity || effectiveOrders?.find((o: any) => o.id === entityState.entityId) || undefined}
+                            initialTab={initialDetailTab}
                             key={`order-detail-${entityState.entityId}`}
                         />
                     </FadeIn>
@@ -1567,7 +1615,7 @@ export default function OrdersPage({
                         <p>Tem certeza que deseja cancelar {singleCancelId ? "este pedido" : `${selection.ids.size} pedido(s)`}?</p>
                         <div className="text-left space-y-1.5">
                             <Input
-                                label="Motivo do cancelamento (opcional)"
+                                label="Motivo do cancelamento"
                                 placeholder="Descreva o motivo..."
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
@@ -1590,6 +1638,7 @@ export default function OrdersPage({
                 }
                 confirmText={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
                 variant="danger"
+                disabled={!cancelReason.trim()}
             />
 
             <BulkEditActionsModal

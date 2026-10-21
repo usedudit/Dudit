@@ -161,11 +161,11 @@ function sectionDisplay(
     const stateName = ESTADOS[ctx.state] || ctx.state
     const cityName = ctx.city
 
-    const MAP: Record<string, Record<string, [string, string]>> = {
+    const MAP: Record<string, Record<string, [string, string?]>> = {
         trending: {
-            country: ["Produtos na Dudit", "Encontre produtos de vendedores locais"],
-            state: [`Produtos em ${stateName}`, `Encontre produtos disponíveis em ${stateName}`],
-            city: [`Produtos em ${cityName}`, `Encontre produtos de vendedores perto de você`],
+            country: ["Produtos na Dudit"],
+            state: [`Produtos em ${stateName}`],
+            city: [`Produtos em ${cityName}`],
         },
         endingSoon: {
             country: ["Acabando hoje", "Ofertas que terminam em breve"],
@@ -213,14 +213,14 @@ function sectionDisplay(
             city: ["Mais visualizados", "O que todo mundo está de olho"],
         },
         services: {
-            country: ["Serviços e profissionais", "Encontre os melhores serviços para o seu dia a dia"],
-            state: [`Serviços em ${stateName}`, `Profissionais e serviços disponíveis em ${stateName}`],
-            city: [`Serviços em ${cityName}`, `Profissionais e serviços perto de você`],
+            country: ["Serviços e profissionais"],
+            state: [`Serviços em ${stateName}`],
+            city: [`Serviços em ${cityName}`],
         },
         topVitrines: {
-            country: ["Lojas e vitrines locais", "Conheça negócios e lojas para você visitar"],
-            state: [`Lojas e vitrines em ${stateName}`, `Conheça negócios e lojas em ${stateName}`],
-            city: [`Lojas e vitrines em ${cityName}`, `Descubra lojas e negócios perto de você`],
+            country: ["Lojas e vitrines locais"],
+            state: [`Lojas e vitrines em ${stateName}`],
+            city: [`Lojas e vitrines em ${cityName}`],
         },
         popular: {
             country: ["Populares na Dudit", "O que está bombando por aqui"],
@@ -230,7 +230,7 @@ function sectionDisplay(
     }
 
     const entry = MAP[id]?.[displayScope] || MAP[id]?.country || ["", ""]
-    return { title: entry[0], subtitle: entry[1] }
+    return { title: entry[0], subtitle: entry[1] ?? "" }
 }
 
 // ─── Determine display scope from tier distribution ────────────────────────

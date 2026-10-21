@@ -99,15 +99,20 @@ Dependendo do contexto, a página Explorar mostra carrosséis de seções espec�
 
 ## Filtros
 
-Na página de resultados, você pode refinar a busca com filtros. No desktop, os filtros aparecem na barra lateral; no mobile, abrem como um bottom sheet.
+Na página de resultados, você pode refinar a busca utlizando diversos filtros.
 
 | Filtro | O que faz |
 | :--- | :--- |
-| **Categoria** | Mostra apenas itens da categoria selecionada |
-| **Preço** | Define preço mínimo e máximo |
+| **Tipo** | Alterna entre Tudo, Produtos, Serviços, Lojas e Assinaturas |
+| **Categoria** | Mostra apenas itens da categoria selecionada. A categoria **Outros** agrupa tudo que ainda não tem categoria cadastrada (inclusive lojas sem categoria) |
+| **Preço** | Define preço mínimo e máximo (itens "sob consulta" continuam aparecendo) |
+| **Avaliação** | Mostra apenas itens com 4+ ou 4,5+ estrelas |
+| **Condição** | Filtra entre Novo e Usado/Desapego (apenas produtos) |
 | **Promoção** | Mostra apenas itens com desconto ativo |
-| **Condição** | Filtra entre Novo e Usado/Desapego |
-| **Raio** | Limita a exibição a itens dentro de X km da sua localização |
+| **Envio nacional** | Mostra apenas itens enviados por transportadora (apenas produtos) |
+| **Entrega** | Em Lojas: com entrega, somente retirada ou entrega grátis |
+| **Distância** | Em Lojas: limita a exibição a lojas dentro de X km da sua localização |
+| **Vitrine online ativa** | Em Lojas: mostra apenas lojas com a vitrine online ativa |
 | **Ordenar** | Define a ordem de exibição |
 
 ### Opções de ordenação
@@ -118,21 +123,14 @@ Na página de resultados, você pode refinar a busca com filtros. No desktop, os
 | **Menor preço** | Do mais barato ao mais caro |
 | **Maior preço** | Do mais caro ao mais barato |
 | **Mais recentes** | Do recém-cadastrado ao mais antigo |
+| **Melhor avaliados** | Do mais bem avaliado para o menos avaliado |
+| **Mais próximos** | Da loja mais próxima para a mais distante (disponível em Lojas) |
 
 > [i] A ordenação por relevância considera diversos fatores como qualidade do cadastro, avaliações, estoque e preço. Veja a documentação de [Visão geral da Vitrine Online](./01-visao-geral.md) para entender o ranqueamento.
 
 ## Modos de visualização
 
-A página Explorar oferece dois modos de exibição dos resultados:
-
-| Modo | Características |
-| :--- | :--- |
-| **Grade** (padrão) | Grid de cards com imagens grandes - ideal para navegar visualmente. |
-| **Lista** | Linhas horizontais com informações resumidas - ideal para comparar preços e detalhes. |
-
-[IMAGEM: Ícones de alternância entre grade e lista]
-
-Clique nos ícones de visão no topo da lista de resultados para trocar entre os modos.
+A página Explorar exibe os resultados em **grade** (cards com imagens), que é o formato padrão e otimizado para navegar visualmente pelo catálogo.
 
 ## Navegação e paginação
 
@@ -152,7 +150,7 @@ Se sua busca por uma cidade específica retornar poucos resultados, o sistema au
 | Seção | O que aparece |
 | :--- | :--- |
 | **Lojas um pouco mais distantes** | Vendedores do seu estado ou região que correspondem à busca |
-| **Um pouco mais distantes do seu raio de busca** | Todos os itens encontrados fora do seu raio, listados direto na página (grade ou lista). Respondem normalmente aos filtros, à ordenação e à troca entre lista/grade. Ao lado de cada item aparece apenas a cidade e o estado do vendedor. |
+| **Um pouco mais distantes do seu raio de busca** | Todos os itens encontrados fora do seu raio, listados direto na página. Respondem normalmente aos filtros e à ordenação. Ao lado de cada item aparece apenas a cidade e o estado do vendedor. |
 
 ## Controles de navegação
 
@@ -265,12 +263,11 @@ Itens com preço riscado estão com **promoção ativa** (preço promocional men
 **Posso filtrar por itens novos ou usados?**
 Sim. Usando o filtro de **Condição**, você pode ver apenas itens **Novos** ou **Usados/Desapegos**.
 
-**O que significa "Grade" e "Lista"?**
-- **Grade**: vista em cards com imagens grandes, ideal para navegação visual.
-- **Lista**: vista em linhas com informações resumidas, ideal para comparar preços.
+**Por que uma loja aparece na categoria "Outros"?**
+Porque ela ainda não tem categoria cadastrada (ou está na categoria "Outros"). Você pode cadastrar a categoria da sua loja no painel para ela aparecer nas categorias corretas.
 
 **Como faço para ver lojas em destaque?**
-Na tela inicial ou em buscas sem tipo específico, a seção **Vendedores em destaque** aparece automaticamente mostrando as lojas com melhor reputação.
+Na tela inicial ou em buscas sem tipo específico, a seção **Vendedores em destaque** aparece automaticamente mostrando as lojas com melhor reputação. Dentro do filtro de **Lojas** também dá para filtrar por **vitrine online ativa** e ordenar por **melhor avaliados** ou **mais próximos**.
 
 **A página Explorar funciona no celular?**
 Sim. A página é totalmente responsiva. No mobile, os filtros e controles de ordenação abrem como painéis deslizantes para melhor usabilidade.

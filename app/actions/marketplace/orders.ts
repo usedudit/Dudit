@@ -166,6 +166,30 @@ export async function cancelBuyerOrderAction(orderId: string) {
     return { error: error.message }
   }
 
+  // Etiqueta de transportadora (quando houver) é cancelada junto: evita
+  // etiqueta órfã e devolve o valor para a carteira da transportadora.
+  try {
+    const { data: shipments } = await supabase
+      .from("order_shipments")
+      .select("id, external_label_id, status")
+      .eq("order_id", orderId)
+      .neq("kind", "return")
+
+    for (const shipment of shipments || []) {
+      if (!shipment?.external_label_id) continue
+      const { cancelCarrierLabelForOrder } = await import("@/lib/services/shipping/superfrete-label-cancel")
+      await cancelCarrierLabelForOrder({
+        partnerId: order.partner_id,
+        orderId,
+        labelId: String(shipment.external_label_id),
+        reason: "Pedido cancelado pelo cliente",
+        currentStatus: shipment.status,
+      })
+    }
+  } catch (labelErr) {
+    console.error("[ORDER CANCELLATION] Error cancelling carrier label:", labelErr)
+  }
+
   if (!order.inventory_deducted) {
     const releaseResult = await releaseOrderInventory({
       client: supabase as any,

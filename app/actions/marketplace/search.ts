@@ -769,6 +769,7 @@ async function hydrateMarketplaceSearchHits(
                 rating: item.rating,
                 itemType: "loja",
                 category: item.partners?.category?.parent?.name || item.partners?.category?.name || "Loja Parceira",
+                is_showcase_active: item.is_showcase_active !== false,
                 delivery_settings: rawDelivery || null,
                 partners: {
                     id: storeId,
@@ -1014,7 +1015,7 @@ async function searchMarketplaceByCity(
         .from("stores")
         .select(`
             id, short_id, partner_id, name, slug, description, logo_url, banner_url,
-            rating, created_at,
+            rating, created_at, is_showcase_active,
             addresses!store_id!inner(city, state, neighborhood, latitude, longitude),
             partners!inner(
                 id, is_active, category_id,
@@ -1188,6 +1189,7 @@ async function searchMarketplaceByCity(
             rating: item.rating || 0,
             itemType: 'loja',
             category: categoryName,
+            is_showcase_active: item.is_showcase_active !== false,
             delivery_settings: rawDelivery || null,
             partners: {
                 id: item.partner_id || storeId,

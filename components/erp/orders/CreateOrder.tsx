@@ -57,6 +57,7 @@ import { formatCurrency } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
+import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, getDeliveryStatusMeta } from "@/lib/orders/status"
 import { diffChangedFields } from "@/lib/admin/changed-fields"
 
 type OrderAdminActionContext = {
@@ -405,6 +406,7 @@ export default function CreateOrder({
     const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
     const [shippingCustomerDetails, setShippingCustomerDetails] = useState<any | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, unknown> | null>(null)
+    const [existingCarrierShipment, setExistingCarrierShipment] = useState<Record<string, any> | null>(null)
     const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
 
     // --- Calculations ---
@@ -496,6 +498,8 @@ export default function CreateOrder({
     )
 
     const isPaidOrder = !adminContext && (originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid')
+    const isCarrierDelivery = (deliveryBreakdown as any)?.source === "superfrete"
+        || Boolean(existingCarrierShipment)
     const isDeliveredOrder = originalDeliveryStatus === 'delivered'
     const isMarketplaceLocked = isMarketplaceOrder && isPaidOrder
 
@@ -587,6 +591,17 @@ export default function CreateOrder({
                 setFinanceAccountId(order.finance_account_id || "")
                 setNotes(cleanOrderNotes(order.notes))
                 setShippingFee((order.delivery_fee || 0).toString())
+                setDeliveryBreakdown(
+                    order.delivery_breakdown && typeof order.delivery_breakdown === "object"
+                        ? order.delivery_breakdown
+                        : null,
+                )
+                const outboundShipments = Array.isArray(order.order_shipments)
+                    ? order.order_shipments
+                        .filter((shipment: any) => shipment?.kind !== "return")
+                        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+                    : []
+                setExistingCarrierShipment(outboundShipments[0] || null)
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
@@ -1368,10 +1383,13 @@ export default function CreateOrder({
             }
         }
 
-        if (deliveryMethod === "delivery" && (!deliveryDate || !deliveryTime)) {
+        const requiresDispatchDateTime = deliveryMethod === "delivery"
+            && !isCarrierDelivery
+            && ["sent", "delivered", "delivery_failed"].includes(deliveryStatus)
+        if (requiresDispatchDateTime && (!deliveryDate || !deliveryTime)) {
             setFieldErrors(new Set(["deliveryDate", "deliveryTime"]))
             setActiveTab("delivery")
-            setValidationMessage("Preencha a data e o horário de saída para criar a entrega automática.")
+            setValidationMessage("Preencha a data e o horário de saída para o status selecionado.")
             setShowValidationModal(true)
             return false
         }
@@ -1425,13 +1443,15 @@ export default function CreateOrder({
         checkoutFulfillment?: Record<string, unknown> | null
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
-        let finalDeliveryStatus = deliveryStatus;
+        let finalDeliveryStatus = !editOrderId && isCarrierDelivery ? "not_sent" : deliveryStatus;
         if (paymentOverrides?.isPendingDelivery) {
             finalDeliveryStatus = deliveryMethod === "pickup" ? "pickup_available" : "not_sent";
         } else if (paymentOverrides?.deliveryStatus) {
             finalDeliveryStatus = paymentOverrides.deliveryStatus;
         } else if (editOrderId) {
             finalDeliveryStatus = deliveryStatus;
+        } else if (isCarrierDelivery) {
+            finalDeliveryStatus = "not_sent";
         } else {
             finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
         }
@@ -1577,15 +1597,19 @@ export default function CreateOrder({
                     ? uploadStagedAttachments(targetOrderId)
                     : Promise.resolve()
 
-                if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
+                if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId && !isCarrierDelivery) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
                     const platformDriverId = isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null
+                    const requiresDispatchDateTime = ["sent", "delivered", "delivery_failed"].includes(String(payload.deliveryStatus))
+                    const startedAt = requiresDispatchDateTime && deliveryDate && deliveryTime
+                        ? new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString()
+                        : undefined
                     const deliveryPromise = createERPDeliveryAction({
                         partnerId,
                         orderIds: [createdOrderId],
                         deliveryPersonId: isPlatformDriver ? null : (selectedDeliveryPersonId || null),
                         status: payload.deliveryStatus as any,
-                        startedAt: new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString(),
+                        startedAt,
                         notes: notes?.trim() || undefined,
                     }).then(async (autoDeliveryResult) => {
                         if (!autoDeliveryResult.success) {
@@ -1602,7 +1626,7 @@ export default function CreateOrder({
                         }
                     })
                     await Promise.all([deliveryPromise, attachmentPromise])
-                } else if (editOrderId) {
+                } else if (editOrderId && !isCarrierDelivery) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
                     const [syncResult] = await Promise.all([
                         syncPlatformDriverForOrderAction({
@@ -1746,14 +1770,15 @@ export default function CreateOrder({
         label: account.name,
     }))
 
-    const deliveryStatusOptions = [
-        { value: "not_sent", label: "Não enviado" },
-        { value: "preparing", label: "Preparando" },
-        { value: "sent", label: "Enviado" },
-        { value: "delivered", label: "Entregue" },
-        { value: "pickup_available", label: "Disponível para retirada" },
-        { value: "delivery_failed", label: "Entrega não realizada" }
-    ]
+    const deliveryStatusOptions = useMemo(() => {
+        const base = deliveryMethod === "pickup"
+            ? PICKUP_STATUS_OPTIONS
+            : DELIVERY_STATUS_OPTIONS
+        // Status legado fora da lista (ex.: "sent" em retirada) continua visível
+        // para não apagar informação ao salvar o pedido.
+        if (!deliveryStatus || base.some((o) => o.value === deliveryStatus)) return base
+        return [...base, { value: deliveryStatus, label: getDeliveryStatusMeta(deliveryStatus).label }]
+    }, [deliveryMethod, deliveryStatus])
 
     const deliveryPeopleOptions = useMemo(() => {
         const baseOptions = deliveryPeople.map((person) => ({
@@ -2251,6 +2276,10 @@ export default function CreateOrder({
                                             originalDeliveryStatus={originalDeliveryStatus}
                                             isMarketplaceLocked={isMarketplaceLocked}
                                             isPaidOrder={isPaidOrder}
+                                            isCarrierDelivery={isCarrierDelivery}
+                                            deliveryBreakdown={deliveryBreakdown}
+                                            existingCarrierShipment={existingCarrierShipment}
+                                            onOpenCarrierShippingSheet={() => setIsShippingSheetOpen(true)}
                                             role={role}
                                             adminContext={adminContext}
                                         />
@@ -2730,6 +2759,10 @@ export default function CreateOrder({
                     }}
                     orderSubtotal={subtotal}
                     currentShippingFee={parseFloat(shippingFee || "0")}
+                    preferCarrier={isCarrierDelivery}
+                    initialCarrierServiceId={
+                        isCarrierDelivery ? Number((deliveryBreakdown as any)?.serviceId || 0) || null : null
+                    }
                     onCreateAddress={async (payload: any) => {
                         const result = await createPOSCustomerAddressAction({
                             partnerId,
