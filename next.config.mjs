@@ -24,7 +24,7 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
-  disable: process.env.NODE_ENV === "development" || process.env.CI || process.env.BUILD_FOR_RENDER,
+  disable: Boolean(process.env.NODE_ENV === "development" || process.env.CI || process.env.BUILD_FOR_RENDER),
   register: false,
   exclude: [
     /\.js$/,
@@ -278,7 +278,7 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // O Sentry continua capturando erros em runtime via SENTRY_DSN; as stack
   // traces ficam minificadas nesse ambiente.
   sourcemaps: {
-    disable: isRailwayBuild || process.env.CI || process.env.BUILD_FOR_RENDER,
+    disable: Boolean(isRailwayBuild || process.env.CI || process.env.BUILD_FOR_RENDER),
   },
 
   authToken:
