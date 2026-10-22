@@ -4,7 +4,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import POSPage from "@/components/erp/pdv/POSPage"
 import { getPOSInitialDataAction } from "@/app/actions/erp/pdv"
-import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
+import { getActiveCashSessionAction, getCashSessionsHistoryPageAction } from "@/app/actions/erp/cash-register"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
@@ -22,13 +22,16 @@ export default async function POSPageServer() {
   const capabilities = await getPartnerCapabilities(partnerId, { storeId: activeStoreId })
 
   // Parallel: load all initial data in a single waterfall step
-  const [initialDataResult, activeSessionResult, promotionsResult, teamResult] = await Promise.all([
+  const [initialDataResult, activeSessionResult, promotionsResult, teamResult, historyResult] = await Promise.all([
     getPOSInitialDataAction(partnerId, activeStoreId),
     capabilities.hasFinancial
       ? getActiveCashSessionAction(partnerId, activeStoreId)
       : Promise.resolve({ success: true as const, data: null }),
     listActivePromotionsForMarketplaceAction(partnerId).catch(() => []),
     getTeamMembers().catch(() => ({ members: [], currentUserId: undefined })),
+    capabilities.hasFinancial
+      ? getCashSessionsHistoryPageAction(partnerId, { cursor: null, limit: 5, storeId: activeStoreId })
+      : Promise.resolve({ success: true as const, items: [] as any[], nextCursor: null, hasMore: false }),
   ])
 
   // PDV deve ser acessível para qualquer usuário com acesso ao ERP.
@@ -44,6 +47,7 @@ export default async function POSPageServer() {
     }
   const activeSession = activeSessionResult.success ? activeSessionResult.data : null
   const initialPromotions = Array.isArray(promotionsResult) ? promotionsResult : []
+  const initialLastSession = historyResult.success && historyResult.items?.length > 0 ? historyResult.items[0] : null
 
   // Normalize team members for the POSPage component
   const initialTeam = {
@@ -68,6 +72,7 @@ export default async function POSPageServer() {
           initialPromotions={initialPromotions}
           initialTeam={initialTeam}
           hasFinancial={capabilities.hasFinancial}
+          initialLastSession={initialLastSession}
         />
       </FadeIn>
     </>

@@ -10,8 +10,6 @@ import {
   type CarrierUnavailableReason,
 } from "@/lib/services/shipping/carrier-checkout"
 
-export type { CarrierFreightOption }
-
 /**
  * Public checkout quote for carrier freight (SuperFrete). Used as a fallback
  * when the store's own delivery radius does not cover the customer address.

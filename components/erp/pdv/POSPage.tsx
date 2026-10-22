@@ -78,6 +78,7 @@ interface Props {
         currentUserId?: string
     }
     hasFinancial?: boolean
+    initialLastSession?: any | null
 }
 
 type TeamMember = {
@@ -128,7 +129,7 @@ function DesktopPOSSheet({
     )
 }
 
-export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam, hasFinancial = true }: Props) {
+export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam, hasFinancial = true, initialLastSession }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug, hasSpecific, businessInfo: contextBusinessInfo } = usePermissions()
@@ -150,6 +151,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         initialTeam?.members?.map((m) => ({ id: m.id, fullName: m.fullName, userId: m.userId })) || []
     )
     const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
+    const [lastSession, setLastSession] = useState<any | null>(initialLastSession || null)
 
     useEffect(() => {
         if (initialData?.products) {
@@ -1752,6 +1754,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         openingNotes={openingNotes}
                         setOpeningNotes={setOpeningNotes}
                         onOpenCash={handleOpenCash}
+                        lastSession={lastSession}
                     />
                 </FadeIn>
             ) : (

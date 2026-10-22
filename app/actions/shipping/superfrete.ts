@@ -42,8 +42,6 @@ import {
   type PartnerIntegrationRow,
 } from "@/lib/services/shipping/superfrete-integration"
 
-export type { PartnerIntegrationRow }
-
 export interface SuperFreteStatus {
   connected: boolean
   email?: string

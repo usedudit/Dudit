@@ -12,7 +12,8 @@ import {
   FormSection,
 } from "@/components/reusable"
 import { PhoneIcon } from "@/lib/icons"
-import { submitSupportTicketAction, type SupportCategory } from "@/app/actions/support"
+import { submitSupportTicketAction } from "@/app/actions/support"
+import type { SupportCategory } from "@/lib/services/discord-support.service"
 import { getClientFeedbackContext } from "@/lib/utils/client-feedback-context"
 
 const SUPPORT_CATEGORIES = [

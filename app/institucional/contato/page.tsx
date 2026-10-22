@@ -6,7 +6,8 @@ import { motion } from "framer-motion"
 import { MailIcon, PhoneIcon, ClockIcon } from "@/lib/icons"
 import { AlertModal, Button, EmailInput, FormDropdown, FormTextarea, InfoCard, Spinner } from "@/components/reusable"
 import { GridLines, Navbar, Footer, CTA } from "@/components/InstitucionalShared"
-import { submitSupportTicketAction, type SupportCategory } from "@/app/actions/support"
+import { submitSupportTicketAction } from "@/app/actions/support"
+import type { SupportCategory } from "@/lib/services/discord-support.service"
 
 const SUPPORT_CATEGORIES = [
     { value: "duvida", label: "Dúvida" },

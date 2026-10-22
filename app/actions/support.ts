@@ -11,8 +11,6 @@ import {
   type SupportCategory,
 } from "@/lib/services/discord-support.service"
 
-export type { SupportCategory }
-
 export interface SubmitSupportInput {
   email: string
   category: SupportCategory
