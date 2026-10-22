@@ -112,6 +112,27 @@ const nextConfig = {
         version: "1.0.0",
       }
     }
+
+    // Render free/starter: 8GB de RAM. Next.js full build vira >8GB de RSS
+    // (webpack + serwist + sourcemaps + 1107 deps). Garante a build cabendo no
+    // cap ajustando limites de memória e paralelismo do webpack/SWC.
+    config.optimization = {
+      ...config.optimization,
+      minimize: true,
+      minimizer: config.optimization?.minimizer,
+    }
+    if (process.env.RENDER || process.env.CI) {
+      // 1 job por vez (sem build paralelo) -> evita picos de memória
+      config.parallelism = 1
+      // cache em memória limitado (evita vazamento de cache entre builds)
+      config.cache = { ...config.cache, memoryCacheUnaffected: true }
+      // chunks menores + sem lazy loading agressivo reduz memória de build
+      config.optimization.usedExports = true
+      config.optimization.sideEffects = true
+      // serializa o build (evita múltiplas instâncias do webpack em memória)
+      config.optimization.minimize = true
+      config.optimization.realContentHash = { hashFunction: "xxhash64" }
+    }
     return config
   },
   experimental: {
@@ -137,6 +158,19 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Regra genérica de imagens. Fica antes das regras específicas de
+        // ícones porque, no Next.js, a última regra que casa sobrescreve o
+        // header — e ícones não podem ser `immutable` por 1 ano (senão um
+        // WebAPK Android continua usando o ícone antigo).
+        source: '/:all*(svg|jpg|jpeg|png|gif|ico|webp|avif)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         source: '/icons/:all*',
         headers: [
           {
@@ -151,15 +185,6 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=86400',
-          },
-        ],
-      },
-      {
-        source: '/:all*(svg|jpg|jpeg|png|gif|ico|webp|avif)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
           },
         ],
       },

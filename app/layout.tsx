@@ -127,14 +127,11 @@ export const metadata: Metadata = {
     },
     icons: {
         icon: [
-            { url: "/favicon.ico?v=2", sizes: "32x32" },
-            { url: "/icons/icon-192x192.png?v=2", sizes: "192x192", type: "image/png" },
-            { url: "/icons/icon-512x512.png?v=2", sizes: "512x512", type: "image/png" },
+            { url: "/favicon.ico?v=3", sizes: "32x32" },
+            { url: "/icons/icon-192x192.png?v=3", sizes: "192x192", type: "image/png" },
+            { url: "/icons/icon-512x512.png?v=3", sizes: "512x512", type: "image/png" },
         ],
-        apple: [{ url: "/icons/apple-touch-icon.png?v=2", sizes: "180x180" }],
-        other: [
-            { rel: "mask-icon", url: "/icons/icon-maskable-512x512.png?v=2" },
-        ],
+        apple: [{ url: "/icons/apple-touch-icon.png?v=3", sizes: "180x180" }],
     },
     manifest: "/manifest.webmanifest",
     other: {
