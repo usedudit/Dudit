@@ -121,17 +121,11 @@ const nextConfig = {
       minimize: true,
       minimizer: config.optimization?.minimizer,
     }
+    // Render/Hobby: 8GB RAM cap. Limita o paralelismo do webpack a 1 job
+    // pra reduzir o pico de memória no `next build` e evitar OOM.
     if (process.env.RENDER || process.env.CI) {
-      // 1 job por vez (sem build paralelo) -> evita picos de memória
       config.parallelism = 1
-      // cache em memória limitado (evita vazamento de cache entre builds)
       config.cache = { ...config.cache, memoryCacheUnaffected: true }
-      // chunks menores + sem lazy loading agressivo reduz memória de build
-      config.optimization.usedExports = true
-      config.optimization.sideEffects = true
-      // serializa o build (evita múltiplas instâncias do webpack em memória)
-      config.optimization.minimize = true
-      config.optimization.realContentHash = { hashFunction: "xxhash64" }
     }
     return config
   },
