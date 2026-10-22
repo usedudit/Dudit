@@ -26,6 +26,8 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import SelectSupplierSheet from "@/components/erp/fornecedores/SelectSupplierSheet"
+import SelectSellerSheet from "@/components/erp/pdv/SelectSellerSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -261,6 +263,10 @@ export default function CreateTransactionPage({
     const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined)
     const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string; email?: string | null; phone?: string | null; avatar_url?: string | null } | null>(null)
     const [customerSheetOpen, setCustomerSheetOpen] = useState(false)
+    const [selectedSupplier, setSelectedSupplier] = useState<{ id: string; name: string } | null>(null)
+    const [supplierSheetOpen, setSupplierSheetOpen] = useState(false)
+    const [selectedSeller, setSelectedSeller] = useState<{ id: string; fullName: string } | null>(null)
+    const [sellerSheetOpen, setSellerSheetOpen] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
     const [showDiscardModal, setShowDiscardModal] = useState(false)
     const [cancelRecurringOpen, setCancelRecurringOpen] = useState(false)
@@ -284,8 +290,7 @@ export default function CreateTransactionPage({
     const [quickName, setQuickName] = useState("")
     const [newAccountType, setNewAccountType] = useState<FinanceAccountType>("cash")
     const [newAccountInitial, setNewAccountInitial] = useState(0)
-    const [newContactModalType, setNewContactModalType] = useState<ContactType>("supplier")
-    const [newContactDesc, setNewContactDesc] = useState("")
+    const [newContactModalType, setNewContactModalType] = useState<ContactType>("service")
     const pendingSelectContactIdRef = useRef<string | null>(null)
     const pendingCloseRef = useRef<(() => void) | null>(null)
     const skipTransferBalanceCheckRef = useRef(false)
@@ -506,6 +511,21 @@ export default function CreateTransactionPage({
         () => contactRows.map((c) => ({ value: c.id, label: c.name })),
         [contactRows],
     )
+    const contactNotesSuffix = useMemo(() => {
+        if (contactType === "supplier" && selectedSupplier) return `Fornecedor: ${selectedSupplier.name}`
+        if (contactType === "employee" && selectedSeller)
+            return `Funcionário: ${selectedSeller.fullName || ""}`
+        return ""
+    }, [contactType, selectedSupplier, selectedSeller])
+    const mergeContactNotes = useCallback(
+        (base: string | undefined | null) => {
+            const s = (base || "").trim()
+            const suffix = contactNotesSuffix.trim()
+            if (!suffix) return s || null
+            return s ? `${s} · ${suffix}` : suffix
+        },
+        [contactNotesSuffix],
+    )
     useEffect(() => {
         if (!needsContactPanel) {
             setContactRows([])
@@ -514,6 +534,13 @@ export default function CreateTransactionPage({
             return
         }
         if (contactType === "customer") {
+            setContactRows([])
+            setSelectedContactId(undefined)
+            setContactsLoading(false)
+            pendingSelectContactIdRef.current = null
+            return
+        }
+        if (contactType === "supplier" || contactType === "employee") {
             setContactRows([])
             setSelectedContactId(undefined)
             setContactsLoading(false)
@@ -582,10 +609,9 @@ export default function CreateTransactionPage({
         setQuickModal("account")
     }
     const openQuickContact = () => {
-        if (contactType === "customer") return
+        if (contactType !== "service" && contactType !== "partner" && contactType !== "other") return
         setQuickName("")
         setNewContactModalType(contactType)
-        setNewContactDesc("")
         setQuickModal("contact")
     }
     const handleQuickSave = async () => {
@@ -665,7 +691,6 @@ export default function CreateTransactionPage({
                     partnerId,
                     name: quickName.trim(),
                     type: newContactModalType,
-                    description: newContactDesc.trim() || null,
                 })
                 if (!res.success) return error(res.error || "Erro")
                 success("Contato criado")
@@ -752,6 +777,20 @@ export default function CreateTransactionPage({
                 contactTypeResolved: null as null,
             }
         }
+        if (contactType === "supplier" && selectedSupplier) {
+            return {
+                contactId: null as string | null,
+                customerId: null as string | null,
+                contactTypeResolved: "supplier" as const,
+            }
+        }
+        if (contactType === "employee" && selectedSeller) {
+            return {
+                contactId: null as string | null,
+                customerId: null as string | null,
+                contactTypeResolved: "employee" as const,
+            }
+        }
         if (!selectedContactId) {
             return {
                 contactId: null as string | null,
@@ -764,7 +803,7 @@ export default function CreateTransactionPage({
             customerId: null as string | null,
             contactTypeResolved: contactType,
         }
-    }, [contactType, selectedCustomer, selectedContactId])
+    }, [contactType, selectedCustomer, selectedSupplier, selectedSeller, selectedContactId])
     const handleSave = async () => {
         const errs = collectValidationErrors()
         if (errs.size > 0) {
@@ -989,7 +1028,7 @@ export default function CreateTransactionPage({
                     paymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                     transactionDate: dueDate ? toMiddayIsoFromYmd(dueDate) : null,
                     status,
-                    notes: notes || null,
+                    notes: mergeContactNotes(notes),
                     origin: "manual",
                     refundKind,
                     referenceNote: referenceNote.trim() || null,
@@ -1086,7 +1125,7 @@ export default function CreateTransactionPage({
                     contactType: cp.contactTypeResolved,
                     paymentType,
                     paymentMethodId: paymentMethodId || null,
-                    notes: notes || null,
+                    notes: mergeContactNotes(notes),
                     initialStatus: status,
                     firstInstallmentPaymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                 })
@@ -1119,7 +1158,7 @@ export default function CreateTransactionPage({
                 paymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                 transactionDate: dueDate ? toMiddayIsoFromYmd(dueDate) : null,
                 status,
-                notes: notes || null,
+                notes: mergeContactNotes(notes),
                 origin: "manual",
             })
             if (!res.success) return error(res.error || "Erro ao salvar transação")
@@ -1544,7 +1583,7 @@ export default function CreateTransactionPage({
     )
     const renderRightColumn = () => (
         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-            <SidebarCard hasSeparator title={txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}>
+            <SidebarCard hasSeparator hasTopStrip title={txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}>
                 <div className="space-y-4">
                     {isIncomeExpense && !isRecurringTemplateEdit && !isEditMode && (
                         <FormDropdown
@@ -1640,7 +1679,7 @@ export default function CreateTransactionPage({
                 </div>
             </SidebarCard>
             {needsContactPanel && (
-                <SidebarCard hasSeparator title="Contato">
+                <SidebarCard hasSeparator hasTopStrip title="Contato">
                     <FormDropdown
                         label="Tipo de contato"
                         options={[
@@ -1652,13 +1691,21 @@ export default function CreateTransactionPage({
                             { value: "other", label: "Outro" },
                         ]}
                         value={contactType}
-                        setValue={(v) => setContactType(v as ContactType)}
+                        setValue={(v) => {
+                            const next = v as ContactType
+                            setContactType(next)
+                            setSelectedContactId(undefined)
+                            if (next !== "customer") setSelectedCustomer(null)
+                            if (next !== "supplier") setSelectedSupplier(null)
+                            if (next !== "employee") setSelectedSeller(null)
+                            pendingSelectContactIdRef.current = null
+                        }}
                         disabled={isSalesOrigin}
                     />
                     <div className="mt-4">
                         {contactType === "customer" ? (
                             selectedCustomer ? (
-                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 flex items-center gap-3">
+                                <div className="flex items-center gap-3">
                                     <UserProfileImage
                                         fullName={selectedCustomer.name || "Cliente"}
                                         imageUrl={selectedCustomer.avatar_url}
@@ -1683,6 +1730,60 @@ export default function CreateTransactionPage({
                                     disabled={isSalesOrigin}
                                 >
                                     Selecionar cliente
+                                </Button>
+                            )
+                        ) : contactType === "supplier" ? (
+                            selectedSupplier ? (
+                                <div className="flex items-center gap-3">
+                                    <UserProfileImage
+                                        fullName={selectedSupplier.name}
+                                        className="w-10 h-10 shrink-0 text-base"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Fornecedor</p>
+                                        <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                            {selectedSupplier.name}
+                                        </p>
+                                    </div>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setSupplierSheetOpen(true)}>
+                                        Alterar
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setSupplierSheetOpen(true)}
+                                >
+                                    Selecionar fornecedor
+                                </Button>
+                            )
+                        ) : contactType === "employee" ? (
+                            selectedSeller ? (
+                                <div className="flex items-center gap-3">
+                                    <UserProfileImage
+                                        fullName={selectedSeller.fullName || "Funcionário"}
+                                        className="w-10 h-10 shrink-0 text-base"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Funcionário</p>
+                                        <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                            {selectedSeller.fullName || "Funcionário"}
+                                        </p>
+                                    </div>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setSellerSheetOpen(true)}>
+                                        Alterar
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setSellerSheetOpen(true)}
+                                >
+                                    Selecionar funcionário
                                 </Button>
                             )
                         ) : contactsLoading ? (
@@ -1878,21 +1979,17 @@ export default function CreateTransactionPage({
                                 </div>
                             </TabsContent>
                             <TabsContent value="notes" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                    <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Observações</h3>
-                                        <FormTextarea
-                                            name="transaction_notes"
-                                            label="Observações internas"
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                            rows={8}
-                                            maxLength={500}
-                                            showCharacterCount
-                                        />
-                                    </div>
-                                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border min-h-[120px]" />
-                                </div>
+                                <FormSection title="Observações" className="mt-0">
+                                    <FormTextarea
+                                        name="transaction_notes"
+                                        label="Observações"
+                                        placeholder="Escreva aqui observações sobre este lançamento..."
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        maxLength={500}
+                                        showCharacterCount
+                                    />
+                                </FormSection>
                             </TabsContent>
                             <TabsContent value="attachments" className="mt-0">
                                 <div className="py-2">
@@ -2025,21 +2122,18 @@ export default function CreateTransactionPage({
                         <FormDropdown
                             label="Tipo do contato"
                             options={[
-                                { value: "supplier", label: "Fornecedor" },
                                 { value: "service", label: "Serviço" },
-                                { value: "employee", label: "Funcionário" },
                                 { value: "partner", label: "Parceiro" },
                                 { value: "other", label: "Outro" },
                             ]}
-                            value={newContactModalType === "customer" ? "supplier" : newContactModalType}
+                            value={newContactModalType === "customer" || newContactModalType === "supplier" || newContactModalType === "employee" ? "service" : newContactModalType}
                             setValue={(v) => setNewContactModalType(v as ContactType)}
                         />
-                        <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Nome exibido nas transações" maxLength={150} />
                         <Input
-                            label="Descrição (opcional)"
-                            value={newContactDesc}
-                            onChange={(e) => setNewContactDesc(e.target.value)}
-                            placeholder="Notas internas"
+                            label="Nome"
+                            value={quickName}
+                            onChange={(e) => setQuickName(e.target.value)}
+                            placeholder="Nome exibido nas transações"
                             maxLength={150}
                         />
                     </div>
@@ -2146,6 +2240,17 @@ export default function CreateTransactionPage({
                         setSelectedCustomer({ id: c.id, name: c.name || "Cliente", email: c.email || null, phone: c.phone || null, avatar_url: c.avatar_url || null })
                     }
                     partnerId={partnerId}
+                />
+                <SelectSupplierSheet
+                    isOpen={supplierSheetOpen}
+                    onClose={() => setSupplierSheetOpen(false)}
+                    partnerId={partnerId}
+                    onSelect={(s: any) => setSelectedSupplier({ id: s.id, name: s.name || "Fornecedor" })}
+                />
+                <SelectSellerSheet
+                    isOpen={sellerSheetOpen}
+                    onClose={() => setSellerSheetOpen(false)}
+                    onSelect={(m: any) => setSelectedSeller({ id: m.id, fullName: m.fullName || "" })}
                 />
                 <SavingStatusModal isOpen={isSaving} text="Salvando transação..." />
                 {unsavedChangesDialogOpen && (

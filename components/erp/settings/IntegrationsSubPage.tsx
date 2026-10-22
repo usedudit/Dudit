@@ -670,7 +670,7 @@ export const IntegrationsSubPage = ({
                                         </div>
                                     </div>
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
-                                        Conecte sua conta para receber pagamentos online com split automático. Aceite cartões, PIX e boleto.
+                                        Conecte sua conta para receber pagamentos online. Aceite cartões, PIX e boleto.
                                     </p>
                                 </div>
 
@@ -1422,14 +1422,14 @@ export const IntegrationsSubPage = ({
                                 {waKnowMoreStep === 2 ? (
                                     <Button
                                         className="flex-1 h-[46px]"
-                                    onClick={() => {
-                                             if (!hasMinimumPlan(planSlug, "escalar")) {
-                                                 setWaActiveModal(null)
-                                                 openPlanUpgrade("escalar")
-                                                 return
-                                             }
-                                             setWaActiveModal(null)
-                                         }}
+                                        onClick={() => {
+                                            if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                setWaActiveModal(null)
+                                                openPlanUpgrade("escalar")
+                                                return
+                                            }
+                                            setWaActiveModal(null)
+                                        }}
                                     >
                                         Entendido
                                     </Button>
@@ -1673,13 +1673,13 @@ export const IntegrationsSubPage = ({
                                     <Button
                                         className="flex-1 h-[46px]"
                                         onClick={() => {
-                                             if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                 setActiveModal(null)
-                                                 openPlanUpgrade("crescer")
-                                                 return
-                                             }
-                                             setActiveModal(null)
-                                         }}
+                                            if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                setActiveModal(null)
+                                                openPlanUpgrade("crescer")
+                                                return
+                                            }
+                                            setActiveModal(null)
+                                        }}
                                     >
                                         Entendido
                                     </Button>

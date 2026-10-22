@@ -41,8 +41,6 @@ const nextConfig = {
   serverExternalPackages: [
     "puppeteer-core",
     "@trigger.dev/sdk",
-    "isomorphic-dompurify",
-    "jsdom",
     "@sparticuz/chromium",
   ],
   typescript: {
@@ -89,7 +87,19 @@ const nextConfig = {
   // da versão anterior acumulava mais de 10 GB entre server/client.
   // Aqui configuramos com expiração (7 dias) e geração de memória limitada
   // para invalidação automática quando o código muda.
-  webpack(config, { dev, webpack }) {
+  webpack(config, { dev, isServer, webpack }) {
+    if (isServer) {
+      // `isomorphic-dompurify` pulls in jsdom on the server (~100 MB RSS).
+      // This alias keeps the browser build untouched while swapping only the
+      // server instance for DOMPurify + happy-dom (same sanitizer engine).
+      config.resolve = config.resolve || {}
+      config.resolve.alias = config.resolve.alias || {}
+      config.resolve.alias["isomorphic-dompurify"] = path.resolve(
+        __dirname,
+        "lib/security/dompurify-server.ts"
+      )
+    }
+
     if (!dev) {
       config.cache = {
         type: "filesystem",

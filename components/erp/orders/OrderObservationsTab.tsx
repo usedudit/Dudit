@@ -16,8 +16,8 @@ export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ note
             <FormSection title="Observações" className="mt-0">
                 <FormTextarea
                     name="notes"
-                    label=""
-                    placeholder="Escreva aqui observações internas sobre este pedido..."
+                    label="Observações"
+                    placeholder="Escreva aqui observações sobre este pedido..."
                     value={notes}
                     onChange={(e: any) => setNotes(e.target.value)}
                     className="min-h-[250px]"
