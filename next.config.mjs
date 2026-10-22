@@ -242,7 +242,7 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // O Sentry continua capturando erros em runtime via SENTRY_DSN; as stack
   // traces ficam minificadas nesse ambiente.
   sourcemaps: {
-    disable: isRailwayBuild,
+    disable: isRailwayBuild || process.env.CI,
   },
 
   authToken: process.env.CI ? undefined : process.env.SENTRY_AUTH_TOKEN,
