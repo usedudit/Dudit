@@ -6,6 +6,7 @@ import { updateProfileAction } from "@/app/actions/profile"
 import { changePasswordAction } from "@/app/actions/shared/password"
 import { useNotification } from "@/hooks/use-notification"
 import { useSearchParams } from "next/navigation"
+import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
@@ -298,13 +299,13 @@ export function UserProfilePage({
             // This tab can be opened directly from a URL. Going back here can
             // leave /perfil (or follow an unrelated previous history entry),
             // especially after an App Router/RSC navigation on mobile.
-            window.history.replaceState(window.history.state, "", "/perfil")
+            replaceUrl("/perfil")
         } else {
             const url = `/perfil?tab=${view}`
             if (currentViewRef.current === "main") {
-                window.history.pushState(window.history.state, "", url)
+                pushUrl(url)
             } else {
-                window.history.replaceState(window.history.state, "", url)
+                replaceUrl(url)
             }
             currentViewRef.current = view
             setCurrentView(view)

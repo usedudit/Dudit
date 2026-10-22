@@ -17,6 +17,7 @@ import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch }
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
+import { pushUrl } from "@/lib/navigation/history"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { SearchIcon, XIcon } from "@/lib/icons"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
@@ -386,7 +387,7 @@ export function ExplorarPageClient({
         if (typeof window !== "undefined") {
             const currentRel = `${window.location.pathname}${window.location.search}`
             if (targetUrl !== currentRel) {
-                window.history.pushState(window.history.state, "", targetUrl)
+                pushUrl(targetUrl)
             }
         }
     }

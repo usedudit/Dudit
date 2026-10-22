@@ -12,6 +12,7 @@ import { getPlanUrl } from "@/lib/utils/url-generator"
 import Link from "next/link"
 import { CalendarIcon, ChevronRightIcon } from "@/lib/icons"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
+import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import {
   MySubscriptionDetailPage,
   getStatusConfig,
@@ -110,7 +111,7 @@ export function MySubscriptionsClient({
     const nextRelative = `${url.pathname}${url.search}${url.hash}`
     const currentRelative = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextRelative !== currentRelative) {
-      window.history.pushState(window.history.state, "", nextRelative)
+      pushUrl(nextRelative)
     }
   }, [])
 
@@ -124,7 +125,7 @@ export function MySubscriptionsClient({
     url.searchParams.delete("view")
     url.searchParams.delete("subscription")
     const nextRelative = `${url.pathname}${url.search}${url.hash}`
-    window.history.replaceState(window.history.state, "", nextRelative)
+    replaceUrl(nextRelative)
   }, [])
 
   const handleCardClick = (e: React.MouseEvent, id: string) => {

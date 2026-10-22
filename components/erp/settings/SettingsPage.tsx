@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from "@/components/reusable"
 import {
@@ -104,10 +105,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       const url = new URL(window.location.href)
       if (slug) {
         url.searchParams.set("tab", slug)
-        window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+        pushUrl(`${url.pathname}${url.search}${url.hash}`)
       } else {
         url.searchParams.delete("tab")
-        window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+        pushUrl(`${url.pathname}${url.search}${url.hash}`)
       }
     }
   }
@@ -117,7 +118,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "home" && typeof window !== "undefined") {
       const url = new URL(window.location.href)
       url.searchParams.set("tab", tab)
-      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+      replaceUrl(`${url.pathname}${url.search}${url.hash}`)
     }
   }
 

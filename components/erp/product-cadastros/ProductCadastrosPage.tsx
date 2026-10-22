@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
+import { pushUrl } from "@/lib/navigation/history"
 
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
@@ -143,7 +144,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
             } else {
                 url.searchParams.set("tab", tab)
             }
-            window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+            pushUrl(`${url.pathname}${url.search}${url.hash}`)
         }
     }
 

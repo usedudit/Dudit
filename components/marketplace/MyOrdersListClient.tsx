@@ -17,6 +17,7 @@ import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-genera
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
 import { canonicalDeliveryStatus } from "@/lib/orders/status";
+import { pushUrl, replaceUrl } from "@/lib/navigation/history";
 
 const ORDERS_PER_PAGE = 10
 
@@ -194,7 +195,7 @@ export function MyOrdersListClient({
             const currentRelative = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
             if (nextRelative !== currentRelative) {
-                window.history.pushState(window.history.state, "", nextRelative);
+                pushUrl(nextRelative);
             }
         }
     }, []);
@@ -217,7 +218,7 @@ export function MyOrdersListClient({
         url.searchParams.delete('order');
         url.searchParams.delete('view');
         const nextRelative = `${url.pathname}${url.search}${url.hash}`;
-        window.history.replaceState(window.history.state, "", nextRelative);
+        replaceUrl(nextRelative);
     }, []);
 
     const handleCardClick = (e: React.MouseEvent, id: string, orderNumber: string) => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams, usePathname } from "next/navigation"
+import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,8 +47,9 @@ function stateFromCurrentUrl(): EntityState {
  *
  * Architecture:
  *   1. Local useState updates SYNCHRONOUSLY on open/close (UI responds in <1ms)
- *   2. URL syncs INSTANTLY (0ms) via window.history.pushState/replaceState
- *      preserving window.history.state so Next.js router remains in sync
+ *   2. URL syncs INSTANTLY (0ms) via pushUrl/replaceUrl, which pass a null
+ *      history state so Next.js can copy its internals and keep the router
+ *      (usePathname/useSearchParams/canonicalUrl) in sync
  *   3. On browser back/forward, popstate → local state syncs instantly
  *   4. Closing uses safe history handling without accidental double-backs
  *
@@ -155,11 +157,11 @@ export function useEntityState() {
                 const newRelative = `${url.pathname}${url.search}${url.hash}`
                 if (wasOpen) {
                     // Modal was already open (e.g. view -> edit): replace state so we don't pollute history
-                    window.history.replaceState(window.history.state, "", newRelative)
+                    replaceUrl(newRelative)
                 } else {
                     // First time opening the modal: push state so browser Back returns to list.
                     // Closing never relies on this entry being present (see close below).
-                    window.history.pushState(window.history.state, "", newRelative)
+                    pushUrl(newRelative)
                 }
                 // Keep the ref in sync so the sync-effect doesn't react to this change
                 lastSyncedUrlRef.current = url.search + url.pathname
@@ -207,7 +209,7 @@ export function useEntityState() {
         }
         if (!needsClean) return
         const newRelative = `${url.pathname}${url.search}${url.hash}`
-        window.history.replaceState(window.history.state, "", newRelative)
+        replaceUrl(newRelative)
         // Keep the ref in sync so the sync-effect doesn't react to this change
         lastSyncedUrlRef.current = window.location.search + window.location.pathname
     }, [pathname])

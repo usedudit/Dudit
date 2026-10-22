@@ -10,6 +10,7 @@ import { useUserProfile } from "@/hooks/use-user-profile"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
+import { replaceUrl } from "@/lib/navigation/history"
 
 // Components
 import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge, UndoGracePeriodToast, ListItem, RadioButton } from "@/components/reusable"
@@ -302,7 +303,7 @@ export default function OrdersPage({
         if (tabFromUrl) {
             const url = new URL(window.location.href)
             url.searchParams.delete("tab")
-            window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+            replaceUrl(`${url.pathname}${url.search}${url.hash}`)
         }
     }, [entityState.isOpen, entityState.action, entityState.entityId])
 

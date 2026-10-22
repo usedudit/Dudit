@@ -9,6 +9,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useSidebar } from "@/lib/sidebar-context"
+import { pushUrl } from "@/lib/navigation/history"
 
 // Reusable Components
 import {
@@ -500,7 +501,7 @@ export default function RecurringSubscriptionsPage({
     const slug = tab === "home" ? null : SECTION_SLUGS[tab as Exclude<SectionKey, "home">]
     if (slug) url.searchParams.set("tab", slug)
     else url.searchParams.delete("tab")
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+    pushUrl(`${url.pathname}${url.search}${url.hash}`)
   }, [])
 
   // Lê ?tab= na montagem e sincroniza com voltar/avançar do navegador

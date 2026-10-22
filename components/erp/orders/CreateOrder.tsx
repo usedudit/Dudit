@@ -18,6 +18,7 @@ import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariant
 import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
+import { replaceUrl } from "@/lib/navigation/history"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
@@ -706,7 +707,7 @@ export default function CreateOrder({
         params.delete("payment")
         const newQuery = params.toString() ? `?${params.toString()}` : ""
         const cleanPath = `${window.location.pathname}${newQuery}${window.location.hash}`
-        window.history.replaceState(window.history.state, "", cleanPath)
+        replaceUrl(cleanPath)
         paymentParamConsumedRef.current = true
     }, [])
     useEffect(() => {

@@ -18,6 +18,7 @@ import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } fro
 import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hours"
 import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange } from "@/lib/services/location.service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
 import { SlidersHorizontal } from "lucide-react"
 import BottomSheet from "@/components/BottomSheet"
@@ -1250,9 +1251,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         if (targetUrl === currentUrl) return
 
         if (push) {
-            window.history.pushState(window.history.state, "", targetUrl)
+            pushUrl(targetUrl)
         } else {
-            window.history.replaceState(window.history.state, "", targetUrl)
+            replaceUrl(targetUrl)
         }
     }, [pathname, vendorFilterState, categorySortBy, contextParam])
     const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })

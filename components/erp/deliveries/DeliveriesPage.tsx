@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { replaceUrl } from "@/lib/navigation/history"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -95,7 +96,7 @@ export default function DeliveriesPage({
             } else {
                 url.searchParams.delete("search")
             }
-            window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+            replaceUrl(`${url.pathname}${url.search}${url.hash}`)
         }
     }, [])
 
