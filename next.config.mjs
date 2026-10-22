@@ -24,7 +24,7 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
-  disable: process.env.NODE_ENV === "development" || process.env.CI,
+  disable: process.env.NODE_ENV === "development" || process.env.CI || process.env.BUILD_FOR_RENDER,
   register: false,
   exclude: [
     /\.js$/,
@@ -278,10 +278,11 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // O Sentry continua capturando erros em runtime via SENTRY_DSN; as stack
   // traces ficam minificadas nesse ambiente.
   sourcemaps: {
-    disable: isRailwayBuild || process.env.CI,
+    disable: isRailwayBuild || process.env.CI || process.env.BUILD_FOR_RENDER,
   },
 
-  authToken: process.env.CI ? undefined : process.env.SENTRY_AUTH_TOKEN,
+  authToken:
+    process.env.CI || process.env.BUILD_FOR_RENDER ? undefined : process.env.SENTRY_AUTH_TOKEN,
 
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
