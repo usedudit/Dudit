@@ -24,7 +24,7 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
-  disable: process.env.NODE_ENV === "development",
+  disable: process.env.NODE_ENV === "development" || process.env.CI,
   register: false,
   exclude: [
     /\.js$/,
@@ -43,6 +43,7 @@ const nextConfig = {
     "@trigger.dev/sdk",
     "isomorphic-dompurify",
     "jsdom",
+    "@sparticuz/chromium",
   ],
   typescript: {
     ignoreBuildErrors: false,
