@@ -33,7 +33,7 @@ import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { BulkEditActionsModal, type BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 import { UndoGracePeriodToast } from "@/components/reusable/UndoGracePeriodToast"
-import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
+import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId, findMercadoPagoAccountId, isMercadoPagoPaymentType } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -216,6 +216,7 @@ export default function TransactionsPage({
     const [discountAmount, setDiscountAmount] = useState("0")
     const [paymentMethodId, setPaymentMethodId] = useState("Pix")
     const [financeAccountId, setFinanceAccountId] = useState<string>("")
+    const [mpPaymentLocked, setMpPaymentLocked] = useState(false)
     const [financeAccounts, setFinanceAccounts] = useState<any[]>([])
     const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
@@ -403,6 +404,24 @@ export default function TransactionsPage({
         const source = (paymentMethods && paymentMethods.length > 0) ? paymentMethods : fallbackPaymentMethods
         return (source || []).filter((m: any) => m.is_active !== false)
     }, [paymentMethods, fallbackPaymentMethods])
+
+    const isMercadoPagoTransaction = useCallback((row: any): boolean => {
+        if (!row) return false
+        if (isMercadoPagoPaymentType(row.paymentType)) return true
+        if (row.origin === "gateway" && (typeof row.paymentType === "string" && isMercadoPagoPaymentType(row.paymentType))) return true
+        if (row.accountId) {
+            const acc = financeAccounts.find((a: any) => a.id === row.accountId)
+            if (acc?.integration_source === "mercadopago") return true
+        }
+        return false
+    }, [financeAccounts])
+
+    const resolveMpPaymentDefaults = useCallback((row: any): { methodId: string; accountId: string } | null => {
+        if (!isMercadoPagoTransaction(row)) return null
+        const mpAccountId = findMercadoPagoAccountId(financeAccounts)
+        if (!mpAccountId) return null
+        return { methodId: "Mercado Pago", accountId: mpAccountId }
+    }, [isMercadoPagoTransaction, financeAccounts])
 
     // ── Bank account resolution for the "Quitar todas as parcelas" flow ──
     // The account field is only changeable when the chosen payment method(s) do NOT
@@ -1144,6 +1163,19 @@ export default function TransactionsPage({
         }
     }, [openEntity])
 
+    const handlePrintTransaction = useCallback((transaction: ERPTransaction) => {
+        window.print()
+    }, [])
+
+    const handleShareTransaction = useCallback((transaction: ERPTransaction) => {
+        if (navigator.share) {
+            navigator.share({
+                title: transaction.description || "Transação",
+                text: `${transaction.contactName || "Transação"} - ${formatCurrency(transaction.amount)}`,
+            }).catch(() => {})
+        }
+    }, [formatCurrency])
+
     const handleCloseTransactionDetail = useCallback(() => {
         closeEntity()
     }, [closeEntity])
@@ -1177,20 +1209,29 @@ export default function TransactionsPage({
         setPaymentAmount(String(initialAmount.toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        const initialMethod = transaction.paymentMethodId || (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
-        setPaymentMethodId(initialMethod)
 
-        const matched = getMatchedPaymentMethod(initialMethod)
-        if (matched?.default_finance_account_id) {
-            setFinanceAccountId(matched.default_finance_account_id)
-        } else if (transaction.accountId) {
-            setFinanceAccountId(transaction.accountId)
+        const mpDefaults = resolveMpPaymentDefaults(transaction)
+        if (mpDefaults) {
+            setPaymentMethodId(mpDefaults.methodId)
+            setFinanceAccountId(mpDefaults.accountId)
+            setMpPaymentLocked(true)
         } else {
-            const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
-            setFinanceAccountId(defaultAcc)
+            const initialMethod = transaction.paymentMethodId || (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+            setPaymentMethodId(initialMethod)
+
+            const matched = getMatchedPaymentMethod(initialMethod)
+            if (matched?.default_finance_account_id) {
+                setFinanceAccountId(matched.default_finance_account_id)
+            } else if (transaction.accountId) {
+                setFinanceAccountId(transaction.accountId)
+            } else {
+                const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+                setFinanceAccountId(defaultAcc)
+            }
+            setMpPaymentLocked(false)
         }
         setPaymentModalOpen(true)
-    }, [getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts])
+    }, [getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts, resolveMpPaymentDefaults])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
         const status = String(transaction.rawStatus || "").toLowerCase()
@@ -1352,7 +1393,7 @@ export default function TransactionsPage({
         openEntity("edit", tx.id)
     }, [loadedTransactions, notifyError, openEntity, closeEntity])
 
-     const handlePayInstallment = useCallback(
+      const handlePayInstallment = useCallback(
         (row: any, meta?: { ledgerDirection: ERPTransaction["ledgerDirection"]; isOrderOrigin: boolean }) => {
             if (!row) return
             if (row.status === "paid") {
@@ -1368,20 +1409,29 @@ export default function TransactionsPage({
             setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
             setInterestAmount("0")
             setDiscountAmount("0")
-            const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
-            setPaymentMethodId(initialMethod)
-            const matched = getMatchedPaymentMethod(initialMethod)
-            if (matched?.default_finance_account_id) {
-                setFinanceAccountId(matched.default_finance_account_id)
-            } else if (row.accountId) {
-                setFinanceAccountId(row.accountId)
+
+            const mpDefaults = resolveMpPaymentDefaults(row)
+            if (mpDefaults) {
+                setPaymentMethodId(mpDefaults.methodId)
+                setFinanceAccountId(mpDefaults.accountId)
+                setMpPaymentLocked(true)
             } else {
-                const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
-                setFinanceAccountId(defaultAcc)
+                const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+                setPaymentMethodId(initialMethod)
+                const matched = getMatchedPaymentMethod(initialMethod)
+                if (matched?.default_finance_account_id) {
+                    setFinanceAccountId(matched.default_finance_account_id)
+                } else if (row.accountId) {
+                    setFinanceAccountId(row.accountId)
+                } else {
+                    const defaultAcc = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+                    setFinanceAccountId(defaultAcc)
+                }
+                setMpPaymentLocked(false)
             }
             setPaymentModalOpen(true)
         },
-        [installmentDetail, notifyError, getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts],
+        [installmentDetail, notifyError, getMatchedPaymentMethod, activePaymentMethodsList, financeAccounts, resolveMpPaymentDefaults],
     )
 
     const handleConfirmInstallmentPayment = useCallback(async () => {
@@ -1401,16 +1451,20 @@ export default function TransactionsPage({
         }
 
         if (!skipPaymentBalanceWarningRef.current) {
-            const acc = financeAccounts.find((a: any) => a.id === financeAccountId)
-            const accBal = acc ? Number(acc.current_balance ?? 0) : 0
-            if (accBal + 0.005 < finalPaid) {
-                setPaymentBalanceWarningMeta({
-                    accountName: acc?.name || "Conta selecionada",
-                    currentBalance: accBal,
-                    amount: finalPaid,
-                })
-                setPaymentBalanceWarningOpen(true)
-                return
+            const isIncome =
+                selectedInstallmentForPayment.ledgerDirection === "in"
+            if (!isIncome) {
+                const acc = financeAccounts.find((a: any) => a.id === financeAccountId)
+                const accBal = acc ? Number(acc.current_balance ?? 0) : 0
+                if (accBal + 0.005 < finalPaid) {
+                    setPaymentBalanceWarningMeta({
+                        accountName: acc?.name || "Conta selecionada",
+                        currentBalance: accBal,
+                        amount: finalPaid,
+                    })
+                    setPaymentBalanceWarningOpen(true)
+                    return
+                }
             }
         }
         skipPaymentBalanceWarningRef.current = false
@@ -1542,6 +1596,7 @@ export default function TransactionsPage({
                         if (payingInstallment) return
                         setPaymentModalOpen(false)
                         setSelectedInstallmentForPayment(null)
+                        setMpPaymentLocked(false)
                     }}
                     title={
                         selectedInstallmentForPayment
@@ -1566,6 +1621,8 @@ export default function TransactionsPage({
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
                         const currentMatchedMethod = getMatchedPaymentMethod(paymentMethodId)
                         const isAccountLockedByMethod = Boolean(currentMatchedMethod?.default_finance_account_id)
+                        const mpAccountId = findMercadoPagoAccountId(financeAccounts)
+                        const isMpPayment = mpPaymentLocked || (mpAccountId && paymentMethodId === "Mercado Pago" && financeAccountId === mpAccountId)
 
                         return (
                             <div className="flex flex-col md:flex-row gap-6">
@@ -1691,7 +1748,7 @@ export default function TransactionsPage({
                                             setValue={handleSelectPaymentMethod}
                                             options={paymentMethodDropdownOptions}
                                             placeholder="Selecione"
-                                            disabled={lockedPaymentMethod}
+                                            disabled={lockedPaymentMethod || !!isMpPayment}
                                         />
                                         <div className="space-y-1">
                                             <FormDropdown
@@ -1700,9 +1757,14 @@ export default function TransactionsPage({
                                                 setValue={setFinanceAccountId}
                                                 options={financeAccounts.map((a: any) => ({ value: a.id, label: a.name }))}
                                                 placeholder="Selecione a conta bancária"
-                                                disabled={isAccountLockedByMethod}
-                                                error={!financeAccountId}
+                                                disabled={isAccountLockedByMethod || !!isMpPayment}
+                                                error={(!financeAccountId && !isMpPayment)}
                                             />
+                                            {isMpPayment && (
+                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                    Conta vinculada automaticamente ao pagamento via Mercado Pago.
+                                                </p>
+                                            )}
                                             {isAccountLockedByMethod && (
                                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">
                                                     Conta vinculada automaticamente ao meio de pagamento.
@@ -1794,7 +1856,7 @@ export default function TransactionsPage({
     }
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
-        if (isLoadingDetail) {
+        if (isLoadingDetail || !currentEntity) {
             return (
                 <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                     <ThreeDotsLoader />
@@ -2176,7 +2238,7 @@ export default function TransactionsPage({
         : null
 
     if (isFormOpen) {
-        if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring") {
+        if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring" && !editingTx) {
             return (
                 <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                     <ThreeDotsLoader />
@@ -2325,6 +2387,8 @@ export default function TransactionsPage({
                                                 onMarkAsPaid={handleMarkAsPaid}
                                                 onCancelPending={handleRequestCancelPending}
                                                 onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                onPrint={handlePrintTransaction}
+                                                onShare={handleShareTransaction}
                                                 {...getPrefetchProps(transaction.id)}
                                             />
                                         ))}
@@ -2402,6 +2466,8 @@ export default function TransactionsPage({
                                                             onMarkAsPaid={handleMarkAsPaid}
                                                             onCancelPending={handleRequestCancelPending}
                                                             onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                            onPrint={handlePrintTransaction}
+                                                            onShare={handleShareTransaction}
                                                             {...getPrefetchProps(transaction.id)}
                                                         />
                                                     ))}

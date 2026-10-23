@@ -1269,6 +1269,16 @@ async function handler(request: NextRequest) {
           feeAmount: 0,
           fixedFeeAmount: 0,
           feeBearer: "merchant",
+          // Determine payment kind based on deposit state
+          paymentKind: (() => {
+            const existingPaid = Number(existingOrder.paid_amount || 0)
+            if (existingPaid > 0.009) return "balance"
+            const depositMeta = (existingOrder.checkout_fulfillment as Record<string, any> | null)?.depositCheckout
+            if (depositMeta?.usesDeposit && depositMeta?.depositStatus === "expired") {
+              return chargeAmount >= fullOrderTotal - 0.009 ? "full" : "balance"
+            }
+            return chargeAmount >= fullOrderTotal - 0.009 ? "full" : "deposit"
+          })(),
           checkoutPricing: checkoutPricing || existingOrder.payment_breakdown?.[0]?.checkoutPricing || {
             subtotal: (existingOrder.order_items || []).reduce((sum: number, item: any) => sum + Number(item.subtotal || 0), 0) || (fullOrderTotal - deliveryFee),
             couponDiscount: couponDiscountAmount,

@@ -304,9 +304,6 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
       {loading ? (
         <div className="py-24 mx-4 md:px-8 flex flex-col items-center justify-center space-y-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px]">
           <ThreeDotsLoader />
-          <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-            Calculando DRE e indicadores contábeis com consultas paralelas...
-          </p>
         </div>
       ) : report ? (
         <>
@@ -666,8 +663,8 @@ function VariationBadge({ value, type }: { value?: number; type: "income" | "exp
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${isGood
-          ? "bg-brand-green-secondary text-brand-green"
-          : "bg-[#fce6e5] text-[#cc4745]"
+        ? "bg-brand-green-secondary text-brand-green"
+        : "bg-[#fce6e5] text-[#cc4745]"
         }`}
     >
       {isPositive ? `+${value}%` : `${value}%`}

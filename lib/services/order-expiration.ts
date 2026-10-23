@@ -123,9 +123,9 @@ export async function checkAndExpireDeposit(
     ],
   }
 
-  // Clean up payment_breakdown to remove the deposit payment leg
+  // Clean up payment_breakdown to remove the deposit placeholder leg
   const currentBreakdown = Array.isArray(orderData.payment_breakdown)
-    ? orderData.payment_breakdown
+    ? [...orderData.payment_breakdown]
     : []
 
   const cleanedBreakdown = currentBreakdown.filter((leg: any) => {
@@ -146,11 +146,12 @@ export async function checkAndExpireDeposit(
       // Clear the deposit MP payment fields so a new payment can be created
       mp_payment_id: null,
       payment_provider: null,
-      payment_method: "Não informado",
+      payment_method: cleanedBreakdown.length > 0 ? undefined : "Não informado",
       // Clear expiration so a new payment can be created
       payment_expires_at: null,
       // Keep the order pending — do NOT cancel it
       checkout_fulfillment: updatedFulfillment,
+      payment_breakdown: cleanedBreakdown.length > 0 ? cleanedBreakdown : undefined,
       updated_at: now,
     })
     .eq("id", orderId)

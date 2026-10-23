@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormSection, FormTextarea, Checkbox, RadioButton, ThreeDotsLoader, SavingStatusModal } from "@/components/reusable"
-import { ChevronLeftIcon, SaveIcon, PrinterIcon, CheckIcon } from "@/lib/icons"
+import { Button, FormSection, FormTextarea, Checkbox, ThreeDotsLoader, SidebarCard, SavingStatusModal } from "@/components/reusable"
+import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -29,7 +29,6 @@ export function ReceiptSettingsSubPage({
 
     const [settings, setSettings] = useState<ReceiptSettings>(DEFAULT_RECEIPT_SETTINGS)
     const [initialSettings, setInitialSettings] = useState<ReceiptSettings>(DEFAULT_RECEIPT_SETTINGS)
-    const [previewTab, setPreviewTab] = useState<"thermal" | "a4">("thermal")
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -48,14 +47,12 @@ export function ReceiptSettingsSubPage({
                     receiptMessage: res.data.receiptMessage ?? "",
                     receiptShowPolicyBlock: res.data.receiptShowPolicyBlock,
                     receiptShowAcknowledgment: res.data.receiptShowAcknowledgment,
-                    defaultReceiptFormat: res.data.defaultReceiptFormat || "thermal",
                     showStorePhone: res.data.showStorePhone,
                     showStoreAddress: res.data.showStoreAddress,
                     showSellerName: res.data.showSellerName,
                 }
                 setSettings(loaded)
                 setInitialSettings(loaded)
-                setPreviewTab(loaded.defaultReceiptFormat)
             } else {
                 notifyError(res.error || "Erro ao carregar configurações de recibos")
             }
@@ -67,13 +64,7 @@ export function ReceiptSettingsSubPage({
     }, [partnerId, notifyError])
 
     const updateField = <K extends keyof ReceiptSettings>(field: K, value: ReceiptSettings[K]) => {
-        setSettings((prev) => {
-            const next = { ...prev, [field]: value }
-            if (field === "defaultReceiptFormat") {
-                setPreviewTab(value as "thermal" | "a4")
-            }
-            return next
-        })
+        setSettings((prev) => ({ ...prev, [field]: value }))
     }
 
     const hasChanges = useMemo(() => {
@@ -88,7 +79,6 @@ export function ReceiptSettingsSubPage({
                 receiptMessage: (settings.receiptMessage || "").trim() || null,
                 receiptShowPolicyBlock: settings.receiptShowPolicyBlock,
                 receiptShowAcknowledgment: settings.receiptShowAcknowledgment,
-                defaultReceiptFormat: settings.defaultReceiptFormat,
                 showStorePhone: settings.showStorePhone,
                 showStoreAddress: settings.showStoreAddress,
                 showSellerName: settings.showSellerName,
@@ -152,7 +142,7 @@ export function ReceiptSettingsSubPage({
                                         isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
                                     }`}
                                 >
-                                    Personalize mensagens de rodapé, formato padrão e elementos dos seus comprovantes de venda.
+                                    Personalize mensagens de rodapé e elementos dos seus comprovantes de venda.
                                 </div>
                             </div>
 
@@ -173,62 +163,9 @@ export function ReceiptSettingsSubPage({
                 <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                     <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                         {/* Left Column - Formulário */}
-                        <div className="col-span-12 lg:col-span-7 pr-0 lg:pr-8 space-y-10">
-                            {/* Formato Padrão de Impressão */}
-                            <FormSection title="Formato padrão de impressão">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div
-                                        onClick={() => updateField("defaultReceiptFormat", "thermal")}
-                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
-                                            settings.defaultReceiptFormat === "thermal"
-                                                ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
-                                                : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                Bobina Térmica (80mm)
-                                            </span>
-                                            <RadioButton
-                                                name="defaultReceiptFormat"
-                                                value="thermal"
-                                                checked={settings.defaultReceiptFormat === "thermal"}
-                                                onChange={() => updateField("defaultReceiptFormat", "thermal")}
-                                            />
-                                        </div>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                            Ideal para impressoras de cupom não fiscal e agilidade no balcão do PDV.
-                                        </p>
-                                    </div>
-
-                                    <div
-                                        onClick={() => updateField("defaultReceiptFormat", "a4")}
-                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
-                                            settings.defaultReceiptFormat === "a4"
-                                                ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
-                                                : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                Folha A4 (Padrão)
-                                            </span>
-                                            <RadioButton
-                                                name="defaultReceiptFormat"
-                                                value="a4"
-                                                checked={settings.defaultReceiptFormat === "a4"}
-                                                onChange={() => updateField("defaultReceiptFormat", "a4")}
-                                            />
-                                        </div>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                            Ideal para vendas corporativas, faturamento e impressoras jato de tinta / laser.
-                                        </p>
-                                    </div>
-                                </div>
-                            </FormSection>
-
+                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
                             {/* Mensagem do Recibo */}
-                            <FormSection title="Mensagem do Recibo" hasSeparator>
+                            <FormSection title="Mensagem do Recibo">
                                 <div className="space-y-4">
                                     <FormTextarea
                                         name="receiptMessage"
@@ -261,9 +198,11 @@ export function ReceiptSettingsSubPage({
                                     />
                                 </div>
                             </FormSection>
+                        </div>
 
-                            {/* Informações da Loja */}
-                            <FormSection title="Informações no Cabeçalho" hasSeparator>
+                        {/* Right Column - Sidebar */}
+                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                            <SidebarCard hasTopStrip hasSeparator title="Informações no Cabeçalho">
                                 <div className="space-y-4">
                                     <Checkbox
                                         label="Exibir telefone da loja no recibo"
@@ -281,200 +220,7 @@ export function ReceiptSettingsSubPage({
                                         onCheckedChange={(v) => updateField("showSellerName", Boolean(v))}
                                     />
                                 </div>
-                            </FormSection>
-                        </div>
-
-                        {/* Right Column - Live Preview */}
-                        <div className="col-span-12 lg:col-span-5 pl-0 lg:pl-8 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                            <div className="sticky top-24 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <PrinterIcon className="w-5 h-5 text-brand-dark dark:text-white" />
-                                        <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                            Prévia em Tempo Real
-                                        </h3>
-                                    </div>
-                                    <div className="flex gap-1 bg-brand-light-gray dark:bg-dark-surface p-1 rounded-lg border border-brand-border dark:border-dark-border">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPreviewTab("thermal")}
-                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                                                previewTab === "thermal"
-                                                    ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
-                                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
-                                            }`}
-                                        >
-                                            Térmica (80mm)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPreviewTab("a4")}
-                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                                                previewTab === "a4"
-                                                    ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
-                                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
-                                            }`}
-                                        >
-                                            Folha A4
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Mockup Box */}
-                                <div className="bg-[#f9fafb] dark:bg-[#18181b] p-4 sm:p-6 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex justify-center items-start shadow-inner">
-                                    {previewTab === "thermal" ? (
-                                        /* Térmica 80mm Preview Mock */
-                                        <div className="w-full max-w-[280px] bg-white text-black font-mono text-[11px] p-4 shadow-md rounded-sm border border-neutral-200 leading-tight">
-                                            <div className="text-center font-bold text-xs uppercase mb-1">
-                                                SUA LOJA EXEMPLO
-                                            </div>
-                                            <div className="text-center text-[10px] text-neutral-600 mb-2">
-                                                CNPJ: 12.345.678/0001-90
-                                                {settings.showStoreAddress && (
-                                                    <div>Av. Principal, 1000 - Centro</div>
-                                                )}
-                                                {settings.showStorePhone && (
-                                                    <div>Tel: (11) 99999-9999</div>
-                                                )}
-                                            </div>
-
-                                            <div className="border-b border-dashed border-neutral-400 my-2" />
-
-                                            <div className="flex justify-between font-bold text-[10px]">
-                                                <span>PEDIDO #1024</span>
-                                                <span>27/08/2026 14:30</span>
-                                            </div>
-                                            {settings.showSellerName && (
-                                                <div className="text-[10px] text-neutral-600">
-                                                    Vendedor: Carlos Silva
-                                                </div>
-                                            )}
-
-                                            <div className="border-b border-dashed border-neutral-400 my-2" />
-
-                                            <div className="space-y-1 text-[10px]">
-                                                <div className="flex justify-between">
-                                                    <span>1x Camiseta Básica</span>
-                                                    <span>R$ 59,90</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span>2x Meia Esportiva</span>
-                                                    <span>R$ 29,80</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="border-b border-dashed border-neutral-400 my-2" />
-
-                                            <div className="flex justify-between font-bold text-xs">
-                                                <span>TOTAL</span>
-                                                <span>R$ 89,70</span>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-neutral-600">
-                                                <span>Forma de Pagto:</span>
-                                                <span>Pix</span>
-                                            </div>
-
-                                            {settings.receiptShowPolicyBlock && (
-                                                <div className="mt-3 pt-2 border-t border-dashed border-neutral-400 text-[9px] text-neutral-600 text-center">
-                                                    * Trocas em até 30 dias com esta nota *
-                                                </div>
-                                            )}
-
-                                            {settings.receiptMessage && (
-                                                <div className="mt-3 text-center font-bold text-[10px] text-neutral-800 break-words whitespace-pre-line">
-                                                    {settings.receiptMessage}
-                                                </div>
-                                            )}
-
-                                            {settings.receiptShowAcknowledgment && (
-                                                <div className="mt-4 pt-3 border-t border-neutral-400 text-[9px] text-center">
-                                                    <div className="h-5 border-b border-neutral-400 mb-1" />
-                                                    <span>Assinatura do Cliente</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        /* Folha A4 Preview Mock */
-                                        <div className="w-full bg-white text-black font-sans text-[10px] p-5 shadow-md rounded-md border border-neutral-200 leading-normal">
-                                            <div className="flex justify-between items-start border-b pb-3 mb-3">
-                                                <div>
-                                                    <div className="font-bold text-sm text-neutral-900">
-                                                        SUA LOJA EXEMPLO
-                                                    </div>
-                                                    <div className="text-neutral-500 text-[9px]">
-                                                        CNPJ: 12.345.678/0001-90
-                                                        {settings.showStorePhone && " • Tel: (11) 99999-9999"}
-                                                    </div>
-                                                    {settings.showStoreAddress && (
-                                                        <div className="text-neutral-500 text-[9px]">
-                                                            Av. Principal, 1000 - Centro, São Paulo/SP
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded text-[9px] font-bold">
-                                                        COMPROVANTE DE VENDA
-                                                    </span>
-                                                    <div className="text-[9px] text-neutral-500 mt-1">
-                                                        Nº: 1024 • 27/08/2026
-                                                    </div>
-                                                    {settings.showSellerName && (
-                                                        <div className="text-[9px] text-neutral-500">
-                                                            Vendedor: Carlos Silva
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-neutral-50 rounded p-2 mb-3">
-                                                <div className="font-bold text-[9px] text-neutral-700 mb-1">
-                                                    ITENS DO PEDIDO
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div className="flex justify-between">
-                                                        <span>1x Camiseta Básica Algodão (Tam: M)</span>
-                                                        <span className="font-semibold">R$ 59,90</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>2x Meia Esportiva Cano Médio</span>
-                                                        <span className="font-semibold">R$ 29,80</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-end mb-3">
-                                                <div className="text-right">
-                                                    <div className="text-[9px] text-neutral-500">Valor Total:</div>
-                                                    <div className="text-sm font-bold text-neutral-900">
-                                                        R$ 89,70
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {settings.receiptShowPolicyBlock && (
-                                                <div className="bg-neutral-50 p-2 rounded text-[8px] text-neutral-600 mb-2">
-                                                    <strong>Política de Troca & Garantia:</strong> Trocas aceitas em até 30 dias mediante apresentação deste comprovante e produto com etiqueta original intacta.
-                                                </div>
-                                            )}
-
-                                            {settings.receiptMessage && (
-                                                <div className="text-center font-medium text-[9px] text-neutral-700 my-2 italic break-words whitespace-pre-line">
-                                                    "{settings.receiptMessage}"
-                                                </div>
-                                            )}
-
-                                            {settings.receiptShowAcknowledgment && (
-                                                <div className="mt-4 pt-4 border-t border-dashed border-neutral-300 flex justify-between items-end text-[8px] text-neutral-600">
-                                                    <div>Recebi as mercadorias descritas neste documento.</div>
-                                                    <div className="w-32 border-b border-neutral-400 text-center pb-0.5">
-                                                        Assinatura
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            </SidebarCard>
                         </div>
                     </div>
                 </div>

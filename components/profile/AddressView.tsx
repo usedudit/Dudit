@@ -285,9 +285,11 @@ export const AddressView = ({
                 subtitle="Gerencie seus endereços de entrega."
                 onBack={() => navigate("main")}
                 action={addresses.length < 5 ? (
-                    <Button onClick={startCreate} className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm">
-                        <PlusIcon size={16} /> Adicionar endereço
-                    </Button>
+                    <div className="hidden lg:flex">
+                        <Button onClick={startCreate} className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm">
+                            <PlusIcon size={16} /> Adicionar endereço
+                        </Button>
+                    </div>
                 ) : undefined}
             />
 
@@ -304,7 +306,7 @@ export const AddressView = ({
             )}
 
             {sortedAddresses.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="pb-20 lg:pb-0 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {sortedAddresses.map((addr: any) => (
                         <div
                             key={addr.id}
@@ -382,6 +384,18 @@ export const AddressView = ({
             >
                 {editingId !== null && renderForm()}
             </DefaultModal>
+
+            {/* Fixed full-width new-address button for tablet/mobile */}
+            {addresses.length < 4 && (
+                <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3">
+                    <Button
+                        onClick={startCreate}
+                        className="w-full flex items-center justify-center gap-1.5 font-semibold text-sm"
+                    >
+                        <PlusIcon size={18} /> Adicionar endereço
+                    </Button>
+                </div>
+            )}
         </motion.div>
     )
 }

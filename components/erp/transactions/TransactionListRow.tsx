@@ -27,6 +27,8 @@ interface TransactionListItemProps {
     onMarkAsPaid?: (transaction: ERPTransaction) => void
     onCancelPending?: (transaction: ERPTransaction) => void
     onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
+    onPrint?: (transaction: ERPTransaction) => void
+    onShare?: (transaction: ERPTransaction) => void
     onPrefetchMouseEnter?: (id: string) => void
     onPrefetchMouseLeave?: (id: string) => void
     onPrefetchTouchStart?: (id: string) => void
@@ -45,7 +47,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, selectable = true, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, selectable = true, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrint, onShare, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -173,6 +175,8 @@ const TransactionListItem = React.memo(
                                         ? "Quitar tudo"
                                         : (transaction.isRecurringOccurrence ? "Marcar como pago" : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId ? "Cancelar" : undefined))
                                 }
+                                onPrint={onPrint ? () => onPrint(transaction) : undefined}
+                                onShare={onShare ? () => onShare(transaction) : undefined}
                             >
                                 {((String(transaction.rawStatus || "").toLowerCase() === "pending" || transaction.isOverdue) && !transaction.isInstallmentGroup && !transaction.isRecurringOccurrence && onMarkAsPaid) && (
                                     <DropdownItem onClick={() => onMarkAsPaid(transaction)}>

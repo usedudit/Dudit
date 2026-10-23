@@ -230,6 +230,8 @@ interface OrderDetailViewProps {
   onCancelOrder: (order: any) => void;
   onOpenNotes: (order: any) => void;
   initialOrder?: any;
+  /** True while the parent entity cache is fetching the full order. */
+  detailLoading?: boolean;
   initialTab?: string;
 }
 
@@ -243,6 +245,7 @@ export default function OrderDetailView({
   onCancelOrder,
   onOpenNotes,
   initialOrder,
+  detailLoading = false,
   initialTab,
 }: OrderDetailViewProps) {
   const { role, canRbac, planSlug } = usePermissions();
@@ -256,7 +259,7 @@ export default function OrderDetailView({
     !initialOrder.__partial,
   );
   const [order, setOrder] = useState<any>(initialOrder || null);
-  const [loading, setLoading] = useState(!initialOrder);
+  const [loading, setLoading] = useState(!initialOrder || detailLoading);
   const [activeTab, setActiveTab] = useState(initialTab || "summary");
 
   useEffect(() => {
@@ -345,18 +348,24 @@ export default function OrderDetailView({
   }, []);
 
   useEffect(() => {
-    if (
-      initialOrder &&
-      (initialOrder.order_items || initialOrder.items) &&
-      !initialOrder.__partial
-    ) {
+    if (detailLoading) return;
+
+    if (initialOrder && (initialOrder.order_items || initialOrder.items) && !initialOrder.__partial) {
       setOrder(initialOrder);
       setLoading(false);
     }
-  }, [initialOrder]);
+  }, [detailLoading, initialOrder]);
 
-  // Always fetch full data in background, even if we have initialOrder
+  // The parent entity cache owns the full-detail request. Fetch here only when
+  // this component was mounted without a usable initial order (for example a
+  // direct fallback render or after a failed cache request). This avoids two
+  // identical getOrderDetailsAction calls when opening a row from the list.
   useEffect(() => {
+    if (detailLoading) return;
+    if (initialOrder && (initialOrder.order_items || initialOrder.items) && !initialOrder.__partial) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -398,7 +407,7 @@ export default function OrderDetailView({
     return () => {
       mounted = false;
     };
-  }, [orderId, partnerId, notifyError, onBack]);
+  }, [detailLoading, initialOrder, orderId, partnerId, notifyError, onBack]);
 
   // Lazy load delivery summary only when delivery tab is active
   useEffect(() => {
@@ -1708,24 +1717,24 @@ export default function OrderDetailView({
                             </div>
                           )}
 
-                          <FormSection
-                            title="Detalhes do Pagamento"
-                            titleRight={
-                              hasMinimumPlan(planSlug, "crescer") ? (
-                                <button
-                                  onClick={loadFinancialBreakdown}
-                                  className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                >
-                                  {financialLoading
-                                    ? "Carregando..."
-                                    : showFinancialBreakdown
-                                      ? "Ocultar lucro líquido"
-                                      : "Ver lucro líquido"}
-                                </button>
-                              ) : null
-                            }
-                            hasSeparator
-                          >
+                           <FormSection
+                             title="Detalhes do Pagamento"
+                             headerRight={
+                               hasMinimumPlan(planSlug, "crescer") ? (
+                                 <button
+                                   onClick={loadFinancialBreakdown}
+                                   className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                 >
+                                   {financialLoading
+                                     ? "Carregando..."
+                                     : showFinancialBreakdown
+                                       ? "Ocultar lucro líquido"
+                                       : "Ver lucro líquido"}
+                                 </button>
+                               ) : null
+                             }
+                             hasSeparator
+                           >
                             <div className="space-y-3">
                               <PaymentRow
                                 label="Método de Pagamento"
@@ -2228,13 +2237,6 @@ export default function OrderDetailView({
                               </div>
                             </div>
                           </FormSection>
-
-                          {showFinancialBreakdown && financialData && (
-                            <FinancialBreakdownDisplay
-                              data={financialData}
-                              formatCurrency={formatCurrency}
-                            />
-                          )}
                         </div>
 
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
@@ -2738,25 +2740,25 @@ export default function OrderDetailView({
                         )}
 
                         {/* 5. Detalhes do Pagamento */}
-                        <FormSection
-                          title="Detalhes do Pagamento"
-                          titleRight={
-                            hasMinimumPlan(planSlug, "crescer") ? (
-                              <button
-                                onClick={loadFinancialBreakdown}
-                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                              >
-                                {financialLoading
-                                  ? "Carregando..."
-                                  : showFinancialBreakdown
-                                    ? "Ocultar lucro líquido"
-                                    : "Ver lucro líquido"}
-                              </button>
-                            ) : null
-                          }
-                          hasSeparator
-                          className="mt-0"
-                        >
+                         <FormSection
+                           title="Detalhes do Pagamento"
+                           headerRight={
+                             hasMinimumPlan(planSlug, "crescer") ? (
+                               <button
+                                 onClick={loadFinancialBreakdown}
+                                 className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                               >
+                                 {financialLoading
+                                   ? "Carregando..."
+                                   : showFinancialBreakdown
+                                     ? "Ocultar lucro líquido"
+                                     : "Ver lucro líquido"}
+                               </button>
+                             ) : null
+                           }
+                           hasSeparator
+                           className="mt-0"
+                         >
                           <div className="space-y-3">
                             <PaymentRow
                               label="Método de Pagamento"
@@ -3236,15 +3238,8 @@ export default function OrderDetailView({
                             </div>
                           </div>
                         </FormSection>
-
-                        {showFinancialBreakdown && financialData && (
-                          <FinancialBreakdownDisplay
-                            data={financialData}
-                            formatCurrency={formatCurrency}
-                          />
-                        )}
                       </div>
-                    </FadeIn>
+                      </FadeIn>
                   </TabsContent>
 
                   <TabsContent value="history" className="mt-0">
@@ -3590,6 +3585,18 @@ export default function OrderDetailView({
             </tbody>
           </table>
         </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={showFinancialBreakdown && !!financialData}
+        onClose={() => setShowFinancialBreakdown(false)}
+        title="Lucro líquido"
+        maxWidth="2xl"
+      >
+        <FinancialBreakdownDisplay
+          data={financialData!}
+          formatCurrency={formatCurrency}
+        />
       </DefaultModal>
     </>
   );

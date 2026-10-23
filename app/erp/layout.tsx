@@ -29,6 +29,7 @@ import {
   getActiveStoreId,
 } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { resolveEffectivePermissions } from "@/lib/store-members"
 import { OfflineBanner } from "@/components/pwa/OfflineBanner"
@@ -47,6 +48,11 @@ export default async function ERPLayout({
   children: React.ReactNode
 }) {
   const user = await requireUser() // Ensure authenticated - single auth call for the entire ERP tree
+
+  // Resolve the canonical ERP context while the layout is fetching its shell
+  // data. Pages under this layout call the same React-cached helper, so they
+  // reuse this result instead of running the live access/store checks again.
+  const erpContextPromise = getErpRequestContext()
 
   // Stage 1: Parallel fetch profile avatar & partner access
   const [profileDataRes, allAccess] = await Promise.all([
@@ -86,7 +92,7 @@ export default async function ERPLayout({
     redirect("/select-erp")
   }
 
-  let context: { partnerId: string; roleId: RoleId; role: PartnerRole; permissions: any; businessInfo: any } | null = null
+  let context: { partnerId: string; roleId: RoleId; role: PartnerRole; permissions: any; businessInfo: any } | null = await erpContextPromise
 
   if (activePartnerId) {
     // Validate cookie against actual access

@@ -7,10 +7,12 @@ import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
+import BottomSheet from "@/components/BottomSheet"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 import SignatureDialog from "./SignatureDialog"
 import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
+import OSSPrintModal from "./OSSPrintModal"
 import {
     updateServiceOrderStatusAction,
     getServiceOrderDetailsAction,
@@ -19,6 +21,7 @@ import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, isServiceOrderB
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
+import { useMediaQuery } from "@/components/erp/hooks"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
@@ -76,6 +79,9 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [selectedStatus, setSelectedStatus] = useState("")
     const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; nextStatus: string } | null>(null)
+    const [showPrintModal, setShowPrintModal] = useState(false)
+    const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     useEffect(() => { setOrder(data) }, [data])
 
@@ -423,7 +429,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 }
                                                 setShareLoading(false);
                                             }}
-                                            onPrint={() => window.open(`/print/os/${order.id}`, "_blank")}
+                                            onPrint={() => setShowPrintModal(true)}
                                             onDelete={() => setConfirmDelete(true)}
                                         />
                                     </div>
@@ -467,6 +473,14 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             </div>
                                                             <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                                                 Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order.priority]?.label || "Média"}</strong>
+                                                            </div>
+                                                            <div className="md:hidden">
+                                                                <button
+                                                                    onClick={() => setIsStepsSheetOpen(true)}
+                                                                    className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
+                                                                >
+                                                                    <span>Ver etapas</span>
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -575,25 +589,25 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 {/* Payment Details FormSection (Exactly like Order Details) */}
                                                 <FormSection title="Detalhes do Pagamento" hasSeparator>
                                                     <div className="space-y-3">
-                                                        <div className="flex justify-between items-center text-[14px]">
+                                                        <div className="flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text font-medium">Mão de obra</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_service_amount || 0)}</span>
                                                         </div>
 
-                                                        <div className="flex justify-between items-center text-[14px]">
+                                                        <div className="flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text font-medium">Produtos</span>
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_product_amount || 0)}</span>
                                                         </div>
 
                                                         {Number(order.other_costs || 0) > 0 && (
-                                                            <div className="flex justify-between items-center text-[14px]">
+                                                            <div className="flex justify-between items-center text-sm">
                                                                 <span className="text-brand-inactive-text font-medium">Outros custos</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">+ {formatCurrency(order.other_costs)}</span>
                                                             </div>
                                                         )}
 
                                                         {discountAmount > 0 && (
-                                                            <div className="flex justify-between items-center text-[14px]">
+                                                            <div className="flex justify-between items-center text-sm">
                                                                 <span className="text-brand-inactive-text font-medium">
                                                                     Desconto {order.discount_type === 'percentage' ? `(${order.discount_value}%)` : ''}
                                                                 </span>
@@ -602,7 +616,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         )}
 
                                                         {Number(order.coupon_discount_amount || 0) > 0 && (
-                                                            <div className="flex justify-between items-center text-[14px]">
+                                                            <div className="flex justify-between items-center text-sm">
                                                                 <span className="text-brand-inactive-text font-medium">
                                                                     Cupom {order.coupon_code ? `(${order.coupon_code})` : ''}
                                                                 </span>
@@ -610,20 +624,22 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             </div>
                                                         )}
 
-                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-2 flex justify-between items-center text-[14px]">
+                                                        <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-2 flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text font-medium">Status de Pagamento</span>
                                                             <Badge variant={order.payment_status === "paid" ? "green" : order.payment_status === "partially_paid" ? "orange" : "gray"}>
                                                                 {order.payment_status === "paid" ? "Pago" : order.payment_status === "partially_paid" ? "Parcialmente Pago" : "Não Pago"}
                                                             </Badge>
                                                         </div>
 
-                                                        <div className="flex justify-between items-center text-[14px]">
-                                                            <span className="text-brand-inactive-text font-medium">Valor Pago</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.paid_amount || 0)}</span>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-brand-inactive-text font-medium">Pedido Vinculado</span>
+                                                            <a href={`/erp/pedidos/?view=${order.order_id}`} className="font-bold text-brand-primary hover:underline text-right">
+                                                                #{order.linked_order_number || order.order_id}
+                                                            </a>
                                                         </div>
 
                                                         {order.payment_method && (
-                                                            <div className="flex justify-between items-center text-[14px]">
+                                                            <div className="flex justify-between items-center text-sm">
                                                                 <span className="text-brand-inactive-text font-medium">Meio de Pagamento</span>
                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading">{order.payment_method}</span>
                                                             </div>
@@ -633,21 +649,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total da OS</span>
                                                             <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount || 0)}</span>
                                                         </div>
-
-                                                        {order.costs?.canView && (
-                                                            <div className="pt-4 mt-3 border-t border-brand-border dark:border-dark-border space-y-2">
-                                                                <div className="flex justify-between items-center text-[13px]">
-                                                                    <span className="text-brand-inactive-text font-medium">Custo dos itens</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(order.costs.totalCost || 0)}</span>
-                                                                </div>
-                                                                <div className="flex justify-between items-center text-[13px]">
-                                                                    <span className="text-brand-inactive-text font-medium">Margem</span>
-                                                                    <span className={`font-bold ${(order.costs.margin || 0) >= 0 ? "text-brand-green" : "text-brand-red"}`}>
-                                                                        {formatCurrency(order.costs.margin || 0)} ({Number(order.costs.marginPercent || 0).toFixed(1)}%)
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        )}
 
                                                         {order.payment_status !== "paid" && order.order_id && (
                                                             <div className="pt-4 flex justify-end">
@@ -668,26 +669,26 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 {order.sale && (
                                                     <SidebarCard hasSeparator title="Venda Vinculada">
                                                         <div className="space-y-3">
-                                                            <div className="flex justify-between items-center text-[13px]">
-                                                                <span className="text-brand-inactive-text">Venda</span>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Venda</span>
                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
                                                                     #{order.sale.sale_number || "-"}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center text-[13px]">
-                                                                <span className="text-brand-inactive-text">Total</span>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
                                                                     {formatCurrency(order.sale.final_amount || order.sale.total_amount || 0)}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center text-[13px]">
-                                                                <span className="text-brand-inactive-text">Pago</span>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Pago</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
                                                                     {formatCurrency(order.sale.paid_amount || 0)}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center text-[13px]">
-                                                                <span className="text-brand-inactive-text">Status</span>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status</span>
                                                                 <Badge
                                                                     variant={order.sale.payment_status === "paid" ? "green" : order.sale.payment_status === "partially_paid" ? "orange" : "gray"}
                                                                     className="text-[11px]"
@@ -696,7 +697,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                 </Badge>
                                                             </div>
                                                             {order.sale.status === "cancelled" && (
-                                                                <div className="flex justify-between items-center text-[13px]">
+                                                                <div className="flex justify-between items-center text-sm">
                                                                     <span className="text-brand-red font-medium">Cancelada</span>
                                                                 </div>
                                                             )}
@@ -706,28 +707,28 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Timing Info Card */}
                                                 {order.created_at && (
-                                                    <SidebarCard hasSeparator title="Tempo">
+                                                    <SidebarCard hasSeparator hasTopStrip title="Tempo">
                                                         <div className="space-y-3">
-                                                            <div className="flex justify-between items-center text-[13px]">
-                                                                <span className="text-brand-inactive-text">Abertura</span>
+                                                            <div className="flex justify-between items-center text-sm">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Abertura</span>
                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
                                                                     {formatDateTime(order.created_at)}
                                                                 </span>
                                                             </div>
                                                             {order.completed_at && (
-                                                                <div className="flex justify-between items-center text-[13px]">
-                                                                    <span className="text-brand-inactive-text">Conclusão</span>
+                                                                <div className="flex justify-between items-center text-sm">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Conclusão</span>
                                                                     <span className="font-medium text-brand-dark dark:text-dark-heading text-right">
                                                                         {formatDateTime(order.completed_at)}
                                                                     </span>
                                                                 </div>
                                                             )}
-                                                            <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
-                                                                <span className="text-brand-inactive-text">Tempo {order.completed_at ? "total" : "decorrido"}</span>
+                                                            <div className="flex justify-between items-center text-sm pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tempo {order.completed_at || (order.status === "concluida" || order.status === "entregue") ? "total" : "decorrido"}</span>
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
                                                                     {(() => {
                                                                         const start = new Date(order.created_at).getTime()
-                                                                        const end = order.completed_at ? new Date(order.completed_at).getTime() : Date.now()
+                                                                        const end = order.completed_at ? new Date(order.completed_at).getTime() : ((order.status === "concluida" || order.status === "entregue") ? new Date(order.updated_at).getTime() : Date.now())
                                                                         const diffMs = Math.max(0, end - start)
                                                                         const diffH = Math.floor(diffMs / 3600000)
                                                                         const diffM = Math.floor((diffMs % 3600000) / 60000)
@@ -745,7 +746,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                     const [h, m] = order.expected_completion_time.split(":").map(Number)
                                                                     expectedDate.setHours(h || 0, m || 0)
                                                                 }
-                                                                const referenceDate = order.completed_at ? new Date(order.completed_at) : new Date()
+                                                                const referenceDate = order.completed_at ? new Date(order.completed_at) : ((order.status === "concluida" || order.status === "entregue") ? new Date(order.updated_at) : new Date())
                                                                 const isLate = referenceDate.getTime() > expectedDate.getTime()
                                                                 const diffLateMs = Math.max(0, referenceDate.getTime() - expectedDate.getTime())
                                                                 const diffLateH = Math.floor(diffLateMs / 3600000)
@@ -755,7 +756,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                 if (isLate) {
                                                                     const label = isCompleted ? "Concluído com atraso" : "Atrasado"
                                                                     return (
-                                                                        <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                        <div className="flex justify-between items-center text-sm pt-1 border-t border-brand-border dark:border-dark-border">
                                                                             <span className="text-brand-red font-medium">{label}</span>
                                                                             <span className="font-bold text-brand-red">
                                                                                 {diffLateD > 0 ? `${diffLateD}d ${diffLateH % 24}h ${diffLateM}m` : `${diffLateH}h ${diffLateM}m`}
@@ -765,7 +766,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                 }
                                                                 if (isCompleted) {
                                                                     return (
-                                                                        <div className="flex justify-between items-center text-[13px] pt-1 border-t border-brand-border dark:border-dark-border">
+                                                                        <div className="flex justify-between items-center text-sm pt-1 border-t border-brand-border dark:border-dark-border">
                                                                             <span className="text-brand-green font-medium">Prazo</span>
                                                                             <span className="font-bold text-brand-green">Concluído no prazo</span>
                                                                         </div>
@@ -1193,6 +1194,44 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                 }}
                 confirmText="Excluir"
                 variant="danger"
+            />
+
+            <BottomSheet
+                isOpen={isStepsSheetOpen}
+                onClose={() => setIsStepsSheetOpen(false)}
+                title="Etapas da Ordem de Serviço"
+            >
+                <div className="space-y-2 my-4">
+                    {timelineSteps.map((step: any, idx: number) => {
+                        const isStepCancelled = step.isCancelled
+                        return (
+                            <div key={idx} className="flex items-center gap-3 p-3 border border-brand-border dark:border-dark-border rounded-lg">
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                    {step.active && <div className="w-2 h-2 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                </div>
+                                <div className="flex-1">
+                                    <span className={`text-sm font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                        {step.label}
+                                    </span>
+                                    {step.date && (
+                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text mt-0.5">
+                                            <span>{step.date}</span>
+                                            {step.time && <span>{step.time}</span>}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </BottomSheet>
+
+            <OSSPrintModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                orderId={order?.id}
+                partnerId={partnerId}
+                storeId={order?.store_id}
             />
         </FadeIn >
     )

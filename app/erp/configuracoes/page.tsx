@@ -24,26 +24,33 @@ export default async function SettingsPage() {
   }
 
   const supabase = createAdminClient()
-  const { data: rawPartner } = await supabase
-    .from("partners")
-    .select("*")
-    .eq("id", context.partnerId)
-    .maybeSingle()
+  // These reads are independent once the ERP context is known. Fetch them in
+  // one wave so settings does not pay one Supabase round-trip per section.
+  const [partnerRes, storeRes, integrationsRes, paymentMethods] = await Promise.all([
+    supabase
+      .from("partners")
+      .select("*")
+      .eq("id", context.partnerId)
+      .maybeSingle(),
+    supabase
+      .from("stores")
+      .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+      .eq("partner_id", context.partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("partner_integrations")
+      .select("provider_slug, status, account_id, connected_at, config, metadata")
+      .eq("partner_id", context.partnerId),
+    getPartnerPaymentMethodsCached(context.partnerId),
+  ])
+
+  const rawPartner = partnerRes.data
+  const store = storeRes.data
+  const partnerIntegrations = integrationsRes.data
 
   if (!rawPartner) return <AccessDenied />
-
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
-    .eq("partner_id", context.partnerId)
-    .order("is_headquarters", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const { data: partnerIntegrations } = await supabase
-    .from("partner_integrations")
-    .select("provider_slug, status, account_id, connected_at, config, metadata")
-    .eq("partner_id", context.partnerId)
 
   const superfreteConnected = (partnerIntegrations || []).some(
     (integration: { provider_slug: string; status: string }) =>
@@ -89,8 +96,6 @@ export default async function SettingsPage() {
     partner.city = defaultAddress.city
     partner.state = defaultAddress.state
   }
-
-  const paymentMethods = await getPartnerPaymentMethodsCached(partner.id)
 
   return (
     <>

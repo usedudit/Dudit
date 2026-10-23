@@ -18,11 +18,12 @@ import {
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
     CheckCircleIcon, EditIcon, UserIcon,
-    TruckIcon, Package
+    TruckIcon, Package, MotorbikeIcon
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
+import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit, formatDeliveryDaysRange } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
@@ -132,6 +133,7 @@ interface OrderGeneralTabProps {
     originalDeliveryPayer?: string
     originalDeliverySubsidy?: number
     role?: string
+    deliveryBreakdown?: Record<string, unknown> | null
 }
 
 export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
@@ -164,6 +166,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     originalDeliverySubsidy = 0,
     role = "OPERATOR",
     searchPromotions = [],
+    deliveryBreakdown = null,
 }) => {
     const { canRbac } = usePermissions()
     const isMarketplaceLocked = isPaidOrder || !canRbac("orders.edit");
@@ -942,15 +945,49 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                                 />
                                             )}
-                                            {deliveryMethod === "delivery" && (
-                                                <ListItem
-                                                    icon={TruckIcon}
-                                                    title="Adicionar entrega"
-                                                    description="Define o valor da entrega do pedido"
-                                                    onClick={isMarketplaceLocked ? undefined : onOpenShipping}
-                                                    className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                />
-                                            )}
+                                            {deliveryMethod === "delivery" && (() => {
+                                                const savedDelivery = deliveryBreakdown as any | null
+                                                const isCarrier = savedDelivery?.source === "superfrete"
+                                                const carrierIcon = isCarrier
+                                                    ? getCarrierBrandIcon(savedDelivery?.companyName, savedDelivery?.serviceName, savedDelivery?.carrier)
+                                                    : null
+                                                if (savedDelivery) {
+                                                    return (
+                                                        <ListItem
+                                                            icon={
+                                                                isCarrier ? (
+                                                                    <img src={carrierIcon || ""} alt="Transportadora" className="object-contain" />
+                                                                ) : (
+                                                                    <MotorbikeIcon className="text-brand-dark dark:text-dark-heading" />
+                                                                )
+                                                            }
+                                                            title={
+                                                                isCarrier
+                                                                    ? [savedDelivery?.companyName, savedDelivery?.serviceName].filter(Boolean).join(" - ") || "Transportadora"
+                                                                    : "Entrega"
+                                                            }
+                                                            description={
+                                                                isCarrier
+                                                                    ? formatDeliveryDaysRange(savedDelivery?.deliveryMinDays, savedDelivery?.deliveryMaxDays)
+                                                                    : savedDelivery?.distanceKm != null
+                                                                        ? `${Number(savedDelivery.distanceKm).toFixed(2)} km de distância`
+                                                                        : "Entrega a combinar"
+                                                            }
+                                                            onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                        />
+                                                    )
+                                                }
+                                                return (
+                                                    <ListItem
+                                                        icon={TruckIcon}
+                                                        title="Adicionar entrega"
+                                                        description="Define o valor da entrega do pedido"
+                                                        onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                    />
+                                                )
+                                            })()}
                                         </>
                                     )}
                                     <MoneyInput

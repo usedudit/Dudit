@@ -63,10 +63,6 @@ function sanitizeSalesSettings(input: Partial<SalesSettings>): Partial<SalesSett
     sanitized.cancelExpiredDepositOrders = Boolean(input.cancelExpiredDepositOrders)
   }
 
-  if (input.defaultReceiptFormat !== undefined) {
-    sanitized.defaultReceiptFormat = input.defaultReceiptFormat === "a4" ? "a4" : "thermal"
-  }
-
   return sanitized
 }
 
@@ -119,14 +115,13 @@ export async function getSalesSettingsAction(partnerId: string) {
       quoteValidityDays: typeof rawSettings?.quoteValidityDays === "number"
         ? rawSettings.quoteValidityDays
         : DEFAULT_SALES_SETTINGS.quoteValidityDays,
-      autoCancelManualOrdersHours: typeof rawSettings?.autoCancelManualOrdersHours === "number"
-        ? rawSettings.autoCancelManualOrdersHours
-        : DEFAULT_SALES_SETTINGS.autoCancelManualOrdersHours,
-      defaultReceiptFormat: rawSettings?.defaultReceiptFormat === "a4" ? "a4" : "thermal",
-      cancelExpiredDepositOrders: typeof rawSettings?.cancelExpiredDepositOrders === "boolean"
-        ? rawSettings.cancelExpiredDepositOrders
-        : DEFAULT_SALES_SETTINGS.cancelExpiredDepositOrders,
-    }
+       autoCancelManualOrdersHours: typeof rawSettings?.autoCancelManualOrdersHours === "number"
+         ? rawSettings.autoCancelManualOrdersHours
+         : DEFAULT_SALES_SETTINGS.autoCancelManualOrdersHours,
+       cancelExpiredDepositOrders: typeof rawSettings?.cancelExpiredDepositOrders === "boolean"
+         ? rawSettings.cancelExpiredDepositOrders
+         : DEFAULT_SALES_SETTINGS.cancelExpiredDepositOrders,
+     }
 
     return { success: true as const, data: settings }
   } catch (e: any) {
@@ -229,15 +224,14 @@ export async function getReceiptSettingsAction(partnerId: string) {
 
     return {
       success: true as const,
-      data: {
-        receiptMessage: (policyData?.receipt_message as string | null) ?? null,
-        receiptShowPolicyBlock: (policyData?.receipt_show_policy_block as boolean | null) ?? true,
-        receiptShowAcknowledgment: (policyData?.receipt_show_acknowledgment as boolean | null) ?? true,
-        defaultReceiptFormat: (rawSales?.defaultReceiptFormat === "a4" ? "a4" : "thermal") as "thermal" | "a4",
-        showStorePhone: rawSales?.showStorePhone !== false,
-        showStoreAddress: rawSales?.showStoreAddress !== false,
-        showSellerName: rawSales?.showSellerName !== false,
-      },
+       data: {
+         receiptMessage: (policyData?.receipt_message as string | null) ?? null,
+         receiptShowPolicyBlock: (policyData?.receipt_show_policy_block as boolean | null) ?? true,
+         receiptShowAcknowledgment: (policyData?.receipt_show_acknowledgment as boolean | null) ?? true,
+         showStorePhone: rawSales?.showStorePhone !== false,
+         showStoreAddress: rawSales?.showStoreAddress !== false,
+         showSellerName: rawSales?.showSellerName !== false,
+       },
     }
   } catch (e: any) {
     return { success: false as const, error: e.message || "Erro ao carregar configurações de recibos." }
@@ -249,15 +243,14 @@ export async function getReceiptSettingsAction(partnerId: string) {
  */
 export async function updateReceiptSettingsAction(
   partnerId: string,
-  data: {
-    receiptMessage?: string | null
-    receiptShowPolicyBlock?: boolean
-    receiptShowAcknowledgment?: boolean
-    defaultReceiptFormat?: "thermal" | "a4"
-    showStorePhone?: boolean
-    showStoreAddress?: boolean
-    showSellerName?: boolean
-  }
+   data: {
+     receiptMessage?: string | null
+     receiptShowPolicyBlock?: boolean
+     receiptShowAcknowledgment?: boolean
+     showStorePhone?: boolean
+     showStoreAddress?: boolean
+     showSellerName?: boolean
+   }
 ) {
   try {
     await requireUser()
@@ -331,7 +324,6 @@ export async function updateReceiptSettingsAction(
 
     const updatedSalesSettings = {
       ...currentSales,
-      ...(data.defaultReceiptFormat ? { defaultReceiptFormat: data.defaultReceiptFormat } : {}),
       ...(data.showStorePhone !== undefined ? { showStorePhone: data.showStorePhone } : {}),
       ...(data.showStoreAddress !== undefined ? { showStoreAddress: data.showStoreAddress } : {}),
       ...(data.showSellerName !== undefined ? { showSellerName: data.showSellerName } : {}),

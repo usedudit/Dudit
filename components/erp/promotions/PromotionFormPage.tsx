@@ -1250,19 +1250,19 @@ export default function PromotionFormPage({
                                                     />
 
                                                      <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">Público da Campanha</p>
-                                                     <div className="flex gap-3">
+                                                     <div className="flex flex-col sm:flex-row gap-3">
                                                          <ListItem
                                                              title="Todos os Clientes"
                                                              description="A campanha vale para toda a base de clientes"
                                                              onClick={() => !isReadOnly && (markDirty(), setCampScope("all"))}
                                                              className="flex-1 px-4 py-3"
                                                              right={
-                                                                 <RadioButton
-                                                                     checked={campScope === "all"}
-                                                                     onChange={() => !isReadOnly && (markDirty(), setCampScope("all"))}
-                                                                     name="custScope"
-                                                                     value="all"
-                                                                 />
+                                                                  <RadioButton
+                                                                      checked={campScope === "all"}
+                                                                      onChange={() => !isReadOnly && (markDirty(), setCampScope("all"))}
+                                                                      name="custScope"
+                                                                      value="all"
+                                                                  />
                                                              }
                                                          />
                                                          <ListItem
@@ -1271,12 +1271,12 @@ export default function PromotionFormPage({
                                                              onClick={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
                                                              className="flex-1 px-4 py-3"
                                                              right={
-                                                                 <RadioButton
-                                                                     checked={campScope === "specific"}
-                                                                     onChange={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
-                                                                     name="custScope"
-                                                                     value="specific"
-                                                                 />
+                                                                  <RadioButton
+                                                                      checked={campScope === "specific"}
+                                                                      onChange={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
+                                                                      name="custScope"
+                                                                      value="specific"
+                                                                  />
                                                              }
                                                      />
                                                      </div>
@@ -1296,6 +1296,7 @@ export default function PromotionFormPage({
                                                                 markDirty()
                                                                 setCampStarts(d ? d.toISOString() : "")
                                                             }}
+                                                            disabled={isReadOnly}
                                                         />
                                                         <DatePicker
                                                             label="Fim da Vigência"
@@ -1304,6 +1305,7 @@ export default function PromotionFormPage({
                                                                 markDirty()
                                                                 setCampEnds(d ? d.toISOString() : "")
                                                             }}
+                                                            disabled={isReadOnly}
                                                         />
                                                     </div>
                                                 </SidebarCard>
@@ -1351,6 +1353,7 @@ export default function PromotionFormPage({
                                                                     markDirty()
                                                                     setEditingRule({ ...editingRule, promotion_type: val })
                                                                 }}
+                                                                disabled={isReadOnly}
                                                                 options={[
                                                                     { value: "discount", label: "Desconto Direto (Fixo ou %)" },
                                                                     { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
@@ -1368,6 +1371,7 @@ export default function PromotionFormPage({
                                                                             markDirty()
                                                                             setEditingRule({ ...editingRule, discount_type: val })
                                                                         }}
+                                                                        disabled={isReadOnly}
                                                                         options={[
                                                                             { value: "percentage", label: "Porcentagem (%)" },
                                                                             { value: "fixed", label: "Valor Fixo (R$)" }
@@ -1393,6 +1397,7 @@ export default function PromotionFormPage({
                                                                             }}
                                                                             error={fieldErrors.has("discount_value")}
                                                                             errorMessage={fieldErrors.has("discount_value") ? "Valor do desconto é obrigatório" : undefined}
+                                                                            disabled={isReadOnly}
                                                                         />
                                                                     ) : (
                                                                         <MoneyInput
@@ -1414,6 +1419,7 @@ export default function PromotionFormPage({
                                                                             }}
                                                                             error={fieldErrors.has("discount_value")}
                                                                             errorMessage={fieldErrors.has("discount_value") ? "Valor do desconto é obrigatório" : undefined}
+                                                                            disabled={isReadOnly}
                                                                         />
                                                                     )}
                                                                     <MoneyInput
@@ -1425,12 +1431,13 @@ export default function PromotionFormPage({
                                                                             markDirty()
                                                                             setEditingRule({ ...editingRule, max_discount_amount: val })
                                                                         }}
+                                                                        disabled={isReadOnly}
                                                                     />
-                                                                </div>
-                                                            )}
+                                                </div>
+                                            )}
 
-                                                            {editingRule.promotion_type === "buy_x_pay_y" && (
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            {editingRule.promotion_type === "buy_x_pay_y" && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <Input
                                                                         label="Leve (Qtd a Comprar)"
                                                                         name="buy_quantity"
@@ -1452,6 +1459,7 @@ export default function PromotionFormPage({
                                                                         }}
                                                                         error={fieldErrors.has("buy_quantity")}
                                                                         errorMessage={fieldErrors.has("buy_quantity") ? "Quantidade de compra é obrigatória" : undefined}
+                                                                        disabled={isReadOnly}
                                                                     />
                                                                     <Input
                                                                         label="Pague (Qtd a Pagar)"
@@ -1474,6 +1482,7 @@ export default function PromotionFormPage({
                                                                         }}
                                                                         error={fieldErrors.has("pay_quantity")}
                                                                         errorMessage={fieldErrors.has("pay_quantity") ? "Quantidade paga é obrigatória" : undefined}
+                                                                        disabled={isReadOnly}
                                                                     />
                                                                 </div>
                                                             )}
@@ -1600,6 +1609,7 @@ export default function PromotionFormPage({
                                                                     setScopePage(1)
                                                                     setEditingRule({ ...editingRule, apply_scope: val })
                                                                 }}
+                                                                disabled={isReadOnly}
                                                                 options={[
                                                                     { value: "entire_cart", label: "Toda a Sacola" },
                                                                     { value: "specific_products", label: "Produtos Específicos" },
@@ -1631,6 +1641,7 @@ export default function PromotionFormPage({
                                                                         markDirty()
                                                                         setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })
                                                                     }}
+                                                                    disabled={isReadOnly}
                                                                 />
                                                                 <MoneyInput
                                                                     label="Mínimo de Compra (R$)"
@@ -1643,6 +1654,7 @@ export default function PromotionFormPage({
                                                                     }}
                                                                     error={fieldErrors.has("min_spend_amount")}
                                                                     errorMessage={fieldErrors.has("min_spend_amount") ? "Valor mínimo de compra é obrigatório" : undefined}
+                                                                    disabled={isReadOnly}
                                                                 />
                                                                 <Input
                                                                     label="Limite Global de Usos"
@@ -1655,6 +1667,7 @@ export default function PromotionFormPage({
                                                                         markDirty()
                                                                         setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })
                                                                     }}
+                                                                    disabled={isReadOnly}
                                                                 />
                                                                 <Input
                                                                     label="Limite de Usos por Cliente"
@@ -1667,6 +1680,7 @@ export default function PromotionFormPage({
                                                                         markDirty()
                                                                         setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })
                                                                     }}
+                                                                    disabled={isReadOnly}
                                                                 />
                                                             </div>
                                                         </SidebarCard>

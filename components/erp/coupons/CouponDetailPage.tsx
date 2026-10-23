@@ -6,6 +6,7 @@ import { ActionsDropdown, Badge, Button, FormSection, SidebarCard, Tabs, TabsCon
 import { ChevronLeftIcon, EditIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useSidebar } from "@/lib/sidebar-context"
+import CouponDeactivationModal from "./CouponDeactivationModal"
 import {
     CouponRelations,
     CouponRow,
@@ -48,6 +49,7 @@ export default function CouponDetailPage({
     isLoadingRelations: boolean
 }) {
     const [activeTab, setActiveTab] = useState("summary")
+    const [showDeactivationModal, setShowDeactivationModal] = useState(false)
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
@@ -89,7 +91,7 @@ export default function CouponDetailPage({
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <ActionsDropdown
                                         onEdit={() => onEdit(coupon)}
-                                        onCancel={() => onToggleStatus(coupon)}
+                                        onCancel={() => setShowDeactivationModal(true)}
                                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                                         onDelete={() => onDelete(coupon)}
                                         onShare={onShare ? () => onShare(coupon) : undefined}
@@ -238,7 +240,7 @@ export default function CouponDetailPage({
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
                         onEdit={() => onEdit(coupon)}
-                        onCancel={() => onToggleStatus(coupon)}
+                        onCancel={() => setShowDeactivationModal(true)}
                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                         onDelete={() => onDelete(coupon)}
                         onShare={onShare ? () => onShare(coupon) : undefined}
@@ -252,6 +254,16 @@ export default function CouponDetailPage({
                         Editar
                     </Button>
                 </div>
+
+                <CouponDeactivationModal
+                isOpen={showDeactivationModal}
+                onClose={() => setShowDeactivationModal(false)}
+                onConfirm={() => {
+                    onToggleStatus(coupon)
+                    setShowDeactivationModal(false)
+                }}
+                coupon={coupon}
+            />
             </div>
         </FadeIn>
     )

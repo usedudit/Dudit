@@ -82,7 +82,7 @@ export function GlobalPeriodFilter() {
   )
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+    <div className="flex items-center gap-2 sm:gap-3 flex-nowrap overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible md:pb-0">
       {insights && insights.length > 0 && (
         <>
           <Button variant="outline" size="icon" onClick={() => setInsightSheetOpen(true)}>

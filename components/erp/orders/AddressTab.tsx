@@ -2,7 +2,7 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Button, DatePicker, FormDropdown, FormSection, Input, SidebarCard, TimePicker } from "@/components/reusable"
+import { Button, DatePicker, FormDropdown, FormSection, InfoCard, Input, SidebarCard, TimePicker } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
@@ -135,7 +135,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                 <div className="lg:col-span-8 flex flex-col gap-8">
                     <FormSection title="Endereço de Entrega">
                         {isAddressReadOnly ? (
-                            <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
+                            <div>
                                 <InfoRow label="CEP" value={cep || "-"} />
                                 <InfoRow label="Rua/Avenida" value={street || "-"} />
                                 <InfoRow label="Número" value={noNumber ? "S/N" : (number || "-")} />
@@ -195,17 +195,18 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         disabled={isAddressLocked}
                                     />
                                 </div>
-                                {isCarrierDelivery && !existingCarrierShipment && (
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Ao alterar o endereço, refaça a cotação da transportadora para atualizar o frete.
-                                    </p>
-                                )}
                             </div>
                         )}
                     </FormSection>
                 </div>
 
                 <div className="lg:col-span-4 flex flex-col gap-8 lg:border-l lg:border-brand-border lg:pl-12 dark:lg:border-dark-border">
+                    {isCarrierDelivery && !existingCarrierShipment && (
+                        <InfoCard
+                            color="orange"
+                            message="Ao alterar o endereço, refaça a cotação da transportadora para atualizar o frete."
+                        />
+                    )}
                     <SidebarCard hasSeparator hasTopStrip title="Informações da Entrega">
                         {isCarrierDelivery ? (
                             <div className="space-y-4">
@@ -239,8 +240,8 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     />
                                 )}
                                 {canReQuoteCarrier && (
-                                    <Button variant="outline" size="sm" className="w-full" onClick={onOpenCarrierShippingSheet}>
-                                        Alterar transportadora
+                                    <Button className="w-full" onClick={onOpenCarrierShippingSheet}>
+                                        Recalcular frete
                                     </Button>
                                 )}
                             </div>

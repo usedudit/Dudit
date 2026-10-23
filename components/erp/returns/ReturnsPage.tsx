@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, DefaultModal, Checkbox, SelectionBanner } from "@/components/reusable"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { PlusIcon, ExportFileIcon, ReturnIcon, XIcon } from "@/lib/icons"
+import { PlusIcon, ExportFileIcon, ReturnIcon, XIcon, TrashIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { useToast } from "@/hooks/use-toast"
@@ -134,12 +135,33 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
     }
 
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+
+    // Batch selection
+    const [selection, setSelection] = useState<{ ids: Set<string> }>({ ids: new Set() })
+    const handleSelectRow = useCallback((id: string) => {
+        setSelection((prev) => {
+            const ids = new Set(prev.ids)
+            if (ids.has(id)) ids.delete(id)
+            else ids.add(id)
+            return { ids }
+        })
+    }, [])
     const [modals, setModals] = useState({ filter: false })
 
     const [showMpPaymentNotFoundModal, setShowMpPaymentNotFoundModal] = useState(false)
     const [mpPaymentNotFoundChecked, setMpPaymentNotFoundChecked] = useState(false)
     const [pendingProcessData, setPendingProcessData] = useState<Record<string, any> | null>(null)
     const [printReturnId, setPrintReturnId] = useState<string | null>(null)
+    const [deletedReturnIds, setDeletedReturnIds] = useState<Set<string>>(new Set())
+
+    const batchDeleteReturns = useCallback((ids: string[]) => {
+        setDeletedReturnIds((prev) => {
+            const next = new Set(prev)
+            ids.forEach((id) => next.add(id))
+            return next
+        })
+        setSelection({ ids: new Set() })
+    }, [])
 
     const { data: returnsData, isLoading: isReturnsLoading } = useQuery({
         queryKey: ['erp', 'returns', partnerId, storeId],
@@ -282,6 +304,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
     const filteredReturns = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase()
         let result = (returnsData ?? []).filter((item) => {
+            if (deletedReturnIds.has(item.id)) return false
             const matchesSearch =
                 !term ||
                 item.orderNumber.toLowerCase().includes(term) ||
@@ -366,7 +389,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
         }
 
         return result
-    }, [returnsData, debouncedSearch, activeTab, sortConfig, filters])
+    }, [returnsData, debouncedSearch, activeTab, sortConfig, filters, deletedReturnIds])
 
     // Dynamic Filter Sections - only show if data exists for that filter
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
@@ -541,16 +564,48 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                 </Tabs>
                             </div>
 
-                            <ReturnPageControls
-                                search={search}
-                                onSearchChange={setSearch}
-                                onOpenFilter={() => setModals({ filter: true })}
-                                onAdd={canManage ? () => openEntity("create") : undefined}
-                                viewMode={effectiveViewMode}
-                                onViewModeChange={setViewModeState}
-                            />
+                             <ReturnPageControls
+                                 search={search}
+                                 onSearchChange={setSearch}
+                                 onOpenFilter={() => setModals({ filter: true })}
+                                 onAdd={canManage ? () => openEntity("create") : undefined}
+                                 viewMode={effectiveViewMode}
+                                 onViewModeChange={setViewModeState}
+                             />
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                             {selection.ids.size > 0 && (
+                                 <div className="px-4 md:px-8 mb-2">
+                                     <SelectionBanner
+                                          selectedCount={selection.ids.size}
+                                          totalCount={paginatedReturns.length}
+                                          onSelectAll={() => setSelection({ ids: new Set(paginatedReturns.map((r) => r.id)) })}
+                                          onClearSelection={() => setSelection({ ids: new Set() })}
+                                          itemName="devoluções"
+                                          singularItemName="devolução"
+                                     />
+                                 </div>
+                             )}
+
+                             {selection.ids.size > 0 && !entityState.isOpen && (
+                                  <FloatingActionBar
+                                    selectedCount={selection.ids.size}
+                                    onClearSelection={() => setSelection({ ids: new Set() })}
+                                  >
+                                     <Button
+                                       variant="ghostred"
+                                       className="h-10 px-3"
+                                        onClick={() => {
+                                         if (!confirm(`Excluir ${selection.ids.size} devolução(ões)?`)) return
+                                         batchDeleteReturns(Array.from(selection.ids))
+                                        }}
+                                       leftIcon={<TrashIcon size={18} />}
+                                     >
+                                       Excluir
+                                     </Button>
+                                 </FloatingActionBar>
+                             )}
+
+                             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                                 <AnimatePresence mode="wait">
                                     {isReturnsLoading ? (
                                         <div className="h-[400px] flex items-center justify-center">
@@ -581,6 +636,8 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                                     onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status) ? () => openEntity("edit", item.id) : undefined}
                                                     onPrint={() => setPrintReturnId(item.id)}
                                                     canManage={canManage}
+                                                    selected={selection.ids.has(item.id)}
+                                                    onSelect={() => handleSelectRow(item.id)}
                                                 />
                                             ))}
                                         </FadeIn>
@@ -623,19 +680,21 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                                                 onEdit={(r) => openEntity("edit", r.id)}
                                                                 onPrint={(r) => setPrintReturnId(r.id)}
                                                                 canManage={canManage}
+                                                                selected={selection.ids.has(item.id)}
+                                                                onSelect={() => handleSelectRow(item.id)}
                                                             />
                                                         ))}
                                                     </tbody>
-                                                </table>
-                                            </div>
-                                        </FadeIn>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                                            </table>
+                                        </div>
+                                    </FadeIn>
+                                )}
+                            </AnimatePresence>
 
-                            {filteredReturns.length > 0 && (
-                                <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-                            )}
+                                {filteredReturns.length > 0 && (
+                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
+                                )}
+                            </div>
                         </div>
                     </FadeIn>
                 )}

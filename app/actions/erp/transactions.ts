@@ -3766,7 +3766,7 @@ export async function getTransactionPresignedUploadUrlAction(
             fileType,
             userId: user.id,
             prefix: R2_PREFIXES.orderAttachments,
-            kind: "document",
+            kind: fileType.startsWith("image/") ? "image" : "document",
         })
 
         return {

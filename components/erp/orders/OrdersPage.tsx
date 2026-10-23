@@ -1296,6 +1296,7 @@ export default function OrdersPage({
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
                             initialOrder={currentEntity || effectiveOrders?.find((o: any) => o.id === entityState.entityId) || undefined}
+                            detailLoading={isLoadingDetail}
                             initialTab={initialDetailTab}
                             key={`order-detail-${entityState.entityId}`}
                         />

@@ -36,7 +36,7 @@ import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
-import { TagIcon, MoneyIcon, FileIcon, TruckIcon } from "@/lib/icons"
+import { TagIcon, MoneyIcon, FileIcon, TruckIcon, MotorbikeIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
@@ -54,7 +54,8 @@ import { OrderObservationsTab } from "./OrderObservationsTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
@@ -1990,6 +1991,7 @@ export default function CreateOrder({
                                             paymentMethodDiscountAmount={paymentMethodDiscountAmount}
                                             paymentMethodExtraAmount={paymentMethodExtraAmount}
                                             role={role}
+                                            deliveryBreakdown={deliveryBreakdown}
                                         />
                                     </div>
                                 </FadeIn>
@@ -1998,7 +2000,7 @@ export default function CreateOrder({
                             {!isPaidOrder && (
                                 <TabsContent value="payment" className="xl:hidden mt-0">
                                     <FadeIn key="payment">
-                                        <SidebarCard title="Pagamento" hasSeparator hasTopStrip>
+                                        <SidebarCard title="Pagamento" hasSeparator hasTopStrip className="lg:mt-6">
                                             {(() => {
                                                 const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
                                                 const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
@@ -2152,15 +2154,49 @@ export default function CreateOrder({
                                                                             className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                                                         />
                                                                     )}
-                                                                    {deliveryMethod === "delivery" && (
-                                                                        <ListItem
-                                                                            icon={TruckIcon}
-                                                                            title="Adicionar entrega"
-                                                                            description="Define o valor da entrega do pedido"
-                                                                            onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
-                                                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                                        />
-                                                                    )}
+                                                                    {deliveryMethod === "delivery" && (() => {
+                                                                         const savedDelivery = deliveryBreakdown as any | null
+                                                                         const isCarrier = savedDelivery?.source === "superfrete"
+                                                                         const carrierIcon = isCarrier
+                                                                             ? getCarrierBrandIcon(savedDelivery?.companyName, savedDelivery?.serviceName, savedDelivery?.carrier)
+                                                                             : null
+                                                                    if (savedDelivery) {
+                                                                        return (
+                                                                            <ListItem
+                                                                                icon={
+                                                                                    isCarrier ? (
+                                                                                        <img src={carrierIcon || ""} alt="Transportadora" className="object-contain" />
+                                                                                    ) : (
+                                                                                        <MotorbikeIcon className="text-brand-dark dark:text-dark-heading" />
+                                                                                    )
+                                                                                }
+                                                                                    title={
+                                                                                        isCarrier
+                                                                                            ? [savedDelivery?.companyName, savedDelivery?.serviceName].filter(Boolean).join(" - ") || "Transportadora"
+                                                                                            : "Entrega"
+                                                                                    }
+                                                                                    description={
+                                                                                        isCarrier
+                                                                                            ? formatDeliveryDaysRange(savedDelivery?.deliveryMinDays, savedDelivery?.deliveryMaxDays)
+                                                                                            : savedDelivery?.distanceKm != null
+                                                                                                ? `${Number(savedDelivery.distanceKm).toFixed(2)} km de distância`
+                                                                                                : "Entrega a combinar"
+                                                                                    }
+                                                                                    onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
+                                                                                    className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                                                />
+                                                                            )
+                                                                        }
+                                                                        return (
+                                                                            <ListItem
+                                                                                icon={TruckIcon}
+                                                                                title="Adicionar entrega"
+                                                                                description="Define o valor da entrega do pedido"
+                                                                                onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
+                                                                                className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                                            />
+                                                                        )
+                                                                    })()}
                                                                 </>
                                                             )}
                                                             <MoneyInput

@@ -1,5 +1,21 @@
 export type FinanceAccountType = "cash" | "bank" | "wallet"
 
+export function findMercadoPagoAccountId(
+  accounts: { id: string; name: string; integration_source?: string | null; is_active?: boolean | null }[],
+): string | null {
+  const rows = accounts.filter((a) => a.is_active !== false)
+  const bySource = rows.find((a) => a.integration_source === "mercadopago")
+  if (bySource) return bySource.id
+  const byName = rows.find((a) => a.name.toLowerCase().includes("mercado pago"))
+  if (byName) return byName.id
+  return null
+}
+
+export function isMercadoPagoPaymentType(paymentType: string | null | undefined): boolean {
+  const norm = String(paymentType || "").toLowerCase().trim()
+  return norm.includes("mercado pago") || norm.includes("mercadopago")
+}
+
 /** Conta padrão do tipo (caixa, banco ou carteira) entre contas ativas. */
 export function pickDefaultAccountIdForType(
   accounts: { id: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[],
@@ -42,6 +58,7 @@ export const STANDARD_PAYMENT_METHODS = [
   { value: "TEF", label: "TEF" },
   { value: "Cheque", label: "Cheque" },
   { value: "Vale-compra", label: "Vale-compra" },
+  { value: "Mercado Pago", label: "Mercado Pago" },
   { value: "Outro", label: "Outro" },
 ]
 
@@ -77,6 +94,7 @@ export function resolveStandardPaymentMethod(label: string | null | undefined): 
   if (norm.includes("boleto")) return "Boleto"
   if (norm.includes("tef")) return "TEF"
   if (norm.includes("cheque") || norm.includes("check")) return "Cheque"
+  if (norm.includes("mercado pago") || norm.includes("mercadopago") || norm === "mercado pago") return "Mercado Pago"
   return ""
 }
 

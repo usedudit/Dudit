@@ -360,7 +360,7 @@ export default function CouponFormPage({
                                             <FadeIn key="general" className="space-y-8">
                                                 <FormSection title="Identificação">
                                                     <div className="grid grid-cols-12 gap-5">
-                                                        <div className="col-span-12 md:col-span-7">
+                                                        <div className="col-span-12 md:col-span-6">
                                                             <Input
                                                                 label="Código do cupom"
                                                                 placeholder="Ex: BEMVINDO10"
@@ -370,7 +370,7 @@ export default function CouponFormPage({
                                                                 showCharacterCount={true}
                                                             />
                                                         </div>
-                                                        <div className="col-span-12 md:col-span-5 mt-[1px]">
+                                                        <div className="col-span-12 md:col-span-6">
                                                             <FormDropdown
                                                                 label="Status"
                                                                 value={form.isActive ? "Ativo" : "Inativo"}
@@ -381,7 +381,7 @@ export default function CouponFormPage({
                                                                 ]}
                                                             />
                                                         </div>
-                                                        <div className="col-span-12 md:col-span-6 mt-[1px]">
+                                                        <div className="col-span-12 md:col-span-6">
                                                             <FormDropdown
                                                                 label="Tipo de desconto"
                                                                 value={form.discountType}
@@ -459,9 +459,9 @@ export default function CouponFormPage({
                                                             label="Aplicar a"
                                                             actionLabel={applyScopeActionLabel}
                                                             onAction={
-                                                    applyScopeActionLabel && form.applyScope !== "all"
-                                                        ? () => handleOpenPicker(form.applyScope as PickerMode)
-                                                        : undefined
+                                                                applyScopeActionLabel && form.applyScope !== "all"
+                                                                    ? () => handleOpenPicker(form.applyScope as PickerMode)
+                                                                    : undefined
                                                             }
                                                         >
                                                             <FormDropdown
@@ -482,9 +482,9 @@ export default function CouponFormPage({
                                                             label="Escopo de clientes"
                                                             actionLabel={form.customerScope === "specific" ? "Selecionar clientes" : null}
                                                             onAction={
-                                                            form.customerScope === "specific"
-                                                                ? () => handleOpenPicker("customers")
-                                                                : undefined
+                                                                form.customerScope === "specific"
+                                                                    ? () => handleOpenPicker("customers")
+                                                                    : undefined
                                                             }
                                                         >
                                                             <FormDropdown

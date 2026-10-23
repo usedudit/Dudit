@@ -24,6 +24,8 @@ export type SystemResourceId =
   | "campaigns"
   | "productivity"
   | "communityVideos"
+  | "recurringPlans"
+  | "recurringSubscriptions"
 
 export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
@@ -185,6 +187,20 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     module: "marketing",
     minimumPlan: "crescer",
   },
+  {
+    id: "recurringPlans",
+    label: "Planos Recorrentes",
+    description: "Planos de cobrança recorrente com produtos e serviços e cobrança automática.",
+    module: "marketing",
+    minimumPlan: "escalar",
+  },
+  {
+    id: "recurringSubscriptions",
+    label: "Assinaturas de Clientes",
+    description: "Assinaturas ativas, cobranças recorrentes e créditos de serviços.",
+    module: "marketing",
+    minimumPlan: "escalar",
+  },
 ]
 
 export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
@@ -192,6 +208,8 @@ export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
   "marketing",
   "showcase",
   "communityVideos",
+  "recurringPlans",
+  "recurringSubscriptions",
 ]
 
 export const DESAPEGO_AVAILABLE_RESOURCES: SystemResourceId[] = [
@@ -252,6 +270,8 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
       "coupons",
       "campaigns",
       "productivity",
+      "recurringPlans",
+      "recurringSubscriptions",
     ]
   }
   const allowed = new Set<SystemResourceId>(SYSTEM_RESOURCE_IDS)
@@ -323,6 +343,8 @@ export function getDefaultResourcesForModeAndCategory(mode?: string, categorySlu
     "campaigns",
     "productivity",
     "communityVideos",
+    "recurringPlans",
+    "recurringSubscriptions",
   ]
 
   // Alimentação & Varejo: esconde serviços e agendamentos por padrão
@@ -398,9 +420,11 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   "/erp/metas": "productivity",
   "/erp/comissoes": "productivity",
   // ── Marketing
-  "/erp/cupons": "coupons",
-  "/erp/promocoes": "campaigns",
-  "/erp/videos": "communityVideos",
+   "/erp/cupons": "coupons",
+   "/erp/promocoes": "campaigns",
+   "/erp/videos": "communityVideos",
+   "/erp/recorrentes/planos": "recurringPlans",
+   "/erp/recorrentes/assinaturas": "recurringSubscriptions",
 }
 
 /**

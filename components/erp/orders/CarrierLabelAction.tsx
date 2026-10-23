@@ -216,25 +216,11 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
             && !["cancelled", "failed", "delivered"].includes(String(shipment.status || ""))
         content = (
             <div className="flex shrink-0 items-center gap-1">
-                {shipment.external_label_id && (
-                    <Button variant="link" type="button" className="shrink-0" onClick={handlePrint} isLoading={printing}>
-                        Imprimir
-                    </Button>
-                )}
-                {shipment.tracking_url && (
-                    <Button
-                        variant="link"
-                        type="button"
-                        className="shrink-0"
-                        onClick={() => window.open(shipment.tracking_url || undefined, "_blank")}
-                    >
-                        Rastrear
-                    </Button>
-                )}
                 <Dropdown
                     align="right"
                     fullWidth={false}
                     width="w-52"
+                    showChevron={false}
                     trigger={
                         <Button variant="outline" className="h-9 w-9 shrink-0 p-0 flex items-center justify-center" aria-label="Ações da etiqueta">
                             <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />

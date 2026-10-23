@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import {
     ChevronLeftIcon,
-    ShareIcon,
     PackageIcon,
     FileIcon,
     ClockIcon,
@@ -21,7 +20,6 @@ import {
     FormSection,
     IconPlaceholder,
     ActionsDropdown,
-    DropdownItem,
     SidebarCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -32,6 +30,7 @@ import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
+import ReturnPrintModal from "@/components/erp/returns/ReturnPrintModal"
 
 const formatReturnReasonLabel = (rawReason?: string | null): string => {
     if (!rawReason) return "Não informado"
@@ -179,6 +178,7 @@ interface AdminReturnDetailViewProps {
 export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewProps) {
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
+    const [printModalOpen, setPrintModalOpen] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     // Header override for mobile back button
@@ -199,6 +199,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
     const relatedReports = detail?.relatedReports || []
 
     const returnId = request?.id?.slice(0, 8) || "N/A"
+    const returnFullId = request?.id || ""
     const statusMeta = getReturnStatusMeta(request?.status)
 
     useEffect(() => {
@@ -279,11 +280,10 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
 
                                         {/* Desktop action buttons */}
                                         <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
-                                            <ActionsDropdown>
-                                                <DropdownItem onClick={handleShare}>
-                                                    <ShareIcon size={16} /> Compartilhar
-                                                </DropdownItem>
-                                            </ActionsDropdown>
+                                            <ActionsDropdown
+                                                onPrint={() => setPrintModalOpen(true)}
+                                                onShare={handleShare}
+                                            />
                                         </div>
                                     </div>
 
@@ -570,17 +570,26 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <div className="flex-1">
-                    <ActionsDropdown trigger={
-                        <Button variant="outline" className="w-full h-12">
-                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
-                        </Button>
-                    }>
-                        <DropdownItem onClick={handleShare}>
-                            <ShareIcon size={16} /> Compartilhar
-                        </DropdownItem>
-                    </ActionsDropdown>
+                    <ActionsDropdown
+                        onPrint={() => setPrintModalOpen(true)}
+                        onShare={handleShare}
+                        trigger={
+                            <Button variant="outline" className="w-full h-12">
+                                <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                            </Button>
+                        }
+                    />
                 </div>
             </div>
+
+            {printModalOpen && returnFullId && (
+                <ReturnPrintModal
+                    isOpen={printModalOpen}
+                    onClose={() => setPrintModalOpen(false)}
+                    returnId={returnFullId}
+                    partnerId={store?.id || ""}
+                />
+            )}
         </>
     )
 }

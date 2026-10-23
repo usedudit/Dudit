@@ -831,7 +831,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                {customer.createdAt ? formatDate(customer.createdAt) : '-'}
+                                                                {customer.created_at ? formatDate(customer.created_at) : '-'}
                                                             </span>
                                                         </div>
                                                         {customer.birth_date && (

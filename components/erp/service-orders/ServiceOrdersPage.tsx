@@ -43,6 +43,7 @@ import {
   bulkDeleteServiceOrderAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, type ServiceOrderStatus } from "@/lib/types/service-order"
+import OSSPrintModal from "./OSSPrintModal"
 
 const SERVICE_STATUS_ORDER: string[] = [
   "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
@@ -125,6 +126,7 @@ export default function ServiceOrdersPage({
   const [statusModal, setStatusModal] = useState<{ orderId: string; currentStatus: string; nextStatus: string } | null>(null)
   const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
   const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null)
   const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
   const itemsPerPage = 50
 
@@ -678,8 +680,23 @@ export default function ServiceOrdersPage({
                     <FilterIcon className="w-4 h-4" />
                   </Button>
                   <Button
+                    variant="outline"
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    className="w-[42px] h-[42px] p-0"
+                  >
+                    <ExportFileIcon className="w-4 h-4" />
+                  </Button>
+                  <Button
                     onClick={() => openEntity("create")}
-                    className="w-[42px] h-[42px] p-0 flex items-center justify-center animate-pulse-once"
+                    className="hidden sm:flex items-center gap-2 h-[42px] px-4"
+                    leftIcon={<PlusIcon size={18} />}
+                  >
+                    Nova OS
+                  </Button>
+                  <Button
+                    onClick={() => openEntity("create")}
+                    className="sm:hidden w-[42px] h-[42px] p-0 flex items-center justify-center animate-pulse-once"
                     leftIcon={<PlusIcon size={18} />}
                   />
                 </div>
@@ -831,7 +848,7 @@ export default function ServiceOrdersPage({
                                     if (token) setShowShareModal({ id: o.id, token })
                                     else setShowShareModal(null)
                                   }}
-                                  onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
+                                        onPrint={() => setPrintOrderId(o.id)}
                                   onDelete={() => setConfirmDelete(o.id)}
                                   statusColor={statusColor(o.status)}
                                   statusLabel={statusLabel(o.status)}
@@ -923,7 +940,7 @@ export default function ServiceOrdersPage({
                                           if (token) setShowShareModal({ id: o.id, token })
                                           else setShowShareModal(null)
                                         }}
-                                        onPrint={() => window.open(`/print/os/${o.id}`, "_blank")}
+                                  onPrint={() => setPrintOrderId(o.id)}
                                         onDelete={() => setConfirmDelete(o.id)}
                                         statusColor={statusColor(o.status)}
                                         statusLabel={statusLabel(o.status)}
@@ -1150,6 +1167,14 @@ export default function ServiceOrdersPage({
           }
         }}
         variant="warning"
+      />
+
+      <OSSPrintModal
+        isOpen={!!printOrderId}
+        onClose={() => setPrintOrderId(null)}
+        orderId={printOrderId || ""}
+        partnerId={partnerId}
+        storeId={storeId}
       />
     </>
   )

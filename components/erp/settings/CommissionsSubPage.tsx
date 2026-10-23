@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
+import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder, SavingStatusModal, MoneyInput, PercentageInput } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon, CrownIcon, ShieldIcon, ManagerIcon, UserIcon, MotorbikeIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -258,7 +258,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                 <th className="py-3 px-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Membro</th>
                                                 <th className="py-3 px-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Tipo de Comissão</th>
-                                                <th className="py-3 px-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Valor</th>
+                                                <th className="py-3 px-6 rounded-r-lg text-center text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Valor</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-brand-border dark:divide-dark-border">
@@ -296,48 +296,70 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                         </td>
                                                         <td className="py-4 px-4">
                                                             <div className="max-w-[200px]">
-                                                                <FormDropdown
-                                                                    value={row.commissionType}
-                                                                    setValue={(value) => {
-                                                                        if (isOwner) return
-                                                                        setRows((prev) =>
-                                                                            prev.map((item) =>
-                                                                                item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
-                                                                                    ? { ...item, commissionType: value as any, value: value === "none" ? 0 : item.value }
-                                                                                    : item,
-                                                                            ),
-                                                                        )
-                                                                    }}
-                                                                    options={options}
-                                                                    className="h-9 text-xs"
-                                                                    disabled={isOwner}
-                                                                />
+                                                                {!isOwner && (
+                                                                    <FormDropdown
+                                                                        value={row.commissionType}
+                                                                        setValue={(value) => {
+                                                                            if (isOwner) return
+                                                                            setRows((prev) =>
+                                                                                prev.map((item) =>
+                                                                                    item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                        ? { ...item, commissionType: value as any, value: value === "none" ? 0 : item.value }
+                                                                                        : item,
+                                                                                ),
+                                                                            )
+                                                                        }}
+                                                                        options={options}
+                                                                        className="h-9 text-xs"
+                                                                        disabled={isOwner}
+                                                                    />
+                                                                )}
                                                                 {isOwner && (
-                                                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-1 block">
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body block">
                                                                         Proprietário não recebe comissão
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-4">
-                                                            <div className="max-w-[120px] mx-auto">
-                                                                <Input
-                                                                    value={String(row.value)}
-                                                                    onChange={(e) => {
-                                                                        if (isOwner) return
-                                                                        const next = e.target.value
-                                                                        setRows((prev) =>
-                                                                            prev.map((item) =>
-                                                                                item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
-                                                                                    ? { ...item, value: Number(next || 0) }
-                                                                                    : item,
-                                                                            ),
-                                                                        )
-                                                                    }}
-                                                                    disabled={isOwner || row.commissionType === "none"}
-                                                                    className="h-9 text-center font-bold text-sm"
-                                                                    placeholder="0.00"
-                                                                />
+                                                            <div className="max-w-[140px] mx-auto flex items-center justify-center">
+                                                                {row.commissionType === "none" ? (
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body text-center w-full">-</span>
+                                                                ) : row.commissionType.includes("percentage") ? (
+                                                                    <PercentageInput
+                                                                        label={valueLabel}
+                                                                        value={row.value}
+                                                                        onChange={(val) => {
+                                                                            if (isOwner) return
+                                                                            setRows((prev) =>
+                                                                                prev.map((item) =>
+                                                                                    item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                        ? { ...item, value: val }
+                                                                                        : item,
+                                                                                ),
+                                                                            )
+                                                                        }}
+                                                                        disabled={isOwner}
+                                                                        className="h-9 text-center font-bold text-sm"
+                                                                    />
+                                                                ) : (
+                                                                    <MoneyInput
+                                                                        label={valueLabel}
+                                                                        value={row.value}
+                                                                        onChange={(val) => {
+                                                                            if (isOwner) return
+                                                                            setRows((prev) =>
+                                                                                prev.map((item) =>
+                                                                                    item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                        ? { ...item, value: val }
+                                                                                        : item,
+                                                                                ),
+                                                                            )
+                                                                        }}
+                                                                        disabled={isOwner}
+                                                                        className="h-9 text-center font-bold text-sm"
+                                                                    />
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -348,7 +370,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                 </div>
 
                                 {/* Mobile List */}
-                                <div className="md:hidden flex flex-col">
+                                <div className="md:hidden flex flex-col space-y-4">
                                     {sortedRows.map((row, idx) => {
                                         const isSeller = row.commissionRole === "seller"
                                         const isOwner = row.role === "OWNER"
@@ -374,55 +396,90 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                             </div>
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium flex items-center gap-1">
                                                                 {React.cloneElement(ROLE_ICONS[row.role] as React.ReactElement<any>, { size: 14 })}
-                                                                <Badge variant={ROLE_COLORS[row.role]} icon={null} className="whitespace-nowrap scale-90">
-                                                                    {row.roleLabel}
-                                                                </Badge>
+                                                                <p>{row.roleLabel}</p>
                                                             </span>
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex gap-3">
-                                                        <div className="flex-1">
-                                                            <FormDropdown
-                                                                label="Tipo de comissão"
-                                                                value={row.commissionType}
-                                                                setValue={(value) => {
-                                                                    if (isOwner) return
-                                                                    setRows((prev) =>
-                                                                        prev.map((item) =>
-                                                                            item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
-                                                                                ? { ...item, commissionType: value as any, value: value === "none" ? 0 : item.value }
-                                                                                : item,
-                                                                        ),
-                                                                    )
-                                                                }}
-                                                                options={options}
-                                                                disabled={isOwner}
-                                                            />
-                                                            {isOwner && (
-                                                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-1 block">
-                                                                    Proprietário não recebe comissão
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="w-[120px]">
-                                                            <Input
-                                                                label={valueLabel}
-                                                                value={String(row.value)}
-                                                                onChange={(e) => {
-                                                                    if (isOwner) return
-                                                                    const next = e.target.value
-                                                                    setRows((prev) =>
-                                                                        prev.map((item) =>
-                                                                            item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
-                                                                                ? { ...item, value: Number(next || 0) }
-                                                                                : item,
-                                                                        ),
-                                                                    )
-                                                                }}
-                                                                disabled={isOwner || row.commissionType === "none"}
-                                                            />
-                                                        </div>
+                                                    <div className={`flex gap-3 mt-2 ${row.commissionType === "none" ? "flex-col" : "flex-row"}`}>
+                                                        {row.commissionType === "none" ? (
+                                                            <div className="w-full">
+                                                                <FormDropdown
+                                                                    label="Tipo de comissão"
+                                                                    value={row.commissionType}
+                                                                    setValue={(value) => {
+                                                                        if (isOwner) return
+                                                                        setRows((prev) =>
+                                                                            prev.map((item) =>
+                                                                                item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                    ? { ...item, commissionType: value as any, value: value === "none" ? 0 : item.value }
+                                                                                    : item,
+                                                                            ),
+                                                                        )
+                                                                    }}
+                                                                    options={options}
+                                                                    disabled={isOwner}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex-1">
+                                                                    <FormDropdown
+                                                                        label="Tipo de comissão"
+                                                                        value={row.commissionType}
+                                                                        setValue={(value) => {
+                                                                            if (isOwner) return
+                                                                            setRows((prev) =>
+                                                                                prev.map((item) =>
+                                                                                    item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                        ? { ...item, commissionType: value as any, value: value === "none" ? 0 : item.value }
+                                                                                        : item,
+                                                                                ),
+                                                                            )
+                                                                        }}
+                                                                        options={options}
+                                                                        disabled={isOwner}
+                                                                    />
+                                                                </div>
+                                                                <div className="w-[120px]">
+                                                                    {row.commissionType.includes("percentage") ? (
+                                                                        <PercentageInput
+                                                                            label={valueLabel}
+                                                                            value={row.value}
+                                                                            onChange={(val) => {
+                                                                                if (isOwner) return
+                                                                                setRows((prev) =>
+                                                                                    prev.map((item) =>
+                                                                                        item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                            ? { ...item, value: val }
+                                                                                            : item,
+                                                                                    ),
+                                                                                )
+                                                                            }}
+                                                                            disabled={isOwner}
+                                                                            className="h-9 text-center font-bold text-sm"
+                                                                        />
+                                                                    ) : (
+                                                                        <MoneyInput
+                                                                            label={valueLabel}
+                                                                            value={row.value}
+                                                                            onChange={(val) => {
+                                                                                if (isOwner) return
+                                                                                setRows((prev) =>
+                                                                                    prev.map((item) =>
+                                                                                        item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                            ? { ...item, value: val }
+                                                                                            : item,
+                                                                                    ),
+                                                                                )
+                                                                            }}
+                                                                            disabled={isOwner}
+                                                                            className="h-9 text-center font-bold text-sm"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {idx < sortedRows.length - 1 && <Separator className="opacity-50" />}

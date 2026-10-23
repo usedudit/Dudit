@@ -1691,28 +1691,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </span>
                         )}
                     </button>
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[32px] shrink-0">
-                        <button
-                            onClick={() => setViewMode("list")}
-                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
-                                ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
-                                }`}
-                            title="Vista em lista"
-                        >
-                            <ListIcon className="w-[15px] h-[15px]" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode("grid")}
-                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
-                                ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
-                                }`}
-                            title="Vista em grade"
-                        >
-                            <GridIcon className="w-[15px] h-[15px]" />
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -1750,28 +1728,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </span>
                         )}
                     </button>
-                    <div className="flex items-center bg-white/10 border border-white/20 rounded-full p-0.5 h-[30px] shrink-0">
-                        <button
-                            onClick={() => setViewMode("list")}
-                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
-                                ? "bg-white/20 text-white"
-                                : "text-white/50 hover:text-white/70"
-                                }`}
-                            title="Vista em lista"
-                        >
-                            <ListIcon className="w-[15px] h-[15px]" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode("grid")}
-                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
-                                ? "bg-white/20 text-white"
-                                : "text-white/50 hover:text-white/70"
-                                }`}
-                            title="Vista em grade"
-                        >
-                            <GridIcon className="w-[15px] h-[15px]" />
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -1854,14 +1810,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     </div>
                                     {renderFilterControls()}
                                     {categoryFilteredItems.length > 0 ? (
-                                        viewMode === "list" ? (
-                                            <div className="flex flex-col mt-4">
-                                                {categoryFilteredItems.map((item: any) => (
-                                                    <VendorListItem key={item.id} item={item} partner={partner} />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
                                                 {categoryFilteredItems.map((item: any) => (
                                                     <ItemCard
                                                         key={item.id}
@@ -1873,10 +1822,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                         hideSalesCount
                                                     />
                                                 ))}
-                                            </div>
-                                        )
-                                    ) : (
-                                        <IconPlaceholder
+                                             </div>
+                                             ) : (
+                                                 <IconPlaceholder
                                             placeholderType="image"
                                             imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                             imageAlt="Nada encontrado"
@@ -1931,43 +1879,24 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         )
                                     })()}
 
-                                    {viewMode === "list" ? (
-                                        groupedItems.length > 0 ? (
-                                            <div className="flex flex-col">
-                                                {groupedItems.map(group => (
-                                                    <section key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px] mb-8 last:mb-0">
-                                                        <h2 className="text-base font-semibold text-brand-dark dark:text-dark-heading mb-3 px-4 lg:px-0 capitalize">{group.name}</h2>
-                                                        <div className="flex flex-col">
-                                                            {group.items.map((item: any) => (
-                                                                <VendorListItem key={item.id} item={item} partner={partner} />
-                                                            ))}
-                                                        </div>
-                                                    </section>
-                                                ))}
+                                    <div className="space-y-6">
+                                        {groupedItems.map(group => (
+                                            <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
+                                                <HorizontalCarousel
+                                                    title={group.name}
+                                                    items={group.items.slice(0, 20)}
+                                                    renderItem={(item) => (
+                                                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
+                                                    )}
+                                                    onSeeAll={() => openCategory(group.id)}
+                                                    itemWidthClass="w-[150px] md:w-[230px]"
+                                                />
                                             </div>
-                                        ) : (
+                                        ))}
+                                        {!groupedItems.length && (
                                             <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascotes/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
-                                        )
-                                    ) : (
-                                        <>
-                                            {groupedItems.map(group => (
-                                                <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
-                                                    <HorizontalCarousel
-                                                        title={group.name}
-                                                        items={group.items.slice(0, 20)}
-                                                        renderItem={(item) => (
-                                                            <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
-                                                        )}
-                                                        onSeeAll={() => openCategory(group.id)}
-                                                        itemWidthClass="w-[150px] md:w-[230px]"
-                                                    />
-                                                </div>
-                                            ))}
-                                            {!groupedItems.length && (
-                                                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
-                                            )}
-                                        </>
-                                    )}
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </div>

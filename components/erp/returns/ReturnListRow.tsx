@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
+import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
 import { formatDate, formatDateTime } from "@/lib/utils"
 import { ReturnIcon } from "@/lib/icons"
 import { ReturnRequest } from "./types"
@@ -16,6 +16,8 @@ interface ReturnListRowProps {
   onPrint?: (returnRequest: ReturnRequest) => void
   onDelete?: (returnRequest: ReturnRequest) => void
   canManage: boolean
+  selected?: boolean
+  onSelect?: () => void
 }
 
 function getAlignClass(align?: string) {
@@ -72,7 +74,7 @@ export function getRefundTypeLabel(refundType: ReturnRequest["refundType"]) {
   }
 }
 
-const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onPrint, onDelete, canManage }: ReturnListRowProps) => {
+const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onPrint, onDelete, canManage, selected, onSelect }: ReturnListRowProps) => {
   const statusMeta = getReturnStatusMeta(returnRequest.status)
 
   const renderCell = (id: string) => {
@@ -80,6 +82,14 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
       case "id":
         return (
           <div className="flex items-center gap-3">
+            {selected !== undefined && (
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={selected || false}
+                  onChange={onSelect}
+                />
+              </div>
+            )}
             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
               <ReturnIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
             </div>

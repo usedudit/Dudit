@@ -284,7 +284,7 @@ export async function getServiceOrderDetailsAction(
         if (error) throw error
         if (!order) throw new Error("Ordem de serviço não encontrada")
 
-        const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes, assignedProfileRes] = await Promise.all([
+        const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes, assignedProfileRes, linkedOrderRes] = await Promise.all([
           admin.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
           admin.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
           admin.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
@@ -293,6 +293,7 @@ export async function getServiceOrderDetailsAction(
           order.assigned_user_id
             ? admin.from("user_profiles").select("full_name").eq("user_id", order.assigned_user_id).maybeSingle()
             : Promise.resolve({ data: null } as any),
+          order.order_id ? admin.from("orders").select("order_number").eq("id", order.order_id).maybeSingle() : Promise.resolve({ data: null }),
         ])
 
         return {
@@ -305,6 +306,7 @@ export async function getServiceOrderDetailsAction(
           attachments: attachmentsRes.data || [],
           history: historyRes,
           sale: saleRes?.data || null,
+          linked_order_number: linkedOrderRes?.data?.order_number || null,
         }
       },
       15,
@@ -379,6 +381,7 @@ export async function getServiceOrderDetailsAction(
         history: detail.history,
         sale: detail.sale,
         costs,
+        linked_order_number: detail.linked_order_number,
       },
     }
   } catch (err: any) {
@@ -1016,11 +1019,12 @@ export async function updateServiceOrderStatusAction(
     }
 
     const updateData: any = { status }
-    if (status === "concluida" && !current.completed_at) {
+    const isCompletedStatus = status === "concluida" || status === "entregue"
+    if (isCompletedStatus && !current.completed_at) {
       updateData.completed_at = new Date().toISOString()
     }
-    // Ao retroceder de "concluída", limpa o marco de conclusão.
-    if (currentStatus === "concluida" && status !== "concluida") {
+    // Ao retroceder de um status terminal (concluída/entregue), limpa o marco de conclusão.
+    if ((currentStatus === "concluida" || currentStatus === "entregue") && !isCompletedStatus) {
       updateData.completed_at = null
     }
 
@@ -1456,8 +1460,8 @@ export async function bulkUpdateServiceOrderStatusAction(
         skipped++
         continue
       }
-      if (status === "concluida" && !current.completed_at) toComplete.push(id)
-      else if (currentStatus === "concluida" && status !== "concluida") toClearCompletedAt.push(id)
+      if ((status === "concluida" || status === "entregue") && !current.completed_at) toComplete.push(id)
+      else if ((currentStatus === "concluida" || currentStatus === "entregue") && (status !== "concluida" && status !== "entregue")) toClearCompletedAt.push(id)
       else plain.push(id)
     }
 
@@ -1922,10 +1926,11 @@ export async function updateServiceOrderAction(
           throw new Error(`Transição de status inválida: ${fromLabel} → ${toLabel}.`)
         }
         updateData.status = input.status
-        if (input.status === "concluida" && !current.completed_at) {
+        const isInputCompleted = input.status === "concluida" || input.status === "entregue"
+        if (isInputCompleted && !current.completed_at) {
           updateData.completed_at = new Date().toISOString()
         }
-        if (current.status === "concluida" && input.status !== "concluida") {
+        if ((current.status === "concluida" || current.status === "entregue") && !isInputCompleted) {
           updateData.completed_at = null
         }
       }

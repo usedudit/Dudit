@@ -1174,12 +1174,29 @@ export async function getERPCustomersPageAction(
 }
 
 export async function getCustomerStoreCreditsAction(customerId: string) {
-  const supabase = await getSupabaseServerClient()
-  await requireUser()
+  const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
+  const authorizedPartner = { partnerId: customerAccess.partnerId }
+  const supabase = customerAccess.admin
+
+  const { data: customer, error: customerError } = await supabase
+    .from("customers")
+    .select("id, partner_id")
+    .eq("id", customerId)
+    .eq("partner_id", authorizedPartner.partnerId)
+    .maybeSingle()
+
+  if (customerError) {
+    console.error("[getCustomerStoreCreditsAction] Customer lookup error:", customerError)
+  }
+
+  if (!customer) {
+    return { success: true, storeCredits: [] }
+  }
 
   const { data, error } = await supabase
     .from("store_credits")
     .select("id, amount, remaining_amount, status, expires_at, created_at")
+    .eq("partner_id", authorizedPartner.partnerId)
     .eq("customer_id", customerId)
     .order("created_at", { ascending: false })
 

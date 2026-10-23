@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
+import { Badge, ActionsDropdown, Tooltip, Checkbox } from "@/components/reusable"
 import { formatDateTime } from "@/lib/utils"
 import { ReturnIcon } from "@/lib/icons"
 import { ReturnRequest } from "./types"
@@ -16,9 +16,11 @@ interface ReturnGridCardProps {
   onPrint?: () => void
   onDelete?: () => void
   canManage: boolean
+  selected?: boolean
+  onSelect?: () => void
 }
 
-const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, onDelete, canManage }: ReturnGridCardProps) => {
+const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, onDelete, canManage, selected, onSelect }: ReturnGridCardProps) => {
   const statusMeta = getReturnStatusMeta(returnRequest.status)
   const resolutionLabel = getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")
   const totalQuantity = returnRequest.items.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
@@ -32,6 +34,12 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, 
       className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
       onClick={onDetails}
     >
+      <div className="absolute top-4 right-4 z-10 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selected || false}
+          onChange={onSelect}
+        />
+      </div>
       <div className="flex gap-4 mb-2">
         {/* Return Visual Indicator */}
         <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">

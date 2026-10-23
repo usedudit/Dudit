@@ -20,6 +20,7 @@ import { ListItem } from "@/components/reusable"
 import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon, ShoppingCartIcon, RepeatIcon, TrendingUpIcon } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import TransactionPrintModal from "./TransactionPrintModal"
 
 interface TransactionDetailViewProps {
     transactionId: string
@@ -43,6 +44,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [isContactSheetOpen, setIsContactSheetOpen] = useState(false)
+    const [printModalOpen, setPrintModalOpen] = useState(false)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -183,7 +185,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown onPrint={() => window.print()} onShare={() => { }} />
+                                        <ActionsDropdown onPrint={() => setPrintModalOpen(true)} onShare={() => { }} />
                                         {detail.canEdit && (
                                             <Button onClick={() => onEdit(transactionId)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                                 Editar
@@ -632,7 +634,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         <ActionsDropdown
-                            onPrint={() => window.print()}
+                            onPrint={() => setPrintModalOpen(true)}
                             onShare={() => { }}
                             trigger={
                                 <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
@@ -679,6 +681,16 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                         )}
                     </div>
                 </BottomSheet>
+
+                {printModalOpen && (
+                    <TransactionPrintModal
+                        isOpen={printModalOpen}
+                        onClose={() => setPrintModalOpen(false)}
+                        transactionId={transactionId}
+                        partnerId={partnerId}
+                        detail={detail}
+                    />
+                )}
             </div>
         </FadeIn>
     )

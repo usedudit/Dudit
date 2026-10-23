@@ -391,53 +391,43 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             </div >
                                         </div >
 
-                                        {/* Mobile/Tablet View */}
-                                        < div className="xl:hidden space-y-6" >
-                                            {/* Summary List Item at the top (like XML import page) */}
-                                            <ListItem
-                                                icon={FileTextIcon}
-                                                title={`${displayItems.length} ${displayItems.length === 1 ? 'item' : 'itens'}`}
-                                                description={`${isIn ? 'Entrada' : 'Saída'} • ${reason || "-"}`}
-                                                showChevron={true}
-                                                onClick={() => setShowSummaryModal(true)}
-                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                            />
+                                         {/* Mobile/Tablet View */}
+                                         < div className="xl:hidden space-y-6" >
+                                             {/* Operation Summary below items (like XML import page sidebar) */}
+                                             <FormSection title="Resumo da Operação" hasSeparator>
+                                                 <div className="space-y-4">
+                                                     <ListItem
+                                                         icon={PinIcon}
+                                                         title="Motivo"
+                                                         description={reason || "-"}
+                                                         className="px-4 py-3 gap-4"
+                                                     />
+                                                     {data.referenceName && (
+                                                         <ListItem
+                                                             icon={LinkIcon}
+                                                             title="Referência"
+                                                             description={data.referenceName}
+                                                             className="px-4 py-3 gap-4"
+                                                         />
+                                                     )}
+                                                 </div>
+                                             </FormSection >
 
-                                            {/* Operation Summary below items (like XML import page sidebar) */}
-                                            <FormSection title="Resumo da Operação" hasSeparator>
-                                                <div className="space-y-4">
-                                                    <ListItem
-                                                        icon={PinIcon}
-                                                        title="Motivo"
-                                                        description={reason || "-"}
-                                                        className="px-4 py-3 gap-4"
-                                                    />
-                                                    {data.referenceName && (
-                                                        <ListItem
-                                                            icon={LinkIcon}
-                                                            title="Referência"
-                                                            description={data.referenceName}
-                                                            className="px-4 py-3 gap-4"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </FormSection >
-
-                                            {/* Notes Mobile */}
-                                            {
-                                                notes && (
-                                                    <InfoCard
-                                                        color="orange"
-                                                        message={
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
-                                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
-                                                            </div>
-                                                        }
-                                                    />
-                                                )
-                                            }
-                                        </div >
+                                             {/* Notes Mobile */}
+                                             {
+                                                 notes && (
+                                                     <InfoCard
+                                                         color="orange"
+                                                         message={
+                                                             <div className="flex flex-col">
+                                                                 <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
+                                                                 <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{notes}</span>
+                                                             </div>
+                                                         }
+                                                     />
+                                                 )
+                                              }
+                                          </div>
                                     </FadeIn >
                                 </TabsContent >
 
@@ -460,6 +450,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                 <TabsContent value="products" className="mt-0 xl:hidden" >
                                     <FadeIn key="products">
                                         <div className="space-y-4">
+                                            <ListItem
+                                                icon={FileTextIcon}
+                                                title={`${displayItems.length} ${displayItems.length === 1 ? 'item' : 'itens'}`}
+                                                description={`${isIn ? 'Entrada' : 'Saída'} • ${reason || "-"}`}
+                                                showChevron={true}
+                                                onClick={() => setShowSummaryModal(true)}
+                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                            />
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                                 {paginatedItems.map((item, index) => {
                                                     const delta = item.product.currentStock - item.product.previousStock;

@@ -14,7 +14,7 @@ export const Switch = ({ checked, onCheckedChange, className = "", disabled }: S
       disabled={disabled}
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={`
-        relative w-[40px] h-[22px] rounded-full p-0.5
+        relative w-[40px] h-[22px] rounded-full p-0.5 shrink-0
         transition-colors duration-300 ease-in-out focus:outline-none
         ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
         ${checked ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border/50"}
