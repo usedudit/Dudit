@@ -196,8 +196,8 @@ export async function resolveCheckoutCartLines(
         optionName: string
         price: number
       }> | null = Array.isArray(row.booking_metadata?.selectedAddons)
-        ? row.booking_metadata.selectedAddons
-        : null
+          ? row.booking_metadata.selectedAddons
+          : null
 
       const addonsUnitPrice = (selectedAddons || []).reduce(
         (sum: number, a: any) => sum + (Number(a.price) || 0),
@@ -494,7 +494,7 @@ export async function resolveCheckoutCartLines(
 
 type FlowLineLike = Pick<ResolvedCartLine, "itemType" | "lineName" | "capabilities">
 
-/** Linhas de produto/assinatura (fluxo físico) — serviços são validados à parte. */
+/** Linhas de produto/assinatura (fluxo físico) - serviços são validados à parte. */
 export function flowLines(lines: FlowLineLike[]) {
   return lines.filter((l) => l.itemType === "product" || l.itemType === "subscription")
 }
@@ -514,7 +514,7 @@ export function deliverySelectionIssue(
         return `"${line.lineName}" não está disponível para retirada.`
       }
     } else if (!modes.includes("delivery") && !modes.includes("shipping")) {
-      return `"${line.lineName}" é apenas para retirada no local — não pode ser entregue nem enviado.`
+      return `"${line.lineName}" é apenas para retirada no local - não pode ser entregue nem enviado.`
     }
   }
   return null

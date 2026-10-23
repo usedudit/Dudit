@@ -10,10 +10,10 @@ import { calculateDistance, geocodeAddress } from "@/lib/services/location.servi
 import { findSuperFreteIntegration } from "@/lib/services/shipping/superfrete-integration"
 import type { StoreFulfillmentCapabilities } from "@/lib/commerce/capabilities"
 import {
-    calculateServiceTravelFee,
-    normalizeServiceAttendanceSettings,
-    type ServiceAttendanceSettings,
-    type ServiceTravelFeeMode,
+  calculateServiceTravelFee,
+  normalizeServiceAttendanceSettings,
+  type ServiceAttendanceSettings,
+  type ServiceTravelFeeMode,
 } from "@/lib/services/service-attendance"
 
 function mapSettingsRow(row: any): DeliverySettings {
@@ -101,13 +101,13 @@ function mapRuleRow(row: any): DeliveryFeeRule {
 // vivem em lib/delivery/order-cache.ts (módulo sem "use server") para não
 // ferar o compilador de Server Actions.
 import {
-    invalidateDeliveryContextCache,
-    invalidateStoreCapabilityCache,
-    invalidateServiceAttendanceCache,
-    deliveryContext,
-    storeCapability,
-    serviceAttendance,
-    type DeliveryContext,
+  invalidateDeliveryContextCache,
+  invalidateStoreCapabilityCache,
+  invalidateServiceAttendanceCache,
+  deliveryContext,
+  storeCapability,
+  serviceAttendance,
+  type DeliveryContext,
 } from "@/lib/delivery/order-cache"
 
 async function resolveDeliveryContext(
@@ -355,9 +355,9 @@ export async function upsertPartnerDeliveryConfigAction(input: {
   let error: any
   if (existing) {
     payload.id = existing.id
-    ;({ error } = await supabase.from("delivery_settings").update(payload).eq("id", existing.id))
+      ; ({ error } = await supabase.from("delivery_settings").update(payload).eq("id", existing.id))
   } else {
-    ;({ error } = await supabase.from("delivery_settings").insert(payload))
+    ; ({ error } = await supabase.from("delivery_settings").insert(payload))
   }
 
   if (error) return { success: false as const, error: error.message }
@@ -585,7 +585,7 @@ export async function resolveServiceAttendanceSettings(
 
   // Partner default (store_id IS NULL) -> store override -> service override
   // Obs.: usar .is()/.eq() explícitos em vez de .in([null, storeId]) porque o
-  // PostgREST não casa NULL dentro de .in() — a linha default (store_id NULL)
+  // PostgREST não casa NULL dentro de .in() - a linha default (store_id NULL)
   // nunca seria retornada e a tela parecia "não salvar".
   let settings: ServiceAttendanceSettings | null = null
   const { data: defaultRow } = await supabase
@@ -689,9 +689,9 @@ export async function upsertServiceAttendanceSettingsAction(input: {
   let error: any
   if (existing) {
     payload.id = existing.id
-    ;({ error } = await supabase.from("service_attendance_settings").update(payload).eq("id", existing.id))
+      ; ({ error } = await supabase.from("service_attendance_settings").update(payload).eq("id", existing.id))
   } else {
-    ;({ error } = await supabase.from("service_attendance_settings").insert(payload))
+    ; ({ error } = await supabase.from("service_attendance_settings").insert(payload))
   }
   if (error) return { success: false as const, error: error.message }
 
@@ -766,7 +766,7 @@ export async function calculateServiceTravelFeeForOrder(input: {
       chargedKm: result.chargedKm,
       fee: result.fee,
       maxServiceKm: settings.maxServiceKm,
-       enforceServiceArea: settings.enforceServiceArea,
+      enforceServiceArea: settings.enforceServiceArea,
     },
   }
 }

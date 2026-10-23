@@ -3,7 +3,7 @@
  * pelo form do ERP. Usado para mostrar ao admin o resumo de alterações no
  * AdminActionModal e para montar a notificação enviada ao vendedor.
  *
- * Módulo puro (sem dependências de server/client) — importável dos dois lados.
+ * Módulo puro (sem dependências de server/client) - importável dos dois lados.
  */
 
 const FIELD_LABELS: Record<string, string> = {
@@ -161,7 +161,7 @@ export function diffChangedFields(
         // Campos que o form envia por padrão mas que não existem no registro
         // original (internos do form) nunca são reportados como "alterados".
         if (origKey === null) continue
-        // Só reporta campos com rótulo conhecido — evita poluir o resumo e a
+        // Só reporta campos com rótulo conhecido - evita poluir o resumo e a
         // notificação com chaves internas do form.
         const label = FIELD_LABELS[key]
         if (!label) continue

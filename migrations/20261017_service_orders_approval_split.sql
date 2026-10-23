@@ -151,7 +151,7 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 2) ASSINATURA (aceite na conclusão — não altera status)
+-- 2) ASSINATURA (aceite na conclusão - não altera status)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.sign_public_service_order(
   p_so_id UUID,

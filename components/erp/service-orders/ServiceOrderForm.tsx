@@ -4,7 +4,8 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import {
     Button, Input, FormSection, DatePicker, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge, IconPlaceholder,
     FormDropdown, TimePicker, MoneyInput, PercentageInput, ListItem, RadioButton, InfoCard, DefaultModal, HourInput, FormTextarea,
-    Tooltip, CustomerMobileBar
+    Tooltip, CustomerMobileBar,
+    SidebarCard
 } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import Pagination from "@/components/reusable/Pagination"
@@ -1228,58 +1229,54 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                     </div>
                                                 ) : null}
                                                 <div className="hidden lg:block">
-                                                {selectedCustomer ? (
-                                                    <CustomerCard
-                                                        customer={selectedCustomer}
-                                                        address={customerPrimaryAddress}
-                                                        billingAddress={customerBillingAddress}
-                                                        onRemove={isCoreLocked ? undefined : () => {
-                                                            if (couponId && couponPricingData?.customerScope === "specific") {
-                                                                setCouponId(null)
-                                                                setCouponCode("")
-                                                                setCouponDiscountAmount(0)
-                                                                setCouponPricingData(null)
-                                                                setDiscountType("fixed")
-                                                                setDiscountValue(0)
-                                                                toast({ description: "Cupom removido por ser específico para um ou mais clientes." })
-                                                            }
-                                                            setCustomerId("")
-                                                            setCustomerName("")
-                                                            setSelectedCustomer(null)
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className={`bg-white dark:bg-dark-surface rounded-2xl border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer transition-colors ${fieldErrors.has("customerId")
-                                                            ? "border-brand-red dark:border-brand-red-dark"
-                                                            : "border-brand-border dark:border-dark-border"
-                                                            }`}
-                                                        data-field="customerId"
-                                                        onClick={isCoreLocked ? undefined : () => setShowCustomerSheet(true)}
-                                                    >
-                                                        <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
-                                                            }`}></div>
-                                                        <IconPlaceholder
-                                                            icon={UserIcon}
-                                                            title="Nenhum cliente selecionado"
-                                                            subtitle="Selecione um cliente para vincular à ordem de serviço."
-                                                            itemButton={isCoreLocked ? undefined : {
-                                                                text: "Selecionar Cliente",
-                                                                action: () => setShowCustomerSheet(true),
-                                                                variant: "outline",
-                                                                className: "rounded-full px-8"
+                                                    {selectedCustomer ? (
+                                                        <CustomerCard
+                                                            customer={selectedCustomer}
+                                                            address={customerPrimaryAddress}
+                                                            billingAddress={customerBillingAddress}
+                                                            onRemove={isCoreLocked ? undefined : () => {
+                                                                if (couponId && couponPricingData?.customerScope === "specific") {
+                                                                    setCouponId(null)
+                                                                    setCouponCode("")
+                                                                    setCouponDiscountAmount(0)
+                                                                    setCouponPricingData(null)
+                                                                    setDiscountType("fixed")
+                                                                    setDiscountValue(0)
+                                                                    toast({ description: "Cupom removido por ser específico para um ou mais clientes." })
+                                                                }
+                                                                setCustomerId("")
+                                                                setCustomerName("")
+                                                                setSelectedCustomer(null)
                                                             }}
                                                         />
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    ) : (
+                                                        <div
+                                                            className={`bg-white dark:bg-dark-surface rounded-2xl border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 cursor-pointer transition-colors ${fieldErrors.has("customerId")
+                                                                ? "border-brand-red dark:border-brand-red-dark"
+                                                                : "border-brand-border dark:border-dark-border"
+                                                                }`}
+                                                            data-field="customerId"
+                                                            onClick={isCoreLocked ? undefined : () => setShowCustomerSheet(true)}
+                                                        >
+                                                            <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"
+                                                                }`}></div>
+                                                            <IconPlaceholder
+                                                                icon={UserIcon}
+                                                                title="Nenhum cliente selecionado"
+                                                                subtitle="Selecione um cliente para vincular à ordem de serviço."
+                                                                itemButton={isCoreLocked ? undefined : {
+                                                                    text: "Selecionar Cliente",
+                                                                    action: () => setShowCustomerSheet(true),
+                                                                    variant: "outline",
+                                                                    className: "rounded-full px-8"
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-6">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                    Pagamento
-                                                </h3>
-
+                                            <SidebarCard title="Pagamento" hasSeparator hasTopStrip>
                                                 <div className="space-y-4">
                                                     <ListItem
                                                         icon={TagIcon}
@@ -1342,7 +1339,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </SidebarCard>
                                         </div>
                                     </FadeIn>
                                 )}
@@ -1489,7 +1486,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                                         )}
                                                                                     </div>
                                                                                     {svc.isEditing ? (
-<div className="mb-0 flex-1">
+                                                                                        <div className="mb-0 flex-1">
                                                                                             <Input
                                                                                                 value={svc.service_name || ""}
                                                                                                 onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
@@ -1595,13 +1592,13 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                                             {svc.isEditing ? (
                                                                                 <div className="mb-0 flex-1">
                                                                                     <Input
-value={svc.service_name || ""}
-                                                        onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
-                                                        placeholder="Nome do serviço manual..."
-                                                        className="mb-0"
-                                                        error={hasNameError}
-                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
-                                                    />
+                                                                                        value={svc.service_name || ""}
+                                                                                        onChange={(e: any) => updateServiceField(index, "service_name", e.target.value)}
+                                                                                        placeholder="Nome do serviço manual..."
+                                                                                        className="mb-0"
+                                                                                        error={hasNameError}
+                                                                                        errorMessage={hasNameError ? "Nome obrigatório" : undefined}
+                                                                                    />
                                                                                 </div>
                                                                             ) : (
                                                                                 <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
@@ -2084,7 +2081,7 @@ value={svc.service_name || ""}
                         </Button>
                     </div>
                 </Tabs>
-            </div>
+            </div >
 
             <SelectCustomerSheet
                 isOpen={showCustomerSheet}
@@ -2321,6 +2318,6 @@ value={svc.service_name || ""}
             />
 
             <SavingStatusModal isOpen={saving} text="Salvando ordem de serviço..." />
-        </FadeIn>
+        </FadeIn >
     )
 }

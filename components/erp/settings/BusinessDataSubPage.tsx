@@ -697,12 +697,12 @@ export const BusinessDataSubPage = ({
                                                                 </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <PercentageInput
-                                                                        label="Simples Nacional — Produtos (%)"
+                                                                        label="Simples Nacional - Produtos (%)"
                                                                         value={taxInfo.simplesTaxRateProducts}
                                                                         onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateProducts: v }))}
                                                                     />
                                                                     <PercentageInput
-                                                                        label="Simples Nacional — Serviços (%)"
+                                                                        label="Simples Nacional - Serviços (%)"
                                                                         value={taxInfo.simplesTaxRateServices}
                                                                         onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateServices: v }))}
                                                                     />

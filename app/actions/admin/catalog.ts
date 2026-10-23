@@ -7,7 +7,7 @@
  * vendedor", SEM impersonation e SEM bypass de RLS no cliente do usuário:
  *
  *  - Gates: requireAdminScope("moderation") + rate limit (ADMIN_READ/ACTION)
- *  - Escrita: getAdminClient() (service role) — o RPC update_product_transaction
+ *  - Escrita: getAdminClient() (service role) - o RPC update_product_transaction
  *    exige membership do parceiro via auth.uid(), por isso o update é feito com
  *    updates diretos espelhando as colunas do RPC (migrations 20260820/20260822).
  *  - Auditoria: adminAuditLog obrigatório em toda mutação + timeline do parceiro
@@ -578,7 +578,7 @@ export async function getAdminPlanFormData(partnerId: string) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// PRODUTO — UPDATE
+// PRODUTO - UPDATE
 // ───────────────────────────────────────────────────────────────────────────
 
 export async function updateAdminProduct(
@@ -739,12 +739,12 @@ export async function updateAdminProduct(
         RPC_PRODUCT_FIELDS.forEach((field) => {
             if (payload[field] !== undefined) productPatch[field] = payload[field]
         })
-        ;[
-            "video_type", "video_thumbnail", "video_duration", "video_provider_id",
-            "moderation_status",
-        ].forEach((field) => {
-            if (payload[field] !== undefined) productPatch[field] = payload[field]
-        })
+            ;[
+                "video_type", "video_thumbnail", "video_duration", "video_provider_id",
+                "moderation_status",
+            ].forEach((field) => {
+                if (payload[field] !== undefined) productPatch[field] = payload[field]
+            })
         productPatch.updated_at = getBrasiliaTime()
 
         const { error: updateError } = await admin.from("products").update(productPatch).eq("id", id)
@@ -838,7 +838,7 @@ export async function updateAdminProduct(
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// SERVIÇO — UPDATE
+// SERVIÇO - UPDATE
 // ───────────────────────────────────────────────────────────────────────────
 
 export async function updateAdminService(
@@ -1215,9 +1215,8 @@ async function setCatalogItemArchived(
             storeId: (existing as any).store_id || null,
             targetType: kind,
             targetId: id,
-            actionTitle: `${entityLabel === "produto" ? "Produto" : "Serviço"} "${existing.name}" ${
-                archived ? "arquivado" : "desarquivado"
-            } pela administração`,
+            actionTitle: `${entityLabel === "produto" ? "Produto" : "Serviço"} "${existing.name}" ${archived ? "arquivado" : "desarquivado"
+                } pela administração`,
             entityLabel,
             entityName: existing.name,
             sellerUrl: kind === "product" ? `/erp/produtos?view=${id}` : `/erp/servicos?view=${id}`,
@@ -1249,7 +1248,7 @@ export async function setAdminCatalogServiceArchived(
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// PLANOS RECORRENTES — CREATE / UPDATE / DELETE
+// PLANOS RECORRENTES - CREATE / UPDATE / DELETE
 // ───────────────────────────────────────────────────────────────────────────
 
 type AdminPlanInput = {

@@ -120,7 +120,7 @@ export default function AdminActionModal({
 
                 <div>
                     <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                        Risk score da loja (0–100) — opcional
+                        Risk score da loja (0–100) - opcional
                     </label>
                     <Input
                         type="number"
@@ -154,20 +154,19 @@ export default function AdminActionModal({
                     )}
                 </div>
 
-                    <label
-                        className={`flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading ${
-                            !reason.trim() ? "opacity-50" : ""
+                <label
+                    className={`flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading ${!reason.trim() ? "opacity-50" : ""
                         }`}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={notifySeller && Boolean(reason.trim())}
-                            onChange={(e) => setNotifySeller(e.target.checked)}
-                            disabled={!reason.trim()}
-                            className="w-4 h-4 rounded border-brand-border accent-brand-green"
-                        />
-                        Enviar notificação ao vendedor pelo Dudit
-                    </label>
+                >
+                    <input
+                        type="checkbox"
+                        checked={notifySeller && Boolean(reason.trim())}
+                        onChange={(e) => setNotifySeller(e.target.checked)}
+                        disabled={!reason.trim()}
+                        className="w-4 h-4 rounded border-brand-border accent-brand-green"
+                    />
+                    Enviar notificação ao vendedor pelo Dudit
+                </label>
             </div>
         </DefaultModal>
     )

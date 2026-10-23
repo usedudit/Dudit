@@ -85,3 +85,58 @@ describe("computePickupPaymentExpiresAt", () => {
     expect(result.getTime()).toBe(expected.getTime())
   })
 })
+
+describe("checkAndExpireDeposit", () => {
+  it("returns false for order without deposit", async () => {
+    const mockClient = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => ({
+              data: {
+                checkout_fulfillment: null,
+                paid_amount: 0,
+                payment_expires_at: new Date().toISOString(),
+              },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    }
+
+    const { checkAndExpireDeposit } = await import("@/lib/services/order-expiration")
+    const result = await checkAndExpireDeposit(mockClient, "test-order-id")
+    expect(result.expired).toBe(false)
+    expect(result.reason).toBe("no_deposit")
+  })
+
+  it("returns false for order with paid deposit", async () => {
+    const mockClient = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => ({
+              data: {
+                checkout_fulfillment: {
+                  depositCheckout: {
+                    usesDeposit: true,
+                    depositStatus: "paid",
+                    sinalPaid: true,
+                  },
+                },
+                paid_amount: 5,
+                payment_expires_at: new Date().toISOString(),
+              },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    }
+
+    const { checkAndExpireDeposit } = await import("@/lib/services/order-expiration")
+    const result = await checkAndExpireDeposit(mockClient, "test-order-id")
+    expect(result.expired).toBe(false)
+  })
+})

@@ -420,7 +420,13 @@ export function PaymentWrapper({
                         } : {}),
                     },
                 },
-                customization: {
+                 customization: {
+                    ...(payDepositOnly ? {
+                        paymentMethods: {
+                            minInstallments: 1,
+                            maxInstallments: 1,
+                        },
+                    } : {}),
                     visual: {
                         style: {
                             theme: "flat",
@@ -500,7 +506,7 @@ export function PaymentWrapper({
                         bankTransfer: mpAcceptedPaymentMethods?.pix === false ? [] : "all",
                         creditCard: mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
                         debitCard: mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
-                        mercadoPago: mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all",
+                        mercadoPago: payDepositOnly ? [] : (mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all"),
                         atm: payDepositOnly ? [] : mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                     },
                 },

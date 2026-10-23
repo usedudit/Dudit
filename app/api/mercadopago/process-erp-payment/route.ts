@@ -58,6 +58,9 @@ async function handler(request: NextRequest) {
       if (depositMethodId === "bolbradesco" || depositMethodId === "boleto" || depositMethodId === "ticket") {
         return NextResponse.json({ error: "Boleto não está disponível para pagamento de sinal." }, { status: 400 })
       }
+      if (depositMethodId === "account_money" || depositMethodId === "mercado_pago_wallet" || depositMethodId === "saldo mercado pago") {
+        return NextResponse.json({ error: "Saldo Mercado Pago não está disponível para pagamento de sinal. Use PIX, cartão de crédito (1 parcela) ou cartão de débito." }, { status: 400 })
+      }
     }
 
     if (!partnerId) {
@@ -275,7 +278,10 @@ async function handler(request: NextRequest) {
     if (paymentFormData.token) {
       mpPaymentRequest.token = paymentFormData.token
     }
-    if (paymentFormData.installments) {
+    // Para sinal, forçar 1 parcela no cartão de crédito
+    if (body.isDepositCharge && paymentFormData.payment_method_id !== "pix" && paymentFormData.payment_method_id !== "bolbradesco") {
+      mpPaymentRequest.installments = 1
+    } else if (paymentFormData.installments) {
       mpPaymentRequest.installments = paymentFormData.installments
     }
     if (paymentFormData.issuer_id) {

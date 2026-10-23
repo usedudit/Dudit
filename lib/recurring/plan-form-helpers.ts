@@ -2,7 +2,7 @@
  * Funções puras de validação/normalização de planos recorrentes.
  *
  * Foram extraídas de app/actions/erp/recurring-plans.ts ("use server") porque
- * arquivos com "use server" só podem exportar server actions — e estas funções
+ * arquivos com "use server" só podem exportar server actions - e estas funções
  * síncronas também são necessárias nas actions administrativas de catálogo
  * (app/actions/admin/catalog.ts), que rodam com o service-role client.
  */

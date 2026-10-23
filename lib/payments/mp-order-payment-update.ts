@@ -105,12 +105,24 @@ export function buildMpApprovedPaymentUpdate(params: {
     feeAmount = params.mpTotalFeeAmount ?? 0
   }
 
-  const paymentKind =
+  let paymentKind =
     currentPaid > 0.009
       ? "balance"
       : nextPaid < totalAmount - 0.005
         ? "deposit"
         : "full"
+
+  // Check if deposit (sinal) has expired - payment after expiry is "full" not "deposit"
+  const depositMeta = params.order.checkout_fulfillment as Record<string, any> | null | undefined
+  const depositMetaObj = depositMeta?.depositCheckout as Record<string, any> | undefined
+  if (
+    depositMetaObj?.usesDeposit &&
+    depositMetaObj?.depositStatus === "expired" &&
+    paymentKind === "deposit"
+  ) {
+    // Payment covers the full amount after deposit expiry - mark as "full" instead of "deposit"
+    paymentKind = "full"
+  }
 
   const mpLeg: Record<string, unknown> = {
     method: params.paymentMethodName,

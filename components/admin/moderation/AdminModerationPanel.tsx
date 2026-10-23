@@ -229,12 +229,12 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
     const RowIcon = rtype === "service" ? BriefcaseIcon : PackageIcon
     const rowInfo =
         rtype === "recurring_plan"
-            ? FREQUENCY_LABELS[(data as any)?.frequency_type] || (data as any)?.frequency_type || "—"
+            ? FREQUENCY_LABELS[(data as any)?.frequency_type] || (data as any)?.frequency_type || "-"
             : formatCurrency(Number((data as any)?.price || 0))
     const rowStatus: { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string } =
         rtype === "recurring_plan"
-            ? PLAN_STATUS_MAP[(data as any)?.status] || { variant: "gray", label: (data as any)?.status || "—" }
-            : MOD_STATUS_MAP[(data as any)?.moderation_status] || { variant: "gray", label: (data as any)?.moderation_status || "—" }
+            ? PLAN_STATUS_MAP[(data as any)?.status] || { variant: "gray", label: (data as any)?.status || "-" }
+            : MOD_STATUS_MAP[(data as any)?.moderation_status] || { variant: "gray", label: (data as any)?.moderation_status || "-" }
 
     return (
         <FadeIn>
@@ -259,21 +259,19 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                 <div className="inline-flex items-center gap-1.5 bg-brand-gray dark:bg-dark-border rounded-lg p-1">
                                     <button
                                         onClick={() => handleModeChange("automatic")}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                            mode === "automatic"
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === "automatic"
                                                 ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
                                                 : "text-brand-inactive-text hover:text-brand-dark"
-                                        }`}
+                                            }`}
                                     >
                                         Automática
                                     </button>
                                     <button
                                         onClick={() => handleModeChange("manual")}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                            mode === "manual"
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === "manual"
                                                 ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
                                                 : "text-brand-inactive-text hover:text-brand-dark"
-                                        }`}
+                                            }`}
                                     >
                                         Manual
                                     </button>
@@ -308,32 +306,29 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                         <div className="inline-flex items-center gap-1.5 bg-brand-gray dark:bg-dark-border rounded-lg p-1">
                             <button
                                 onClick={() => handleModeChange("automatic")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                    mode === "automatic"
+                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "automatic"
                                         ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
                                         : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
+                                    }`}
                             >
                                 Fila de Moderação
                             </button>
                             <button
                                 onClick={() => handleModeChange("manual")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                    mode === "manual"
+                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "manual"
                                         ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
                                         : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
+                                    }`}
                             >
                                 <SearchIcon size={16} className="inline mr-1" />
                                 Busca por ID
                             </button>
                             <button
                                 onClick={() => handleModeChange("videos")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                    mode === "videos"
+                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "videos"
                                         ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
                                         : "text-brand-inactive-text hover:text-brand-dark"
-                                }`}
+                                    }`}
                             >
                                 <PlayIcon size={16} className="inline mr-1" />
                                 Vídeos da Comunidade
@@ -383,7 +378,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                 </div>
                             )}
 
-                            {/* Manual Result — produto/serviço/assinatura: linha estilo lista do ERP */}
+                            {/* Manual Result - produto/serviço/assinatura: linha estilo lista do ERP */}
                             {result && isCatalogResult && detailHref && (
                                 <div className="mb-6 overflow-x-auto custom-scrollbar border border-brand-border dark:border-dark-border rounded-xl">
                                     <table className="w-full text-left border-separate border-spacing-0 min-w-[640px]">
@@ -419,7 +414,7 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                                 <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-left">
                                                     <div className="flex items-center gap-1.5 text-sm text-brand-dark dark:text-dark-heading">
                                                         <StoreIcon size={13} className="text-brand-inactive-text shrink-0" />
-                                                        <span className="truncate">{data?.store?.name || "—"}</span>
+                                                        <span className="truncate">{data?.store?.name || "-"}</span>
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4 border-b border-brand-border dark:border-dark-border text-sm text-center font-bold text-brand-green">

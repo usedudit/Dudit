@@ -382,7 +382,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
   }, {})
 
   // 3.5. Resolvemos as capabilities de envio nacional (transportadora/SuperFrete)
-  // por parceiro/loja — usado pela sacola para só cotar/mostrar transportadora
+  // por parceiro/loja - usado pela sacola para só cotar/mostrar transportadora
   // quando a loja realmente oferece "shipping" (evita flash de frete inválido).
   for (const storeKey of Object.keys(itemsByPartner)) {
     const entry: any = itemsByPartner[storeKey]

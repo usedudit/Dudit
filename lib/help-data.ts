@@ -5153,7 +5153,7 @@ Use o tipo de lançamento **Ajuste** para corrigir o saldo da conta para o valor
 - **Parceiro** - terceiros estratégicos ou pessoa física/jurídica com quem transaciona de forma eventual (ex.: tiozão do zap, sócio, contador).
 - **Outro** - demais pessoas ou empresas que não se encaixam acima.
 
-> Clientes, fornecedores e funcionários são selecionados diretamente da lista do respectivo módulo ao lançar uma receita ou despesa — não precisam ser cadastrados como contato financeiro.
+> Clientes, fornecedores e funcionários são selecionados diretamente da lista do respectivo módulo ao lançar uma receita ou despesa - não precisam ser cadastrados como contato financeiro.
 
 ## Como criar um contato
 

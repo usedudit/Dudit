@@ -34,7 +34,7 @@ export const DEFAULT_STORE_FULFILLMENT_CAPABILITIES: StoreFulfillmentCapabilitie
   shipping: false,
 }
 
-/** Modos que dependem de entregar/enviar — exigem endereço do cliente. */
+/** Modos que dependem de entregar/enviar - exigem endereço do cliente. */
 export const ADDRESS_REQUIRED_MODES: readonly FulfillmentMode[] = [
   "delivery",
   "customer_location",

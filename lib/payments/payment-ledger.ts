@@ -422,16 +422,19 @@ export function normalizeDepositCheckoutMeta(
     metaStatus === "paid" ||
     metaStatus === "partially_paid"
 
-  let depositStatus: NormalizedDepositCheckout["depositStatus"]
-  if (fullOrderTotal > PAYMENT_AMOUNT_TOLERANCE && paid >= fullOrderTotal - PAYMENT_AMOUNT_TOLERANCE) {
-    depositStatus = "paid"
-  } else if (sinalPaid) {
-    depositStatus = "partially_paid"
-  } else if (options?.expired) {
-    depositStatus = "expired"
-  } else {
-    depositStatus = "pending"
-  }
+   let depositStatus: NormalizedDepositCheckout["depositStatus"]
+   if (fullOrderTotal > PAYMENT_AMOUNT_TOLERANCE && paid >= fullOrderTotal - PAYMENT_AMOUNT_TOLERANCE) {
+     depositStatus = "paid"
+   } else if (sinalPaid) {
+     depositStatus = "partially_paid"
+   } else if (metaStatus === "expired") {
+     // Preserve existing expired status from metadata (set by checkAndExpireDeposit)
+     depositStatus = "expired"
+   } else if (options?.expired) {
+     depositStatus = "expired"
+   } else {
+     depositStatus = "pending"
+   }
 
   let balanceStatus: NormalizedDepositCheckout["balanceStatus"]
   if (fullOrderTotal > PAYMENT_AMOUNT_TOLERANCE && paid >= fullOrderTotal - PAYMENT_AMOUNT_TOLERANCE) {

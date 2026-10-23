@@ -841,7 +841,7 @@ async function processWebhookWithRetry(
       effectiveAmount: Number(paymentInfo.transaction_amount || 0),
       amountReceived: Number(paymentInfo.transaction_amount || 0),
       netReceivedAmount: paymentInfo.transaction_details?.net_received_amount ?? Number(paymentInfo.transaction_amount || 0),
-      paymentKind: Number(orderData.paid_amount || 0) > 0.009 ? "balance" : "deposit",
+      paymentKind: Number(orderData.paid_amount || 0) > 0.009 ? "balance" : (Number(paymentInfo.transaction_amount || 0) >= Number(orderData.total_amount || 0) - 0.009 ? "full" : "deposit"),
       provider: "Mercado Pago",
       adjustmentType: "none",
       adjustmentPercent: 0,

@@ -46,7 +46,7 @@ const PAGE_SIZE = 100
 
 /**
  * Guard não-bloqueante de estoque: registra um evento de timeline quando itens
- * de produto são adicionados sem estoque suficiente. NÃO impede a operação —
+ * de produto são adicionados sem estoque suficiente. NÃO impede a operação -
  * a baixa de estoque acontece apenas no pagamento do pedido vinculado.
  */
 async function logStockShortagesForServiceOrder(
@@ -1489,7 +1489,7 @@ export async function bulkUpdateServiceOrderStatusAction(
           `Status em lote → ${SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status} (${updated} OS)`,
           ...(changeReason?.trim() ? [`Motivo: ${changeReason.trim()}`] : []),
         ],
-      }).catch(() => {})
+      }).catch(() => { })
     }
 
     revalidatePath("/erp/ordens-de-servico")
@@ -1527,7 +1527,7 @@ export async function bulkDeleteServiceOrderAction(
         entityType: "service_order", entityId: (data as any[])[0].id,
         actionType: "deleted", source: "manual",
         changeLines: [`${deleted} OS deletada(s) em lote`],
-      }).catch(() => {})
+      }).catch(() => { })
     }
 
     revalidatePath("/erp/ordens-de-servico")
@@ -2507,7 +2507,7 @@ export async function signPublicServiceOrderAction(
  * Aprovação da OS pelo portal (autorização pré-execução).
  * Para membros do ERP (lojista/responsável/criador) ou quando o e-mail do
  * usuário logado é o do cliente, não exige código. Caso contrário, valida o
- * código de 4 dígitos via RPC. Não assina — apenas muda o status para 'aprovada'.
+ * código de 4 dígitos via RPC. Não assina - apenas muda o status para 'aprovada'.
  */
 export async function approvePublicServiceOrderAction(
   token: string,

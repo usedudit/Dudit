@@ -2,7 +2,7 @@ import "server-only"
 
 /**
  * Contexto opcional de uma ação administrativa: motivo, risk score e
- * notificação ao vendedor (via Dudit — notificação in-app + push).
+ * notificação ao vendedor (via Dudit - notificação in-app + push).
  *
  * Usado pelas actions de catálogo (produto/serviço/plano) e de pedidos.
  * Nunca derruba a action principal: falhas de risk score/notificação são

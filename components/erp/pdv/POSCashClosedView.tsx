@@ -27,7 +27,7 @@ export default function POSCashClosedView({
   setOpeningBalance,
   openingNotes,
   setOpeningNotes,
-   onOpenCash,
+  onOpenCash,
   lastSession,
 }: Props) {
   const tz = usePartnerTimezone()
@@ -78,13 +78,13 @@ export default function POSCashClosedView({
             <div className="flex justify-between">
               <span className="text-xs text-brand-inactive-text dark:text-dark-body">Aberto por</span>
               <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                {lastSession.user_name || "—"}
+                {lastSession.user_name || "-"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-brand-inactive-text dark:text-dark-body">Fechado em</span>
               <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">
-                {lastSession.closed_at ? formatInTz(lastSession.closed_at, tz, "dd/MM/yyyy '•' HH:mm") : "—"}
+                {lastSession.closed_at ? formatInTz(lastSession.closed_at, tz, "dd/MM/yyyy '•' HH:mm") : "-"}
               </span>
             </div>
             <div className="my-2 border-t border-brand-border dark:border-dark-border" />

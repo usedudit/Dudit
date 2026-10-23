@@ -16,17 +16,17 @@ export async function incrementCacheVersion(): Promise<number> {
 }
 
 export async function invalidateProductCache(
-  productId: string, 
-  partnerId: string, 
+  productId: string,
+  partnerId: string,
   action: 'create' | 'update' | 'delete' = 'update',
   options?: { silent?: boolean }
 ) {
   console.log(`[CACHE] INVALIDATING product:${productId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
-  
+
   // If silent update (e.g. stock decrements/reservations from sales, orders, cart checkout),
   // skip all remote Redis sync. Only purge local RAM version and revalidate Next.js cache layers.
   if (options?.silent) {
-    // Silent updates don't touch Redis — they rely on Next.js tag revalidation below
+    // Silent updates don't touch Redis - they rely on Next.js tag revalidation below
   } else {
     // 1. Increment in-memory version (purges RAM search cache)
     await incrementCacheVersion()
@@ -71,7 +71,7 @@ export async function invalidateProductCache(
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers:`, error)
   }
-  
+
   console.log(`[CACHE] INVALIDATION COMPLETE product:${productId}`)
 }
 
@@ -108,13 +108,13 @@ export async function invalidateStoreCache(
       safeRevalidateTag(`store-${slug}`)
       try {
         revalidatePath(`/${slug}`)
-      } catch {}
+      } catch { }
     }
 
     try {
       revalidatePath("/sacola")
       revalidatePath("/erp/lojas")
-    } catch {}
+    } catch { }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar store cache:`, error)
   }
@@ -128,7 +128,7 @@ export async function invalidateServiceCache(
 ) {
   console.log(`[CACHE] INVALIDATING service:${serviceId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
   if (options?.silent) {
-    // Silent updates don't touch Redis — they rely on Next.js tag revalidation below
+    // Silent updates don't touch Redis - they rely on Next.js tag revalidation below
   } else {
     await incrementCacheVersion()
 
@@ -161,7 +161,7 @@ export async function invalidateServiceCache(
 
     try {
       revalidatePath('/erp/servicos')
-    } catch {}
+    } catch { }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers para servico:`, error)
   }
@@ -197,7 +197,7 @@ export async function invalidateRecurringPlanCache(
 
     try {
       revalidatePath('/erp/recorrentes/planos')
-    } catch {}
+    } catch { }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers para plano recorrente:`, error)
   }

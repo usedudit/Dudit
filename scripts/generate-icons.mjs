@@ -10,10 +10,9 @@ const ANY_SIZES = [72, 96, 128, 144, 152, 192, 384, 512]
 const MASKABLE_SIZES = [192, 512]
 const APPLE_TOUCH_SIZE = 180
 
-// Full-bleed artwork: the launcher applies its own mask, so the outer edges
-// may be cropped on circular/squircle shapes. Set this below 1 (e.g. 0.66)
-// if the artwork ever needs to stay fully inside the maskable safe zone.
-const MASKABLE_CONTENT_RATIO = 1
+// The maskable safe zone is the inner 80% circle. Rendering the artwork at
+// ~66% of the canvas keeps it fully visible after the launcher applies its mask.
+const MASKABLE_CONTENT_RATIO = 0.66
 
 async function renderAny(source, size) {
   return sharp(source)

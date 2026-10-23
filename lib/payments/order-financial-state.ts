@@ -189,6 +189,15 @@ export function getExpectedMpChargeAmount(order: OrderFinancialSnapshot): number
     return getOrderRemainingBalance(order)
   }
   const depositSummary = getOrderDepositSummary(order)
+  // If deposit (sinal) was already paid or partially paid, charge remaining balance
+  if (depositSummary.sinalPaid && depositSummary.usesDeposit) {
+    return Math.max(0, depositSummary.remainingBalance)
+  }
+  // If deposit expired and nothing was paid, charge the full order total
+  if (depositSummary.usesDeposit && depositSummary.depositStatus === "expired") {
+    return getOrderTotalAmount(order)
+  }
+  // If deposit is pending, charge the initial deposit amount
   if (
     depositSummary.usesDeposit &&
     depositSummary.initialChargeAmount > 0.009

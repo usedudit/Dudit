@@ -19,7 +19,7 @@ import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 // ─── Aba "Comprador e Loja" ─────────────────────────────────────────────────
 // Mesmo layout da aba "parties" do AdminOrderDetailView (grid 12, loja na
 // coluna principal, proprietário na sidebar). Itens de catálogo não têm
-// comprador — o par aqui é a loja/vendedor + o parceiro dono do item.
+// comprador - o par aqui é a loja/vendedor + o parceiro dono do item.
 
 export function CatalogPartiesTab({
     store,

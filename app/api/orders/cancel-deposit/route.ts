@@ -85,6 +85,11 @@ export async function POST(request: NextRequest) {
             .from("orders")
             .update({
                 checkout_fulfillment: clearedFulfillment,
+                // Clear payment method fields so customer can pay the full amount afterward
+                payment_expires_at: null,
+                mp_payment_id: null,
+                payment_provider: null,
+                payment_method: "Não informado",
                 updated_at: cancelledAt,
             })
             .eq("id", orderId);

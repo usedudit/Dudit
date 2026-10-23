@@ -154,7 +154,7 @@ const nextConfig = {
       {
         // Regra genérica de imagens. Fica antes das regras específicas de
         // ícones porque, no Next.js, a última regra que casa sobrescreve o
-        // header — e ícones não podem ser `immutable` por 1 ano (senão um
+        // header - e ícones não podem ser `immutable` por 1 ano (senão um
         // WebAPK Android continua usando o ícone antigo).
         source: '/:all*(svg|jpg|jpeg|png|gif|ico|webp|avif)',
         headers: [

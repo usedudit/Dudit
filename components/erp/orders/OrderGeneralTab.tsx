@@ -13,6 +13,7 @@ import {
     FormSection,
     Badge,
     Tooltip,
+    SidebarCard,
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
@@ -927,9 +928,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                     {/* --- 2. PAYMENT CARD --- */}
                     {!isPaidOrder && (
-                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
-                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
-
+                        <SidebarCard title="Pagamento" hasSeparator hasTopStrip>
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-3">
                                     {!isQuickMode && (
@@ -1032,7 +1031,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     Ir para Pagamento
                                 </Button>
                             </div>
-                        </div>
+                        </SidebarCard>
                     )}
                 </div>
             </div>

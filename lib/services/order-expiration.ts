@@ -39,13 +39,187 @@ export function computePickupPaymentExpiresAt(now = new Date()): Date {
   return new Date(now.getTime() + EXPIRATION_TIMES.pickup_payment * 1000)
 }
 
+/**
+ * Checks if a deposit (sinal) payment has expired and expires ONLY the deposit,
+ * leaving the order available for paying the full amount or remaining balance.
+ *
+ * Returns { expired: true } when only the deposit expires (order NOT cancelled).
+ * Returns { expired: false, reason } when the deposit should NOT be expired
+ * (e.g., sinal already paid, or order has no deposit).
+ */
+export async function checkAndExpireDeposit(
+  client: SupabaseClient,
+  orderId: string,
+  order?: any,
+): Promise<{ expired: boolean; reason?: string }> {
+  // Use provided order data or fetch from DB
+  let orderData = order
+  if (!orderData) {
+    const { data: fetchedOrder, error: fetchError } = await client
+      .from("orders")
+      .select("id, situation, payment_expires_at, cancelled_at, paid_amount, amount_paid, total_amount, checkout_fulfillment, payment_breakdown, partner_id, order_number, buyer_id, customer_name, notes")
+      .eq("id", orderId)
+      .single()
+
+    if (fetchError || !fetchedOrder) {
+      return { expired: false, reason: "order_not_found" }
+    }
+
+    orderData = fetchedOrder
+  }
+
+  // Check if this order uses a deposit (sinal)
+  const fulfillment = orderData.checkout_fulfillment || {}
+  const depositMeta = fulfillment.depositCheckout
+  if (!depositMeta || !depositMeta.usesDeposit) {
+    return { expired: false, reason: "no_deposit" }
+  }
+
+  // If sinal was already paid, don't expire it
+  if (depositMeta.sinalPaid || depositMeta.depositStatus === "paid" || depositMeta.depositStatus === "partially_paid") {
+    return { expired: false, reason: "sinal_already_paid" }
+  }
+
+  // If paid amount > 0, the sinal might have been replaced by a full payment
+  const paidAmount = Number(orderData.paid_amount || orderData.amount_paid || 0)
+  if (paidAmount > 0.009) {
+    return { expired: false, reason: "order_already_paid" }
+  }
+
+  // Check if payment_expires_at has passed
+  if (!orderData.payment_expires_at) {
+    return { expired: false, reason: "no_expiration_set" }
+  }
+
+  if (new Date() <= new Date(orderData.payment_expires_at)) {
+    return { expired: false, reason: "not_yet_expired" }
+  }
+
+  // ═══ Sinal expired — expire ONLY the deposit ═══
+  const now = new Date().toISOString()
+  const depositHistory = Array.isArray(fulfillment.depositCheckoutHistory)
+    ? [...fulfillment.depositCheckoutHistory]
+    : []
+
+  const updatedFulfillment = {
+    ...fulfillment,
+    depositCheckout: {
+      ...depositMeta,
+      depositStatus: "expired" as const,
+      balanceStatus: "not_required" as const,
+      paymentProvider: null,
+      expiredAt: now,
+      expiredBy: "system" as const,
+      lastPaymentAt: depositMeta.lastPaymentAt || null,
+    },
+    depositCheckoutHistory: [
+      ...depositHistory,
+      {
+        ...depositMeta,
+        depositStatus: "expired",
+        expiredAt: now,
+        expiredBy: "system",
+      },
+    ],
+  }
+
+  // Clean up payment_breakdown to remove the deposit payment leg
+  const currentBreakdown = Array.isArray(orderData.payment_breakdown)
+    ? orderData.payment_breakdown
+    : []
+
+  const cleanedBreakdown = currentBreakdown.filter((leg: any) => {
+    // Keep legs that are NOT the deposit payment method (e.g., store_credit)
+    if (leg?.method === "store_credit") return true
+    // Remove legs that look like the deposit/placeholder MP leg (no received amount)
+    const received = Number(leg?.amountReceived || 0)
+    const isMp = String(leg?.provider || "").toLowerCase().includes("mercado pago")
+    if (!received || received <= 0.009) return false
+    if (isMp) return true
+    return true
+  })
+
+  // Update order: clear deposit payment fields, keep order open
+  const { error: updateError } = await client
+    .from("orders")
+    .update({
+      // Clear the deposit MP payment fields so a new payment can be created
+      mp_payment_id: null,
+      payment_provider: null,
+      payment_method: "Não informado",
+      // Clear expiration so a new payment can be created
+      payment_expires_at: null,
+      // Keep the order pending — do NOT cancel it
+      checkout_fulfillment: updatedFulfillment,
+      updated_at: now,
+    })
+    .eq("id", orderId)
+    .in("situation", ["pending", "in_process", "payment_failed"])
+
+  if (updateError) {
+    console.error("[order-expiration] Failed to expire deposit:", updateError.message)
+    return { expired: false, reason: `update_failed: ${updateError.message}` }
+  }
+
+  // Log audit event
+  try {
+    const { logAuditEvent } = await import("@/lib/services/timeline.service")
+    await logAuditEvent({
+      partnerId: orderData.partner_id,
+      actorUserId: null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "deposit_expired",
+      changeLines: [
+        "Sinal expirado automaticamente pelo sistema.",
+        `Sinal: R$ ${Number(depositMeta.depositAmount || 0).toFixed(2)}`,
+        "O prazo de pagamento do sinal expirou. O pedido permanece aberto para pagamento do saldo.",
+      ],
+      source: "system",
+      metadata: {
+        depositAmount: depositMeta.depositAmount,
+        initialChargeAmount: depositMeta.initialChargeAmount,
+        statusScope: "deposit",
+      },
+    })
+  } catch (err) {
+    console.error("[order-expiration] Error logging deposit expiration audit event:", err)
+  }
+
+  // Trigger system notification for customer and seller
+  try {
+    const { onOrderStatusChanged } = await import("@/lib/services/notification-automation.service")
+    await onOrderStatusChanged(
+      { ...orderData, situation: "pending", checkout_fulfillment: updatedFulfillment },
+      "pending",
+      undefined,
+      "system",
+      "O prazo de pagamento do sinal expirou. O pedido permanece aberto para pagamento do saldo restante."
+    )
+  } catch (err) {
+    console.error("[order-expiration] Error triggering deposit expiration notification:", err)
+  }
+
+  // Revalidate marketplace
+  try {
+    const { revalidateMarketplace } = await import("@/lib/utils/revalidation")
+    await revalidateMarketplace()
+  } catch { }
+
+  return { expired: true }
+}
+
 export async function checkAndExpireOrder(
   client: SupabaseClient,
   orderId: string,
-): Promise<{ expired: boolean; reason?: string }> {
+): Promise<{ expired: boolean; reason?: string; depositExpired?: boolean }> {
   const { data: order, error } = await client
     .from("orders")
-    .select("id, order_number, situation, payment_expires_at, cancelled_at, partner_id, total_amount, buyer_id, customer_name, notes")
+    .select(`
+      id, order_number, situation, payment_expires_at, cancelled_at,
+      partner_id, total_amount, buyer_id, customer_name, notes,
+      paid_amount, amount_paid, payment_breakdown, checkout_fulfillment
+    `)
     .eq("id", orderId)
     .single()
 
@@ -67,6 +241,15 @@ export async function checkAndExpireOrder(
 
   if (new Date() <= new Date(order.payment_expires_at)) {
     return { expired: false, reason: "not_yet_expired" }
+  }
+
+  // ── NEW: Check if this is a deposit (sinal) payment that expired ──
+  // If the order has a deposit checkout and the deposit hasn't been paid yet,
+  // expire ONLY the deposit (not the entire order). This allows the customer
+  // to still pay the full amount or remaining balance.
+  const depositResult = await checkAndExpireDeposit(client, orderId, order)
+  if (depositResult.expired) {
+    return { expired: true, reason: depositResult.reason, depositExpired: true }
   }
 
   const now = new Date().toISOString()
