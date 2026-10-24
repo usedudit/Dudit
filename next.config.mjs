@@ -113,17 +113,9 @@ const nextConfig = {
       }
     }
 
-    // Render free/starter: 8GB de RAM. Next.js full build vira >8GB de RSS
-    // (webpack + serwist + sourcemaps + 1107 deps). Garante a build cabendo no
-    // cap ajustando limites de memória e paralelismo do webpack/SWC.
-    config.optimization = {
-      ...config.optimization,
-      minimize: true,
-      minimizer: config.optimization?.minimizer,
-    }
-    // Render/Hobby: 8GB RAM cap. Limita o paralelismo do webpack a 1 job
+    // 8GB RAM cap (Render free/starter | Railway). Limita webpack a 1 job
     // pra reduzir o pico de memória no `next build` e evitar OOM.
-    if (process.env.RENDER || process.env.CI) {
+    if (process.env.RENDER || process.env.CI || process.env.BUILD_FOR_RENDER) {
       config.parallelism = 1
       config.cache = { ...config.cache, memoryCacheUnaffected: true }
     }

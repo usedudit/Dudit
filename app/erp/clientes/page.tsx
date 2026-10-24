@@ -19,7 +19,7 @@ export default async function CustomersRoute() {
   const partnerId = context.partnerId
   const [{ allowed }, page] = await Promise.all([
     checkPermission(partnerId, "customers", "view"),
-    getERPCustomersPageAction(partnerId, { cursor: null, limit: 100 }),
+    getERPCustomersPageAction(partnerId, { cursor: null, limit: 100, filters: { includeArchived: true } }),
   ])
 
   if (!allowed) return <AccessDenied />

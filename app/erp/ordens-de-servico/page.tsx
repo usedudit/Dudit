@@ -1,6 +1,6 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { checkPermission } from "@/lib/permissions/access"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPServiceOrdersPageAction } from "@/app/actions/erp/service-orders"
@@ -9,7 +9,7 @@ import ServiceOrdersPage from "@/components/erp/service-orders/ServiceOrdersPage
 export const dynamic = "force-dynamic"
 
 export default async function ServiceOrdersPageServer() {
-  const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId

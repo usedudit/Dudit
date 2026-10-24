@@ -39,6 +39,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 
 // New Component Imports
@@ -268,6 +269,9 @@ export default function ServicesPage({
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as any })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [sharingService, setSharingService] = useState<any>(null)
+    const [resolvedPartner, setResolvedPartner] = useState<any>(partner || null)
+    const [isLoadingPartner, setIsLoadingPartner] = useState(false)
+    const partnerLoadInFlightRef = useRef(false)
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -281,6 +285,25 @@ export default function ServicesPage({
         bulkInactive: false
     })
     const undoManager = useUndoGracePeriod(10000)
+
+    // The partner profile is only required for public sharing URLs.
+    // Keep it out of the initial list and entity form critical paths.
+    useEffect(() => {
+        if (!sharingService || resolvedPartner || partnerLoadInFlightRef.current) return
+        let cancelled = false
+        partnerLoadInFlightRef.current = true
+        setIsLoadingPartner(true)
+        getPartnerProfile(partnerId)
+            .then((value) => {
+                if (!cancelled && value) setResolvedPartner(value)
+            })
+            .catch(() => {})
+            .finally(() => {
+                partnerLoadInFlightRef.current = false
+                if (!cancelled) setIsLoadingPartner(false)
+            })
+        return () => { cancelled = true }
+    }, [sharingService, partnerId, resolvedPartner])
 
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
@@ -781,7 +804,7 @@ export default function ServicesPage({
                         service={formService}
                         onBack={closeEntity}
                         partnerId={partnerId}
-                        partner={partner}
+                        partner={resolvedPartner}
                         storeId={selectedStore?.id}
                         isLoadingDetails={isLoadingDetail}
                         onClose={handleFormClose}
@@ -1069,10 +1092,11 @@ export default function ServicesPage({
                 <ShareModal
                     isOpen={!!sharingService}
                     onClose={() => setSharingService(null)}
-                    url={typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(sharingService, partner)}` : ""}
+                    url={resolvedPartner && typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(sharingService, resolvedPartner)}` : ""}
                     title={sharingService.name}
                     shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${sharingService.name}*\nConfere aqui os detalhes:`}
                     label="Link do serviço"
+                    isLoading={isLoadingPartner || !resolvedPartner}
                 />
             )}
 

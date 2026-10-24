@@ -34,6 +34,7 @@ export async function listStoresAction(partnerId: string) {
             const isPartnerOwner = partnerRes.data?.user_id === user.id
             const roleId = String(puRes.data?.role_id || "").toLowerCase()
             let allowedStoreIds: string[] | null = null
+            const storeRoleMap = new Map<string, string>()
 
             if (!isPartnerOwner && roleId !== "owner") {
                 if (!puRes.data) return []
@@ -41,7 +42,10 @@ export async function listStoresAction(partnerId: string) {
                     .from("store_members")
                     .select("store_id, role")
                     .eq("partner_user_id", puRes.data.id)
-                const memberStoreIds = (members || []).map((m: any) => m.store_id)
+                for (const member of members || []) {
+                    if (member.store_id && member.role) storeRoleMap.set(member.store_id, member.role)
+                }
+                const memberStoreIds = Array.from(storeRoleMap.keys())
                 if (memberStoreIds.length === 0) return []
                 allowedStoreIds = memberStoreIds
             }
@@ -55,18 +59,6 @@ export async function listStoresAction(partnerId: string) {
             if (allowedStoreIds !== null) query = query.in("id", allowedStoreIds)
             const { data, error } = await query.order("created_at", { ascending: true })
             if (error) throw new Error(error.message)
-
-            // Build a map of store_id -> user_role for non-owner users
-            const storeRoleMap = new Map<string, string>()
-            if (!isPartnerOwner && roleId !== "owner" && puRes.data) {
-                const { data: members } = await admin
-                    .from("store_members")
-                    .select("store_id, role")
-                    .eq("partner_user_id", puRes.data.id)
-                for (const m of members || []) {
-                    if (m.store_id && m.role) storeRoleMap.set(m.store_id, m.role)
-                }
-            }
 
             const stores: any[] = []
             for (const store of data || []) {

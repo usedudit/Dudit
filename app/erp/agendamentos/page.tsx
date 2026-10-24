@@ -1,4 +1,4 @@
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import AppointmentsPage from "@/components/erp/appointments/AppointmentsPage"
@@ -133,7 +133,7 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
 }
 
 export default async function AgendamentosPage() {
-  const context = await getCurrentPartnerContext()
+  const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId

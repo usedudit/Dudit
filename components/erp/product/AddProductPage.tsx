@@ -26,6 +26,7 @@ import { Spinner } from "@/components/reusable/Spinner"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { generateEAN13 } from "@/lib/utils/barcode"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -934,10 +935,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
     }, [productData, setMode, notifyInfo])
 
     const [showShareModal, setShowShareModal] = useState(false)
+    const [sharePartner, setSharePartner] = useState<any>(partner || null)
+    const [isLoadingSharePartner, setIsLoadingSharePartner] = useState(false)
 
     const handleShareProduct = useCallback(() => {
         setShowShareModal(true)
-    }, [])
+        if (sharePartner || isLoadingSharePartner || !partnerId) return
+        setIsLoadingSharePartner(true)
+        getPartnerProfile(partnerId)
+            .then((value) => { if (value) setSharePartner(value) })
+            .catch(() => {})
+            .finally(() => setIsLoadingSharePartner(false))
+    }, [partnerId, sharePartner, isLoadingSharePartner])
 
     const confirmArchiveProduct = useCallback(async () => {
         if (!productData.id) return
@@ -1432,10 +1441,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     <ShareModal
                         isOpen={showShareModal}
                         onClose={() => setShowShareModal(false)}
-                        url={typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(productData, partner)}` : ""}
+                        url={sharePartner && typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(productData, sharePartner)}` : ""}
                         title={productData.name}
                         shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${productData.name}*\nConfere aqui os detalhes:`}
                         label="Link do produto"
+                        isLoading={isLoadingSharePartner || !sharePartner}
                     />
                 )}
 

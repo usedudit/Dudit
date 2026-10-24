@@ -3,21 +3,17 @@ import ServicesPage from "@/components/erp/servicos/ServicesPage"
 import { getERPServicesPageAction } from "@/app/actions/erp/servicos"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { getPartnerProfile } from "@/app/actions/marketplace/partners"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 
 export const dynamic = "force-dynamic"
 
 export default async function ServicesPageServer() {
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
     const partnerId = context.partnerId
     const activeStoreId = context.activeStoreId || null
 
-    const [page, partner] = await Promise.all([
-        getERPServicesPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined }),
-        getPartnerProfile(partnerId)
-    ])
+    const page = await getERPServicesPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined, filters: { includeArchived: true } })
     if (!page.success) {
         throw new Error(page.error || "Erro ao carregar serviços.")
     }
@@ -31,7 +27,6 @@ export default async function ServicesPageServer() {
                     initialNextCursor={page.nextCursor}
                     initialHasMore={page.hasMore}
                     partnerId={partnerId}
-                    partner={partner}
                 />
             </FadeIn>
         </>

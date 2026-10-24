@@ -2,12 +2,12 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { redirect } from "next/navigation"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { getERPStockMovementsPageAction } from "@/app/actions/erp/stock-movements"
 
 export default async function StockMovementsPage() {
   // Layout already guarantees auth + valid context - just read cached data
-  const context = await getCurrentPartnerContext()
+  const context = await getErpRequestContext()
   if (!context) redirect("/select-erp")
 
   const { partnerId, activeStoreId } = context

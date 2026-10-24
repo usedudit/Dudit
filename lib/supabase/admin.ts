@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { createSupabasePerformanceFetch } from "@/lib/supabase/performance-fetch"
 
 /**
  * Singleton admin (service role) Supabase client.
@@ -30,6 +31,9 @@ export function getAdminClient(): any {
     }
 
     _adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        global: {
+            fetch: createSupabasePerformanceFetch("admin-singleton"),
+        },
         auth: {
             autoRefreshToken: false,
             persistSession: false,

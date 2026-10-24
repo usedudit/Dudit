@@ -1053,6 +1053,7 @@ export async function getERPCustomersPageAction(
       return { success: false, error: "Sem permissão para acessar a listagem de clientes." }
     }
     partnerId = customerAccess.partnerId
+    const canViewPersonalData = can(customerAccess as RbacUserLike, "customers.view_personal_data")
 
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CUSTOMERS_PAGE_SIZE))))
@@ -1101,10 +1102,20 @@ export async function getERPCustomersPageAction(
 
         if (customerIds.length > 0) {
           // Fetch address info (city, state) for all customers on this page
-          const { data: addrRows } = await supabase
-            .from("addresses")
-            .select("customer_id, city, state")
-            .in("customer_id", customerIds)
+          const [addressResult, orderResult] = await Promise.all([
+            supabase
+              .from("addresses")
+              .select("customer_id, city, state")
+              .in("customer_id", customerIds),
+            supabase
+              .from("orders")
+              .select("buyer_id, customer_id, total_amount, created_at")
+              .eq("partner_id", partnerId)
+              .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
+              .neq("situation", "cancelled"),
+          ])
+
+          const addrRows = addressResult.data
 
           if (addrRows) {
             const addrMap = new Map<string, { city: string | null; state: string | null }>()
@@ -1122,12 +1133,7 @@ export async function getERPCustomersPageAction(
 
           // Aggregate order stats only for the visible page, then cache the
           // result together with the list so revisiting the route is one hit.
-          const { data: orderAgg } = await supabase
-            .from("orders")
-            .select("buyer_id, customer_id, total_amount, created_at")
-            .eq("partner_id", partnerId)
-            .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
-            .neq("situation", "cancelled")
+          const orderAgg = orderResult.data
 
           if (orderAgg) {
             const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
@@ -1156,18 +1162,18 @@ export async function getERPCustomersPageAction(
     const hasMore = page.hasMore
     const items: any[] = page.items
 
-    if (!can(customerAccess as RbacUserLike, "customers.view_personal_data")) {
-      for (const item of items) {
-        delete item.birth_date
-        delete item.user_id
-      }
-    }
+    const visibleItems = canViewPersonalData
+      ? items
+      : items.map((item) => {
+          const { birth_date: _birthDate, user_id: _userId, ...safeItem } = item
+          return safeItem
+        })
 
-    const last = items[items.length - 1]
+    const last = visibleItems[visibleItems.length - 1]
     const nextCursor: ERPCustomerListCursor | null =
       hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
 
-    return { success: true, items, nextCursor, hasMore }
+    return { success: true, items: visibleItems, nextCursor, hasMore }
   } catch (e: any) {
     return { success: false, error: e?.message || "Erro ao carregar clientes" }
   }

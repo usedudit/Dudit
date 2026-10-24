@@ -1,5 +1,5 @@
 import SuppliersPage from "@/components/erp/fornecedores/SuppliersPage"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { AccessDenied } from "@/components/erp/access-denied"
@@ -8,7 +8,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPSuppliersPageAction } from "@/app/actions/erp/suppliers"
 
 export default async function SuppliersRoute() {
-  const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
   const activeStoreId = context.activeStoreId || null

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePathname } from "next/navigation"
 import { XIcon, AlertTriangleIcon } from "@/lib/icons"
@@ -9,6 +10,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getLimitStatusAction } from "@/app/actions/erp/limits-status"
 import type { LimitStatusData } from "@/app/actions/erp/limits-status"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
+import { usePermissions } from "@/lib/permission-context"
 
 interface PageLimitConfig {
     key: string
@@ -31,23 +33,24 @@ export function LimitStatusWidget() {
     const pathname = usePathname()
     const [isOpen, setIsOpen] = useState(false)
     const [dismissed, setDismissed] = useState(false)
-    const [data, setData] = useState<LimitStatusData | null>(null)
-    const [loading, setLoading] = useState(true)
     const popupRef = useRef<HTMLDivElement>(null)
 
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { partnerId } = usePermissions()
 
     const pageConfig = Object.entries(PAGE_LIMIT_MAP).find(([path]) =>
         pathname === path || pathname.startsWith(path + "/")
     )?.[1]
 
-    useEffect(() => {
-        if (!pageConfig) {
-            setLoading(false)
-            return
-        }
-        fetchData()
-    }, [pageConfig?.key])
+    const { data = null } = useQuery<LimitStatusData | null>({
+        queryKey: ["erp", "limit-status", partnerId],
+        queryFn: getLimitStatusAction,
+        enabled: Boolean(pageConfig && partnerId),
+        staleTime: 60_000,
+        gcTime: 5 * 60_000,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+    })
 
     useEffect(() => {
         if (!isOpen) return
@@ -62,13 +65,6 @@ export function LimitStatusWidget() {
         document.addEventListener("mousedown", handleClickOutside)
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [isOpen])
-
-    const fetchData = async () => {
-        setLoading(true)
-        const result = await getLimitStatusAction()
-        if (result) setData(result)
-        setLoading(false)
-    }
 
     const handleClose = useCallback(() => {
         setIsOpen(false)

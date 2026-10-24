@@ -4,7 +4,6 @@ import { getERPProductsPageAction } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
-import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 
 export const dynamic = "force-dynamic"
 
@@ -14,10 +13,7 @@ export default async function ProductsPageServer() {
     const partnerId = context.partnerId
     const activeStoreId = context.activeStoreId || null
 
-    const [page, partner] = await Promise.all([
-        getERPProductsPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined }),
-        getPartnerProfile(partnerId)
-    ])
+    const page = await getERPProductsPageAction(partnerId, { cursor: null, limit: 100, storeId: activeStoreId || undefined, filters: { includeArchived: true } })
     if (!page.success) {
         throw new Error(page.error || "Erro ao carregar produtos.")
     }
@@ -31,7 +27,6 @@ export default async function ProductsPageServer() {
                     initialNextCursor={page.nextCursor}
                     initialHasMore={page.hasMore}
                     partnerId={partnerId}
-                    partner={partner}
                     suppliers={[]}
                 />
             </FadeIn>

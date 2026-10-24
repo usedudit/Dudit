@@ -53,6 +53,7 @@ import Pagination from "@/components/reusable/Pagination"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { LabelPrintModal } from "@/components/erp/labels/LabelPrintModal"
 
 // New Component Imports
@@ -330,6 +331,9 @@ export default function ProductsPage({
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as Product | null })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [sharingProduct, setSharingProduct] = useState<Product | null>(null)
+    const [resolvedPartner, setResolvedPartner] = useState<any>(partner || null)
+    const [isLoadingPartner, setIsLoadingPartner] = useState(false)
+    const partnerLoadInFlightRef = useRef(false)
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>({
@@ -357,6 +361,25 @@ export default function ProductsPage({
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
     const undoManager = useUndoGracePeriod(10000)
+
+    // The full partner profile is only needed to generate a public share URL.
+    // Do not block the initial list or entity form on it.
+    useEffect(() => {
+        if (!sharingProduct || resolvedPartner || partnerLoadInFlightRef.current) return
+        let cancelled = false
+        partnerLoadInFlightRef.current = true
+        setIsLoadingPartner(true)
+        getPartnerProfile(partnerId)
+            .then((value) => {
+                if (!cancelled && value) setResolvedPartner(value)
+            })
+            .catch(() => {})
+            .finally(() => {
+                partnerLoadInFlightRef.current = false
+                if (!cancelled) setIsLoadingPartner(false)
+            })
+        return () => { cancelled = true }
+    }, [sharingProduct, partnerId, resolvedPartner])
 
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
@@ -1049,7 +1072,7 @@ export default function ProductsPage({
                         suppliers={suppliers}
                         unidadesMedida={UNIDADES_MEDIDA}
                         partnerId={partnerId}
-                        partner={partner}
+                        partner={resolvedPartner}
                         storeId={selectedStore?.id || ""}
                         isLoadingDetails={isLoadingDetail}
                     />
@@ -1410,10 +1433,11 @@ export default function ProductsPage({
                 <ShareModal
                     isOpen={!!sharingProduct}
                     onClose={() => setSharingProduct(null)}
-                    url={typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(sharingProduct, partner)}` : ""}
+                    url={resolvedPartner && typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(sharingProduct, resolvedPartner)}` : ""}
                     title={sharingProduct.name}
                     shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${sharingProduct.name}*\nConfere aqui os detalhes:`}
                     label="Link do produto"
+                    isLoading={isLoadingPartner || !resolvedPartner}
                 />
             )}
 

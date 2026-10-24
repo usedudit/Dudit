@@ -1,7 +1,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
 import { checkPermission } from "@/lib/permissions/access"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPQuotesPageAction } from "@/app/actions/erp/quotes"
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 
 export default async function QuotesPageServer() {
     // Layout already guarantees auth + valid context
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId

@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import { createSupabasePerformanceFetch } from "@/lib/supabase/performance-fetch"
 
 /**
  * Creates an authenticated Supabase client for server-side usage.
@@ -21,6 +22,9 @@ export async function createClient(): Promise<SupabaseClient> {
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      fetch: createSupabasePerformanceFetch("user"),
+    },
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -64,6 +68,9 @@ export function createAdminClient(): any {
   }
 
   return createServiceRoleClient(supabaseUrl, serviceRoleKey, {
+    global: {
+      fetch: createSupabasePerformanceFetch("admin"),
+    },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

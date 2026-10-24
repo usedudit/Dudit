@@ -460,7 +460,7 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
   const admin = getAdminClient()
   const { data, error } = await admin
     .from("usage_counters")
-    .select("*")
+    .select("partner_id, products_count, users_count, images_count, services_count, quotes_month_count, quotes_month_reset, orders_month_count, orders_month_reset, appointments_month_count, appointments_month_reset, service_orders_month_count, service_orders_month_reset, xml_imports_month_count, xml_imports_month_reset")
     .eq("partner_id", partnerId)
     .maybeSingle()
 
@@ -512,7 +512,11 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
       console.error("[SUBSCRIPTION] Error resetting monthly counters:", updateError.message)
       // Still return stale counters; limit enforcement will be conservative (deny).
     } else {
-      const { data: refreshed } = await admin.from("usage_counters").select("*").eq("partner_id", partnerId).maybeSingle()
+      const { data: refreshed } = await admin
+        .from("usage_counters")
+        .select("partner_id, products_count, users_count, images_count, services_count, quotes_month_count, quotes_month_reset, orders_month_count, orders_month_reset, appointments_month_count, appointments_month_reset, service_orders_month_count, service_orders_month_reset, xml_imports_month_count, xml_imports_month_reset")
+        .eq("partner_id", partnerId)
+        .maybeSingle()
       if (refreshed) return refreshed as UsageCounters
     }
   }

@@ -57,10 +57,13 @@ export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
 
     if (!counters) return null
 
+    const limits = await Promise.all(
+      LIMITS_CONFIG.map((cfg) => getLimit(context.partnerId, cfg.limitName)),
+    )
     const items: LimitStatusItem[] = []
 
-    for (const cfg of LIMITS_CONFIG) {
-      const limit = await getLimit(context.partnerId, cfg.limitName)
+    LIMITS_CONFIG.forEach((cfg, index) => {
+      const limit = limits[index]
       const current = cfg.counterField
         ? ((counters as any)[cfg.counterField] ?? 0)
         : cfg.key === "recurring_plans"
@@ -81,7 +84,7 @@ export async function getLimitStatusAction(): Promise<LimitStatusData | null> {
         percentage,
         isMonthly: cfg.isMonthly,
       })
-    }
+    })
 
     const nextSlug = getNextPlanTarget(plan.slug)
     const nextName = nextSlug ? getHardcodedPlan(nextSlug).name : null

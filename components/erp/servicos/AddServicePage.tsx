@@ -20,6 +20,7 @@ import { fetchWithCSRF, fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
@@ -544,6 +545,18 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     }, [serviceData.name])
 
     const [showShareModal, setShowShareModal] = useState(false)
+    const [sharePartner, setSharePartner] = useState<any>(partner || null)
+    const [isLoadingSharePartner, setIsLoadingSharePartner] = useState(false)
+
+    const handleShareService = useCallback(() => {
+        setShowShareModal(true)
+        if (sharePartner || isLoadingSharePartner || !partnerId) return
+        setIsLoadingSharePartner(true)
+        getPartnerProfile(partnerId)
+            .then((value) => { if (value) setSharePartner(value) })
+            .catch(() => {})
+            .finally(() => setIsLoadingSharePartner(false))
+    }, [partnerId, sharePartner, isLoadingSharePartner])
 
     const handleDuplicateService = useCallback(() => {
         setOriginalNameForDuplicate(serviceData.name)
@@ -659,7 +672,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                     return (
                                                         <ActionsDropdown
                                                             onDuplicate={handleDuplicateService}
-                                                            onShare={() => setShowShareModal(true)}
+                                                            onShare={handleShareService}
                                                             onArchive={!isArchived ? handleArchiveService : undefined}
                                                             onUnarchive={isArchived ? handleUnarchiveService : undefined}
                                                             onDelete={onDeleteConfirm ? () => void handleDeleteService() : () => setShowDeleteModal(true)}
@@ -829,7 +842,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                             <>
                                 <ActionsDropdown
                                     onDuplicate={handleDuplicateService}
-                                    onShare={() => setShowShareModal(true)}
+                                    onShare={handleShareService}
                                     onDelete={onDeleteConfirm ? () => void handleDeleteService() : () => setShowDeleteModal(true)}
                                     trigger={
                                         <Button
@@ -886,10 +899,11 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 <ShareModal
                     isOpen={showShareModal}
                     onClose={() => setShowShareModal(false)}
-                    url={typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(serviceData, partner)}` : ""}
+                    url={sharePartner && typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(serviceData, sharePartner)}` : ""}
                     title={serviceData.name}
                     shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${serviceData.name}*\nConfere aqui os detalhes:`}
                     label="Link do serviço"
+                    isLoading={isLoadingSharePartner || !sharePartner}
                 />
             )}
 
