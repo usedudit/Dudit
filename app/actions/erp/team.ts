@@ -459,8 +459,10 @@ export async function updateTeamMemberRole(
 
         // Invalidate the affected user's access cache so role change reflects immediately
         const { revalidateUserAccess, revalidateTeamMembers } = await import("@/lib/utils/revalidation")
-        revalidateUserAccess(memberUserId)
-        revalidateTeamMembers(partnerId)
+        await Promise.all([
+            revalidateUserAccess(memberUserId),
+            revalidateTeamMembers(partnerId),
+        ])
 
         return { success: true }
     } catch (error: any) {
@@ -533,8 +535,10 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
         // Invalidate the removed user's access cache so the ERP disappears from their selector
         // and they can no longer access this ERP
         const { revalidateUserAccess, revalidateTeamMembers } = await import("@/lib/utils/revalidation")
-        revalidateUserAccess(memberUserId)
-        revalidateTeamMembers(partnerId)
+        await Promise.all([
+            revalidateUserAccess(memberUserId),
+            revalidateTeamMembers(partnerId),
+        ])
 
         return { success: true }
     } catch (error: any) {

@@ -1,12 +1,15 @@
 import React from "react"
 import { Button, Input } from "@/components/reusable"
-import { SearchIcon, FilterIcon, GridIcon, ListIcon, PlusIcon } from "@/lib/icons"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
+import { SearchIcon, FilterIcon, GridIcon, ListIcon, PlusIcon, Settings2Icon, ExportFileIcon } from "@/lib/icons"
 
 interface ReturnPageControlsProps {
     search: string
     onSearchChange: (v: string) => void
     onOpenFilter: () => void
     onAdd?: () => void
+    onExport?: () => void
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     addDisabled?: boolean
@@ -17,6 +20,7 @@ export default function ReturnPageControls({
     onSearchChange,
     onOpenFilter,
     onAdd,
+    onExport,
     viewMode,
     onViewModeChange,
     addDisabled = false,
@@ -39,6 +43,22 @@ export default function ReturnPageControls({
                 <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                     <FilterIcon className="w-4 h-4" />
                 </Button>
+                <Dropdown
+                    trigger={
+                        <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                            <Settings2Icon className="w-4 h-4" />
+                        </Button>
+                    }
+                    align="right"
+                    showChevron={false}
+                    className="w-fit"
+                >
+                    {onExport && (
+                        <DropdownItem onClick={onExport}>
+                            <ExportFileIcon size={14} /> Exportar
+                        </DropdownItem>
+                    )}
+                </Dropdown>
                 {onAdd && (
                     <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px] p-0 rounded-full">
                         <PlusIcon className="w-5 h-5" />

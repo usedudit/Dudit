@@ -3,6 +3,8 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -21,6 +23,8 @@ import {
     InfoIcon,
     CancelCircleIcon,
     AlertTriangleIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 import type { TransactionTab } from "../../../lib/services/transactions.types"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
@@ -54,6 +58,7 @@ interface TransactionPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     addDisabled?: boolean
+    onExport?: () => void
     /** When true, hides the tab selector (used when the tab is forced by the route) */
     hideTabs?: boolean
     tabCounts?: { "Transações": number; "Entradas": number; "Saídas": number; "A pagar": number; "A receber": number; "Vencidos": number; "Cancelados": number }
@@ -85,6 +90,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     addDisabled = false,
+    onExport,
     hideTabs = false,
     tabCounts,
     tabValues,
@@ -247,6 +253,22 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         <Button
                             onClick={onAddTransaction}
                             disabled={addDisabled}

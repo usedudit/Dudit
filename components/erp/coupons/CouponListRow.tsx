@@ -29,11 +29,10 @@ interface CouponListItemProps {
   onEdit?: (coupon: CouponRow) => void
   onToggleStatus?: (coupon: CouponRow) => void
   onDelete?: (coupon: CouponRow) => void
-  onShare?: (coupon: CouponRow) => void
 }
 
 const CouponListItem = React.memo(
-  ({ coupon, columns, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete, onShare }: CouponListItemProps) => {
+  ({ coupon, columns, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete }: CouponListItemProps) => {
     const getJustifyClass = (align?: string) => {
       if (align === "center") return "justify-center"
       if (align === "right") return "justify-end"
@@ -107,7 +106,6 @@ const CouponListItem = React.memo(
                 onCancel={onToggleStatus ? () => onToggleStatus(coupon) : undefined}
                 cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                 onDelete={onDelete ? () => onDelete(coupon) : undefined}
-                onShare={onShare ? () => onShare(coupon) : undefined}
               />
             </div>
           )

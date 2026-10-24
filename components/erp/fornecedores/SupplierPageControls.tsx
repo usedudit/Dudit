@@ -1,6 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -15,6 +17,8 @@ import {
   CheckCircleIcon,
   CancelCircleIcon,
   InfoIcon,
+  Settings2Icon,
+  ExportFileIcon,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -28,6 +32,7 @@ interface SupplierPageControlsProps {
   onSearchChange: (value: string) => void
   onOpenFilter: () => void
   onAddSupplier: () => void
+  onExport?: () => void
   filters: FilterState
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>
   viewMode: "list" | "grid"
@@ -43,6 +48,7 @@ const SupplierPageControls: React.FC<SupplierPageControlsProps> = ({
   onSearchChange,
   onOpenFilter,
   onAddSupplier,
+  onExport,
   filters,
   setFilters,
   viewMode,
@@ -111,6 +117,22 @@ const SupplierPageControls: React.FC<SupplierPageControlsProps> = ({
             <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
               <FilterIcon className="w-4 h-4" />
             </Button>
+            <Dropdown
+              trigger={
+                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                  <Settings2Icon className="w-4 h-4" />
+                </Button>
+              }
+              align="right"
+              showChevron={false}
+              className="w-fit"
+            >
+              {onExport && (
+                <DropdownItem onClick={onExport}>
+                  <ExportFileIcon size={14} /> Exportar
+                </DropdownItem>
+              )}
+            </Dropdown>
             <Button onClick={onAddSupplier} className="w-[42px] h-[42px] p-0 flex items-center justify-center" leftIcon={<PlusIcon size={18} />} />
           </div>
         </div>

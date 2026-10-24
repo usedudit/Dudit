@@ -3,9 +3,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import FilterChip from "@/components/reusable/FilterChip"
-import { SearchIcon, PlusIcon, GridIcon, ListIcon, AwardIcon, RankingIcon, FilterIcon, CheckCircleIcon, CalendarIcon } from "@/lib/icons"
+import { SearchIcon, PlusIcon, GridIcon, ListIcon, AwardIcon, RankingIcon, FilterIcon, CheckCircleIcon, CalendarIcon, Settings2Icon, ExportFileIcon } from "@/lib/icons"
 import {
     EMPTY_DATE_PERIOD,
     isDatePeriodFilterActive,
@@ -34,6 +36,7 @@ interface GoalsPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     tabCounts?: { Metas: number; Ranking: number }
+    onExport?: () => void
 }
 
 const GoalsPageControls: React.FC<GoalsPageControlsProps> = ({
@@ -49,6 +52,7 @@ const GoalsPageControls: React.FC<GoalsPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     tabCounts,
+    onExport,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -134,6 +138,22 @@ const GoalsPageControls: React.FC<GoalsPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         {activeTab === "Metas" && (
                             <Button
                                 onClick={onCreate}

@@ -23,7 +23,6 @@ import {
     MoneyIcon,
     InfoIcon,
     TagIcon,
-    BoxIcon,
     CameraIcon,
     StarIcon,
     ArchiveIcon,

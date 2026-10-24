@@ -2071,7 +2071,7 @@ async function createOrderStockMovement(params: {
     }
   }
 
-  revalidateStockMovements(params.partnerId);
+  await revalidateStockMovements(params.partnerId);
 
   for (const item of movementItems) {
     if (item.product_id) {

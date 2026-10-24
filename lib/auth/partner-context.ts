@@ -313,8 +313,12 @@ export const getCurrentContext = cache(async (): Promise<RequestContext> => {
     }
 
     const [allPartners, activePartner] = await Promise.all([
-        getAllUserPartnerAccess(user),
-        getCurrentPartnerContext(user),
+        // Keep the canonical no-argument cache key shared with ERP pages.
+        // Authentication is still resolved from the same request-scoped user.
+        getAllUserPartnerAccess(),
+        // Use the canonical no-argument cache key so ERP pages and the
+        // authorization helpers share the same request-scoped context.
+        getCurrentPartnerContext(),
     ])
 
     return {

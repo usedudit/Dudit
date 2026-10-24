@@ -3,6 +3,8 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -18,6 +20,8 @@ import {
     CancelCircleIcon,
     BlockedIcon,
     InfoIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 
 interface VideoPageControlsProps {
@@ -33,6 +37,7 @@ interface VideoPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters?: boolean
     tabCounts?: { Todos: number; Pendentes: number; Aprovados: number; Rejeitados: number }
+    onExport?: () => void
 }
 
 const VideoPageControls: React.FC<VideoPageControlsProps> = ({
@@ -48,6 +53,7 @@ const VideoPageControls: React.FC<VideoPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters = false,
     tabCounts,
+    onExport,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -132,6 +138,22 @@ const VideoPageControls: React.FC<VideoPageControlsProps> = ({
                                 <FilterIcon className="w-4 h-4" />
                             </Button>
                         )}
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         {onAddVideo && (
                             <Button
                                 onClick={onAddVideo}

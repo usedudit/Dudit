@@ -484,6 +484,7 @@ export default function SuppliersPage({
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals({ filter: true })}
                                     onAddSupplier={handleAddSupplier}
+                                    onExport={handleExport}
                                     filters={filters}
                                     setFilters={setFilters as any}
                                     viewMode={viewMode}

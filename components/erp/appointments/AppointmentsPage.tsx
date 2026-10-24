@@ -55,6 +55,7 @@ import { AppointmentsSuggestionsSheet } from './AppointmentsSuggestionsSheet';
 import { usePlanUpgrade } from '@/components/erp/subscription/PlanUpgradeModal';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { AppointmentListRow } from './AppointmentListRow';
+import { SelectionBanner } from '@/components/reusable/SelectionBanner';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 import { text } from 'node:stream/consumers';
 import { useNotification } from '@/hooks/use-notification';
@@ -884,6 +885,15 @@ const AppointmentsPage = ({
                                 onImport={() => router.push('/erp/agendamentos/importar')}
                                 onOpenSuggestions={handleOpenSuggestions}
                                 hasEscalarPlan={hasEscalarPlan}
+                            />
+
+                            <SelectionBanner
+                                selectedCount={selectedIds.size}
+                                totalCount={visibleAppointments.length}
+                                onSelectAll={() => setSelectedIds(new Set(visibleAppointments.map((appointment) => appointment.id)))}
+                                onClearSelection={() => setSelectedIds(new Set())}
+                                itemName="agendamentos"
+                                singularItemName="agendamento"
                             />
 
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full md:px-8">

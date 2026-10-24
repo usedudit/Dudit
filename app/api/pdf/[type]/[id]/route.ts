@@ -101,6 +101,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             .maybeSingle()
 
         partnerId = inv?.partner_id || null
+    } else if (type === "transacao") {
+        resource = "financial"
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("partner_id")
+            .eq("id", id)
+            .maybeSingle()
+
+        partnerId = transaction?.partner_id || null
     } else {
         return new Response(JSON.stringify({ error: "Tipo de documento inválido" }), {
             status: 400,

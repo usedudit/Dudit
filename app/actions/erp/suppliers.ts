@@ -650,7 +650,7 @@ export async function deleteSuppliersInBatchAction(supplierIds: string[]) {
 
   if (error) return { error: error.message }
 
-  revalidateSuppliers(partnerId)
+  await revalidateSuppliers(partnerId)
   revalidatePath("/erp/fornecedores")
   return { success: true }
 }
@@ -686,7 +686,7 @@ export async function toggleSuppliersStatusAction(supplierIds: string[], isActiv
 
   if (error) return { error: error.message }
 
-  revalidateSuppliers(partnerId)
+  await revalidateSuppliers(partnerId)
   revalidatePath("/erp/fornecedores")
   return { success: true }
 }

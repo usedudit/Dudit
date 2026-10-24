@@ -16,7 +16,13 @@ export const getErpRequestContext = cache(async (
   resolvedUser?: User | any,
 ): Promise<PartnerContext | null> => {
   const user = await requireUser(resolvedUser)
-  const context = await getCurrentPartnerContext(user)
+  // Keep the no-argument path identical to pages that call
+  // getCurrentPartnerContext() directly. React cache keys include arguments,
+  // so passing the resolved user here created a second context resolution in
+  // the ERP layout/page request.
+  const context = resolvedUser
+    ? await getCurrentPartnerContext(user)
+    : await getCurrentPartnerContext()
   if (!context) return null
   return context
 })

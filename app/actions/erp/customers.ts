@@ -300,7 +300,7 @@ export async function createComprehensiveCustomerAction(data: {
     }
   }
 
-  revalidateCustomers(partnerId)
+  await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
   return { success: true }
 }
@@ -333,7 +333,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
     return { error: error.message }
   }
 
-  revalidateCustomers(partnerId)
+  await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
 
   return { success: true }
@@ -588,7 +588,7 @@ export async function updateComprehensiveCustomerAction(data: {
       .eq("address_type", "billing")
   }
 
-  revalidateCustomers(partnerId)
+  await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
   return { success: true }
 }
@@ -938,7 +938,7 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
     return { error: error.message }
   }
 
-  revalidateCustomers(partnerId)
+  await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
   return { success: true }
 }
@@ -958,7 +958,7 @@ export async function archiveCustomerAction(customerId: string) {
   const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
   if (error) return { error: error.message }
 
-  revalidateCustomers(customer.partner_id)
+  await revalidateCustomers(customer.partner_id)
   revalidatePath("/erp/clientes")
   return { success: true }
 }
@@ -983,7 +983,7 @@ export async function unarchiveCustomerAction(customerId: string) {
   const { error } = await supabase.from("customers").update(payload).eq("id", customerId)
   if (error) return { error: error.message }
 
-  revalidateCustomers(customer.partner_id)
+  await revalidateCustomers(customer.partner_id)
   revalidatePath("/erp/clientes")
   return { success: true }
 }
@@ -1023,7 +1023,7 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
     return { error: error.message }
   }
 
-  revalidateCustomers(partnerId)
+  await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
   return { success: true }
 }

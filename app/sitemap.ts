@@ -121,12 +121,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .order("created_at", { ascending: false })
                 .limit(500),
 
-            // Top 500 active services in marketplace
+            // Top 500 active services in marketplace (using public RPC)
             supabase
-                .from("services")
-                .select("id, short_id, name, updated_at, created_at, partners!inner(id, addresses!left(city, state))")
-                .eq("is_active", true)
-                .eq("show_in_marketplace", true)
+                .rpc("get_marketplace_services_public", { p_service_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })
                 .limit(500),
 
@@ -155,12 +152,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
         // --- Services ---
         const services = servicesResponse.data || []
-        const servicesSitemap: MetadataRoute.Sitemap = services.map((srv: any) => ({
-            url: `https://dudit.com.br${getServiceUrl(srv)}`,
-            lastModified: new Date(srv.updated_at || srv.created_at),
-            changeFrequency: "daily",
-            priority: 0.8,
-        }))
+        const servicesSitemap: MetadataRoute.Sitemap = services.map((srv: any) => {
+            // Transform RPC response to match getServiceUrl expectations
+            const serviceWithPartner = {
+                ...srv,
+                partners: [{
+                    city: srv.store_city,
+                    state: srv.store_state,
+                    addresses: [{ city: srv.store_city, state: srv.store_state }],
+                }],
+            }
+            return {
+                url: `https://dudit.com.br${getServiceUrl(serviceWithPartner)}`,
+                lastModified: new Date(srv.updated_at || srv.created_at),
+                changeFrequency: "daily",
+                priority: 0.8,
+            }
+        })
 
         // --- Stores ---
         const stores = storesResponse.data || []

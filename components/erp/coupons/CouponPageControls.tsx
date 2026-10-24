@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -16,6 +18,8 @@ import {
     CheckCircleIcon,
     CancelCircleIcon,
     SparklesIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 
 type FilterState = {
@@ -37,6 +41,7 @@ interface CouponPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     onAddCoupon?: () => void
+    onExport?: () => void
     tabCounts?: { Todos: number; Ativos: number; Inativos: number; Automaticos: number }
 }
 
@@ -52,6 +57,7 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     onAddCoupon,
+    onExport,
     tabCounts,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -147,6 +153,22 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         <Button
                             onClick={onAddCoupon}
                             disabled={!onAddCoupon}

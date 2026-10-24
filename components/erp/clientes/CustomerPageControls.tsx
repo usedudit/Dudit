@@ -1,6 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -17,6 +19,8 @@ import {
     BlockedIcon,
     InfoIcon,
     ArchiveIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
@@ -166,6 +170,20 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            <DropdownItem onClick={onExport}>
+                                <ExportFileIcon size={14} /> Exportar
+                            </DropdownItem>
+                        </Dropdown>
                         <Button
                             onClick={onAddCustomer}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"

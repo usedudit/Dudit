@@ -10,6 +10,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
+import { SelectionBanner } from "@/components/reusable/SelectionBanner"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
@@ -20,6 +21,7 @@ import TransactionListItem from "./TransactionListRow"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
+import TransactionPrintModal from "./TransactionPrintModal"
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
@@ -205,6 +207,7 @@ export default function TransactionsPage({
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [bulkModalOpen, setBulkModalOpen] = useState(false)
+    const [printTransactionId, setPrintTransactionId] = useState<string | null>(null)
     const undoManager = useUndoGracePeriod(10000)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
@@ -450,8 +453,8 @@ export default function TransactionsPage({
                 if (method?.default_finance_account_id) return method.default_finance_account_id
             }
         }
-        return settleAccountId
-    }, [settleAccountLocked, settlePendingCount, settlePendingInstallments, activePaymentMethodsList, settleAccountId])
+        return settleAccountId || pickBankThenCashDefaultFinanceAccountId(financeAccounts) || null
+    }, [settleAccountLocked, settlePendingCount, settlePendingInstallments, activePaymentMethodsList, settleAccountId, financeAccounts])
 
     const getMatchedPaymentMethod = useCallback((methodIdOrLabel: string | null | undefined) => {
         if (!methodIdOrLabel) return null
@@ -1164,17 +1167,8 @@ export default function TransactionsPage({
     }, [openEntity])
 
     const handlePrintTransaction = useCallback((transaction: ERPTransaction) => {
-        window.print()
+        setPrintTransactionId(transaction.id)
     }, [])
-
-    const handleShareTransaction = useCallback((transaction: ERPTransaction) => {
-        if (navigator.share) {
-            navigator.share({
-                title: transaction.description || "Transação",
-                text: `${transaction.contactName || "Transação"} - ${formatCurrency(transaction.amount)}`,
-            }).catch(() => {})
-        }
-    }, [formatCurrency])
 
     const handleCloseTransactionDetail = useCallback(() => {
         closeEntity()
@@ -1313,7 +1307,7 @@ export default function TransactionsPage({
                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                     interestAmount: "0",
                     discountAmount: "0",
-                    paymentMethodId: resolveStandardPaymentMethod(row.paymentType) || row.paymentMethodId || "Pix",
+                    paymentMethodId: row.paymentMethodId || resolveStandardPaymentMethod(row.paymentType) || "Pix",
                 }
             }
             setSettlePaymentsByInstallment(nextState)
@@ -2322,6 +2316,7 @@ export default function TransactionsPage({
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
                     onAddTransaction={() => openEntity("create")}
+                    onExport={handleExport}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={effectiveViewMode}
@@ -2374,6 +2369,16 @@ export default function TransactionsPage({
                                 key={activeTab + effectiveViewMode}
                                 className="w-full"
                             >
+                                {!isSettledTab(activeTab) && (
+                                    <SelectionBanner
+                                        selectedCount={selection.ids.size}
+                                        totalCount={paginatedTransactions.length}
+                                        onSelectAll={() => setSelection({ ids: new Set(paginatedTransactions.map((item) => item.id)) })}
+                                        onClearSelection={() => setSelection({ ids: new Set() })}
+                                        itemName="transações"
+                                        singularItemName="transação"
+                                    />
+                                )}
                                 {effectiveViewMode === "grid" ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginatedTransactions.map((transaction) => (
@@ -2388,7 +2393,6 @@ export default function TransactionsPage({
                                                 onCancelPending={handleRequestCancelPending}
                                                 onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                                 onPrint={handlePrintTransaction}
-                                                onShare={handleShareTransaction}
                                                 {...getPrefetchProps(transaction.id)}
                                             />
                                         ))}
@@ -2467,7 +2471,6 @@ export default function TransactionsPage({
                                                             onCancelPending={handleRequestCancelPending}
                                                             onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                                             onPrint={handlePrintTransaction}
-                                                            onShare={handleShareTransaction}
                                                             {...getPrefetchProps(transaction.id)}
                                                         />
                                                     ))}
@@ -2562,6 +2565,14 @@ export default function TransactionsPage({
                 isExecuting={undoManager.isExecuting}
                 onUndo={undoManager.undo}
                 onConfirmNow={undoManager.flush}
+            />
+
+            <TransactionPrintModal
+                isOpen={Boolean(printTransactionId)}
+                onClose={() => setPrintTransactionId(null)}
+                transactionId={printTransactionId || ""}
+                partnerId={partnerId}
+                storeId={storeId}
             />
 
             {renderSharedModals()}

@@ -3,6 +3,8 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
@@ -17,6 +19,8 @@ import {
     ArrowDownIcon,
     CalendarIcon,
     UserIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -44,6 +48,7 @@ interface CashRegisterPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     tabCounts?: { all: number; open: number; closed: number }
+    onExport?: () => void
 }
 
 const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
@@ -57,6 +62,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     tabCounts,
+    onExport,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -166,6 +172,22 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon size={18} />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         <Button
                             onClick={onOpenSession}
                             leftIcon={<PlusIcon size={18} />}

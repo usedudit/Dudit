@@ -104,8 +104,13 @@ export function useEntityPage<
             },
         fetchFn: fetchPageFn,
         dedupeKey,
+        // Keep the SSR page fast on first mount, but allow React Query to
+        // refresh it when the user returns after it becomes stale. Without
+        // this, refetchOnMount=false left newly created/updated records out of
+        // the list until a hard browser reload.
+        staleTime,
         refetchOnWindowFocus: false,
-        refetchOnMount: false,
+        refetchOnMount: true,
     })
 
     // ── Entity Cache ─────────────────────────────────────────────────────

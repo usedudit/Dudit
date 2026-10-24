@@ -474,7 +474,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                             <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                                                 Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order.priority]?.label || "Média"}</strong>
                                                             </div>
-                                                            <div className="md:hidden">
+                                                            <div className="lg:hidden">
                                                                 <button
                                                                     onClick={() => setIsStepsSheetOpen(true)}
                                                                     className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
@@ -513,6 +513,58 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Mobile/Tablet Timeline - mimics order status timeline */}
+                                                <div className="lg:hidden mb-6">
+                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                        <div className="bg-brand-gray dark:bg-dark-border/50 p-4 border-b border-brand-border dark:border-dark-border flex justify-between items-center">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                    Responsável pelo serviço:
+                                                                </span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                    {assignedName}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                {timelineSteps.filter(s => s.active).length} de {timelineSteps.length} etapas concluídas
+                                                            </span>
+                                                        </div>
+                                                        <div className="bg-white dark:bg-dark-surface p-4">
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <div className={`h-2 flex-1 rounded-full bg-gray-100 dark:bg-dark-border/50 overflow-hidden`}>
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                        style={{ width: `${progressPercent}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {timelineSteps.map((step: any, idx: number) => {
+                                                                    const isStepCancelled = step.isCancelled
+                                                                    return (
+                                                                        <div key={idx} className="flex items-center gap-3">
+                                                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                            </div>
+                                                                            <div className="flex-1 flex flex-col">
+                                                                                <span className={`text-sm font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                                    {step.label}
+                                                                                </span>
+                                                                                {step.date && (
+                                                                                    <div className="flex items-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                        <span>{step.date}</span>
+                                                                                        {step.time && <><span>•</span><span>{step.time}</span></>}
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </div>
@@ -633,9 +685,11 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                         <div className="flex justify-between items-center text-sm">
                                                             <span className="text-brand-inactive-text font-medium">Pedido Vinculado</span>
-                                                            <a href={`/erp/pedidos/?view=${order.order_id}`} className="font-bold text-brand-primary hover:underline text-right">
-                                                                #{order.linked_order_number || order.order_id}
-                                                            </a>
+                                                            {order.order_id ? (
+                                                                <a href={`/erp/pedidos/?view=${order.order_id}`} className="font-bold text-brand-primary hover:underline text-right">#{order.linked_order_number || order.order_id}</a>
+                                                            ) : (
+                                                                <span className="font-medium text-brand-inactive-text dark:text-dark-body text-right">-</span>
+                                                            )}
                                                         </div>
 
                                                         {order.payment_method && (
@@ -752,7 +806,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                                 const diffLateH = Math.floor(diffLateMs / 3600000)
                                                                 const diffLateD = Math.floor(diffLateH / 24)
                                                                 const diffLateM = Math.floor((diffLateMs % 3600000) / 60000)
-                                                                const isCompleted = !!order.completed_at
+                                                                const isCompleted = !!order.completed_at || order.status === "concluida" || order.status === "entregue"
                                                                 if (isLate) {
                                                                     const label = isCompleted ? "Concluído com atraso" : "Atrasado"
                                                                     return (
@@ -1201,8 +1255,17 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                 onClose={() => setIsStepsSheetOpen(false)}
                 title="Etapas da Ordem de Serviço"
             >
-                <div className="space-y-2 my-4">
-                    {timelineSteps.map((step: any, idx: number) => {
+                <div className="space-y-4 my-4">
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                            Responsável:
+                        </span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                            {assignedName}
+                        </span>
+                    </div>
+                    <div className="space-y-2">
+                        {timelineSteps.map((step: any, idx: number) => {
                         const isStepCancelled = step.isCancelled
                         return (
                             <div key={idx} className="flex items-center gap-3 p-3 border border-brand-border dark:border-dark-border rounded-lg">
@@ -1223,6 +1286,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                             </div>
                         )
                     })}
+                    </div>
                 </div>
             </BottomSheet>
 

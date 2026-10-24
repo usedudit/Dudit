@@ -3159,11 +3159,11 @@ export async function getTransactionDetailsAction(
 
             currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
-            // Show ALL installments of the group (the selected transaction is just one of them).
-            // Fallback: if the group rows weren't returned (e.g. empty result), synthesize the
-            // current transaction so the breakdown still renders at least one row.
-            const groupRowsAll = (groupRows && groupRows.length > 0)
-                ? groupRows
+            // Show ONLY the current parcel (the selected transaction). Other installments
+            // in the group are listed on the Transactions page, not in this detail view.
+            const currentGroupRow = (groupRows || []).find((g: any) => String(g.id) === String(row.id))
+            const groupRowsAll = currentGroupRow
+                ? [currentGroupRow]
                 : [{
                     id: row.id,
                     installment_number: row.installment_number,

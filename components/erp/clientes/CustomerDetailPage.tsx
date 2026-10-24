@@ -10,6 +10,7 @@ import { ReviewsSection } from '@/components/marketplace/ReviewsSection';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction, deleteCustomerAction, archiveCustomerAction, unarchiveCustomerAction, getCustomerStoreCreditsAction } from '@/app/actions/erp/customers';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
+import OrderGridCard from '@/components/erp/orders/OrderGridCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
 import { useRouter } from 'next/navigation';
@@ -357,7 +358,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             const fetchReviews = async () => {
                 setIsLoadingReviews(true);
                 try {
-                    const res = await fetch(`/api/marketplace/customer-reviews?customerId=${realCustomerId}`);
+                    const res = await fetch(`/api/erp/customers/${realCustomerId}/reviews`);
                     if (res.ok) {
                         const data = await res.json();
                         setFetchedReviews(data.reviews || []);
@@ -770,16 +771,18 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                     <TabsContent value="Review" className="mt-0">
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                            <div className="flex items-center justify-end mb-4">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={handleExportReviews}
-                                                    disabled={isExporting || !(fetchedReviews && fetchedReviews.length)}
-                                                    leftIcon={<ExportFileIcon size={18} />}
-                                                >
-                                                    {isExporting ? "Exportando..." : "Exportar"}
-                                                </Button>
-                                            </div>
+                                            {(fetchedReviews && fetchedReviews.length > 0) && (
+                                                <div className="flex items-center justify-end mb-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={handleExportReviews}
+                                                        disabled={isExporting}
+                                                        leftIcon={<ExportFileIcon size={18} />}
+                                                    >
+                                                        {isExporting ? "Exportando..." : "Exportar avaliações"}
+                                                    </Button>
+                                                </div>
+                                            )}
                                             <ReviewsContent reviews={fetchedReviews || []} isLoading={isLoadingReviews} />
                                         </motion.div>
                                     </TabsContent>
@@ -1032,6 +1035,7 @@ const OrdersContent = ({
     setSortConfig: (c: any) => void;
 }) => {
     const isMobile = useMediaQuery("(max-width: 767px)");
+    const isTablet = useMediaQuery("(max-width: 1279px)");
 
     return (
         <div className="mt-6">
@@ -1041,58 +1045,25 @@ const OrdersContent = ({
                         <ThreeDotsLoader />
                     </div>
                 ) : formattedOrders.length > 0 ? (
-                    isMobile ? (
-                        <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                    // Tablet/Mobile: Grid with OrderGridCard
+                    (isMobile || isTablet) ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                             {paginatedOrders.map((o: any) => (
-                                <div
+                                <OrderGridCard
                                     key={o.originalId}
-                                    className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
-                                    onClick={() => handleDetailsOrder(o)}
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-0.5">
-                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                {o.displayId}
-                                            </h3>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                            <Badge variant={o.statusColor} icon={<MoneyIcon />} className="h-5 text-[10px] px-1.5">
-                                                {o.statusLabel}
-                                            </Badge>
-                                            {!o.hasOnlyServices && (
-                                                <Badge variant={o.deliveryStatusColor || "gray"} icon={
-                                                    o.delivery_type === "pickup"
-                                                        ? <StoreIcon />
-                                                        : o.carrierBrandIcon
-                                                            ? <img src={o.carrierBrandIcon} alt="Transportadora" className="object-contain" />
-                                                            : <TruckIcon />
-                                                } className="h-5 text-[10px] px-1.5">
-                                                    {o.deliveryStatusLabel || "Não informado"}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1.5">
-                                            {o.formattedDate}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[14px] mt-1">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
-                                            </span>
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-bold">•</span>
-                                            <span className="font-bold text-brand-primary">
-                                                {formatCurrency(o.total_amount)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                    order={o}
+                                    selected={false}
+                                    onSelect={() => {}}
+                                    onDetails={() => handleDetailsOrder(o)}
+                                    onEdit={() => {}}
+                                    onCancel={() => {}}
+                                    canEdit={false}
+                                    cancelLabel="Cancelar"
+                                />
                             ))}
-                            {totalPages > 1 && (
-                                <div className="flex justify-center mt-6">
-                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-                                </div>
-                            )}
                         </div>
                     ) : (
+                        // Desktop: Table layout
                         <div className="w-full overflow-hidden rounded-xl relative">
                             <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                             <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
@@ -1205,7 +1176,7 @@ const OrdersContent = ({
             </AnimatePresence>
 
             {totalPages > 1 && formattedOrders.length > 0 && (
-                <div className="flex justify-center mt-6 w-full hidden md:flex">
+                <div className="flex justify-center mt-6 w-full">
                     <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                 </div>
             )}
@@ -1496,6 +1467,20 @@ function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boo
         return (
             <div className="flex items-center justify-center p-8 py-20">
                 <ThreeDotsLoader />
+            </div>
+        )
+    }
+
+    if (!reviews || reviews.length === 0) {
+        return (
+            <div className="mt-6">
+                <IconPlaceholder
+                    title="Nenhuma avaliação encontrada"
+                    subtitle="Este cliente ainda não deixou nenhuma avaliação."
+                    imageSrc="https://img.dudit.com.br/static/mascots/SemAvaliacoes.png"
+                    imageAlt="Nenhuma avaliação encontrada"
+                    placeholderType="image"
+                />
             </div>
         )
     }

@@ -1577,8 +1577,10 @@ export async function linkProductSupplierAction(productId: string, supplierId: s
         })
         if (error && !error.message.includes("duplicate")) return { error: error.message }
 
-        revalidateSuppliers(product.partner_id)
-        revalidateProducts(product.partner_id, productId)
+        await Promise.all([
+            revalidateSuppliers(product.partner_id),
+            revalidateProducts(product.partner_id, productId),
+        ])
         return { success: true }
     } catch (error: any) {
         return { error: error.message }
@@ -1602,8 +1604,10 @@ export async function linkProductSuppliersBatchAction(productId: string, supplie
 
         if (error) return { error: error.message }
 
-        revalidateSuppliers(product.partner_id)
-        revalidateProducts(product.partner_id, productId)
+        await Promise.all([
+            revalidateSuppliers(product.partner_id),
+            revalidateProducts(product.partner_id, productId),
+        ])
         return { success: true }
     } catch (error: any) {
         return { error: error.message }
@@ -1617,8 +1621,10 @@ export async function unlinkProductSupplierAction(productId: string, supplierId:
         const { error } = await admin.from("product_suppliers").delete().eq("product_id", productId).eq("supplier_id", supplierId)
         if (error) return { error: error.message }
 
-        revalidateSuppliers(product.partner_id)
-        revalidateProducts(product.partner_id, productId)
+        await Promise.all([
+            revalidateSuppliers(product.partner_id),
+            revalidateProducts(product.partner_id, productId),
+        ])
         return { success: true }
     } catch (error: any) {
         return { error: error.message }
@@ -1635,8 +1641,10 @@ export async function updateProductSupplierAction(productId: string, supplierId:
         if (data.leadTimeDays !== undefined) updates.lead_time_days = data.leadTimeDays
         const { error } = await admin.from("product_suppliers").update(updates).eq("product_id", productId).eq("supplier_id", supplierId)
         if (error) return { error: error.message }
-        revalidateSuppliers(product.partner_id)
-        revalidateProducts(product.partner_id, productId)
+        await Promise.all([
+            revalidateSuppliers(product.partner_id),
+            revalidateProducts(product.partner_id, productId),
+        ])
         return { success: true }
     } catch (error: any) {
         return { error: error.message }

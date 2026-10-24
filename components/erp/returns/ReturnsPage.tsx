@@ -569,6 +569,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                                  onSearchChange={setSearch}
                                  onOpenFilter={() => setModals({ filter: true })}
                                  onAdd={canManage ? () => openEntity("create") : undefined}
+                                 onExport={handleExport}
                                  viewMode={effectiveViewMode}
                                  onViewModeChange={setViewModeState}
                              />
@@ -788,6 +789,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     returnId={printReturnId}
                     partnerId={partnerId}
                     storeId={selectedStore?.id}
+                    onEdit={canManage ? () => openEntity("edit", printReturnId || "") : undefined}
                 />
             )}
 

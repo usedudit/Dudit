@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { AlertModal, Button, Checkbox, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { SelectionBanner } from "@/components/reusable/SelectionBanner"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -604,6 +605,15 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                         onCreate={onCreate}
                     />
 
+                    <SelectionBanner
+                        selectedCount={selection.ids.size}
+                        totalCount={filteredMethods.length}
+                        onSelectAll={() => setSelection({ ids: new Set(filteredMethods.map((method) => method.id)) })}
+                        onClearSelection={clearSelection}
+                        itemName="métodos"
+                        singularItemName="método"
+                    />
+
                     <div className="mt-4">
                         <AnimatePresence mode="wait">
                             <FadeIn
@@ -677,6 +687,15 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                                     onViewModeChange={setViewMode}
                                     hasActiveFilters={hasActiveFilters}
                                     onCreate={onCreate}
+                                />
+
+                                <SelectionBanner
+                                    selectedCount={selection.ids.size}
+                                    totalCount={filteredMethods.length}
+                                    onSelectAll={() => setSelection({ ids: new Set(filteredMethods.map((method) => method.id)) })}
+                                    onClearSelection={clearSelection}
+                                    itemName="métodos"
+                                    singularItemName="método"
                                 />
 
                                 <div className="mt-4">

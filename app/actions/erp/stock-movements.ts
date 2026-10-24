@@ -121,7 +121,7 @@ export async function createStockMovementAction(data: {
             return errorResponse(error.message)
         }
 
-        revalidateStockMovements(partnerId)
+        await revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
 
@@ -283,7 +283,7 @@ export async function createBatchStockMovementAction(data: {
             return errorResponse(error.message)
         }
 
-        revalidateStockMovements(partnerId)
+        await revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
 
@@ -484,7 +484,7 @@ export async function deleteStockMovementAction(id: string) {
             return errorResponse(error.message)
         }
 
-        revalidateStockMovements(ctx.partnerId)
+        await revalidateStockMovements(ctx.partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
 
@@ -579,7 +579,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
                 .eq("id", id)
         }
 
-        revalidateStockMovements(partnerId)
+        await revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
 

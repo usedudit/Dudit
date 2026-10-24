@@ -236,7 +236,7 @@ export default function OSSPrintModal({ isOpen, onClose, orderId, partnerId, sto
                                             forceMount
                                         >
                                             <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
-                                                <div className="w-full max-w-3xl">
+                                                <div className="w-full max-w-full sm:max-w-3xl">
                                                     <OSPreview
                                                         invoiceNumber={order.order_number || ""}
                                                         orderDate={order.created_at || ""}

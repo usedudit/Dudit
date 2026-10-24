@@ -23,9 +23,11 @@ import {
     getSubscriptionReportData,
     getAppointmentsReportData,
 } from "@/lib/data/reports"
-import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
-import { checkPermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { redirect } from "next/navigation"
@@ -36,7 +38,7 @@ export const dynamic = "force-dynamic"
 export default async function ERPEstatisticasPage(props: {
     searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }>
 }) {
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
@@ -57,44 +59,6 @@ export default async function ERPEstatisticasPage(props: {
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
     const hasProducts = activeResources.includes("products")
-    const hasServices = activeResources.includes("services") || activeResources.includes("appointments")
-    const hasFinancial = activeResources.includes("financial")
-    const hasOrders = activeResources.includes("orders") || activeResources.includes("products") || activeResources.includes("pos")
-    const hasCustomers = activeResources.includes("customers")
-    const hasReturns = activeResources.includes("returns")
-    const hasDeliveries = activeResources.includes("deliveries")
-    const hasMarketing = activeResources.includes("marketing") || activeResources.includes("coupons") || activeResources.includes("campaigns")
-    const hasProductivity = activeResources.includes("productivity") || activeResources.includes("team")
-    const hasServiceOrders = activeResources.includes("serviceOrders")
-    const hasGoals = activeResources.includes("goals")
-    const hasSubscriptions = activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
-    const hasAppointments = activeResources.includes("appointments")
-
-    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue, appointmentsData] = await Promise.all([
-        hasProducts ? checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null) : Promise.resolve(null),
-        hasServices ? checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null) : Promise.resolve(null),
-        hasFinancial ? checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null) : Promise.resolve(null),
-        hasOrders ? checkPermission(partnerId, "products", "view").then(res => res.allowed ? getSalesReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasCustomers ? checkPermission(partnerId, "customers", "view").then(res => res.allowed ? getCustomerReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasReturns ? checkPermission(partnerId, "orders", "view").then(res => res.allowed ? getReturnsReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasDeliveries ? checkPermission(partnerId, "delivery", "view").then(res => res.allowed ? getDeliveryReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasMarketing ? checkPermission(partnerId, "products", "view").then(res => res.allowed ? getMarketingReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasProductivity ? checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getProductivityReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasServiceOrders ? checkPermission(partnerId, "service_orders", "view").then(res => res.allowed ? getServiceOrderReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasGoals ? checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getGoalReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasSubscriptions ? checkPermission(partnerId, "recurring_subscriptions", "view").then(res => res.allowed ? getSubscriptionReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-        hasProducts ? checkPermission(partnerId, "products", "view").then(async (res) => {
-          if (!res.allowed) return 0
-          try {
-            const supabase = (await import("@/lib/supabase/server")).createAdminClient()
-            const r = await supabase.from("products").select("stock_quantity, cost_price").eq("partner_id", partnerId)
-            if (r.error || !r.data) return 0
-            return r.data.reduce((sum: number, p: any) => sum + (Number(p.stock_quantity || 0) * Number(p.cost_price || 0)), 0)
-          } catch { return 0 }
-        }) : Promise.resolve(0),
-        hasAppointments ? checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getAppointmentsReportData(partnerId, period).catch(() => null) : null) : Promise.resolve(null),
-    ])
-
     return (
         <>
             <ERPPageHeader title={activeStore?.storeName ?? "Estatísticas"} />
@@ -116,29 +80,92 @@ export default async function ERPEstatisticasPage(props: {
                         </header>
 
                         <Suspense fallback={<ReportsSkeleton />}>
-                            <ReportsPage
+                            <ReportsContent
+                                partnerId={partnerId}
                                 activeResources={activeResources}
                                 period={period}
                                 planSlug={plan.slug}
-                                productsData={productsData}
-                                servicesData={servicesData}
-                                financialData={financialData}
-                                salesData={salesData}
-                                customerData={customerData}
-                                returnsData={returnsData}
-                                deliveryData={deliveryData}
-                                marketingData={marketingData}
-                                productivityData={productivityData}
-                                serviceOrdersData={serviceOrdersData}
-                                goalData={goalData}
-                                subscriptionData={subscriptionData}
-                                stockValue={stockValue}
-                                appointmentsData={appointmentsData}
+                                permissionContext={context as RbacUserLike}
                             />
                         </Suspense>
                     </div>
                 </DashboardProvider>
             </FadeIn>
         </>
+    )
+}
+
+async function ReportsContent({
+    partnerId,
+    activeResources,
+    period,
+    planSlug,
+    permissionContext,
+}: {
+    partnerId: string
+    activeResources: string[]
+    period: Period
+    planSlug: string
+    permissionContext: RbacUserLike
+}) {
+    const hasProducts = activeResources.includes("products")
+    const hasServices = activeResources.includes("services") || activeResources.includes("appointments")
+    const hasFinancial = activeResources.includes("financial")
+    const hasOrders = activeResources.includes("orders") || activeResources.includes("products") || activeResources.includes("pos")
+    const hasCustomers = activeResources.includes("customers")
+    const hasReturns = activeResources.includes("returns")
+    const hasDeliveries = activeResources.includes("deliveries")
+    const hasMarketing = activeResources.includes("marketing") || activeResources.includes("coupons") || activeResources.includes("campaigns")
+    const hasProductivity = activeResources.includes("productivity") || activeResources.includes("team")
+    const hasServiceOrders = activeResources.includes("serviceOrders")
+    const hasGoals = activeResources.includes("goals")
+    const hasSubscriptions = activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
+    const hasAppointments = activeResources.includes("appointments")
+    const hasPermission = (permission: string) => can(permissionContext, permission)
+
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue, appointmentsData] = await Promise.all([
+        hasProducts && hasPermission("products.view") ? getDashboardProductsData(partnerId).catch(() => null) : Promise.resolve(null),
+        hasServices && hasPermission("appointments.view") ? getDashboardServicesData(partnerId).catch(() => null) : Promise.resolve(null),
+        hasFinancial && hasPermission("financial.view") ? getDashboardFinancialData(partnerId).catch(() => null) : Promise.resolve(null),
+        hasOrders && hasPermission("products.view") ? getSalesReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasCustomers && hasPermission("customers.view") ? getCustomerReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasReturns && hasPermission("orders.view") ? getReturnsReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasDeliveries && hasPermission("delivery.view") ? getDeliveryReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasMarketing && hasPermission("products.view") ? getMarketingReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasProductivity && hasPermission("appointments.view") ? getProductivityReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasServiceOrders && hasPermission("service_orders.view") ? getServiceOrderReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasGoals && hasPermission("appointments.view") ? getGoalReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasSubscriptions && hasPermission("recurring_subscriptions.view") ? getSubscriptionReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+        hasProducts && hasPermission("products.view") ? (async () => {
+            try {
+                const supabase = (await import("@/lib/supabase/server")).createAdminClient()
+                const r = await supabase.from("products").select("stock_quantity, cost_price").eq("partner_id", partnerId)
+                if (r.error || !r.data) return 0
+                return r.data.reduce((sum: number, p: any) => sum + (Number(p.stock_quantity || 0) * Number(p.cost_price || 0)), 0)
+            } catch { return 0 }
+        })() : Promise.resolve(0),
+        hasAppointments && hasPermission("appointments.view") ? getAppointmentsReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+    ])
+
+    return (
+        <ReportsPage
+            activeResources={activeResources}
+            period={period}
+            planSlug={planSlug}
+            productsData={productsData}
+            servicesData={servicesData}
+            financialData={financialData}
+            salesData={salesData}
+            customerData={customerData}
+            returnsData={returnsData}
+            deliveryData={deliveryData}
+            marketingData={marketingData}
+            productivityData={productivityData}
+            serviceOrdersData={serviceOrdersData}
+            goalData={goalData}
+            subscriptionData={subscriptionData}
+            stockValue={stockValue}
+            appointmentsData={appointmentsData}
+        />
     )
 }

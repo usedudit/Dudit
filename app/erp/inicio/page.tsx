@@ -23,6 +23,21 @@ export default async function InicioPage() {
         redirect("/erp/entregas")
     }
 
+    return (
+        <FadeIn className="p-4">
+            <Suspense fallback={<QuickModeLoadingSkeleton />}>
+                <DashboardContent partnerId={partnerId} />
+            </Suspense>
+        </FadeIn>
+    )
+}
+
+/**
+ * Keep the expensive dashboard query behind the Suspense boundary.
+ * The previous version awaited this data in the page before rendering the
+ * boundary, so the skeleton could never be streamed to the browser.
+ */
+async function DashboardContent({ partnerId }: { partnerId: string }) {
     const result = await getUnifiedDashboardAction(partnerId)
 
     if (!result.success) {
@@ -37,13 +52,7 @@ export default async function InicioPage() {
         )
     }
 
-    return (
-        <FadeIn className="p-4">
-            <Suspense fallback={<QuickModeLoadingSkeleton />}>
-                <QuickModeHome data={result.data as any} partnerId={partnerId} />
-            </Suspense>
-        </FadeIn>
-    )
+    return <QuickModeHome data={result.data as any} partnerId={partnerId} />
 }
 
 function QuickModeLoadingSkeleton() {

@@ -185,7 +185,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown onPrint={() => setPrintModalOpen(true)} onShare={() => { }} />
+                                        <ActionsDropdown onPrint={() => setPrintModalOpen(true)} />
                                         {detail.canEdit && (
                                             <Button onClick={() => onEdit(transactionId)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                                 Editar
@@ -635,7 +635,6 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         <ActionsDropdown
                             onPrint={() => setPrintModalOpen(true)}
-                            onShare={() => { }}
                             trigger={
                                 <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
                                     Opções

@@ -813,8 +813,10 @@ export default function CreateTransactionPage({
             return
         }
         setFieldErrors(new Set())
-        /* ── Insufficient balance check for transactions with positive amount and selected account ── */
-        if (txKind !== "transfer" && txKind !== "adjustment") {
+        /* ── Insufficient balance check: only when money leaves the account ── */
+        const balanceLeavesAccount =
+            txKind === "expense" || (txKind === "refund" && refundKind === "revenue_refund")
+        if (txKind !== "transfer" && txKind !== "adjustment" && balanceLeavesAccount) {
             if (!skipBalanceWarningRef.current && amount > 0 && accountId) {
                 const curBal = getAccountBalance(accountId)
                 if (curBal + 0.005 < amount) {

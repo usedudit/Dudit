@@ -182,7 +182,7 @@ export async function saveAppointmentItemsAction(
         for (const pid of productIds) {
             await invalidateProductCache(pid, partnerId, 'update', { silent: true })
         }
-        revalidateStockMovements(partnerId)
+        await revalidateStockMovements(partnerId)
 
         return successResponse({ count: items.length })
     } catch (err: any) {
@@ -368,7 +368,7 @@ export async function handleAppointmentItemsStockMovement(params: {
         }
     }
     try {
-        revalidateStockMovements(partnerId)
+        await revalidateStockMovements(partnerId)
     } catch (err) {
         console.error("[appointment_stock] revalidation error:", err)
     }

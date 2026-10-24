@@ -681,7 +681,8 @@ export default function CashRegisterPage({
                                 search={search}
                                 onSearchChange={setSearch}
                                 onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                                onOpenSession={() => setOpenModal(true)}
+                                    onOpenSession={() => setOpenModal(true)}
+                                onExport={handleExport}
                                 filters={filters}
                                 setFilters={setFilters}
                                 viewMode={effectiveViewMode}

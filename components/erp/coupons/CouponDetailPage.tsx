@@ -36,7 +36,6 @@ export default function CouponDetailPage({
     onEdit,
     onDelete,
     onToggleStatus,
-    onShare,
     isLoadingRelations,
 }: {
     coupon: CouponRow
@@ -45,7 +44,6 @@ export default function CouponDetailPage({
     onEdit: (coupon: CouponRow) => void
     onDelete: (coupon: CouponRow) => void
     onToggleStatus: (coupon: CouponRow) => void
-    onShare?: (coupon: CouponRow) => void
     isLoadingRelations: boolean
 }) {
     const [activeTab, setActiveTab] = useState("summary")
@@ -94,7 +92,6 @@ export default function CouponDetailPage({
                                         onCancel={() => setShowDeactivationModal(true)}
                                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                                         onDelete={() => onDelete(coupon)}
-                                        onShare={onShare ? () => onShare(coupon) : undefined}
                                     />
                                     <Button onClick={() => onEdit(coupon)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                         Editar cupom
@@ -243,7 +240,6 @@ export default function CouponDetailPage({
                         onCancel={() => setShowDeactivationModal(true)}
                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                         onDelete={() => onDelete(coupon)}
-                        onShare={onShare ? () => onShare(coupon) : undefined}
                         trigger={
                             <Button variant="outline" className="flex-1">
                                 Opções

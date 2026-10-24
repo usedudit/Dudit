@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import {
     CreditCardIcon,
@@ -12,6 +14,8 @@ import {
     ListIcon,
     PlusIcon,
     SearchIcon,
+    Settings2Icon,
+    ExportFileIcon,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -29,6 +33,7 @@ interface PaymentMethodPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     onCreate?: () => void
+    onExport?: () => void
 }
 
 export default function PaymentMethodPageControls({
@@ -41,6 +46,7 @@ export default function PaymentMethodPageControls({
     onViewModeChange,
     hasActiveFilters,
     onCreate,
+    onExport,
 }: PaymentMethodPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -112,6 +118,25 @@ export default function PaymentMethodPageControls({
                         >
                             <FilterIcon size={18} className="text-brand-inactive-text" />
                         </Button>
+                        <Dropdown
+                            trigger={
+                                <Button
+                                    className="w-[42px] h-[42px] p-0 rounded-full"
+                                    variant="outline"
+                                >
+                                    <Settings2Icon size={18} className="text-brand-inactive-text" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            {onExport && (
+                                <DropdownItem onClick={onExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            )}
+                        </Dropdown>
                         {onCreate && (
                             <Button
                                 onClick={onCreate}

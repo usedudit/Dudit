@@ -38,13 +38,11 @@ import {
     getCouponStatusVariant,
     getCouponUsageCount,
     getCouponUsageSummary,
-    getCouponValueLabel,
     mapCouponToForm,
     ScopeCustomer,
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ShareModal } from "@/components/marketplace/ShareModal"
-import { getStoreUrl } from "@/lib/utils/url-generator"
+import { SelectionBanner } from "@/components/reusable/SelectionBanner"
 import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -140,7 +138,6 @@ export default function CouponsPage({
     const [isDeleting, setIsDeleting] = useState(false)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
-    const [sharingCoupon, setSharingCoupon] = useState<CouponRow | null>(null)
     const [localPartner, setLocalPartner] = useState<any>(partner || null)
 
     useEffect(() => {
@@ -816,7 +813,6 @@ export default function CouponsPage({
                                 onEdit={openEdit}
                                 onDelete={handleDelete}
                                 onToggleStatus={handleToggleStatus}
-                                onShare={setSharingCoupon}
                                 isLoadingRelations={isLoadingRelations}
                             />
                         </FadeIn>
@@ -869,6 +865,16 @@ export default function CouponsPage({
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
                                     onAddCoupon={canCreateCoupons && !planGate ? openCreate : undefined}
+                                    onExport={handleExport}
+                                />
+
+                                <SelectionBanner
+                                    selectedCount={selection.ids.size}
+                                    totalCount={filteredCoupons.length}
+                                    onSelectAll={() => setSelection({ ids: new Set(filteredCoupons.map((coupon) => coupon.id)) })}
+                                    onClearSelection={() => setSelection({ ids: new Set() })}
+                                    itemName="cupons"
+                                    singularItemName="cupom"
                                 />
 
                                 <div className="flex-1 min-h-[420px]">
@@ -920,7 +926,6 @@ export default function CouponsPage({
                                                                         onEdit={canEditCoupons ? openEdit : undefined}
                                                                         onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
                                                                         onDelete={canDeleteCoupons ? handleDelete : undefined}
-                                                                        onShare={setSharingCoupon}
                                                                     />
                                                                 ))}
                                                             </AnimatePresence>
@@ -999,7 +1004,6 @@ export default function CouponsPage({
                                                                                 onEdit={canEditCoupons ? openEdit : undefined}
                                                                                 onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
                                                                                 onDelete={canDeleteCoupons ? handleDelete : undefined}
-                                                                                onShare={setSharingCoupon}
                                                                             />
                                                                         ))}
                                                                     </tbody>
@@ -1049,27 +1053,6 @@ export default function CouponsPage({
                 onConfirm={handleColumnConfirm}
                 onClose={closeColumnSelectionModal}
             />
-
-            {sharingCoupon && (
-                <ShareModal
-                    isOpen={!!sharingCoupon}
-                    onClose={() => setSharingCoupon(null)}
-                    url={typeof window !== 'undefined' ? `${window.location.origin}${getStoreUrl({
-                        id: storeId || localPartner?.id,
-                        short_id: localPartner?.store?.short_id || localPartner?.short_id,
-                        slug: localPartner?.slug,
-                        name: localPartner?.store?.name || localPartner?.store_name,
-                        storeName: localPartner?.store?.name || localPartner?.store_name,
-                        city: localPartner?.city,
-                        state: localPartner?.state,
-                        addresses: localPartner?.addresses
-                    })}?cupom=${sharingCoupon.code}` : ""}
-                    title={`Cupom ${sharingCoupon.code}`}
-
-                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store?.name || localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
-                    label="Link com cupom"
-                />
-            )}
         </>
     )
 }

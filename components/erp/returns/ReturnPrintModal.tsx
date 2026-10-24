@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
-import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
+import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon, ThreeDotsIcon, EditIcon } from "@/lib/icons"
+import Dropdown from "@/components/reusable/Dropdown"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
 import { useStore } from "@/lib/store-context"
@@ -25,9 +27,10 @@ export type ReturnPrintModalProps = {
     returnId: string
     partnerId: string
     storeId?: string
+    onEdit?: () => void
 }
 
-export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId, storeId }: ReturnPrintModalProps) {
+export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId, storeId, onEdit }: ReturnPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
     const zIndex = useModalLayer(isOpen)
@@ -239,35 +242,49 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                 </div>
 
                                             <div className="hidden lg:flex gap-3 pt-2">
-                                                <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
-                                                    Imprimir
+                                                <Button className="flex-1 h-12" onClick={onEdit} leftIcon={<EditIcon size={18} />}>
+                                                    Editar
                                                 </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    className="flex-1 h-12"
-                                                    onClick={handleDownloadPdf}
-                                                    disabled={isDownloading}
-                                                    leftIcon={<DownloadIcon size={18} />}
+                                                <Dropdown
+                                                    trigger={
+                                                        <Button variant="outline" className="flex-1 h-12">
+                                                            <ThreeDotsIcon size={18} />
+                                                        </Button>
+                                                    }
+                                                    align="right"
+                                                    showChevron={false}
                                                 >
-                                                    {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
-                                                </Button>
+                                                    <DropdownItem onClick={handlePrint}>
+                                                        <PrinterIcon size={14} /> Imprimir
+                                                    </DropdownItem>
+                                                    <DropdownItem onClick={handleDownloadPdf} disabled={isDownloading}>
+                                                        <DownloadIcon size={14} /> {isDownloading ? "Gerando PDF..." : "Salvar PDF"}
+                                                    </DropdownItem>
+                                                </Dropdown>
                                             </div>
                                         </div>
 
                                         {/* Mobile footer actions */}
                                         <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                            <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
-                                                Imprimir
+                                            <Button className="flex-1 h-12" onClick={onEdit} leftIcon={<EditIcon size={18} />}>
+                                                Editar
                                             </Button>
-                                            <Button
-                                                variant="outline"
-                                                className="flex-1 h-12"
-                                                onClick={handleDownloadPdf}
-                                                disabled={isDownloading}
-                                                leftIcon={<DownloadIcon size={18} />}
+                                            <Dropdown
+                                                trigger={
+                                                    <Button variant="outline" className="flex-1 h-12">
+                                                        <ThreeDotsIcon size={18} />
+                                                    </Button>
+                                                }
+                                                align="right"
+                                                showChevron={false}
                                             >
-                                                {isDownloading ? "Gerando..." : "PDF"}
-                                            </Button>
+                                                <DropdownItem onClick={handlePrint}>
+                                                    <PrinterIcon size={14} /> Imprimir
+                                                </DropdownItem>
+                                                <DropdownItem onClick={handleDownloadPdf} disabled={isDownloading}>
+                                                    <DownloadIcon size={14} /> {isDownloading ? "Gerando..." : "PDF"}
+                                                </DropdownItem>
+                                            </Dropdown>
                                         </div>
                                     </div>
 
