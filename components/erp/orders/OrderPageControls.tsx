@@ -215,15 +215,6 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
                             <FilterIcon className="w-4 h-4" />
                         </Button>
-                        {onOpenSuggestions && (
-                            <Button
-                                variant="outlineorange"
-                                onClick={onOpenSuggestions}
-                                className="w-[42px] h-[42px] p-0"
-                            >
-                                <StarIcon className="w-4 h-4" />
-                            </Button>
-                        )}
                         <Dropdown
                             trigger={
                                 <Button variant="outline" className="w-[42px] h-[42px] p-0">
@@ -234,6 +225,11 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                             showChevron={false}
                             className="w-fit"
                         >
+                            {onOpenSuggestions && (
+                                <DropdownItem onClick={onOpenSuggestions}>
+                                    <StarIcon size={14} /> Sugestões & Oportunidades
+                                </DropdownItem>
+                            )}
                             <DropdownItem onClick={onExport}>
                                 <ExportFileIcon size={14} /> Exportar
                             </DropdownItem>

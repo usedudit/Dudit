@@ -12,6 +12,8 @@ import { downloadPdf } from "@/lib/pdf/download"
 import { toast } from "@/hooks/use-notification"
 import { formatDateToBR } from "@/lib/utils"
 import type { DreReportData, DreRegime } from "@/lib/services/dre.service"
+import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
+import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 import { DreA4Preview } from "./DreA4Preview"
 
 export interface DrePrintModalProps {
@@ -49,6 +51,24 @@ export function DrePrintModal({
   const [showComparison, setShowComparison] = useState(true)
   const [showKpiSummary, setShowKpiSummary] = useState(true)
   const [showSignatures, setShowSignatures] = useState(true)
+  const [partnerHeader, setPartnerHeader] = useState<SaleReceiptPartnerHeader | undefined>(undefined)
+
+  useEffect(() => {
+    if (!isOpen || !partnerId) {
+      setPartnerHeader(undefined)
+      return
+    }
+
+    let cancelled = false
+    async function loadHeader() {
+      const res = await getPartnerReceiptHeaderAction(partnerId, storeId)
+      if (!cancelled && res.success) {
+        setPartnerHeader(res.data)
+      }
+    }
+    loadHeader()
+    return () => { cancelled = true }
+  }, [isOpen, partnerId, storeId])
 
   useEffect(() => {
     if (isOpen) {
@@ -310,6 +330,7 @@ export function DrePrintModal({
                           showComparison={showComparison}
                           showKpiSummary={showKpiSummary}
                           showSignatures={showSignatures}
+              partnerHeader={partnerHeader || undefined}
                         />
                       </div>
                     </TabsContent>

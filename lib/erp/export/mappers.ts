@@ -370,7 +370,7 @@ export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
 export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow {
   const isPJ = String(row.person_type || "").toLowerCase() === "pj"
   const statusMap: Record<string, string> = { ativo: "Ativo", inativo: "Inativo", bloqueado: "Bloqueado" }
-  const addr = Array.isArray(row.addresses) ? row.addresses[0] : row.addresses || {}
+  const addr = (Array.isArray(row.addresses) ? row.addresses[0] : row.addresses) || {}
 
   const base = {
     name: row.name || "-",

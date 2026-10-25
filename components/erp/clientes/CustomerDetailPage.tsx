@@ -97,6 +97,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [isArchiving, setIsArchiving] = useState(false);
     const [storeCredits, setStoreCredits] = useState<any[]>([]);
     const [isLoadingStoreCredits, setIsLoadingStoreCredits] = useState(false);
+    const [storeCreditsError, setStoreCreditsError] = useState<string | null>(null);
 
     const router = useRouter();
     const [page, setPage] = useState(1);
@@ -258,6 +259,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     useEffect(() => {
         setHasLoadedStoreCredits(false);
         setStoreCredits([]);
+        setStoreCreditsError(null);
     }, [realCustomerId]);
 
     useEffect(() => {
@@ -312,34 +314,51 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         };
     }, [realCustomerId]);
 
-    // Lazy load store credits only when tab is accessed
+    // Lazy load store credits only when tab is accessed. `isLoadingStoreCredits`
+    // must stay OUT of the dependency list: toggling it inside the effect would
+    // trigger its cleanup, cancel `isCurrent`, and leave the loader stuck forever.
     useEffect(() => {
-        if (activeTab === "StoreCredits" && !hasLoadedStoreCredits && !isLoadingStoreCredits) {
-            let isCurrent = true;
-            setIsLoadingStoreCredits(true);
-            getCustomerStoreCreditsAction(realCustomerId)
-                .then((res) => {
-                    if (!isCurrent) return;
-                    if (res.success && res.storeCredits) {
-                        setStoreCredits(res.storeCredits);
-                    }
-                    setHasLoadedStoreCredits(true);
-                })
-                .catch((e) => {
-                    console.error("Error fetching store credits:", e);
-                })
-                .finally(() => {
-                    if (isCurrent) setIsLoadingStoreCredits(false);
-                });
+        if (activeTab !== "StoreCredits" || hasLoadedStoreCredits) return;
 
-            return () => {
-                isCurrent = false;
-            };
-        }
-    }, [activeTab, hasLoadedStoreCredits, isLoadingStoreCredits, realCustomerId]);
+        let isCurrent = true;
+        setIsLoadingStoreCredits(true);
+        setStoreCreditsError(null);
+
+        getCustomerStoreCreditsAction(realCustomerId)
+            .then((res) => {
+                if (!isCurrent) return;
+                if (res.success) {
+                    setStoreCredits(res.storeCredits || []);
+                } else {
+                    setStoreCredits([]);
+                    setStoreCreditsError(res.error || "Erro ao carregar os vales-compra.");
+                }
+            })
+            .catch((e) => {
+                if (!isCurrent) return;
+                console.error("Error fetching store credits:", e);
+                setStoreCredits([]);
+                setStoreCreditsError("Não foi possível carregar os vales-compra.");
+            })
+            .finally(() => {
+                if (!isCurrent) return;
+                setHasLoadedStoreCredits(true);
+                setIsLoadingStoreCredits(false);
+            });
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [activeTab, hasLoadedStoreCredits, realCustomerId]);
+
+    const handleRetryStoreCredits = useCallback(() => {
+        setStoreCreditsError(null);
+        setHasLoadedStoreCredits(false);
+    }, []);
 
     const [fetchedReviews, setFetchedReviews] = useState<any[] | null>(null);
     const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+    const [reviewsError, setReviewsError] = useState<string | null>(null);
 
     useEffect(() => {
         canCustomerReceiveNotificationAction(realCustomerId).then(res => {
@@ -351,23 +370,28 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
     useEffect(() => {
         setFetchedReviews(null);
+        setReviewsError(null);
     }, [realCustomerId]);
 
     useEffect(() => {
         if (activeTab === "Review" && fetchedReviews === null && !isLoadingReviews) {
             const fetchReviews = async () => {
                 setIsLoadingReviews(true);
+                setReviewsError(null);
                 try {
-                    const res = await fetch(`/api/erp/customers/${realCustomerId}/reviews`);
+                    const res = await fetch(`/api/erp/customers/${realCustomerId}/reviews`, { cache: "no-store" });
                     if (res.ok) {
                         const data = await res.json();
                         setFetchedReviews(data.reviews || []);
                     } else {
+                        console.error("[CustomerDetailPage] Failed to load reviews:", res.status);
                         setFetchedReviews([]);
+                        setReviewsError("Não foi possível carregar as avaliações.");
                     }
                 } catch (e) {
                     console.error("Error fetching reviews:", e);
                     setFetchedReviews([]);
+                    setReviewsError("Não foi possível carregar as avaliações.");
                 } finally {
                     setIsLoadingReviews(false);
                 }
@@ -375,6 +399,11 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             fetchReviews();
         }
     }, [activeTab, fetchedReviews, isLoadingReviews, realCustomerId]);
+
+    const handleRetryReviews = useCallback(() => {
+        setReviewsError(null);
+        setFetchedReviews(null);
+    }, []);
 
     const stats = useMemo(() => {
         if (orderStats) {
@@ -734,6 +763,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             <StoreCreditsContent
                                                 isLoadingStoreCredits={isLoadingStoreCredits}
                                                 storeCredits={storeCredits}
+                                                error={storeCreditsError}
+                                                onRetry={handleRetryStoreCredits}
                                             />
                                         </motion.div>
                                     </TabsContent>
@@ -783,7 +814,12 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     </Button>
                                                 </div>
                                             )}
-                                            <ReviewsContent reviews={fetchedReviews || []} isLoading={isLoadingReviews} />
+                                            <ReviewsContent
+                                                reviews={fetchedReviews || []}
+                                                isLoading={isLoadingReviews}
+                                                error={reviewsError}
+                                                onRetry={handleRetryReviews}
+                                            />
                                         </motion.div>
                                     </TabsContent>
                                 </div>
@@ -830,7 +866,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-4">
+                                                    <div>
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -851,7 +887,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         </div>
 
                                                         {(customer.personType === 'pj' || customer.cnpj) ? (
-                                                            <div className="space-y-4">
+                                                            <div>
                                                                 {customer.cnpj && (
                                                                     <div className="flex justify-between items-center">
                                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CNPJ</span>
@@ -871,7 +907,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             </div>
                                                         ) : (
                                                             customer.cpf && (
-                                                                <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
+                                                                <div className="flex justify-between items-center">
                                                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CPF</span>
                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
                                                                 </div>
@@ -1210,9 +1246,13 @@ const STORE_CREDIT_COLUMNS: { id: string; label: string; align: "left" | "center
 function StoreCreditsContent({
     isLoadingStoreCredits,
     storeCredits,
+    error,
+    onRetry,
 }: {
     isLoadingStoreCredits: boolean;
     storeCredits: any[];
+    error?: string | null;
+    onRetry?: () => void;
 }) {
     const isMobile = useMediaQuery("(max-width: 767px)");
     const [page, setPage] = useState(1);
@@ -1281,6 +1321,19 @@ function StoreCreditsContent({
         return (
             <div className="flex-1 flex items-center justify-center p-8 py-20">
                 <ThreeDotsLoader />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 py-20 text-center">
+                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{error}</p>
+                {onRetry && (
+                    <Button variant="outline" className="mt-4" onClick={onRetry}>
+                        Tentar novamente
+                    </Button>
+                )}
             </div>
         );
     }
@@ -1462,11 +1515,34 @@ function StoreCreditsContent({
 
 /* ── Reviews Content ──────────────────────────────────────────── */
 
-function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boolean }) {
+function ReviewsContent({
+    reviews,
+    isLoading,
+    error,
+    onRetry,
+}: {
+    reviews: any[];
+    isLoading: boolean;
+    error?: string | null;
+    onRetry?: () => void;
+}) {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-8 py-20">
                 <ThreeDotsLoader />
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 py-20 text-center">
+                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{error}</p>
+                {onRetry && (
+                    <Button variant="outline" className="mt-4" onClick={onRetry}>
+                        Tentar novamente
+                    </Button>
+                )}
             </div>
         )
     }

@@ -265,6 +265,9 @@ export function ERPSidebar() {
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
     const productivityResourceActive = isSystemResourceActive(businessInfo, "productivity")
     const communityVideosResourceActive = isSystemResourceActive(businessInfo, "communityVideos")
+    const recurringPlansResourceActive = isSystemResourceActive(businessInfo, "recurringPlans")
+    const recurringSubscriptionsResourceActive = isSystemResourceActive(businessInfo, "recurringSubscriptions")
+    const recurringGroupActive = recurringPlansResourceActive || recurringSubscriptionsResourceActive
     const marketingGroupActive = marketingResourceActive || couponsResourceActive || campaignsResourceActive || communityVideosResourceActive
     const salesGroupActive = ordersResourceActive || quotesResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
     const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceOrdersResourceActive || serviceCadastrosResourceActive
@@ -302,6 +305,7 @@ export function ERPSidebar() {
                 if (item.label === "Financeiro" && !financialResourceActive) return null;
                 if (item.href === "/erp/clientes" && !customersResourceActive) return null;
                 if (item.label === "Marketing" && !marketingGroupActive) return null;
+                if (item.label === "Assinaturas" && !recurringGroupActive) return null;
                 if (item.label === "Minha Vitrine" && !showcaseResourceActive) return null;
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
@@ -330,6 +334,12 @@ export function ERPSidebar() {
 
                 // Clone item to avoid mutating the original navItems
                 const newItem = { ...item };
+                if (newItem.label === "Assinaturas" && newItem.href) {
+                    // Direct access should always open a resource that is enabled.
+                    newItem.href = recurringPlansResourceActive
+                        ? "/erp/recorrentes/planos"
+                        : "/erp/recorrentes/assinaturas"
+                }
                 if (newItem.submenu) {
                     newItem.submenu = newItem.submenu.filter((sub) => {
                         if (isQuick) {
@@ -376,6 +386,11 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/videos") return communityVideosResourceActive
                             return marketingGroupActive
                         }
+                        if (item.label === "Assinaturas") {
+                            if (sub.href === "/erp/recorrentes/planos") return recurringPlansResourceActive
+                            if (sub.href === "/erp/recorrentes/assinaturas") return recurringSubscriptionsResourceActive
+                            return recurringGroupActive
+                        }
                         if (item.label === "Desempenho") {
                             if (sub.href === "/erp/estatisticas" || sub.href === "/erp/relatorios") return reportsResourceActive
                             return productivityResourceActive
@@ -408,7 +423,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isDesapego, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive, communityVideosResourceActive, productivityResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isDesapego, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive, communityVideosResourceActive, recurringPlansResourceActive, recurringSubscriptionsResourceActive, recurringGroupActive, productivityResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

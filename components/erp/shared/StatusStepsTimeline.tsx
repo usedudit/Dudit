@@ -17,14 +17,17 @@ interface StatusStepsTimelineProps {
     steps: StatusStep[]
     /** Title for the BottomSheet (e.g. "Status do Pedido", "Status da Entrega") */
     sheetTitle: string
-    /** Optional section title shown above the desktop timeline card header */
-    sectionTitle?: string
-    /** Optional subtitle shown in the desktop card header */
-    sectionSubtitle?: string
-    /** Optional custom header node (replaces the default sectionTitle/subtitle header) */
-    headerNode?: React.ReactNode
+    /**
+     * Header block shown on the SAME card as the timeline on desktop
+     * (e.g. "Tipo/Origem", "Responsável pela venda/Origem da venda").
+     * On mobile/tablet it is rendered inside the BottomSheet, above the steps.
+     * Never rendered loose on the page.
+     */
+    header?: React.ReactNode
     /** Override the auto-detected danger/cancelled state for colors */
     forceDanger?: boolean
+    /** Extra className for the outer wrapper */
+    className?: string
 }
 
 function useTimelineDangerState(
@@ -38,26 +41,19 @@ function useTimelineDangerState(
 }
 
 /**
- * Shared component that renders a step-based status timeline.
+ * Shared step-based status timeline.
  *
- * - Desktop (≥lg): full horizontal progress-bar timeline with dots + dates.
- * - Mobile/Tablet (<lg): compact `ListItem` with a circle indicator showing the
- *   current step + date/time. Tapping opens a `BottomSheet` with the full vertical list.
- *
- * This replaces the duplicated pattern previously inline in:
- *   - OrderDetailView.tsx
- *   - QuoteDetail.tsx
- *   - DeliveryTabContent.tsx (DeliveryStatusTimeline)
- *   - ServiceOrderDetail.tsx
- *   - TransactionDetailView.tsx
+ * - Desktop (≥lg): single card with optional `header` + horizontal progress timeline.
+ * - Mobile/Tablet (<lg): compact `ListItem` (circle + current status/date). The
+ *   `header` is NOT shown on the page — it is rendered inside the `BottomSheet`
+ *   above the full vertical step list.
  */
 export function StatusStepsTimeline({
     steps,
     sheetTitle,
-    sectionTitle,
-    sectionSubtitle,
-    headerNode,
+    header,
     forceDanger,
+    className = "",
 }: StatusStepsTimelineProps) {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
 
@@ -68,7 +64,6 @@ export function StatusStepsTimeline({
             ? ((Math.max(activeCount, 1) - 1) / (steps.length - 1)) * 100
             : 0
 
-    // The current (right-most active) step, or the first step if none active
     const currentStep =
         [...steps].filter((s) => s.active).reverse()[0] || steps[0]
 
@@ -94,33 +89,11 @@ export function StatusStepsTimeline({
 
     return (
         <>
-            <div className="space-y-6">
-                {/* ─── Desktop: Full horizontal timeline ─── */}
+            <div className={`space-y-6 ${className}`}>
+                {/* ─── Desktop: Header + full horizontal timeline in ONE card ─── */}
                 <div className="hidden lg:block">
                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                        {(headerNode || sectionTitle) && (
-                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                {headerNode ? (
-                                    headerNode
-                                ) : (
-                                    <div className="flex justify-between items-center flex-wrap gap-2">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                {sectionTitle}
-                                            </span>
-                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                {currentStep.label}
-                                            </div>
-                                        </div>
-                                        {sectionSubtitle && (
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {sectionSubtitle}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {header}
 
                         <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
                             <div className="relative px-4">
@@ -187,7 +160,7 @@ export function StatusStepsTimeline({
                     </div>
                 </div>
 
-                {/* ─── Mobile/Tablet: Compact circle + ListItem ─── */}
+                {/* ─── Mobile/Tablet: ONLY the compact circle row (header goes in the sheet) ─── */}
                 <div className="lg:hidden">
                     <FormSection title="" className="mt-0">
                         <ListItem
@@ -222,12 +195,18 @@ export function StatusStepsTimeline({
                 </div>
             </div>
 
-            {/* ─── BottomSheet: full vertical step list ── */}
+            {/* ─── BottomSheet: header info + full vertical step list ─── */}
             <BottomSheet
                 isOpen={isSheetOpen}
                 onClose={() => setIsSheetOpen(false)}
                 title={sheetTitle}
             >
+                {header && (
+                    <div className="rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border mb-5">
+                        {header}
+                    </div>
+                )}
+
                 <div className="space-y-0 my-4 px-2">
                     {steps.map((step, idx) => {
                         const isLastFailed = isFailed && idx === steps.length - 1

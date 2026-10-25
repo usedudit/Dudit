@@ -9,7 +9,7 @@ let globalBrowserPromise: Promise<Browser> | null = null
 let globalBrowser: Browser | null = null
 
 async function getBrowser(): Promise<Browser> {
-    if (globalBrowser && globalBrowser.isConnected()) {
+    if (globalBrowser && globalBrowser.connected) {
         return globalBrowser
     }
     if (globalBrowserPromise) {
@@ -324,6 +324,17 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                 .dre-a4-print .break-inside-avoid,
                 .dre-a4-print thead tr,
                 .dre-a4-print tbody tr {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                /* All A4 receipt print classes: prevent table row splitting */
+                .sale-receipt-a4-print tr,
+                .sale-receipt-a4-print thead tr,
+                .sale-receipt-a4-print tbody tr,
+                .quote-a4-print tr,
+                .quote-a4-print thead tr,
+                .quote-a4-print tbody tr {
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
                 }

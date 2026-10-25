@@ -142,10 +142,12 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     marketing_coupons: { key: "marketing_coupons", path: "/erp/cupons", label: "Cupons de Desconto", category: "Marketing" },
     marketing_promotions: { key: "marketing_promotions", path: "/erp/promocoes", label: "Campanhas e Promoções", category: "Marketing" },
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
-    recurring_plans: { key: "recurring_plans", path: "/erp/recorrentes/planos", label: "Planos Recorrentes", category: "Marketing" },
-    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Marketing" },
     community_videos: { key: "community_videos", path: "/erp/videos", label: "Vídeos da Comunidade", category: "Marketing" },
     colecoes: { key: "colecoes", path: "/erp/marketing/colecoes", label: "Coleções", category: "Marketing" },
+
+    // ── Assinaturas
+    recurring_plans: { key: "recurring_plans", path: "/erp/recorrentes/planos", label: "Planos Recorrentes", category: "Assinaturas" },
+    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recorrentes/assinaturas", label: "Assinaturas", category: "Assinaturas" },
 
     // ── Lojas e Filiais
     stores: {

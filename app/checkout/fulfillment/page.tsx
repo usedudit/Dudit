@@ -13,11 +13,12 @@ import { useRealtimeRecord } from "@/hooks/use-realtime-record"
 export default function CheckoutFulfillmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ subscription_id?: string; preapproval_id?: string; status?: string }>
+  searchParams: Promise<{ subscription_id?: string; preapproval_id?: string; status?: string; checkout_token?: string }>
 }) {
   const router = useRouter()
   const params = use(searchParams)
   const subscriptionId = params.subscription_id
+  const checkoutToken = params.checkout_token
   const preapprovalId = params.preapproval_id
   const mpStatus = params.status
 
@@ -54,7 +55,7 @@ export default function CheckoutFulfillmentPage({
     // 1. Initial immediate check (in case payment completed before page mounted)
     const checkInitial = async () => {
       try {
-        const res = await checkSubscriptionStatusAction(subscriptionId)
+        const res = await checkSubscriptionStatusAction(subscriptionId, checkoutToken || "")
         if (!isMounted) return
         if (res.error) throw new Error(res.error)
 
@@ -78,7 +79,7 @@ export default function CheckoutFulfillmentPage({
     const fallbackTimer = setTimeout(async () => {
       if (!isMounted || status !== "pending") return
       try {
-        const res = await checkSubscriptionStatusAction(subscriptionId)
+        const res = await checkSubscriptionStatusAction(subscriptionId, checkoutToken || "")
         if (!isMounted) return
         if (res.status === "active") {
           setStatus("active")
@@ -100,7 +101,7 @@ export default function CheckoutFulfillmentPage({
       clearTimeout(fallbackTimer)
       clearTimeout(timeoutTimer)
     }
-  }, [subscriptionId, router, status])
+  }, [subscriptionId, checkoutToken, router, status])
 
   const handleManualSync = async () => {
     if (!subscriptionId) return
@@ -109,11 +110,11 @@ export default function CheckoutFulfillmentPage({
 
     try {
       // Check subscription status first
-      const statusRes = await checkSubscriptionStatusAction(subscriptionId)
+      const statusRes = await checkSubscriptionStatusAction(subscriptionId, checkoutToken || "")
       if (statusRes.error) throw new Error(statusRes.error)
 
-      if (statusRes.partner_id) {
-        const res = await syncSubscriptionWithMpAction(statusRes.partner_id, subscriptionId)
+      if (!statusRes.error) {
+        const res = await syncSubscriptionWithMpAction(subscriptionId, checkoutToken || "")
         if (res.success && res.status === "active") {
           setStatus("active")
         } else if (res.success && res.status === "payment_failed") {
@@ -122,9 +123,6 @@ export default function CheckoutFulfillmentPage({
         } else {
           setStatus("timeout")
         }
-      } else {
-        setStatus("failed")
-        setErrorDetails("Assinatura inválida.")
       }
     } catch (err: any) {
       setStatus("failed")

@@ -240,10 +240,11 @@ export type RouteKey =
     | "marketing_coupons"
     | "marketing_promotions"
     | "cadastros_marketing"
-    | "recurring_plans"
-    | "recurring_subscriptions"
     | "community_videos"
     | "colecoes"
+    // Assinaturas
+    | "recurring_plans"
+    | "recurring_subscriptions"
     // Lojas e Filiais
     | "stores"
     | "stores_members"

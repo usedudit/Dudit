@@ -1,85 +1,97 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/auth/authorization"
+import { getCurrentUser } from "@/lib/auth/server-user"
+import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ customerId: string }> }
 ) {
-  const user = await requireUser()
-  const { customerId } = await params
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+  }
 
+  const { customerId } = await params
   const supabase = createAdminClient()
 
-  // Get the customer and verify it belongs to the user's partner
+  // Resolve the customer first, then validate the caller's access to its
+  // partner. Never trust the customer id alone as an authorization boundary.
   const { data: customer, error: customerError } = await supabase
     .from("customers")
-    .select("id, partner_id")
+    .select("id, partner_id, user_id, marketplace_user_id")
     .eq("id", customerId)
     .maybeSingle()
 
-  if (customerError || !customer) {
-    return NextResponse.json({ reviews: [] })
+  if (customerError) {
+    console.error("[erp/customer-reviews] Customer lookup error:", customerError)
+    return NextResponse.json({ error: customerError.message }, { status: 500 })
   }
 
-  // Verify user has access to this partner
-  const { data: partnerAccess } = await supabase
-    .from("partners")
-    .select("id")
-    .eq("id", customer.partner_id)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  // Also check if user is a member of the partner
-  const { data: memberAccess } = await supabase
-    .from("partner_members")
-    .select("partner_id")
-    .eq("partner_id", customer.partner_id)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (!partnerAccess && !memberAccess) {
-    return NextResponse.json({ reviews: [] })
+  if (!customer) {
+    return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 })
   }
 
-  // Find all orders for this customer under the partner
-  const { data: customerOrders } = await supabase
-    .from("orders")
-    .select("id, buyer_id, customer_id")
-    .eq("partner_id", customer.partner_id)
-    .or(`customer_id.eq.${customerId},buyer_id.eq.${customerId}`)
+  try {
+    await requirePartnerAccessWithPermission(customer.partner_id, "customers", "view", user)
+  } catch (error) {
+    console.error("[erp/customer-reviews] Access denied:", error)
+    return NextResponse.json({ error: "Acesso negado ao cliente" }, { status: 403 })
+  }
 
-  const orderIds = (customerOrders || []).map((o: any) => o.id).filter(Boolean)
-  const buyerIds = (customerOrders || []).map((o: any) => o.buyer_id).filter(Boolean)
-  const customerIdsFromOrders = (customerOrders || []).map((o: any) => o.customer_id).filter(Boolean)
-
-  // Collect all candidate user IDs that could have left reviews
-  const candidateUserIds = Array.from(
-    new Set([...buyerIds, ...customerIdsFromOrders].filter(Boolean))
+  // A customer can be linked to a marketplace account through user_id and/or
+  // marketplace_user_id. Legacy orders may also point buyer_id directly at the
+  // customer id, so all variants are considered.
+  const linkedIds = Array.from(
+    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
   ) as string[]
 
-  // Build OR conditions for querying reviews
-  const orConditions: string[] = []
-  
-  // Search by user_id (marketplace users who placed orders)
-  if (candidateUserIds.length > 0) {
-    for (const uId of candidateUserIds) {
-      orConditions.push(`user_id.eq.${uId}`)
-    }
+  const orderOrParts: string[] = []
+  for (const id of linkedIds) {
+    orderOrParts.push(`customer_id.eq.${id}`)
+    orderOrParts.push(`buyer_id.eq.${id}`)
   }
-  
-  // Also search by order_id directly
+
+  const { data: customerOrders, error: ordersError } = await supabase
+    .from("orders")
+    .select("id, buyer_id")
+    .eq("partner_id", customer.partner_id)
+    .or(orderOrParts.join(","))
+
+  if (ordersError) {
+    console.error("[erp/customer-reviews] Orders lookup error:", ordersError)
+    return NextResponse.json({ error: ordersError.message }, { status: 500 })
+  }
+
+  const orderIds = Array.from(
+    new Set((customerOrders || []).map((o: any) => o.id).filter(Boolean))
+  ) as string[]
+  const orderBuyerIds = Array.from(
+    new Set((customerOrders || []).map((o: any) => o.buyer_id).filter(Boolean))
+  ) as string[]
+
+  // Collect all candidate user IDs that could have left reviews.
+  const candidateUserIds = Array.from(
+    new Set([
+      customer.id,
+      customer.user_id,
+      customer.marketplace_user_id,
+      ...orderBuyerIds,
+    ].filter(Boolean))
+  ) as string[]
+
+  const orConditions: string[] = []
+  if (candidateUserIds.length > 0) {
+    orConditions.push(`user_id.in.(${candidateUserIds.join(",")})`)
+  }
   if (orderIds.length > 0) {
-    for (const oId of orderIds) {
-      orConditions.push(`order_id.eq.${oId}`)
-    }
+    orConditions.push(`order_id.in.(${orderIds.join(",")})`)
   }
 
   if (orConditions.length === 0) {
     return NextResponse.json({ reviews: [] })
   }
 
-  // Fetch reviews
   const { data: reviews, error } = await supabase
     .from("reviews")
     .select(`
@@ -101,12 +113,13 @@ export async function GET(
     .limit(50)
 
   if (error) {
+    console.error("[erp/customer-reviews] Reviews lookup error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   // Enrich with order item details (quantity, variant)
   const reviewOrderIds = Array.from(new Set((reviews || []).map((r: any) => r.order_id).filter(Boolean)))
-  let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
+  const orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
 
   if (reviewOrderIds.length > 0) {
     const { data: itemsData } = await supabase
@@ -131,7 +144,7 @@ export async function GET(
 
   // Enrich with user profiles
   const reviewUserIds = Array.from(new Set((reviews || []).map((r: any) => r.user_id).filter(Boolean)))
-  let profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null }>()
 
   if (reviewUserIds.length > 0) {
     const { data: profilesData } = await supabase

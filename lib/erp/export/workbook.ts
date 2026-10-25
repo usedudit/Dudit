@@ -202,8 +202,9 @@ function formatCsvValue(value: unknown, col: ExportColumnDef): string {
   }
 }
 
-function csvEscape(value: string): string {
-  const v = String(value)
+function csvEscape(value: string, protectFormula = false): string {
+  const raw = String(value)
+  const v = protectFormula && /^[\t ]*[=+\-@]/.test(raw) ? `'${raw}` : raw
   return /[;"\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
@@ -234,22 +235,22 @@ function buildCsv(params: {
   const lines: string[] = []
 
   if (meta) {
-    lines.push(csvEscape(meta.title))
+    lines.push(csvEscape(meta.title, true))
     const info: string[] = []
     if (meta.partnerName) info.push(`Empresa: ${meta.partnerName}`)
     if (meta.documentNumber) info.push(`CNPJ/CPF: ${meta.documentNumber}`)
     if (meta.storeName) info.push(`Unidade: ${meta.storeName}`)
     if (meta.periodLabel) info.push(`Período: ${meta.periodLabel}`)
-    if (info.length) lines.push(csvEscape(info.join(" | ")))
-    if (meta.filtersLabel) lines.push(csvEscape(`Filtros: ${meta.filtersLabel}`))
-    lines.push(csvEscape(`Gerado em: ${formatBrDateTime(meta.generatedAt ?? new Date())}`))
+    if (info.length) lines.push(csvEscape(info.join(" | "), true))
+    if (meta.filtersLabel) lines.push(csvEscape(`Filtros: ${meta.filtersLabel}`, true))
+    lines.push(csvEscape(`Gerado em: ${formatBrDateTime(meta.generatedAt ?? new Date())}`, true))
     lines.push("")
   }
 
-  lines.push(columns.map((c) => csvEscape(c.header)).join(";"))
+  lines.push(columns.map((c) => csvEscape(c.header, true)).join(";"))
 
   for (const row of rows) {
-    lines.push(columns.map((c) => csvEscape(formatCsvValue(row[c.key], c))).join(";"))
+    lines.push(columns.map((c) => csvEscape(formatCsvValue(row[c.key], c), !isNumericType(typeOf(c)))).join(";"))
   }
 
   const totals = computeTotals(columns, rows)
@@ -257,7 +258,7 @@ function buildCsv(params: {
     lines.push(
       columns
         .map((_c, i) => {
-          if (i === 0) return csvEscape("TOTAL")
+          if (i === 0) return csvEscape("TOTAL", true)
           if (totals.has(i)) {
             const min = typeOf(columns[i]) === "currency" ? 2 : 0
             return csvEscape(formatCsvNumber(totals.get(i)!, min))

@@ -147,6 +147,33 @@ async function syncMarketplaceUserAddress(
   }
 }
 
+async function resolveMarketplaceProfileCpf(
+  supabase: any,
+  userId: string | null,
+): Promise<string | null> {
+  if (!userId) return null
+
+  const { data } = await supabase
+    .from("user_profiles")
+    .select("cpf")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (!data?.cpf) return null
+
+  try {
+    const rawCpf = String(data.cpf)
+    const decrypted = rawCpf.startsWith("v1:") || rawCpf.startsWith("v2:")
+      ? await (await import("@/lib/crypto")).decryptCPF(rawCpf)
+      : rawCpf
+    const cleanCpf = decrypted.replace(/\D/g, "")
+    return validateCPF(cleanCpf) ? cleanCpf : null
+  } catch (error) {
+    console.error("[ensureMarketplaceCustomer] Failed to resolve profile CPF:", error)
+    return null
+  }
+}
+
 export async function ensureMarketplaceCustomer({
    partnerId,
    name,
@@ -157,9 +184,19 @@ export async function ensureMarketplaceCustomer({
  }: CustomerParams): Promise<string | null> {
   const supabase = getAdminClient()
 
-  const cleanCpf = cpf ? cpf.replace(/\D/g, "") : null
-  const isValidCpf = cleanCpf && validateCPF(cleanCpf)
   const marketplaceUserId = userId || null
+  let cleanCpf = cpf ? cpf.replace(/\D/g, "") : null
+  let isValidCpf = Boolean(cleanCpf && validateCPF(cleanCpf))
+
+  // Marketplace profiles already hold the CPF collected at signup/checkout.
+  // Reuse it when the caller did not pass a CPF (e.g. cart/catalog flows).
+  if (!isValidCpf && marketplaceUserId) {
+    const profileCpf = await resolveMarketplaceProfileCpf(supabase, marketplaceUserId)
+    if (profileCpf) {
+      cleanCpf = profileCpf
+      isValidCpf = true
+    }
+  }
 
   let customerId: string | null = null
 
@@ -180,7 +217,7 @@ export async function ensureMarketplaceCustomer({
       if (name && existing.name !== name) updateData.name = name
       if (phone && !existing.phone) updateData.phone = phone
       if (email && !existing.email) updateData.email = email
-      if (isValidCpf && !existing.cpf) {
+      if (isValidCpf && cleanCpf && !existing.cpf) {
         try {
           const { encryptCPF } = await import("@/lib/crypto")
           const { generateCpfLookupHash } = await import("@/lib/services/cpf-hash")
@@ -221,7 +258,7 @@ export async function ensureMarketplaceCustomer({
         needsUpdate = true
       }
 
-      if (!existingCustomer.cpf && isValidCpf) {
+      if (!existingCustomer.cpf && isValidCpf && cleanCpf) {
         try {
           const { encryptCPF } = await import("@/lib/crypto")
           const { generateCpfLookupHash } = await import("@/lib/services/cpf-hash")
@@ -336,7 +373,7 @@ export async function ensureMarketplaceCustomer({
   if (!customerId) {
     let encryptedCpf: string | null = null
     let lookupHash: string | null = null
-    if (isValidCpf) {
+    if (isValidCpf && cleanCpf) {
       try {
         const { encryptCPF } = await import("@/lib/crypto")
         const { generateCpfLookupHash } = await import("@/lib/services/cpf-hash")

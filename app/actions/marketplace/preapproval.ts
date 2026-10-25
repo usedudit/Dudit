@@ -16,6 +16,7 @@ import { computeNextExecutionAt, toMpFrequency } from "@/lib/services/recurring/
 import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
+import { verifyCheckoutFulfillmentToken } from "@/lib/security/checkout-fulfillment-token"
 
 interface CreatePreapprovalInput {
   partnerId: string
@@ -234,15 +235,21 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
 /**
  * Admin action to fetch official preapproval state from Mercado Pago and synchronize local status.
  */
-export async function syncSubscriptionWithMpAction(partnerId: string, subscriptionId: string) {
+export async function syncSubscriptionWithMpAction(subscriptionId: string, checkoutToken: string) {
   try {
+    const rateLimit = await requireRateLimit(RateLimitCategory.SUBSCRIPTION_CREATE)
+    if (!rateLimit.success) return { success: false, error: rateLimit.error || "Muitas tentativas." }
+
+    if (!subscriptionId || !verifyCheckoutFulfillmentToken(subscriptionId, checkoutToken)) {
+      return { success: false, error: "Link de checkout inválido ou expirado." }
+    }
+
     const admin = getAdminClient()
 
     const { data: sub, error: subErr } = await admin
       .from("recurring_subscriptions")
       .select("id, status, mp_preapproval_id, partner_id, pending_cancellation_reason")
       .eq("id", subscriptionId)
-      .eq("partner_id", partnerId)
       .single()
 
     if (subErr || !sub) {
@@ -254,7 +261,7 @@ export async function syncSubscriptionWithMpAction(partnerId: string, subscripti
     }
 
     // Call Mercado Pago API
-    const mpDetails = await getMpPreapprovalDetails(partnerId, sub.mp_preapproval_id)
+    const mpDetails = await getMpPreapprovalDetails(sub.partner_id, sub.mp_preapproval_id)
     const mpStatus = String(mpDetails.status).toLowerCase()
 
     let newStatus: typeof sub.status = sub.status
@@ -283,7 +290,7 @@ export async function syncSubscriptionWithMpAction(partnerId: string, subscripti
         .eq("id", sub.id)
 
       await logAuditEvent({
-        partnerId,
+        partnerId: sub.partner_id,
         actorUserId: null,
         entityType: "recurring_subscription",
         entityId: sub.id,

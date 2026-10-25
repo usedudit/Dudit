@@ -1,5 +1,7 @@
 import "server-only"
 
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app"
+import { getMessaging } from "firebase-admin/messaging"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { NotificationType } from "@/lib/notifications/types"
 
@@ -18,9 +20,6 @@ function getFirebaseAdmin(): FirebaseAdminApp | null {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const admin = require("firebase-admin") as typeof import("firebase-admin")
-
     const normalized = serviceAccountJson.trim()
 
     const parsed = JSON.parse(
@@ -29,11 +28,9 @@ function getFirebaseAdmin(): FirebaseAdminApp | null {
         : normalized
     )
 
-    const credential = admin.credential.cert(parsed)
+    const credential = cert(parsed)
 
-    firebaseApp = admin.apps.length
-      ? admin.app()
-      : admin.initializeApp({ credential })
+    firebaseApp = getApps().length ? getApp() : initializeApp({ credential })
     return firebaseApp
   } catch (err) {
     console.error("[fcm] Firebase Admin init failed", err instanceof Error ? err.message : err)
@@ -83,9 +80,7 @@ export async function sendPushToUser(params: {
     return { sent: 0, failed: 0, skipped: true, reason: "no_subscriptions" }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const admin = require("firebase-admin") as typeof import("firebase-admin")
-  const messaging = admin.messaging(app)
+  const messaging = getMessaging(app)
 
   let sent = 0
   let failed = 0

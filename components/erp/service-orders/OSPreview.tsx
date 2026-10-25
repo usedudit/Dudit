@@ -1,14 +1,20 @@
 "use client"
 
 import React, { useMemo } from 'react';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils';
 import { formatAddressParts } from '@/lib/utils/format-address';
-import { formatBrazilPhone } from "@/lib/utils/phone-utils";
-import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import { r2PublicConfig } from "@/lib/r2/r2-public";
+import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
+import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt";
+import {
+    ReceiptA4Document,
+    ReceiptA4Page,
+    ReceiptStoreHeaderA4,
+    ReceiptA4StoreData,
+    ReceiptA4Footer,
+} from "@/components/erp/orders/receipt/ReceiptComponents";
 
-const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br";
-const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`;
+const DEFAULT_PRIMARY = "#003229";
+const DEFAULT_SECONDARY = "#d4f995";
 
 interface OSPreviewProps {
     invoiceNumber: string;
@@ -37,8 +43,7 @@ interface OSPreviewProps {
     salespersonName?: string;
 }
 
-const DEFAULT_PRIMARY = "#003229";
-const DEFAULT_SECONDARY = "#d4f995";
+const buildImageUrl = (key: string) => key.startsWith("http") ? key : `https://img.dudit.com.br/${key}`;
 
 const OSPreview = ({
     invoiceNumber,
@@ -55,8 +60,8 @@ const OSPreview = ({
     diagnosis,
     signatureImageKey,
     signedAt,
-    primaryColor = DEFAULT_PRIMARY,
-    secondaryColor = DEFAULT_SECONDARY,
+    primaryColor,
+    secondaryColor,
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
     partnerPhone,
@@ -66,13 +71,8 @@ const OSPreview = ({
     showCustomerContact = true,
     salespersonName
 }: OSPreviewProps) => {
-
-    const resolvedColors = useMemo(() => {
-        return {
-            primary: primaryColor,
-            secondary: secondaryColor
-        };
-    }, [primaryColor, secondaryColor]);
+    const resolvedPrimary = primaryColor || DEFAULT_PRIMARY;
+    const resolvedSecondary = secondaryColor || DEFAULT_SECONDARY;
 
     const customerAddressText = useMemo(() => {
         if (!selectedCustomer) return null;
@@ -104,6 +104,17 @@ const OSPreview = ({
         return lines.slice(0, 2).join('\n');
     }, [partnerAddress]);
 
+    const partnerHeader: SaleReceiptPartnerHeader = useMemo(
+        () => ({
+            fantasyName: partnerName,
+            legalName: partnerName,
+            addressLine: partnerAddressFormatted || "",
+            taxIdLine: "",
+            phone: partnerPhone ?? null,
+        }),
+        [partnerName, partnerAddressFormatted, partnerPhone]
+    );
+
     // Build the visual rows representing either Services or Products
     const items = useMemo(() => {
         const rows: { type: 'service' | 'product'; name: string; qty: number; price: number; total: number }[] = [];
@@ -131,15 +142,13 @@ const OSPreview = ({
         return rows;
     }, [services, products]);
 
-    // Advanced Pagination Logic modeled after QuotePreview
+    // Pagination Logic
     const pages = useMemo(() => {
         const ROW_HEIGHT = 40;
         const TOTALS_SECTION_HEIGHT = 150;
         const NOTES_SECTION_HEIGHT = (description || diagnosis) ? 120 : 0;
         const FOOTER_HEIGHT = 40;
 
-        // A descrição/diagnóstico agora aparece no topo da 1ª página (antes da
-        // tabela), então sua altura é reservada no conteúdo fixo da página 1.
         const P1_FIXED_CONTENT_HEIGHT = 449 + NOTES_SECTION_HEIGHT;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123;
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT;
@@ -188,258 +197,198 @@ const OSPreview = ({
     }, [items, description, diagnosis, signatureImageKey]);
 
     return (
-        <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "quote-a4-print" : "md:border-l border-brand-border dark:border-dark-border"}`}>
-            <div className={printMode ? "w-full p-0" : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm"}>
-                <div className={printMode ? "w-full flex flex-col items-center p-0" : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8"}>
-                    {pages.map((page, pageIndex) => (
-                        <div
-                            key={pageIndex}
-                            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm"}`}
-                        >
-                            {/* HEADER */}
-                            <div
-                                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
-                                style={{ backgroundColor: resolvedColors.primary }}
-                            >
-                                {showDecoration && (
-                                    <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+        <ReceiptA4Document printMode={printMode} printClassName="quote-a4-print">
+            {pages.map((page, pageIndex) => (
+                <ReceiptA4Page key={pageIndex} printMode={printMode}>
+                    <ReceiptStoreHeaderA4
+                        partnerName={partnerName}
+                        partnerAvatar={partnerAvatar}
+                        primaryColor={resolvedPrimary}
+                        secondaryColor={resolvedSecondary}
+                        title="Ordem de Serviço"
+                        subtitle={`Ordem de serviço #${invoiceNumber}`}
+                        showDecoration={showDecoration}
+                    />
+
+                    <div className={`flex-1 flex flex-col ${page.type !== 'first' ? 'pt-8' : ''}`}>
+                        {page.type === 'first' && (
+                            <>
+                                {/* Order info grid */}
+                                <div className="px-8 py-6">
+                                    <div className="grid grid-cols-4 gap-4 border-b border-gray-100 pb-6 w-full">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
+                                            <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
                                         </div>
-                                        <div className="flex flex-col gap-3 -mt-12">
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão</span>
+                                            <span className="font-bold text-sm text-brand-dark">{formatDateTime(orderDate)}</span>
                                         </div>
-                                    </div>
-                                )}
-
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <UserProfileImage
-                                            fullName={partnerName}
-                                            imageUrl={partnerAvatar && !partnerAvatar.includes("Placeholder.png") ? partnerAvatar : null}
-                                            className="w-8 h-8 shrink-0 text-[13px] font-bold"
-                                            style={{ backgroundColor: resolvedColors.secondary }}
-                                        />
-                                        <span className="text-white font-bold text-md">{partnerName}</span>
-                                    </div>
-
-                                    <div>
-                                        <h1 className="text-2xl font-medium text-white">Ordem de Serviço</h1>
-                                        <p className="text-white/80 text-xs tracking-widest font-light mt-1">
-                                            Ordem de serviço #{invoiceNumber}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className={`flex-1 flex flex-col ${page.type !== 'first' ? 'pt-8' : ''}`}>
-                                {page.type === 'first' && (
-                                    <>
-                                        <div className="px-8 py-6">
-                                            <div className="grid grid-cols-4 gap-4 border-b border-gray-100 pb-6 w-full">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Número</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{formatDateTime(orderDate)}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Previsão</span>
-                                                    <span className="font-bold text-sm text-brand-dark">
-                                                        {expectedCompletionDate
-                                                            ? `${formatDate(expectedCompletionDate)}${expectedCompletionTime ? ` às ${expectedCompletionTime}` : ""}`
-                                                            : "-"}
-                                                    </span>
-                                                </div>
-                                                {salespersonName && (
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Responsável</span>
-                                                        <span className="font-bold text-sm text-brand-dark">{salespersonName}</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Previsão</span>
+                                            <span className="font-bold text-sm text-brand-dark">
+                                                {expectedCompletionDate
+                                                    ? `${formatDate(expectedCompletionDate)}${expectedCompletionTime ? ` às ${expectedCompletionTime}` : ""}`
+                                                    : "-"}
+                                            </span>
                                         </div>
-
-                                        <div className="px-8 pb-6">
-                                            <div className="grid grid-cols-2 gap-8">
-                                                <div>
-                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
-                                                    <div className="text-xs text-gray-600 space-y-1">
-                                                        <p className="font-bold text-brand-dark">{partnerName}</p>
-                                                        {partnerPhone && <p>{formatBrazilPhone(partnerPhone)}</p>}
-                                                        <p className="whitespace-pre-wrap">{partnerAddressFormatted}</p>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
-                                                    {selectedCustomer ? (
-                                                        <div className="text-xs text-gray-600 space-y-1">
-                                                            <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
-                                                            {showCustomerContact && selectedCustomer.phone && <p>{formatBrazilPhone(selectedCustomer.phone)}</p>}
-                                                            {customerAddressText && <p className="whitespace-pre-wrap">{customerAddressText}</p>}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-xs text-gray-600 space-y-1">
-                                                            <p className="font-bold text-black">Consumidor final</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {(description || diagnosis) && (
-                                            <div className="px-8 pb-6">
-                                                <div className="w-full border-t border-gray-100 pt-6 space-y-4">
-                                                    {description && (
-                                                        <div>
-                                                            <h4 className="font-bold text-xs mb-1.5 text-black">Descrição</h4>
-                                                            <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                                {description}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                    {diagnosis && (
-                                                        <div>
-                                                            <h4 className="font-bold text-xs mb-1.5 text-black">Diagnóstico</h4>
-                                                            <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
-                                                                {diagnosis}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                <div className="px-8 pb-4">
-                                    <table className="w-full text-left border-separate border-spacing-0">
-                                        <thead>
-                                            <tr className="bg-brand-gray/40">
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Descrição do Item</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Tipo</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Qtd</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Preço</th>
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {page.items.map((item, idx) => (
-                                                <tr key={idx} className="bg-white">
-                                                    <td className="py-2 pl-6 pr-4 border-b border-gray-50">
-                                                        <span className="font-bold text-[13px] text-black block truncate max-w-[200px]">
-                                                            {item.name}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 px-4 border-b border-gray-50 text-center">
-                                                        <span className="text-[11px] font-semibold text-gray-500 uppercase">
-                                                            {item.type === 'service' ? 'Serviço' : 'Produto'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 px-4 border-b border-gray-50 text-center">
-                                                        <span className="text-[13px] font-medium text-gray-600">
-                                                            {item.qty}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 px-4 border-b border-gray-50 text-right">
-                                                        <span className="text-[13px] font-medium text-gray-600">
-                                                            {formatCurrency(item.price)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
-                                                        <span className="text-[13px] font-bold text-black">
-                                                            {formatCurrency(item.total)}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {page.hasTotals && (
-                                    <div className="mt-auto">
-                                        <div className="px-8 pb-6 flex justify-start">
-                                            <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black">
-                                                {totalServiceAmount > 0 && (
-                                                    <div className="flex justify-between items-center text-xs mb-2">
-                                                        <span className="text-gray-500 font-medium">Total de Serviços</span>
-                                                        <span className="font-bold">{formatCurrency(totalServiceAmount)}</span>
-                                                    </div>
-                                                )}
-                                                {totalProductAmount > 0 && (
-                                                    <div className="flex justify-between items-center text-xs mb-2">
-                                                        <span className="text-gray-500 font-medium">Total de Produtos</span>
-                                                        <span className="font-bold">{formatCurrency(totalProductAmount)}</span>
-                                                    </div>
-                                                )}
-
-                                                <div className="border-t border-gray-200 my-3"></div>
-
-                                                <div className="flex justify-between items-center">
-                                                    <span className="font-bold text-sm">Valor Total Geral</span>
-                                                    <div className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm" style={{ backgroundColor: resolvedColors.primary }}>
-                                                        {formatCurrency(totalAmount)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {signatureImageKey ? (
-                                            <div className="px-8 pb-12">
-                                                <div className="w-full border-t border-brand-border pt-6">
-                                                    <div className="flex flex-col items-center">
-                                                        <h4 className="font-bold text-xs mb-2 text-black">Assinatura do Cliente</h4>
-                                                        <img
-                                                            src={buildImageUrl(signatureImageKey)}
-                                                            alt="Assinatura"
-                                                            className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
-                                                        />
-                                                        <div className="mt-4 w-full max-w-[280px] border-t border-gray-400 pt-2 text-center">
-                                                            <p className="font-bold text-[11px] text-brand-dark">{selectedCustomer?.name || "Cliente"}</p>
-                                                            <p className="text-[9px] text-gray-500">Assinatura do Cliente</p>
-                                                            {signedAt && (
-                                                                <p className="text-[9px] text-gray-400 mt-1">
-                                                                    Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="px-8 pb-12">
-                                                <div className="w-full border-t border-brand-border pt-6">
-                                                    <div className="flex items-center justify-center text-gray-400 text-xs italic">
-                                                        Aguardando Assinatura do Cliente
-                                                    </div>
-                                                </div>
+                                        {salespersonName && (
+                                            <div className="flex flex-col">
+                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Responsável</span>
+                                                <span className="font-bold text-sm text-brand-dark">{salespersonName}</span>
                                             </div>
                                         )}
                                     </div>
+                                </div>
+
+                                <ReceiptA4StoreData
+                                    partnerHeader={partnerHeader}
+                                    partnerName={partnerName}
+                                    customerName={selectedCustomer?.name || "Consumidor final"}
+                                    customerPhone={showCustomerContact ? selectedCustomer?.phone : null}
+                                    customerAddress={customerAddressText}
+                                />
+
+                                {/* Description / Diagnosis */}
+                                {(description || diagnosis) && (
+                                    <div className="px-8 pb-6">
+                                        <div className="w-full border-t border-gray-100 pt-6 space-y-4">
+                                            {description && (
+                                                <div>
+                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Descrição</h4>
+                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                        {description}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {diagnosis && (
+                                                <div>
+                                                    <h4 className="font-bold text-xs mb-1.5 text-black">Diagnóstico</h4>
+                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap max-h-[140px] overflow-y-auto">
+                                                        {diagnosis}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
+                            </>
+                        )}
 
-                                {!page.hasTotals && <div className="mt-auto"></div>}
-                            </div>
-
-                            {/* Footer */}
-                            <div
-                                className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center shrink-0 w-full h-[40px]"
-                                style={{ backgroundColor: resolvedColors.primary }}
-                            >
-                                <span>Criado via Dudit - dudit.com.br</span>
-                            </div>
+                        <div className="px-8 pb-4">
+                            <table className="w-full text-left border-separate border-spacing-0">
+                                <thead>
+                                    <tr className="bg-brand-gray/40">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Descrição do Item</th>
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Tipo</th>
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Qtd</th>
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Preço</th>
+                                        <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tr-xl border-b border-gray-100 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {page.items.map((item, idx) => (
+                                        <tr key={idx} className="bg-white">
+                                            <td className="py-2 pl-6 pr-4 border-b border-gray-50">
+                                                <span className="font-bold text-[13px] text-black block truncate max-w-[200px]">
+                                                    {item.name}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-4 border-b border-gray-50 text-center">
+                                                <span className="text-[11px] font-semibold text-gray-500 uppercase">
+                                                    {item.type === 'service' ? 'Serviço' : 'Produto'}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-4 border-b border-gray-50 text-center">
+                                                <span className="text-[13px] font-medium text-gray-600">
+                                                    {item.qty}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-4 border-b border-gray-50 text-right">
+                                                <span className="text-[13px] font-medium text-gray-600">
+                                                    {formatCurrency(item.price)}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
+                                                <span className="text-[13px] font-bold text-black">
+                                                    {formatCurrency(item.total)}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    ))}
-                </div>
-            </div>
-        </div>
+
+                        {page.hasTotals && (
+                            <div className="mt-auto">
+                                <div className="px-8 pb-6 flex justify-start">
+                                    <div className="w-full bg-brand-gray/40 p-6 rounded-lg text-black">
+                                        {totalServiceAmount > 0 && (
+                                            <div className="flex justify-between items-center text-xs mb-2">
+                                                <span className="text-gray-500 font-medium">Total de Serviços</span>
+                                                <span className="font-bold">{formatCurrency(totalServiceAmount)}</span>
+                                            </div>
+                                        )}
+                                        {totalProductAmount > 0 && (
+                                            <div className="flex justify-between items-center text-xs mb-2">
+                                                <span className="text-gray-500 font-medium">Total de Produtos</span>
+                                                <span className="font-bold">{formatCurrency(totalProductAmount)}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="border-t border-gray-200 my-3"></div>
+
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-sm">Valor Total Geral</span>
+                                            <div className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm" style={{ backgroundColor: resolvedPrimary }}>
+                                                {formatCurrency(totalAmount)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {signatureImageKey ? (
+                                    <div className="px-8 pb-12">
+                                        <div className="w-full border-t border-brand-border pt-6">
+                                            <div className="flex flex-col items-center">
+                                                <h4 className="font-bold text-xs mb-2 text-black">Assinatura do Cliente</h4>
+                                                <img
+                                                    src={buildImageUrl(signatureImageKey)}
+                                                    alt="Assinatura"
+                                                    className="max-h-[80px] object-contain border border-gray-200 rounded p-1 bg-white"
+                                                />
+                                                <div className="mt-4 w-full max-w-[280px] border-t border-gray-400 pt-2 text-center">
+                                                    <p className="font-bold text-[11px] text-brand-dark">{selectedCustomer?.name || "Cliente"}</p>
+                                                    <p className="text-[9px] text-gray-500">Assinatura do Cliente</p>
+                                                    {signedAt && (
+                                                        <p className="text-[9px] text-gray-400 mt-1">
+                                                            Assinado em {new Date(signedAt).toLocaleDateString("pt-BR")} às {new Date(signedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="px-8 pb-12">
+                                        <div className="w-full border-t border-brand-border pt-6">
+                                            <div className="flex items-center justify-center text-gray-400 text-xs italic">
+                                                Aguardando Assinatura do Cliente
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {!page.hasTotals && <div className="mt-auto"></div>}
+                    </div>
+
+                    <ReceiptA4Footer primaryColor={resolvedPrimary} />
+                </ReceiptA4Page>
+            ))}
+        </ReceiptA4Document>
     );
 };
 

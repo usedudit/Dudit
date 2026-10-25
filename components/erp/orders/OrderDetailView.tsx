@@ -906,7 +906,7 @@ export default function OrderDetailView({
   );
   const isDepositOrder = Boolean(
     order?.checkout_fulfillment?.depositCheckout?.payDepositOnly ||
-      order?.checkout_fulfillment?.depositCheckout?.usesDeposit,
+    order?.checkout_fulfillment?.depositCheckout?.usesDeposit,
   );
   const depositSummary = getOrderDepositSummary(order);
   const hasItemDiscount =
@@ -1717,24 +1717,24 @@ export default function OrderDetailView({
                             </div>
                           )}
 
-                           <FormSection
-                             title="Detalhes do Pagamento"
-                             headerRight={
-                               hasMinimumPlan(planSlug, "crescer") ? (
-                                 <button
-                                   onClick={loadFinancialBreakdown}
-                                   className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                 >
-                                   {financialLoading
-                                     ? "Carregando..."
-                                     : showFinancialBreakdown
-                                       ? "Ocultar lucro líquido"
-                                       : "Ver lucro líquido"}
-                                 </button>
-                               ) : null
-                             }
-                             hasSeparator
-                           >
+                          <FormSection
+                            title="Detalhes do Pagamento"
+                            headerRight={
+                              hasMinimumPlan(planSlug, "crescer") ? (
+                                <button
+                                  onClick={loadFinancialBreakdown}
+                                  className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                >
+                                  {financialLoading
+                                    ? "Carregando..."
+                                    : showFinancialBreakdown
+                                      ? "Ocultar lucro líquido"
+                                      : "Ver lucro líquido"}
+                                </button>
+                              ) : null
+                            }
+                            hasSeparator
+                          >
                             <div className="space-y-3">
                               <PaymentRow
                                 label="Método de Pagamento"
@@ -2740,25 +2740,25 @@ export default function OrderDetailView({
                         )}
 
                         {/* 5. Detalhes do Pagamento */}
-                         <FormSection
-                           title="Detalhes do Pagamento"
-                           headerRight={
-                             hasMinimumPlan(planSlug, "crescer") ? (
-                               <button
-                                 onClick={loadFinancialBreakdown}
-                                 className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                               >
-                                 {financialLoading
-                                   ? "Carregando..."
-                                   : showFinancialBreakdown
-                                     ? "Ocultar lucro líquido"
-                                     : "Ver lucro líquido"}
-                               </button>
-                             ) : null
-                           }
-                           hasSeparator
-                           className="mt-0"
-                         >
+                        <FormSection
+                          title="Detalhes do Pagamento"
+                          headerRight={
+                            hasMinimumPlan(planSlug, "crescer") ? (
+                              <button
+                                onClick={loadFinancialBreakdown}
+                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                              >
+                                {financialLoading
+                                  ? "Carregando..."
+                                  : showFinancialBreakdown
+                                    ? "Ocultar lucro líquido"
+                                    : "Ver lucro líquido"}
+                              </button>
+                            ) : null
+                          }
+                          hasSeparator
+                          className="mt-0"
+                        >
                           <div className="space-y-3">
                             <PaymentRow
                               label="Método de Pagamento"
@@ -2786,25 +2786,25 @@ export default function OrderDetailView({
                                 />
                               )}
 
-                              {isDepositOrder && depositSummary.sinalPaid && (
-                                <PaymentRow
-                                  label="Saldo"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                      {formatCurrency(
-                                        depositSummary.remainingBalance,
-                                      )}
-                                      <span
-                                        className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.remainingBalance <= 0.009 ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
-                                      >
-                                        {depositSummary.remainingBalance <= 0.009
-                                          ? "pago"
-                                          : "pendente"}
-                                      </span>
+                            {isDepositOrder && depositSummary.sinalPaid && (
+                              <PaymentRow
+                                label="Saldo"
+                                value={
+                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                    {formatCurrency(
+                                      depositSummary.remainingBalance,
+                                    )}
+                                    <span
+                                      className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.remainingBalance <= 0.009 ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
+                                    >
+                                      {depositSummary.remainingBalance <= 0.009
+                                        ? "pago"
+                                        : "pendente"}
                                     </span>
-                                  }
-                                />
-                              )}
+                                  </span>
+                                }
+                              />
+                            )}
 
                             {isMercadoPago && (
                               <>
@@ -3239,7 +3239,7 @@ export default function OrderDetailView({
                           </div>
                         </FormSection>
                       </div>
-                      </FadeIn>
+                    </FadeIn>
                   </TabsContent>
 
                   <TabsContent value="history" className="mt-0">
@@ -3435,6 +3435,46 @@ export default function OrderDetailView({
         onClose={() => setIsStepsSheetOpen(false)}
         title="Status do Pedido"
       >
+        <div className="rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border mb-5">
+          <div className="bg-brand-gray dark:bg-dark-border/50 p-4 border-b border-brand-border dark:border-dark-border">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                  {order.order_source === "Marketplace"
+                    ? "Origem da venda:"
+                    : "Responsável pela venda:"}
+                </span>
+                <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                  {order.order_source === "Marketplace"
+                    ? order.order_source || "Marketplace"
+                    : order.seller_name || "Não informado"}
+                </div>
+              </div>
+              {order.order_source !== "Marketplace" && (
+                <div className="flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                  Origem da venda:
+                  {sourceServiceOrder ? (
+                    <strong className="text-brand-dark dark:text-dark-heading">
+                      Ordem de Serviço #{sourceServiceOrder?.order_number || ""}
+                    </strong>
+                  ) : sourceQuote ? (
+                    <strong className="text-brand-dark dark:text-dark-heading">
+                      Orçamento {sourceQuote.quote_number}
+                    </strong>
+                  ) : sourceSubscriptionId ? (
+                    <strong className="text-brand-dark dark:text-dark-heading">
+                      Assinatura
+                    </strong>
+                  ) : (
+                    <strong className="text-brand-dark dark:text-dark-heading">
+                      {normalizeOrderSource(order.order_source)}
+                    </strong>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         <div className="space-y-0 my-4 px-2">
           {timelineSteps.map((step, idx) => {
             const isLastFailed =

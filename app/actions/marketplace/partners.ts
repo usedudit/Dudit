@@ -688,7 +688,10 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     updateData.business_info = {
       ...newInfo,
       activeResources: existingInfo.activeResources,
-      mode: existingInfo.mode // Never trust the frontend for mode changes on update
+      mode: existingInfo.mode, // Never trust the frontend for mode changes on update
+      ...(existingInfo.resourcesVersion !== undefined
+        ? { resourcesVersion: existingInfo.resourcesVersion }
+        : {}),
     }
   }
 

@@ -7,6 +7,8 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { listRecurringSubscriptionsAction } from "@/app/actions/erp/recurring-subscriptions"
 import RecurringSubscriptionsPage from "@/components/erp/recurring/RecurringSubscriptionsPage"
+import { canAccessRoute, normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
+import type { PartnerRole } from "@/lib/permissions/types"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -15,6 +17,10 @@ export default async function RecurringSubscriptionsRoute() {
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
     if (context.businessInfo?.mode === "quick" || context.businessInfo?.mode === "desapego") return <AccessDenied />
+
+    const role = (context.role || "DELIVERY") as PartnerRole
+    const routePermissions = normalizeToRoutePermissions(role, context.roleId === "owner" ? null : context.permissions)
+    if (!canAccessRoute(routePermissions, "recurring_subscriptions")) return <AccessDenied />
 
     const partnerId = context.partnerId
     const plan = await getPartnerPlan(partnerId)

@@ -30,10 +30,10 @@ import { getTrustedClientIP } from "@/lib/security/client-ip"
  * Uses platform IP data first. Proxy headers are accepted only when the
  * deployment explicitly declares that the proxy is trusted.
  */
-async function getClientIP(): Promise<string> {
+async function getClientIP(platformIP?: string | null): Promise<string> {
     try {
         const headersList = await headers()
-        return getTrustedClientIP(headersList)
+    return getTrustedClientIP(headersList, platformIP)
     } catch {
         return "unknown"
     }
@@ -65,11 +65,12 @@ async function getCurrentUserId(): Promise<string | null> {
  */
 async function buildIdentifier(
     identifierType: IdentifierType,
-    endpointName?: string
+    endpointName?: string,
+    platformIP?: string | null,
 ): Promise<string> {
     switch (identifierType) {
         case IdentifierType.IP: {
-            const ip = await getClientIP()
+            const ip = await getClientIP(platformIP)
             return `ip:${ip}`
         }
 
@@ -77,14 +78,14 @@ async function buildIdentifier(
             const userId = await getCurrentUserId()
             if (userId) return `user:${userId}`
             // Fallback to IP if user is not authenticated
-            const ip = await getClientIP()
+            const ip = await getClientIP(platformIP)
             return `ip:${ip}`
         }
 
         case IdentifierType.USER_PLUS_IP: {
             const [userId, ip] = await Promise.all([
                 getCurrentUserId(),
-                getClientIP(),
+                getClientIP(platformIP),
             ])
             if (userId) return `user:${userId}:ip:${ip}`
             // Fallback to IP only if user is not authenticated
@@ -126,7 +127,8 @@ const localShortCircuitCache = new Map<string, { count: number; resetAt: number 
  */
 export async function requireRateLimit(
     category: RateLimitCategory,
-    endpointName?: string
+    endpointName?: string,
+    platformIP?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
     const config = RATE_LIMIT_CONFIGS[category]
     const limiter = getLimiter(category)
@@ -134,19 +136,9 @@ export async function requireRateLimit(
     try {
         const identifier = await buildIdentifier(
             config.identifierType,
-            endpointName
+            endpointName,
+            platformIP,
         )
-
-        // Authenticated ERP operators have valid session tokens & RBAC permissions.
-        // Bypassing remote Redis for ERP_GENERAL, PRODUCT_CREATE, PRODUCT_UPDATE and PRODUCT_DELETE completely eliminates Redis spikes while managing products & orders.
-        if (
-            category === RateLimitCategory.ERP_GENERAL ||
-            category === RateLimitCategory.PRODUCT_CREATE ||
-            category === RateLimitCategory.PRODUCT_UPDATE ||
-            category === RateLimitCategory.PRODUCT_DELETE
-        ) {
-            return { success: true }
-        }
 
         // Memory pre-check for non-critical routes to save Redis commands during fast UI interaction
         if (!config.failClosed) {
@@ -207,14 +199,15 @@ export async function requireRateLimit(
  */
 export async function checkRateLimitForAPI(
     category: RateLimitCategory,
-    endpointName?: string
+    endpointName?: string,
+    platformIP?: string | null,
 ): Promise<{
     limited: boolean
     status?: number
     body?: { error: string; retryAfter?: number }
 }> {
     try {
-        const result = await requireRateLimit(category, endpointName)
+        const result = await requireRateLimit(category, endpointName, platformIP)
         if (!result.success) {
             return {
                 limited: true,

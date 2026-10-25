@@ -180,31 +180,10 @@ export async function middleware(request: NextRequest) {
 
   const isServerAction = request.headers.has("Next-Action")
 
-  // Classify App Router requests without logging cookies, tokens, query values
-  // or user identifiers. This lets us distinguish a real navigation from a
-  // speculative RSC/prefetch request.
-  const purpose = request.headers.get("purpose")
-  const isPrefetch = request.headers.has("next-router-prefetch")
-    || request.headers.get("x-middleware-prefetch") === "1"
-    || purpose === "prefetch"
-  const isRsc = request.headers.get("RSC") === "1"
-    || request.headers.get("Accept")?.includes("text/x-component") === true
-
-  // Early-exit for RSC/prefetch requests: skip CSP construction, security
-  // headers, rate limiting, and auth. CSP is only enforced on HTML document
-  // responses; RSC payloads are consumed by the Next.js client-side router.
-  if (isPrefetch || isRsc) {
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set("x-dudit-request-id", requestId)
-    requestHeaders.set("x-dudit-request-start", String(requestStartedAt))
-    requestHeaders.delete("x-user-id")
-    requestHeaders.delete("x-user-email")
-    requestHeaders.delete("x-skip-auth-fallback")
-    // Mark public pages so the root layout can skip the getCurrentUser() call.
-    const isPublicPage = ["/institucional", "/ajuda", "/auth", "/manutencao"].some(p => pathname === p || pathname.startsWith(p + "/"))
-    if (isPublicPage) requestHeaders.set("x-dudit-public-page", "1")
-    return NextResponse.next({ request: { headers: requestHeaders } })
-  }
+  // RSC and prefetch requests must still receive security headers and the same
+  // authorization checks as document requests. Skipping middleware here could
+  // expose protected data through a client-router request or bypass a Server
+  // Action's origin validation.
 
   // ============================================================================
   // SECURITY FIX (HIGH-03): Origin-based CSRF protection for ALL Server Actions.

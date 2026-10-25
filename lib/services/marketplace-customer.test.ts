@@ -61,6 +61,8 @@ describe("ensureMarketplaceCustomer", () => {
       const { client, chain } = createAdminMock()
       getAdminClientMock.mockReturnValue(client)
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Step 1: lookup by marketplace_user_id -> null
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Step 2: lookup by email -> null
@@ -115,6 +117,8 @@ describe("ensureMarketplaceCustomer", () => {
         is_default: true,
       }
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Step 1: lookup by marketplace_user_id -> null
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Step 2: lookup by email -> null
@@ -163,6 +167,8 @@ describe("ensureMarketplaceCustomer", () => {
 
       const existingCustomerId = "existing-customer-with-addr"
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Step 1: found by marketplace_user_id
       chain.maybeSingle.mockResolvedValueOnce({
         data: { id: existingCustomerId, name, email, phone, cpf: null },
@@ -195,6 +201,8 @@ describe("ensureMarketplaceCustomer", () => {
 
       const existingCustomerId = "existing-customer-1"
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,
@@ -215,8 +223,10 @@ describe("ensureMarketplaceCustomer", () => {
       expect(chain.insert).not.toHaveBeenCalled()
 
       const eqCalls = chain.eq.mock.calls
-      expect(eqCalls[0]).toEqual(["partner_id", partnerA])
-      expect(eqCalls[1]).toEqual(["marketplace_user_id", userId])
+      const partnerEq = eqCalls.find((c: any[]) => c[0] === "partner_id" && c[1] === partnerA)
+      const userEq = eqCalls.find((c: any[]) => c[0] === "marketplace_user_id" && c[1] === userId)
+      expect(partnerEq).toBeDefined()
+      expect(userEq).toBeDefined()
     })
 
     it("updates non-sensitive fields on reuse when they have changed", async () => {
@@ -225,6 +235,8 @@ describe("ensureMarketplaceCustomer", () => {
 
       const existingCustomerId = "existing-customer-2"
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       // Found by marketplace_user_id - name differs, phone is null
       chain.maybeSingle.mockResolvedValueOnce({
         data: { id: existingCustomerId, name: "Old Name", email, phone: null, cpf: null },
@@ -259,6 +271,8 @@ describe("ensureMarketplaceCustomer", () => {
       getAdminClientMock.mockReturnValue(client)
 
       // ---- Partner A ----
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.single.mockResolvedValueOnce({
@@ -283,6 +297,8 @@ describe("ensureMarketplaceCustomer", () => {
       expect(insertA.marketplace_user_id).toBe(userId)
 
       // ---- Partner B ----
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.single.mockResolvedValueOnce({
@@ -317,6 +333,8 @@ describe("ensureMarketplaceCustomer", () => {
 
       const existingCustomerId = "migrated-customer"
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,
@@ -349,6 +367,8 @@ describe("ensureMarketplaceCustomer", () => {
 
       const existingCustomerId = "store-credit-customer"
 
+      // Marketplace profile has no CPF -> resolver returns null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
       chain.maybeSingle.mockResolvedValueOnce({
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,

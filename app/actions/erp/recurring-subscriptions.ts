@@ -683,7 +683,10 @@ export async function syncSubscriptionWithMpErpAction(partnerId: string, subscri
   try {
     await requirePermission(partnerId, "recurring_subscriptions", "manage")
     const { syncSubscriptionWithMpAction } = await import("@/app/actions/marketplace/preapproval")
-    return await syncSubscriptionWithMpAction(partnerId, subscriptionId)
+    const { createCheckoutFulfillmentToken } = await import("@/lib/security/checkout-fulfillment-token")
+    const checkoutToken = createCheckoutFulfillmentToken(subscriptionId)
+    if (!checkoutToken) return { success: false, error: "Configuração de segurança ausente." }
+    return await syncSubscriptionWithMpAction(subscriptionId, checkoutToken)
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao sincronizar" }
   }

@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getDreReport, type DreRegime } from "@/lib/services/dre.service"
 import { DreA4Preview } from "@/components/erp/financial/dre/receipt/DreA4Preview"
@@ -40,10 +41,11 @@ export default async function PrintDrePage({ searchParams }: PrintDrePageProps) 
   }
 
   const admin = createAdminClient()
-  const [plan, partnerRes, puRes] = await Promise.all([
+  const [plan, partnerRes, puRes, partnerHeaderRes] = await Promise.all([
     getPartnerPlan(partnerId),
     admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
     admin.from("partner_users").select("id, role_id").eq("partner_id", partnerId).eq("user_id", user.id).maybeSingle(),
+    getPartnerReceiptHeaderAction(partnerId, storeId === "all" ? undefined : storeId || undefined),
   ])
 
   // 1. Validação do Plano Escalar
@@ -120,6 +122,8 @@ export default async function PrintDrePage({ searchParams }: PrintDrePageProps) 
   const showKpiSummary = resolvedSearchParams.showKpiSummary !== "false"
   const showSignatures = resolvedSearchParams.showSignatures !== "false"
 
+  const partnerHeader = partnerHeaderRes?.success ? partnerHeaderRes.data : undefined
+
   return (
     <PrintLayout paperSize="a4">
       <DreA4Preview
@@ -133,6 +137,7 @@ export default async function PrintDrePage({ searchParams }: PrintDrePageProps) 
         showKpiSummary={showKpiSummary}
         showSignatures={showSignatures}
         printMode={true}
+        partnerHeader={partnerHeader || undefined}
       />
     </PrintLayout>
   )

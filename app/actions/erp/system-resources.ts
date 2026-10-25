@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
-import { normalizeActiveResources } from "@/lib/system-resources"
+import { normalizeActiveResources, SYSTEM_RESOURCES_VERSION } from "@/lib/system-resources"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
@@ -36,7 +36,7 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
   const nextBusinessInfo = {
     ...businessInfo,
     activeResources: normalizeActiveResources(activeResources),
-    resourcesVersion: 8,
+    resourcesVersion: SYSTEM_RESOURCES_VERSION,
   }
 
   const { error } = await supabase

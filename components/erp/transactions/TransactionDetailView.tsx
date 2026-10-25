@@ -210,7 +210,28 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                 <TabsContent value="summary" className="mt-0">
                                     <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                            {/* Mobile Contact Section at the top */}
+                                            {/* Timeline first - shared component (header inside the card / inside the BottomSheet) */}
+                                            <StatusStepsTimeline
+                                                steps={timelineSteps as StatusStep[]}
+                                                sheetTitle="Status da Transação"
+                                                forceDanger={detail.timeline.step2?.danger || isCancelled}
+                                                className="mb-8"
+                                                header={
+                                                    <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-between items-center flex-wrap gap-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Tipo:</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{detail.typeBannerLabel}</span>
+                                                            </div>
+                                                            <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium md:text-right">
+                                                                Origem: <strong className="text-brand-dark dark:text-dark-heading">{detail.originLabel}</strong>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            />
+
+                                            {/* Mobile Contact Section */}
                                             {detail.contactCard && (detail.contactCard.name || detail.contactCard.title) && (
                                                 <div className="lg:hidden mb-6">
                                                     <FormSection title="" className="mt-0">
@@ -238,28 +259,6 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     </FormSection>
                                                 </div>
                                             )}
-                                            {/* Tipo/Origem card - always visible on all screen sizes */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex justify-between items-center flex-wrap gap-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Tipo:</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{detail.typeBannerLabel}</span>
-                                                        </div>
-                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium md:text-right">
-                                                            Origem: <strong className="text-brand-dark dark:text-dark-heading">{detail.originLabel}</strong>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Timeline - shared component (handles desktop + mobile + BottomSheet) */}
-                                            <StatusStepsTimeline
-                                                steps={timelineSteps as StatusStep[]}
-                                                sheetTitle="Status da Transação"
-                                                forceDanger={detail.timeline.step2?.danger || isCancelled}
-                                                sectionTitle="Status"
-                                            />
 
                                             <FormSection title={detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"} hasSeparator>
                                                 <div className="space-y-4">

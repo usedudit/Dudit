@@ -1,4 +1,5 @@
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { createCheckoutFulfillmentToken } from "@/lib/security/checkout-fulfillment-token"
 
 interface PreapprovalConfig {
   partnerId: string
@@ -27,9 +28,14 @@ export async function createMpPreapproval({
 }: PreapprovalConfig) {
   const token = await getValidMercadoPagoAccessToken(partnerId)
 
+  const checkoutToken = createCheckoutFulfillmentToken(externalReference)
+  if (!checkoutToken) {
+    throw new Error("CHECKOUT_FULFILLMENT_SECRET não configurado")
+  }
+
   const payload = {
     payer_email: payerEmail,
-    back_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://dudit.com.br"}/checkout/fulfillment?subscription_id=${externalReference}`,
+    back_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://dudit.com.br"}/checkout/fulfillment?subscription_id=${encodeURIComponent(externalReference)}&checkout_token=${encodeURIComponent(checkoutToken)}`,
     reason: `Assinatura: ${planName}`,
     external_reference: externalReference,
     auto_recurring: {

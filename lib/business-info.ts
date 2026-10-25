@@ -3,6 +3,7 @@ export type BusinessMode = "desapego" | "quick" | "showcase" | "erp"
 export type PartnerBusinessInfo = {
   mode?: BusinessMode
   activeResources?: string[]
+  resourcesVersion?: number
   salesSettings?: Record<string, unknown>
 }
 
@@ -35,7 +36,7 @@ export const DEFAULT_BUSINESS_INFO: Required<Pick<PartnerBusinessInfo, "mode" | 
   ],
 }
 
-export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusinessInfo, "mode" | "activeResources">> & { salesSettings?: Record<string, unknown> } {
+export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusinessInfo, "mode" | "activeResources">> & { resourcesVersion?: number; salesSettings?: Record<string, unknown> } {
   const raw = (() => {
     if (!input) return null
     if (typeof input === "string") {
@@ -62,6 +63,9 @@ export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusi
   return {
     mode,
     activeResources: activeResources.length ? activeResources : DEFAULT_BUSINESS_INFO.activeResources,
+    ...(typeof raw?.resourcesVersion === "number" && Number.isFinite(raw.resourcesVersion)
+      ? { resourcesVersion: raw.resourcesVersion }
+      : {}),
     ...(raw?.salesSettings ? { salesSettings: raw.salesSettings } : {}),
   }
 }

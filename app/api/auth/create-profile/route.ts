@@ -3,10 +3,30 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { NextRequest, NextResponse } from "next/server"
 import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { escapeHtml } from "@/lib/security/input-sanitizer"
+import { z } from "zod"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
+
+const createProfileSchema = z.object({
+  userId: z.string().uuid(),
+  email: z.string().email().max(320).optional(),
+  fullName: z.string().trim().max(200).optional(),
+  isPendingPartner: z.boolean().optional(),
+}).strict()
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, email, fullName, isPendingPartner } = await request.json()
+    const rateLimit = await checkRateLimitForAPI(
+      RateLimitCategory.API_GENERAL,
+      "create-profile",
+      (request as NextRequest & { ip?: string }).ip,
+    )
+    if (rateLimit.limited) {
+      return NextResponse.json(rateLimit.body, { status: rateLimit.status || 429 })
+    }
+
+    const body = createProfileSchema.parse(await request.json())
+    const { userId, fullName, isPendingPartner } = body
 
     if (!userId) {
       return NextResponse.json(
@@ -45,7 +65,7 @@ export async function POST(request: NextRequest) {
         hint: userProfileError.hint,
       })
       return NextResponse.json(
-        { error: `Failed to create user profile: ${userProfileError.message}` },
+        { error: "Não foi possível criar o perfil." },
         { status: 500 }
       )
     } else {
@@ -53,13 +73,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Send welcome email via SMTP2GO
-    if (email) {
+    const welcomeEmail = user.email
+    if (welcomeEmail) {
       try {
         const escapedFullName = escapeHtml(fullName || "usuário")
         const emailResult = await SMTP2GOService.sendEmail({
           userId,
           from: process.env.SMTP2GO_FROM_EMAIL || "noreply@dudit.com.br",
-          to: [{ email }],
+          to: [{ email: welcomeEmail }],
           subject: "Bem-vindo à Plataforma!",
           html: `
             <h1>Bem-vindo, ${escapedFullName}!</h1>

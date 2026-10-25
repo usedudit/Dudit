@@ -27,7 +27,7 @@ export type SystemResourceId =
   | "recurringPlans"
   | "recurringSubscriptions"
 
-export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
+export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing" | "recurring"
 
 export interface SystemResourceDefinition {
   id: SystemResourceId
@@ -44,7 +44,11 @@ export const SYSTEM_RESOURCE_MODULE_LABELS: Record<SystemResourceModule, string>
   operations: "Operação",
   management: "Gestão",
   marketing: "Marketing",
+  recurring: "Assinaturas",
 }
+
+/** Current shape version of `partners.business_info.activeResources`. */
+export const SYSTEM_RESOURCES_VERSION = 9
 
 export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
@@ -191,14 +195,14 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     id: "recurringPlans",
     label: "Planos Recorrentes",
     description: "Planos de cobrança recorrente com produtos e serviços e cobrança automática.",
-    module: "marketing",
+    module: "recurring",
     minimumPlan: "escalar",
   },
   {
     id: "recurringSubscriptions",
     label: "Assinaturas de Clientes",
     description: "Assinaturas ativas, cobranças recorrentes e créditos de serviços.",
-    module: "marketing",
+    module: "recurring",
     minimumPlan: "escalar",
   },
 ]
@@ -207,9 +211,6 @@ export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
   ...SYSTEM_RESOURCES.map((resource) => resource.id),
   "marketing",
   "showcase",
-  "communityVideos",
-  "recurringPlans",
-  "recurringSubscriptions",
 ]
 
 export const DESAPEGO_AVAILABLE_RESOURCES: SystemResourceId[] = [
@@ -366,16 +367,35 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo?: { mode?: un
   return getDefaultResourcesForModeAndCategory(mode)
 }
 
+const RECURRING_RESOURCES_INTRODUCED_IN = 9
+
 export function resolveActiveResources(businessInfo: { mode?: unknown; activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
   if (Array.isArray(businessInfo?.activeResources)) {
     const current = normalizeActiveResources(businessInfo.activeResources)
+    const mode = String(businessInfo?.mode || "erp").toLowerCase().trim()
+    const version = Number(businessInfo?.resourcesVersion || 0)
+
+    // Assinaturas ficavam sempre visíveis antes de existirem como recursos
+    // controláveis. Para não esconder a funcionalidade de parceiros que nunca
+    // salvaram a nova versão, ativamos os dois recursos uma única vez. Depois
+    // que o parceiro salva em "Gerenciar recursos", a versão sobe e a escolha
+    // dele passa a ser respeitada (inclusive desativado).
+    if (mode === "erp" && version < RECURRING_RESOURCES_INTRODUCED_IN) {
+      const available = getAvailableResourcesForMode(mode)
+      for (const resourceId of ["recurringPlans", "recurringSubscriptions"] as const) {
+        if (available.includes(resourceId) && !current.includes(resourceId)) {
+          current.push(resourceId)
+        }
+      }
+    }
+
     return current
   }
   return defaultActiveResourcesForBusinessInfo(businessInfo)
 }
 
 export function isSystemResourceActive(
-  businessInfo: { activeResources?: unknown },
+  businessInfo: { mode?: unknown; activeResources?: unknown; resourcesVersion?: number },
   resourceId: SystemResourceId,
 ): boolean {
   return resolveActiveResources(businessInfo).includes(resourceId)
@@ -423,6 +443,7 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
    "/erp/cupons": "coupons",
    "/erp/promocoes": "campaigns",
    "/erp/videos": "communityVideos",
+   // ── Assinaturas
    "/erp/recorrentes/planos": "recurringPlans",
    "/erp/recorrentes/assinaturas": "recurringSubscriptions",
 }

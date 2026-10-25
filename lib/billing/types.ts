@@ -88,6 +88,8 @@ export interface InvoiceData {
     verification_hash: string
     created_at: string
     status: string
+    primaryColor?: string
+    secondaryColor?: string
 
     partner: {
         name: string

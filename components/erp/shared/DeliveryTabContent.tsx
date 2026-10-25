@@ -456,6 +456,23 @@ export const DeliveryStatusTimeline: React.FC<DeliveryStatusTimelineProps> = ({
                 onClose={() => setIsStepsSheetOpen(false)}
                 title={isPickup ? "Status da Retirada" : "Status da Entrega"}
             >
+                <div className="rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border mb-5">
+                    <div className="bg-brand-gray dark:bg-dark-border/50 p-4 border-b border-brand-border dark:border-dark-border">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                    {isPickup ? "Retirada" : "Entrega"}:
+                                </span>
+                                <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                    {currentStep.label}
+                                </div>
+                            </div>
+                            <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                {steps.filter((s) => s.active).length} de {steps.length} etapas
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div className="space-y-0 my-4 px-2">
                     {steps.map((step, idx) => {
                         const isLastFailed = isFailed && idx === steps.length - 1

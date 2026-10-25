@@ -87,6 +87,17 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                             page-break-inside: avoid !important;
                         }
 
+                        /* All A4 receipt print classes: prevent table row splitting */
+                        .sale-receipt-a4-print tr,
+                        .sale-receipt-a4-print thead tr,
+                        .sale-receipt-a4-print tbody tr,
+                        .quote-a4-print tr,
+                        .quote-a4-print thead tr,
+                        .quote-a4-print tbody tr {
+                            break-inside: avoid !important;
+                            page-break-inside: avoid !important;
+                        }
+
                         @media print {
                             html, body {
                                 background-color: #ffffff !important;

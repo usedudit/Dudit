@@ -44,7 +44,16 @@ async function handleUpload(request: NextRequest) {
     // =============================
     // Rate limit (UPLOAD category: 20 req/hour per user)
     // =============================
-    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.UPLOAD)
+    const uploadType = request.nextUrl.searchParams.get("uploadType") || "products"
+    const user = await getCurrentUser()
+    const platformIP = (request as NextRequest & { ip?: string }).ip
+    const rateLimit = await checkRateLimitForAPI(
+      !user && uploadType === "partner-logo"
+        ? RateLimitCategory.PARTNER_LOGO_UPLOAD
+        : RateLimitCategory.UPLOAD,
+      "image-upload",
+      platformIP,
+    )
     if (rateLimit.limited) {
       return NextResponse.json(
         rateLimit.body || { error: "Muitas requisições. Tente novamente mais tarde." },
@@ -55,9 +64,6 @@ async function handleUpload(request: NextRequest) {
     // =============================
     // Auth - Permite partner-logo durante cadastro mesmo sem sessão logada
     // =============================
-    const uploadType = request.nextUrl.searchParams.get("uploadType") || "products"
-    const user = await getCurrentUser()
-
     if (!user && uploadType !== "partner-logo") {
       return NextResponse.json(
         { error: "Não autenticado." },
@@ -77,6 +83,11 @@ async function handleUpload(request: NextRequest) {
 
     if (contentType.includes("application/json")) {
       // JSON com imageData (base64)
+      const contentLength = Number(request.headers.get("content-length") || 0)
+      if (contentLength > MAX_FILE_SIZE * 2) {
+        return NextResponse.json({ error: "Requisição muito grande." }, { status: 413 })
+      }
+
       const body = await request.json()
       if (!body.imageData) {
         return NextResponse.json(
@@ -88,8 +99,6 @@ async function handleUpload(request: NextRequest) {
       // Decodificar base64
       const base64Data = body.imageData.split(",")[1] || body.imageData
       buffer = Buffer.from(base64Data, "base64")
-      mimeType = body.imageData.split(";")[0]?.replace("data:", "") || "image/jpeg"
-
       mimeType = body.imageData.split(";")[0]?.replace("data:", "") || "image/jpeg"
 
       // SECURITY FIX (LOW-02): Gate debug logs behind development mode
@@ -224,12 +233,11 @@ async function handleUpload(request: NextRequest) {
     } else {
       const analysis = await moderateImageWithBase64(buffer.toString("base64"))
       if (analysis.isUnavailable) {
-        // Fail-open: Se o Sightengine estiver indisponível, der erro ou bater a cota mensal gratuita, deixa passar aprovado
-        decision = {
-          status: "APPROVED",
-          message: "Imagem aprovada.",
-          shouldSaveToR2: true,
-        }
+        // Fail closed: never publish unmoderated content during provider outages.
+        return NextResponse.json(
+          { error: "A moderação de imagens está temporariamente indisponível. Tente novamente em alguns minutos." },
+          { status: 503 },
+        )
       } else {
         decision = decideImageStatus(analysis)
       }

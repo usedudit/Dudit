@@ -28,10 +28,10 @@ export function getSentryOptions() {
     tracesSampleRate: isProduction ? 0.1 : 0,
     maxBreadcrumbs: 20,
     enableLogs: false,
-    beforeSend,
-    beforeSendTransaction,
-    beforeSendSpan,
-    beforeBreadcrumb: sanitizeBreadcrumb,
+    beforeSend: beforeSend as any,
+    beforeSendTransaction: beforeSendTransaction as any,
+    beforeSendSpan: beforeSendSpan as any,
+    beforeBreadcrumb: sanitizeBreadcrumb as any,
   }
 }
 

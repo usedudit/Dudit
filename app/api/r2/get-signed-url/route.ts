@@ -69,8 +69,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[API] Erro em /api/r2/get-signed-url:", error)
 
-    const message =
-      error instanceof Error ? error.message : "Erro ao gerar signed URL"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return NextResponse.json({ error: "Não foi possível gerar a URL de upload." }, { status: 400 })
   }
 }

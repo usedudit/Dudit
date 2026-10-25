@@ -463,7 +463,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-4">
+                                                    <div>
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fornecedor desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -476,7 +476,7 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
 
                                                         {isPJ ? (
-                                                            <div className="space-y-4">
+                                                            <div>
                                                                 {supplier.cnpj && (
                                                                     <div className="flex justify-between items-center">
                                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CNPJ</span>

@@ -29,6 +29,7 @@ import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { resolveActiveResources } from "@/lib/system-resources"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { redirect } from "next/navigation"
 import type { Period } from "@/lib/period-types"
@@ -54,7 +55,7 @@ export default async function ERPEstatisticasPage(props: {
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
-    const activeResources = businessInfo.activeResources
+    const activeResources = resolveActiveResources(businessInfo)
 
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
@@ -119,7 +120,7 @@ async function ReportsContent({
     const hasProductivity = activeResources.includes("productivity") || activeResources.includes("team")
     const hasServiceOrders = activeResources.includes("serviceOrders")
     const hasGoals = activeResources.includes("goals")
-    const hasSubscriptions = activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
+    const hasSubscriptions = activeResources.includes("recurringSubscriptions") || activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
     const hasAppointments = activeResources.includes("appointments")
     const hasPermission = (permission: string) => can(permissionContext, permission)
 

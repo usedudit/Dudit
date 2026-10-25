@@ -1,10 +1,12 @@
 "use client"
 
 import { formatCurrency } from "@/lib/utils"
-import { QUOTE_PREVIEW_PRIMARY_COLOR } from "@/lib/quotes/quote-preview-theme"
+import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 import { usePartnerTimezone } from "@/lib/store-context"
 import {
+    ReceiptA4Document,
+    ReceiptA4Page,
     ReceiptStoreHeaderA4,
     ReceiptA4StoreData,
     ReceiptA4Footer,
@@ -16,6 +18,8 @@ type CashSessionA4PreviewProps = {
     partnerHeader: SaleReceiptPartnerHeader
     partnerAvatar?: string
     type: "opening" | "closing"
+    primaryColor?: string
+    secondaryColor?: string
     printMode?: boolean
 }
 
@@ -30,10 +34,13 @@ const CashSessionA4Preview = ({
     partnerHeader,
     partnerAvatar,
     type,
+    primaryColor,
+    secondaryColor,
     printMode = false,
 }: CashSessionA4PreviewProps) => {
     const tz = usePartnerTimezone()
-    const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR
+    const primary = primaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
+    const secondary = secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
     const partnerName = data.partnerName
     const isClosed = type === "closing"
 
@@ -51,28 +58,18 @@ const CashSessionA4Preview = ({
     }
 
     return (
-        <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "md:border-l border-brand-border dark:border-dark-border"
-                }`}
-        >
-            <div
-                className={printMode
-                    ? "w-full flex flex-col items-center p-0"
-                    : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
-                }
-            >
-                <div
-                    className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
-                >
-                    <ReceiptStoreHeaderA4
-                        partnerName={partnerName}
-                        partnerAvatar={partnerAvatar}
-                        primaryColor={primaryColor}
-                        title={isClosed ? "Cupom de fechamento de caixa" : "Cupom de abertura de caixa"}
-                        subtitle={`Sessão ${data.sessionId.slice(0, 8).toUpperCase()}`}
-                    />
+        <ReceiptA4Document printMode={printMode} printClassName="sale-receipt-a4-print">
+            <ReceiptA4Page printMode={printMode}>
+                <ReceiptStoreHeaderA4
+                    partnerName={partnerName}
+                    partnerAvatar={partnerAvatar}
+                    primaryColor={primary}
+                    secondaryColor={secondary}
+                    title={isClosed ? "Cupom de fechamento de caixa" : "Cupom de abertura de caixa"}
+                    subtitle={`Sessão ${data.sessionId.slice(0, 8).toUpperCase()}`}
+                />
 
-                    <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col">
                         <div className="px-8 py-6">
                             <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
                                 {metaCells.map((cell) => (
@@ -178,7 +175,7 @@ const CashSessionA4Preview = ({
                                         <span className="font-bold text-sm">Saldo calculado</span>
                                         <div
                                             className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"
-                                            style={{ backgroundColor: primaryColor }}
+                                            style={{ backgroundColor: primary }}
                                         >
                                             {formatCurrency(data.totals.calculatedDrawerTotal)}
                                         </div>
@@ -211,11 +208,10 @@ const CashSessionA4Preview = ({
                         </div>
                     </div>
 
-                    <ReceiptA4Footer primaryColor={primaryColor} />
-                </div>
-            </div>
-        </div>
-    )
+                    <ReceiptA4Footer primaryColor={primary} />
+                </ReceiptA4Page>
+            </ReceiptA4Document>
+        )
 }
 
 export default CashSessionA4Preview

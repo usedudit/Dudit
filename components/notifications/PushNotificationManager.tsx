@@ -68,8 +68,8 @@ export async function syncFcmToken(userId: string, force = false): Promise<strin
     const registration = await getOrRegisterServiceWorker()
     if (!registration) return null
 
-    const { initializeApp, getApps } = await import("firebase/app")
-    const { getMessaging, getToken } = await import("firebase/messaging")
+    const { initializeApp, getApps } = await import("@firebase/app")
+    const { getMessaging, getToken } = await import("@firebase/messaging")
     const { firebaseClientConfig } = await import("@/lib/notifications/firebase-config")
 
     const app = getApps().length ? getApps()[0]! : initializeApp(firebaseClientConfig)
@@ -259,8 +259,8 @@ export function PushNotificationManager() {
         }
 
         // Listener para mensagens em primeiro plano
-        const { initializeApp, getApps } = await import("firebase/app")
-        const { getMessaging, onMessage } = await import("firebase/messaging")
+        const { initializeApp, getApps } = await import("@firebase/app")
+        const { getMessaging, onMessage } = await import("@firebase/messaging")
         const { firebaseClientConfig } = await import("@/lib/notifications/firebase-config")
 
         const app = getApps().length ? getApps()[0]! : initializeApp(firebaseClientConfig)

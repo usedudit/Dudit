@@ -7,7 +7,8 @@ import {
   QUOTE_PREVIEW_SECONDARY_COLOR,
 } from "@/lib/quotes/quote-preview-theme"
 import type { DreReportData, DreRegime, DreNode } from "@/lib/services/dre.service"
-import { ReceiptA4Footer, ReceiptStoreHeaderA4 } from "@/components/erp/orders/receipt/ReceiptComponents"
+import { ReceiptA4Document, ReceiptA4Page, ReceiptStoreHeaderA4, ReceiptA4StoreData, ReceiptA4Footer } from "@/components/erp/orders/receipt/ReceiptComponents"
+import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 
 interface DreA4PreviewProps {
   report: DreReportData
@@ -20,6 +21,9 @@ interface DreA4PreviewProps {
   showKpiSummary?: boolean
   showSignatures?: boolean
   printMode?: boolean
+  primaryColor?: string
+  secondaryColor?: string
+  partnerHeader?: SaleReceiptPartnerHeader
 }
 
 function translateType(type: "income" | "expense" | "subtotal" | "result" | "item"): string {
@@ -57,14 +61,24 @@ export function DreA4Preview({
   showKpiSummary = true,
   showSignatures = true,
   printMode = false,
+  primaryColor: requestedPrimaryColor,
+  secondaryColor: requestedSecondaryColor,
+  partnerHeader,
 }: DreA4PreviewProps) {
-  const primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR
-  const secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR
+  const primary = requestedPrimaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
+  const secondary = requestedSecondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
   const partnerName = report.companyInfo?.partnerName || "Empresa Parceira"
   const partnerAvatar = report.companyInfo?.partnerAvatar
   const kpis = report.kpis
   const documentNumber = report.companyInfo?.documentNumber
   const documentType = report.companyInfo?.documentType
+  const resolvedHeader: SaleReceiptPartnerHeader = partnerHeader ?? {
+    fantasyName: partnerName,
+    legalName: report.companyInfo?.tradeName || partnerName,
+    addressLine: "",
+    taxIdLine: documentNumber ? `${documentType === "cpf" ? "CPF" : "CNPJ"}: ${documentNumber}` : "",
+    phone: "",
+  }
 
   const pages = useMemo(() => {
     const ROW_HEIGHT = 40
@@ -125,47 +139,8 @@ export function DreA4Preview({
     return chunks
   }, [report.structure, showSubItems, showKpiSummary, showSignatures])
 
-  const renderDreTable = (nodes: DreNode[], pageType: "first" | "middle") => (
+  const renderDreTable = (nodes: DreNode[]) => (
     <>
-      {pageType === "first" && (
-        <>
-          {/* ── 1. Top Banner Estilo Canônico da Dudit ─────────────────── */}
-          <ReceiptStoreHeaderA4
-            partnerName={partnerName}
-            partnerAvatar={partnerAvatar}
-            primaryColor={primaryColor}
-            secondaryColor={secondaryColor}
-            title="Demonstração do Resultado"
-            subtitle={`Período: ${formatDate(startDate)} até ${formatDate(endDate)} • Regime de ${regime === "competencia" ? "Competência" : "Caixa"}`}
-          />
-
-          {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
-          <div className="px-8 py-6">
-            <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
-              <div className="flex flex-col">
-                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Empresa</span>
-                <span className="font-bold text-sm text-brand-dark">{partnerName}</span>
-                {documentNumber && (
-                  <span className="text-[10px] text-gray-500">
-                    {documentType === "cpf" ? "CPF" : "CNPJ"}: {documentNumber}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Unidade / Loja</span>
-                <span className="font-bold text-sm text-brand-dark">{storeName}</span>
-                <span className="text-[10px] text-gray-500">{report.companyInfo?.taxRegimeLabel}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão / Gerado em</span>
-                <span className="font-bold text-sm text-brand-dark">{report.companyInfo?.generatedAt}</span>
-                <span className="text-[10px] text-gray-500">Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}</span>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
       {/* ── 3. Tabela Principal da DRE ─────────────────────────────────── */}
       <div className="px-8 pb-4">
         <table className="w-full text-left border-separate border-spacing-0">
@@ -213,23 +188,54 @@ export function DreA4Preview({
   const isLastPage = (index: number) => index === pages.length - 1
 
   return (
-    <div
-      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "dre-a4-print" : "md:border-l border-brand-border dark:border-dark-border"
-        }`}
-    >
-      <div
-        className={
-          printMode
-            ? "w-full p-0"
-            : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
-        }
-      >
-        {pages.map((page, pageIndex) => (
-          <div
-            key={pageIndex}
-            className={`w-[210mm] min-w-[210mm] max-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
-          >
-            {renderDreTable(page.nodes, page.type)}
+    <ReceiptA4Document printMode={printMode} printClassName="dre-a4-print">
+      {pages.map((page, pageIndex) => (
+        <ReceiptA4Page key={pageIndex} printMode={printMode}>
+          <ReceiptStoreHeaderA4
+            partnerName={partnerName}
+            partnerAvatar={partnerAvatar}
+            primaryColor={primary}
+            secondaryColor={secondary}
+            title="Demonstração do Resultado"
+            subtitle={`Período: ${formatDate(startDate)} até ${formatDate(endDate)} • Regime de ${regime === "competencia" ? "Competência" : "Caixa"}`}
+          />
+
+          <div className="flex-1 flex flex-col">
+            {page.type === "first" && (
+              <>
+                {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
+                <div className="px-8 py-6">
+                  <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Empresa</span>
+                      <span className="font-bold text-sm text-brand-dark">{partnerName}</span>
+                      {documentNumber && (
+                        <span className="text-[10px] text-gray-500">
+                          {documentType === "cpf" ? "CPF" : "CNPJ"}: {documentNumber}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Unidade / Loja</span>
+                      <span className="font-bold text-sm text-brand-dark">{storeName}</span>
+                      <span className="text-[10px] text-gray-500">{report.companyInfo?.taxRegimeLabel}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão / Gerado em</span>
+                      <span className="font-bold text-sm text-brand-dark">{report.companyInfo?.generatedAt}</span>
+                      <span className="text-[10px] text-gray-500">Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <ReceiptA4StoreData
+                  partnerHeader={resolvedHeader}
+                  partnerName={partnerName}
+                />
+              </>
+            )}
+
+            {renderDreTable(page.nodes)}
 
             {isLastPage(pageIndex) && (
               <>
@@ -283,11 +289,11 @@ export function DreA4Preview({
             {!isLastPage(pageIndex) && <div className="mt-auto" />}
 
             {/* ── Rodapé Oficial Dudit ───────────────────────────────────────── */}
-            <ReceiptA4Footer primaryColor={primaryColor} />
+            <ReceiptA4Footer primaryColor={primary} />
           </div>
-        ))}
-      </div>
-    </div>
+        </ReceiptA4Page>
+      ))}
+    </ReceiptA4Document>
   )
 }
 

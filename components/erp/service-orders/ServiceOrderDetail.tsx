@@ -451,33 +451,32 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     <FadeIn key="summary">
                                         <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
-                                                {/* Cliente - Mobile/Tablet only */}
-                                                <div className="lg:hidden">
-                                                    <CustomerMobileBar customer={order.customer_snapshot} address={customerPrimaryAddress} billingAddress={customerBillingAddress} showMap={false} />
-                                                </div>
-                                                {/* Responsável header - always visible on all screen sizes */}
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                                    <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                        <div className="flex justify-between items-center flex-wrap gap-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                    Responsável pelo serviço:
-                                                                </span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{assignedName}</span>
-                                                            </div>
-                                                            <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order?.priority]?.label || "Média"}</strong>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Timeline - shared component (handles desktop + mobile + BottomSheet) */}
+                                                {/* Timeline first - shared component (header inside the card / inside the BottomSheet) */}
                                                 <StatusStepsTimeline
                                                     steps={timelineSteps as StatusStep[]}
                                                     sheetTitle="Etapas da Ordem de Serviço"
                                                     forceDanger={isCancelled}
+                                                    header={
+                                                        <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                            <div className="flex justify-between items-center flex-wrap gap-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                        Responsável pelo serviço:
+                                                                    </span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{assignedName}</span>
+                                                                </div>
+                                                                <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                    Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order?.priority]?.label || "Média"}</strong>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    }
                                                 />
+
+                                                {/* Cliente - Mobile/Tablet only */}
+                                                <div className="lg:hidden">
+                                                    <CustomerMobileBar customer={order.customer_snapshot} address={customerPrimaryAddress} billingAddress={customerBillingAddress} showMap={false} />
+                                                </div>
 
                                                 {/* Details OS FormSection */}
                                                 <FormSection title="Detalhes da OS" hasSeparator>

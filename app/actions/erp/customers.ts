@@ -644,12 +644,12 @@ export async function updateComprehensiveCustomerAction(data: {
 export async function getCustomerByIdAction(customerId: string) {
   const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
   const authorizedPartner = { partnerId: customerAccess.partnerId }
+  const detailAdmin = createAdminClient()
   const { data: customer, error: customerError } = await getCachedErpPage(
     ["erp-customer-detail", authorizedPartner.partnerId, customerId],
     [TAGS.customers(authorizedPartner.partnerId), TAGS.orders(authorizedPartner.partnerId)],
     async () => {
-      const detailClient = createAdminClient()
-      return detailClient
+      return detailAdmin
         .from("customers")
         .select(`
           id, partner_id, name, email, phone, phone_fixed, status, person_type,
@@ -674,10 +674,64 @@ export async function getCustomerByIdAction(customerId: string) {
 
   // Decrypt CPF if present
   if (customer.cpf) {
-    try {
-      customer.cpf = await decryptCPF(customer.cpf)
-    } catch (e) {
-      // keep encrypted
+    const rawCpf = String(customer.cpf)
+    if (rawCpf.startsWith("v1:") || rawCpf.startsWith("v2:")) {
+      try {
+        customer.cpf = await decryptCPF(rawCpf)
+      } catch (e) {
+        console.error("[getCustomerByIdAction] Failed to decrypt CPF:", e)
+        customer.cpf = null
+      }
+    }
+  }
+
+  // Marketplace-created customers often store the CPF only on the linked
+  // marketplace profile (user_profiles). Backfill it into the customer record
+  // so the ERP detail page shows it without requiring a new checkout.
+  if (!customer.cpf) {
+    const linkedUserId = customer.user_id || customer.marketplace_user_id
+    if (linkedUserId) {
+      try {
+        const { data: profile } = await detailAdmin
+          .from("user_profiles")
+          .select("cpf")
+          .eq("user_id", linkedUserId)
+          .maybeSingle()
+
+        if (profile?.cpf) {
+          const rawProfileCpf = String(profile.cpf)
+          const decryptedCpf = rawProfileCpf.startsWith("v1:") || rawProfileCpf.startsWith("v2:")
+            ? await decryptCPF(rawProfileCpf)
+            : rawProfileCpf
+
+          if (decryptedCpf) {
+            customer.cpf = decryptedCpf
+
+            const cleanCpf = decryptedCpf.replace(/\D/g, "")
+            if (validateCPF(cleanCpf)) {
+              const encryptedCpf = rawProfileCpf.startsWith("v1:") || rawProfileCpf.startsWith("v2:")
+                ? rawProfileCpf
+                : await encryptCPF(cleanCpf)
+              const cpfLookupHash = generateCpfLookupHash(cleanCpf)
+
+              const { error: backfillError } = await detailAdmin
+                .from("customers")
+                .update({
+                  cpf: encryptedCpf,
+                  cpf_lookup_hash: cpfLookupHash,
+                  person_type: customer.person_type || "pf",
+                })
+                .eq("id", customer.id)
+
+              if (backfillError) {
+                console.error("[getCustomerByIdAction] Failed to backfill CPF:", backfillError)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[getCustomerByIdAction] Failed to resolve CPF from marketplace profile:", e)
+      }
     }
   }
 
@@ -1234,7 +1288,7 @@ export async function getCustomerStoreCreditsAction(customerId: string) {
 
   const { data: customer, error: customerError } = await supabase
     .from("customers")
-    .select("id, partner_id")
+    .select("id, partner_id, user_id, marketplace_user_id")
     .eq("id", customerId)
     .eq("partner_id", authorizedPartner.partnerId)
     .maybeSingle()
@@ -1247,12 +1301,29 @@ export async function getCustomerStoreCreditsAction(customerId: string) {
     return { success: true, storeCredits: [] }
   }
 
-  const { data, error } = await supabase
+  // Store credits may be attached to the ERP customer id or directly to the
+  // marketplace user (customer_user_id), depending on how they were created.
+  // Include every linked identity so vouchers from marketplace returns show up.
+  const creditOwnerIds = Array.from(
+    new Set([customer.id, customer.user_id, customer.marketplace_user_id].filter(Boolean))
+  ) as string[]
+
+  const creditOrParts: string[] = []
+  for (const id of creditOwnerIds) {
+    creditOrParts.push(`customer_id.eq.${id}`)
+    creditOrParts.push(`customer_user_id.eq.${id}`)
+  }
+
+  let creditQuery = supabase
     .from("store_credits")
     .select("id, amount, remaining_amount, status, expires_at, created_at")
     .eq("partner_id", authorizedPartner.partnerId)
-    .eq("customer_id", customerId)
-    .order("created_at", { ascending: false })
+
+  if (creditOrParts.length > 0) {
+    creditQuery = creditQuery.or(creditOrParts.join(","))
+  }
+
+  const { data, error } = await creditQuery.order("created_at", { ascending: false })
 
   if (error) {
     console.error("Erro ao buscar store_credits:", error)

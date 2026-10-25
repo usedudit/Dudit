@@ -995,6 +995,19 @@ export default function DeliveryAssignmentDetail({
                     <BottomSheet isOpen={isStepsSheetOpen} onClose={() => setIsStepsSheetOpen(false)}>
                         <div className="p-6 space-y-6">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Progresso da Entrega</h3>
+                            <div className="rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border">
+                                <div className="bg-brand-gray dark:bg-dark-border/50 p-4 border-b border-brand-border dark:border-dark-border">
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{assignment.store_name || assignment.partner_name || "Loja"}</span>
+                                        </div>
+                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                            Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div className="space-y-4">
                                 {timelineSteps.map((step, idx) => (
                                     <div key={idx} className="flex items-start gap-4">

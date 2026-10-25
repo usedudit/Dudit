@@ -337,7 +337,7 @@ export function SalesSettingsSubPage({
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
                                             {/* Mensagem do Recibo */}
                                             <FormSection title="Mensagem do Recibo">
-                                                <div className="space-y-4">
+                                                <div>
                                                     <FormTextarea
                                                         name="receiptMessage"
                                                         label="Mensagem personalizada de rodapé"
@@ -348,9 +348,6 @@ export function SalesSettingsSubPage({
                                                         maxLength={1000}
                                                         showCharacterCount
                                                     />
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Esta mensagem aparece destacada no rodapé de todos os recibos de venda emitidos no sistema.
-                                                    </p>
                                                 </div>
                                             </FormSection>
 

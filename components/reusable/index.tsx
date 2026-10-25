@@ -60,4 +60,5 @@ export { BarcodeScannerInput } from "./BarcodeScannerInput"
 export { UndoGracePeriodToast } from "./UndoGracePeriodToast"
 export { Turnstile } from "./Turnstile"
 export type { TurnstileRef, TurnstileProps } from "./Turnstile"
+export { default as FloatingActionBar } from "./FloatingActionBar"
 

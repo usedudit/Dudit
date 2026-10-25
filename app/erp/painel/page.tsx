@@ -11,6 +11,7 @@ import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { IconPlaceholder } from "@/components/reusable"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { resolveActiveResources } from "@/lib/system-resources"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import type { Period, CompareMode } from "@/lib/period-types"
@@ -51,7 +52,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
     if (!allowed) return <AccessDenied />
 
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
-    const activeResources = businessInfo.activeResources
+    const activeResources = resolveActiveResources(businessInfo)
 
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)

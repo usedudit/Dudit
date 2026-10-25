@@ -8,6 +8,8 @@ import {
 } from "@/lib/sales/sale-receipt"
 import { QUOTE_PREVIEW_PRIMARY_COLOR } from "@/lib/quotes/quote-preview-theme"
 import {
+    ReceiptA4Document,
+    ReceiptA4Page,
     ReceiptStoreHeaderA4,
     ReceiptA4StoreData,
     ReceiptA4Footer,
@@ -95,262 +97,252 @@ const SaleReceiptA4Preview = ({
     }, [quoteItems])
 
     return (
-        <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "md:border-l border-brand-border dark:border-dark-border"
-                }`}
+        <ReceiptA4Document
+            printMode={printMode}
+            printClassName="sale-receipt-a4-print"
         >
-            <div
-                className={printMode
-                    ? "w-full flex flex-col items-center p-0"
-                    : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
-                }
-            >
-                {pages.map((page, pageIndex) => (
-                    <div
-                        key={pageIndex}
-                        className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
-                    >
-                        <ReceiptStoreHeaderA4
-                            partnerName={partnerName}
-                            partnerAvatar={partnerAvatar}
-                            primaryColor={data.primaryColor}
-                            secondaryColor={data.secondaryColor}
-                            title="Comprovante de venda"
-                            subtitle={`Pedido #${data.orderNumber}`}
-                        />
+            {pages.map((page, pageIndex) => (
+                <ReceiptA4Page key={pageIndex} printMode={printMode}>
+                    <ReceiptStoreHeaderA4
+                        partnerName={partnerName}
+                        partnerAvatar={partnerAvatar}
+                        primaryColor={data.primaryColor}
+                        secondaryColor={data.secondaryColor}
+                        title="Comprovante de venda"
+                        subtitle={`Pedido #${data.orderNumber}`}
+                    />
 
-                        <div className={`flex-1 flex flex-col ${page.type !== "first" ? "pt-8" : ""}`}>
-                            {page.type === "first" && (
-                                <>
-                                    <div className="px-8 py-6">
-                                        <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Pedido</span>
-                                                <span className="font-bold text-sm text-brand-dark">{data.orderNumber}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Data</span>
-                                                <span className="font-bold text-sm text-brand-dark">{saleDate}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
-                                                    Canal / Origem
-                                                </span>
-                                                <span className="font-bold text-sm text-brand-dark">
-                                                    {data.isOnlineOrder ? (
-                                                        data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"
-                                                    ) : (
-                                                        data.orderSource || data.sellerName || "Não informado"
-                                                    )}
-                                                </span>
-                                            </div>
+                    <div className={`flex-1 flex flex-col ${page.type !== "first" ? "pt-8" : ""}`}>
+                        {page.type === "first" && (
+                            <>
+                                <div className="px-8 py-6">
+                                    <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Pedido</span>
+                                            <span className="font-bold text-sm text-brand-dark">{data.orderNumber}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Data</span>
+                                            <span className="font-bold text-sm text-brand-dark">{saleDate}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
+                                                Canal / Origem
+                                            </span>
+                                            <span className="font-bold text-sm text-brand-dark">
+                                                {data.isOnlineOrder ? (
+                                                    data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"
+                                                ) : (
+                                                    data.orderSource || data.sellerName || "Não informado"
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
+                                </div>
 
-                                    <ReceiptA4StoreData
-                                        partnerHeader={data.partner}
-                                        partnerName={partnerName}
-                                        customerName={data.customerName}
-                                        customerPhone={data.customerPhone}
-                                        customerAddress={data.customerAddress}
-                                    />
-                                </>
-                            )}
+                                <ReceiptA4StoreData
+                                    partnerHeader={data.partner}
+                                    partnerName={partnerName}
+                                    customerName={data.customerName}
+                                    customerPhone={data.customerPhone}
+                                    customerAddress={data.customerAddress}
+                                />
+                            </>
+                        )}
 
-                            <div className="px-8 pb-4">
-                                <table className="w-full text-left border-separate border-spacing-0">
-                                    <thead>
-                                        <tr className="bg-brand-gray/40">
-                                            <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
-                                                Item
-                                            </th>
-                                            <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-24 border-b border-gray-100">
-                                                Qtd
-                                            </th>
-                                            <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">
-                                                Preço
-                                            </th>
-                                            <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">
-                                                Total
-                                            </th>
+                        <div className="px-8 pb-4">
+                            <table className="w-full text-left border-separate border-spacing-0">
+                                <thead>
+                                    <tr className="bg-brand-gray/40">
+                                        <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
+                                            Item
+                                        </th>
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-24 border-b border-gray-100">
+                                            Qtd
+                                        </th>
+                                        <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">
+                                            Preço
+                                        </th>
+                                        <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">
+                                            Total
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {page.items.map((item, idx) => (
+                                        <tr key={idx} className="bg-white">
+                                            <td className="py-2 pl-6 pr-4 border-b border-gray-50">
+                                                <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
+                                                    {item.description}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-4 border-b border-gray-50 text-center">
+                                                <span className="text-[13px] font-medium text-gray-600">{item.qty}</span>
+                                            </td>
+                                            <td className="py-2 px-4 border-b border-gray-50 text-right">
+                                                <span className="text-[13px] font-medium text-gray-600">
+                                                    {formatCurrency(item.unitPrice)}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
+                                                <span className="text-[13px] font-bold text-black">
+                                                    {formatCurrency(item.unitPrice * item.qty)}
+                                                </span>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {page.items.map((item, idx) => (
-                                            <tr key={idx} className="bg-white">
-                                                <td className="py-2 pl-6 pr-4 border-b border-gray-50">
-                                                    <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
-                                                        {item.description}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2 px-4 border-b border-gray-50 text-center">
-                                                    <span className="text-[13px] font-medium text-gray-600">{item.qty}</span>
-                                                </td>
-                                                <td className="py-2 px-4 border-b border-gray-50 text-right">
-                                                    <span className="text-[13px] font-medium text-gray-600">
-                                                        {formatCurrency(item.unitPrice)}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
-                                                    <span className="text-[13px] font-bold text-black">
-                                                        {formatCurrency(item.unitPrice * item.qty)}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
-                            {page.hasTotals && (
-                                <div className="mt-6">
-                                    <div className="px-8 pb-6 flex flex-col gap-4">
-                                        <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5">
+                        {page.hasTotals && (
+                            <div className="mt-6">
+                                <div className="px-8 pb-6 flex flex-col gap-4">
+                                    <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Itens do pedido</span>
+                                            <span className="font-bold">{formatCurrency(grossTotal)}</span>
+                                        </div>
+
+                                        {discountValue > 0.009 && (
                                             <div className="flex justify-between items-center text-xs">
-                                                <span className="text-gray-500 font-medium">Itens do pedido</span>
-                                                <span className="font-bold">{formatCurrency(grossTotal)}</span>
+                                                <span className="text-gray-500 font-medium">Descontos</span>
+                                                <span className="font-bold text-brand-green">
+                                                    -{formatCurrency(discountValue)}
+                                                </span>
                                             </div>
+                                        )}
 
-                                            {discountValue > 0.009 && (
+                                        {(shippingNum > 0.009 || data.deliveryPayer === 'seller') && (
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="text-gray-500 font-medium">Taxa de entrega</span>
+                                                <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
+                                                    {isDeliveryFree ? "Grátis (subsidiado)" : formatCurrency(shippingNum)}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {otherCosts > 0.009 && (
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="text-gray-500 font-medium">Outros custos</span>
+                                                <span className="font-bold">+{formatCurrency(otherCosts)}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="border-t border-gray-200 my-2" />
+
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-sm">Total do Pedido</span>
+                                            <div
+                                                className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"
+                                                style={{ backgroundColor: primaryColor }}
+                                            >
+                                                {formatCurrency(total)}
+                                            </div>
+                                        </div>
+
+                                        {/* Bloco de Forma de Pagamento */}
+                                        <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
+                                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Forma de pagamento</p>
+                                            {data.paymentLines && data.paymentLines.length > 0 ? (
+                                                data.paymentLines.map((line, i) => (
+                                                    <div key={i} className="flex justify-between items-center text-xs">
+                                                        <span className="text-gray-600 font-medium">{line.label}</span>
+                                                        <span className="font-bold text-brand-dark">{formatCurrency(line.amount)}</span>
+                                                    </div>
+                                                ))
+                                            ) : (
                                                 <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Descontos</span>
-                                                    <span className="font-bold text-brand-green">
-                                                        -{formatCurrency(discountValue)}
-                                                    </span>
+                                                    <span className="text-gray-600">Não informado</span>
+                                                    <span className="font-bold">{formatCurrency(total)}</span>
                                                 </div>
                                             )}
 
-                                            {(shippingNum > 0.009 || data.deliveryPayer === 'seller') && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Taxa de entrega</span>
-                                                    <span className={`font-bold ${isDeliveryFree ? 'text-brand-green' : ''}`}>
-                                                        {isDeliveryFree ? "Grátis (subsidiado)" : formatCurrency(shippingNum)}
-                                                    </span>
+                                            {/* Aviso para pagamento online */}
+                                            {data.isOnlinePayment && (
+                                                <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5 mt-2">
+                                                    Pedido pago online. Não cobrar do cliente
                                                 </div>
                                             )}
 
-                                            {otherCosts > 0.009 && (
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Outros custos</span>
-                                                    <span className="font-bold">+{formatCurrency(otherCosts)}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="border-t border-gray-200 my-2" />
-
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-bold text-sm">Total do Pedido</span>
-                                                <div
-                                                    className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"
-                                                    style={{ backgroundColor: primaryColor }}
-                                                >
-                                                    {formatCurrency(total)}
-                                                </div>
-                                            </div>
-
-                                            {/* Bloco de Forma de Pagamento */}
-                                            <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
-                                                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Forma de pagamento</p>
-                                                {data.paymentLines && data.paymentLines.length > 0 ? (
-                                                    data.paymentLines.map((line, i) => (
-                                                        <div key={i} className="flex justify-between items-center text-xs">
-                                                            <span className="text-gray-600 font-medium">{line.label}</span>
-                                                            <span className="font-bold text-brand-dark">{formatCurrency(line.amount)}</span>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-gray-600">Não informado</span>
-                                                        <span className="font-bold">{formatCurrency(total)}</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Aviso para pagamento online */}
-                                                {data.isOnlinePayment && (
-                                                    <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5 mt-2">
-                                                        Pedido pago online. Não cobrar do cliente
-                                                    </div>
-                                                )}
-
-                                                {data.change > 0.009 && (
-                                                    <div className="flex justify-between items-center text-xs pt-1 text-gray-600">
-                                                        <span>Troco</span>
-                                                        <span className="font-bold">{formatCurrency(data.change)}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Detalhamento de parcelas */}
-                                            {data.installmentDetails && data.installmentDetails.length > 0 && (
-                                                <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
-                                                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Detalhamento das parcelas</p>
-                                                    {data.installmentDetails.map((inst, i) => (
-                                                        <div key={i} className="flex items-center justify-between text-xs bg-brand-gray/30 rounded-lg py-2">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-bold text-brand-dark">
-                                                                    Parcela {String(inst.number).padStart(2, "0")}/{String(inst.total).padStart(2, "0")}
-                                                                </span>
-                                                                <span className="text-gray-500 text-[10px]">Vencimento: {inst.dueDate}</span>
-                                                            </div>
-                                                            <span className="font-bold text-brand-dark">{formatCurrency(inst.amount)}</span>
-                                                        </div>
-                                                    ))}
+                                            {data.change > 0.009 && (
+                                                <div className="flex justify-between items-center text-xs pt-1 text-gray-600">
+                                                    <span>Troco</span>
+                                                    <span className="font-bold">{formatCurrency(data.change)}</span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Observações do pedido */}
-                                        {data.notes && (
-                                            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
-                                                <p className="font-bold uppercase tracking-wide text-[10px] text-gray-500 mb-1">Observações:</p>
-                                                <p className="whitespace-pre-line leading-relaxed">{data.notes}</p>
+                                        {/* Detalhamento de parcelas */}
+                                        {data.installmentDetails && data.installmentDetails.length > 0 && (
+                                            <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
+                                                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Detalhamento das parcelas</p>
+                                                {data.installmentDetails.map((inst, i) => (
+                                                    <div key={i} className="flex items-center justify-between text-xs bg-brand-gray/30 rounded-lg py-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-brand-dark">
+                                                                Parcela {String(inst.number).padStart(2, "0")}/{String(inst.total).padStart(2, "0")}
+                                                            </span>
+                                                            <span className="text-gray-500 text-[10px]">Vencimento: {inst.dueDate}</span>
+                                                        </div>
+                                                        <span className="font-bold text-brand-dark">{formatCurrency(inst.amount)}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
 
-                                    {shouldShowAck && (
-                                        <div className="px-8 pb-6">
-                                            <p className="text-[11px] text-gray-600 leading-relaxed text-center">
-                                                {DEFAULT_RECEIPT_ACKNOWLEDGMENT}
-                                            </p>
-                                            <div className="mt-6 border-b border-dashed border-gray-400 w-full max-w-md mx-auto" />
-                                            <p className="text-[10px] font-bold text-center uppercase mt-2 text-gray-700">
-                                                Assinatura do cliente
-                                            </p>
+                                    {/* Observações do pedido */}
+                                    {data.notes && (
+                                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
+                                            <p className="font-bold uppercase tracking-wide text-[10px] text-gray-500 mb-1">Observações:</p>
+                                            <p className="whitespace-pre-line leading-relaxed">{data.notes}</p>
                                         </div>
                                     )}
+                                </div>
 
-                                    {data.returnPolicyBlock?.showBlock && (
-                                        <div className="px-8 pb-4">
-                                            <p className="text-[10px] font-bold uppercase text-gray-700 mb-1">Política de trocas</p>
-                                            <p className="text-[10px] text-gray-600">
-                                                Prazo comercial: {data.returnPolicyBlock.commercialDeadlineDays} dias
-                                                {data.returnPolicyBlock.additionalWarrantyDays > 0 && (
-                                                    <> · Garantia adicional: {data.returnPolicyBlock.additionalWarrantyDays} dias</>
-                                                )}
-                                            </p>
-                                            {data.returnPolicyBlock.message && (
-                                                <p className="text-[10px] text-gray-600 mt-1">{data.returnPolicyBlock.message}</p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="px-8 pb-12">
-                                        <p className="text-center font-bold text-sm uppercase tracking-wide text-brand-dark">
-                                            {footerMessage}
+                                {shouldShowAck && (
+                                    <div className="px-8 pb-6">
+                                        <p className="text-[11px] text-gray-600 leading-relaxed text-center">
+                                            {DEFAULT_RECEIPT_ACKNOWLEDGMENT}
+                                        </p>
+                                        <div className="mt-6 border-b border-dashed border-gray-400 w-full max-w-md mx-auto" />
+                                        <p className="text-[10px] font-bold text-center uppercase mt-2 text-gray-700">
+                                            Assinatura do cliente
                                         </p>
                                     </div>
+                                )}
+
+                                {data.returnPolicyBlock?.showBlock && (
+                                    <div className="px-8 pb-4">
+                                        <p className="text-[10px] font-bold uppercase text-gray-700 mb-1">Política de trocas</p>
+                                        <p className="text-[10px] text-gray-600">
+                                            Prazo comercial: {data.returnPolicyBlock.commercialDeadlineDays} dias
+                                            {data.returnPolicyBlock.additionalWarrantyDays > 0 && (
+                                                <> · Garantia adicional: {data.returnPolicyBlock.additionalWarrantyDays} dias</>
+                                            )}
+                                        </p>
+                                        {data.returnPolicyBlock.message && (
+                                            <p className="text-[10px] text-gray-600 mt-1">{data.returnPolicyBlock.message}</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="px-8 pb-12">
+                                    <p className="text-center font-bold text-sm uppercase tracking-wide text-brand-dark">
+                                        {footerMessage}
+                                    </p>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {!page.hasTotals && <div className="mt-auto" />}
-                        </div>
-
-                        <ReceiptA4Footer primaryColor={data.primaryColor} />
+                        {!page.hasTotals && <div className="mt-auto" />}
                     </div>
-                ))}
-            </div>
-        </div>
+
+                    <ReceiptA4Footer primaryColor={data.primaryColor} />
+                </ReceiptA4Page>
+            ))}
+        </ReceiptA4Document>
     )
 }
 

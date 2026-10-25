@@ -38,26 +38,26 @@ export function ReceiptSettingsSubPage({
 
     useEffect(() => {
         let cancelled = false
-        ;(async () => {
-            setLoading(true)
-            const res = await getReceiptSettingsAction(partnerId)
-            if (cancelled) return
-            if (res.success && res.data) {
-                const loaded = {
-                    receiptMessage: res.data.receiptMessage ?? "",
-                    receiptShowPolicyBlock: res.data.receiptShowPolicyBlock,
-                    receiptShowAcknowledgment: res.data.receiptShowAcknowledgment,
-                    showStorePhone: res.data.showStorePhone,
-                    showStoreAddress: res.data.showStoreAddress,
-                    showSellerName: res.data.showSellerName,
+            ; (async () => {
+                setLoading(true)
+                const res = await getReceiptSettingsAction(partnerId)
+                if (cancelled) return
+                if (res.success && res.data) {
+                    const loaded = {
+                        receiptMessage: res.data.receiptMessage ?? "",
+                        receiptShowPolicyBlock: res.data.receiptShowPolicyBlock,
+                        receiptShowAcknowledgment: res.data.receiptShowAcknowledgment,
+                        showStorePhone: res.data.showStorePhone,
+                        showStoreAddress: res.data.showStoreAddress,
+                        showSellerName: res.data.showSellerName,
+                    }
+                    setSettings(loaded)
+                    setInitialSettings(loaded)
+                } else {
+                    notifyError(res.error || "Erro ao carregar configurações de recibos")
                 }
-                setSettings(loaded)
-                setInitialSettings(loaded)
-            } else {
-                notifyError(res.error || "Erro ao carregar configurações de recibos")
-            }
-            setLoading(false)
-        })()
+                setLoading(false)
+            })()
         return () => {
             cancelled = true
         }
@@ -113,9 +113,8 @@ export function ReceiptSettingsSubPage({
                     <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
                         {/* Back button - desktop only */}
                         <div
-                            className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${
-                                isScrolled ? "scale-90" : "scale-100"
-                            }`}
+                            className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"
+                                }`}
                         >
                             <Button
                                 variant="filled"
@@ -130,17 +129,15 @@ export function ReceiptSettingsSubPage({
                         <div className="hidden md:flex items-start justify-between">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                 <h1
-                                    className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${
-                                        isScrolled ? "text-xl" : "text-xl md:text-3xl"
-                                    }`}
+                                    className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"
+                                        }`}
                                 >
                                     <span className="truncate">Recibos e Impressão</span>
                                 </h1>
 
                                 <div
-                                    className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${
-                                        isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-                                    }`}
+                                    className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+                                        }`}
                                 >
                                     Personalize mensagens de rodapé e elementos dos seus comprovantes de venda.
                                 </div>
@@ -166,7 +163,7 @@ export function ReceiptSettingsSubPage({
                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
                             {/* Mensagem do Recibo */}
                             <FormSection title="Mensagem do Recibo">
-                                <div className="space-y-4">
+                                <div>
                                     <FormTextarea
                                         name="receiptMessage"
                                         label="Mensagem personalizada de rodapé"
@@ -177,9 +174,6 @@ export function ReceiptSettingsSubPage({
                                         maxLength={1000}
                                         showCharacterCount
                                     />
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Esta mensagem aparece destacada no rodapé de todos os recibos de venda emitidos no sistema.
-                                    </p>
                                 </div>
                             </FormSection>
 

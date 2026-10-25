@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox, FormSection, ListItem, RadioButton, InfoCard } from "@/components/reusable"
-import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon } from "@/lib/icons"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox, FormSection, ListItem, RadioButton, InfoCard, FloatingActionBar } from "@/components/reusable"
+import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon, TrashIcon, XIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -504,6 +504,19 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE)
     const mappedCount = (Array.isArray(mapping) ? mapping : []).filter((m) => m.field).length
 
+    // Remove selected items from the import list
+    const removeSelectedItems = useCallback(() => {
+        setSelection((prev) => {
+            const next = new Set(prev)
+            const idsToRemove = Array.from(next)
+            next.clear()
+            setParsedCustomers((prevCustomers) =>
+                prevCustomers.filter((c: any) => !idsToRemove.includes(c.id))
+            )
+            return next
+        })
+    }, [])
+
     if (importDone && importStats) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -782,11 +795,12 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                             label=""
                                         />
                                     </div>
-                                    <div className="flex items-center gap-1 bg-brand-gray/60 dark:bg-dark-border/40 p-1 rounded-xl">
+                                    {/* View mode toggle - hidden on tablet/mobile like ERP pages */}
+                                    <div className="hidden md:flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                                         <button
                                             type="button"
                                             onClick={() => setViewMode("list")}
-                                            className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-white dark:bg-dark-surface shadow-xs text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"}`}
+                                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                                             title="Visualização em Lista"
                                         >
                                             <ListIcon size={18} />
@@ -794,7 +808,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                         <button
                                             type="button"
                                             onClick={() => setViewMode("grid")}
-                                            className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-white dark:bg-dark-surface shadow-xs text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"}`}
+                                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                                             title="Visualização em Grade"
                                         >
                                             <GridIcon size={18} />
@@ -822,6 +836,21 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                             itemName="clientes"
                                             singularItemName="cliente"
                                         />
+
+                                        {/* Floating Action Bar for bulk actions */}
+                                        <FloatingActionBar
+                                            selectedCount={selection.size}
+                                            onClearSelection={() => setSelection(new Set())}
+                                        >
+                                            <Button
+                                                variant="ghostred"
+                                                onClick={removeSelectedItems}
+                                                leftIcon={<TrashIcon size={18} />}
+                                                className="h-10 px-3"
+                                            >
+                                                Remover
+                                            </Button>
+                                        </FloatingActionBar>
 
                                         {viewMode === "grid" ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">

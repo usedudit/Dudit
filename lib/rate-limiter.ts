@@ -22,6 +22,7 @@ export enum RateLimitCategory {
   AUTH_EMAIL_CHANGE = "AUTH_EMAIL_CHANGE",
   AUTH_PASSWORD_CHANGE = "AUTH_PASSWORD_CHANGE",
   UPLOAD = "UPLOAD",
+  PARTNER_LOGO_UPLOAD = "PARTNER_LOGO_UPLOAD",
   PRODUCT_CREATE = "PRODUCT_CREATE",
   PRODUCT_UPDATE = "PRODUCT_UPDATE",
   PRODUCT_DELETE = "PRODUCT_DELETE",
@@ -30,6 +31,7 @@ export enum RateLimitCategory {
   REVIEW_CREATE = "REVIEW_CREATE",
   PAYMENT = "PAYMENT",
   API_GENERAL = "API_GENERAL",
+  CLIENT_ERROR_LOG = "CLIENT_ERROR_LOG",
   WEBHOOK = "WEBHOOK",
   INTERNAL_CRON = "INTERNAL_CRON",
   ADMIN = "ADMIN",
@@ -132,25 +134,31 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 20,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: false,
+    failClosed: true,
+  },
+  [RateLimitCategory.PARTNER_LOGO_UPLOAD]: {
+    maxRequests: 3,
+    window: "1 h",
+    identifierType: IdentifierType.IP,
+    failClosed: true,
   },
   [RateLimitCategory.PRODUCT_CREATE]: {
     maxRequests: 10,
     window: "10 m",
     identifierType: IdentifierType.USER,
-    failClosed: false,
+    failClosed: true,
   },
   [RateLimitCategory.PRODUCT_UPDATE]: {
     maxRequests: 200,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: false,
+    failClosed: true,
   },
   [RateLimitCategory.PRODUCT_DELETE]: {
     maxRequests: 50,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: false,
+    failClosed: true,
   },
   [RateLimitCategory.REPORT_CREATE]: {
     // Reports are abuse-sensitive: combine user+IP and fail-closed to block
@@ -183,6 +191,12 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     window: "1 m",
     identifierType: IdentifierType.USER,
     failClosed: false,
+  },
+  [RateLimitCategory.CLIENT_ERROR_LOG]: {
+    maxRequests: 30,
+    window: "1 h",
+    identifierType: IdentifierType.IP,
+    failClosed: true,
   },
   [RateLimitCategory.WEBHOOK]: {
     maxRequests: 500,
@@ -254,7 +268,7 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 200,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: false,
+    failClosed: true,
   },
   [RateLimitCategory.SERVICE_ORDER_PUBLIC]: {
     maxRequests: 120,
