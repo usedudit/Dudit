@@ -117,7 +117,13 @@ const nextConfig = {
 
     // 8GB RAM cap (Render free/starter | Railway). Limita webpack a 1 job
     // pra reduzir o pico de memória no `next build` e evitar OOM.
-    if (process.env.RENDER || process.env.CI || process.env.BUILD_FOR_RENDER) {
+    // Override: defina WEBPACK_PARALLELISM=N no Railway pra tentar build
+    // mais rápido (ex: 2 ou 4). Se der OOM, remova a var.
+    const forcedParallelism = Number(process.env.WEBPACK_PARALLELISM || 0)
+    if (forcedParallelism > 0) {
+      config.parallelism = forcedParallelism
+      config.cache = { ...config.cache, memoryCacheUnaffected: true }
+    } else if (process.env.RENDER || process.env.CI || process.env.BUILD_FOR_RENDER) {
       config.parallelism = 1
       config.cache = { ...config.cache, memoryCacheUnaffected: true }
     }
