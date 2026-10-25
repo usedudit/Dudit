@@ -113,6 +113,26 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       return { success: false, error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
     }
 
+    const { resolveMarketplaceCapabilities, resolveRecurringPlanSaleBlock } = await import("@/lib/marketplace-capabilities")
+    const capabilities = await resolveMarketplaceCapabilities(input.partnerId, {
+      storeId: plan.store_id || null,
+    })
+    const { data: planItems } = await admin
+      .from("recurring_plan_items")
+      .select("item_type")
+      .eq("plan_id", plan.id)
+    const saleBlock = resolveRecurringPlanSaleBlock(
+      capabilities,
+      (planItems || []) as Array<{ item_type: string }>,
+      input.deliveryType || "pickup",
+    )
+    if (saleBlock) {
+      return {
+        success: false,
+        error: "Este plano não está disponível para novas assinaturas pela Dudit no momento.",
+      }
+    }
+
     const billingMode = plan.billing_mode || "manual"
     if (billingMode !== "auto_mercado_pago") {
       return { success: false, error: "Este plano não suporta pagamento automático via Mercado Pago." }

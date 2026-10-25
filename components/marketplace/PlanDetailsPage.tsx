@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { ShareIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon, FlagIcon, PlusIcon } from "@/lib/icons"
+import { ShareIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon, TruckIcon, FlagIcon, PlusIcon, WhatsappIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -161,6 +161,16 @@ export function PlanDetailsPageClient({
 
     const isClosedAndBlocking = partner.acceptOrdersWhenClosed === false && !isStoreOpenNow
 
+    const recurringSaleAvailable = (plan as any).saleViaDudit !== false
+    const planWhatsappUrl = useMemo(() => {
+        const rawPhone = (plan as any).whatsappPhone || partner.phone
+        const cleanPhone = rawPhone ? String(rawPhone).replace(/\D/g, "") : ""
+        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+        if (!formattedPhone) return null
+        const msg = encodeURIComponent(`Olá! Vi o plano "${plan.name}" na Dudit e gostaria de assinar pelo WhatsApp.`)
+        return `https://wa.me/${formattedPhone}?text=${msg}`
+    }, [plan, partner.phone])
+
     const planImages = useMemo(() => {
         const imgs = (plan.images || []).filter((img: any) => typeof img === "string" && img.trim()).map((img: string) => getR2ImageUrl(img))
         return imgs.length > 0 ? imgs : [PLACEHOLDER]
@@ -303,6 +313,14 @@ export function PlanDetailsPageClient({
         `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
     const handleSubscribe = async () => {
+        if (!recurringSaleAvailable) {
+            if (planWhatsappUrl) {
+                window.open(planWhatsappUrl, "_blank")
+            } else {
+                notifyError("As assinaturas pela Dudit estão desativadas e o vendedor não cadastrou um WhatsApp.")
+            }
+            return
+        }
         if (partner.isShowcaseActive === false) {
             notifyError("Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
             return
@@ -561,6 +579,14 @@ export function PlanDetailsPageClient({
                     className="mb-8"
                 />
             )}
+            {!isPlanOwner && !recurringSaleAvailable && (
+                <InfoCard
+                    title="Assinatura pelo WhatsApp"
+                    message="As assinaturas pela Dudit estão desativadas nesta loja. Continue pelo WhatsApp do vendedor para combinar a contratação."
+                    color="yellow"
+                    className="mb-8"
+                />
+            )}
             {!isPlanOwner && (
                 <>
                     {/* Delivery Options */}
@@ -673,6 +699,11 @@ export function PlanDetailsPageClient({
                                 "Vitrine Inativa"
                             ) : isClosedAndBlocking ? (
                                 "Loja Fechada"
+                            ) : !recurringSaleAvailable ? (
+                                <span className="flex items-center gap-2">
+                                    <WhatsappIcon size={18} className="fill-white" />
+                                    Assinar pelo WhatsApp
+                                </span>
                             ) : submitting ? (
                                 <span className="flex items-center gap-2">
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1463,6 +1494,11 @@ export function PlanDetailsPageClient({
                                     "Vitrine Inativa"
                                 ) : isClosedAndBlocking ? (
                                     "Loja Fechada"
+                                ) : !recurringSaleAvailable ? (
+                                    <span className="flex items-center gap-2">
+                                        <WhatsappIcon size={16} className="fill-white" />
+                                        WhatsApp
+                                    </span>
                                 ) : submitting ? (
                                     <span className="flex items-center gap-2">
                                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

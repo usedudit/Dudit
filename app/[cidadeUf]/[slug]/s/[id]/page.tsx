@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const dynamic = 'force-dynamic'
@@ -106,7 +107,7 @@ export default async function ServiceDetailsPage({
     // Fetch staff + reviews + partner plan in parallel
     const partner = Array.isArray(service.partners) ? service.partners[0] : service.partners
     const resolvedPartnerId = partner?.id || service.partner_id
-    const [staff, reviews, detailAds, partnerPlan] = await Promise.all([
+    const [staff, reviews, detailAds, partnerPlan, capabilities] = await Promise.all([
         getServiceStaffMembers(resolvedPartnerId, storeId),
         getServiceReviews(service.id, storeId),
         getSponsoredAdsForSlot("detail", {
@@ -118,6 +119,9 @@ export default async function ServiceDetailsPage({
             state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
         }),
         getPartnerPlan(resolvedPartnerId).catch(() => null),
+        resolvedPartnerId
+            ? resolveMarketplaceCapabilities(resolvedPartnerId, { storeId })
+            : Promise.resolve(null),
     ])
     const detailAd = detailAds[0] ?? null
     const partnerPlanSlug = partnerPlan?.slug || "free"
@@ -176,6 +180,9 @@ export default async function ServiceDetailsPage({
                 cartCount={cartCount}
                 sponsoredAd={detailAd}
                 partnerPlanSlug={partnerPlanSlug}
+                quotesViaDudit={capabilities?.quotesViaDudit ?? true}
+                appointmentsViaDudit={capabilities?.appointmentsViaDudit ?? true}
+                whatsappPhone={capabilities?.whatsappPhone ?? null}
             />
 
             <MarketplaceFooter />

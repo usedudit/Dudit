@@ -32,6 +32,7 @@ import {
   quoteCarrierFreightFee,
   extractPostalCodeFromAddress,
 } from "@/lib/services/shipping/carrier-checkout"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -280,6 +281,54 @@ async function handler(request: NextRequest) {
 
     const partnerId = canonicalPartnerId
 
+    // Recursos desativados no ERP devem valer também para chamadas diretas a
+    // esta rota. Pedidos já existentes continuam pagáveis (o contrato já foi
+    // criado); apenas novas cobranças são bloqueadas.
+    const capabilities = await resolveMarketplaceCapabilities(partnerId, {
+      storeId: storeId || null,
+    })
+
+    if (!existingOrderId && !capabilities.checkoutViaDudit) {
+      return NextResponse.json(
+        {
+          error: "Esta loja finaliza os pedidos pelo WhatsApp. Continue o atendimento por lá.",
+          whatsappFallback: true,
+          whatsappPhone: capabilities.whatsappPhone,
+        },
+        { status: 409 },
+      )
+    }
+
+    if (
+      !existingOrderId &&
+      normalizedDeliveryType === "delivery" &&
+      !capabilities.deliveriesEnabled
+    ) {
+      return NextResponse.json(
+        {
+          error: "As entregas estão desativadas nesta loja. Combine a entrega pelo WhatsApp.",
+          whatsappFallback: true,
+          whatsappPhone: capabilities.whatsappPhone,
+        },
+        { status: 409 },
+      )
+    }
+
+    if (
+      !existingOrderId &&
+      (resolvedCartLines || []).some((line: any) => line?.itemType === "service_booking") &&
+      !capabilities.appointmentsViaDudit
+    ) {
+      return NextResponse.json(
+        {
+          error: "Os agendamentos estão desativados nesta loja. Agende pelo WhatsApp.",
+          whatsappFallback: true,
+          whatsappPhone: capabilities.whatsappPhone,
+        },
+        { status: 409 },
+      )
+    }
+
     // Este request cria o pedido (fluxo temp-/unified cart): aplica os mesmos
     // limites do checkout de carrinho ANTES de gerar a cobrança. Pedidos já
     // existentes foram contados no checkout original. Lojas em fluxo WhatsApp
@@ -454,7 +503,7 @@ async function handler(request: NextRequest) {
         cartItemIds: cartItemIds!,
         deliveryType: normalizedDeliveryType,
         deliveryAddress: deliveryAddress || "",
-        couponCode,
+        couponCode: capabilities.couponsEnabled ? couponCode : null,
         paymentMethod: pmtConfig,
         carrierServiceId: body.checkoutPricing?.carrierServiceId,
         destinationPostalCode: body.checkoutPricing?.destinationPostalCode,
@@ -766,7 +815,7 @@ async function handler(request: NextRequest) {
 
       // ── Coupon validation ─────────────────────────────────────────────────
       let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
-      if (couponCode) {
+      if (couponCode && capabilities.couponsEnabled) {
         const couponResult = await validateCoupon({
           partnerId,
           code: couponCode,

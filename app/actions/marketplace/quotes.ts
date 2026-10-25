@@ -13,6 +13,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { withTelemetry } from "@/lib/utils/action-logger"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 export interface RequestMarketplaceQuoteInput {
     serviceId: string
@@ -69,7 +70,17 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
             // 2. Check partner plan: must be 'crescer' or 'escalar'
             const partnerPlan = await getPartnerPlan(partnerId)
             if (!hasMinimumPlan(partnerPlan.slug, "crescer")) {
-                return errorResponse("Este prestador recebe solicitações de orçamento apenas via WhatsApp.")
+                return errorResponse("Este prestador recebe solicitações de orçamento apenas via WhatsApp.", { whatsappFallback: true })
+            }
+
+            const capabilities = await resolveMarketplaceCapabilities(partnerId, {
+                storeId: (service as any).store_id || input.storeId || null,
+            })
+            if (!capabilities.quotesViaDudit) {
+                return errorResponse(
+                    "Os orçamentos estão desativados nesta loja. Fale diretamente pelo WhatsApp.",
+                    { whatsappFallback: true, whatsappPhone: capabilities.whatsappPhone },
+                )
             }
 
             // 3. Check monthly quotes limit

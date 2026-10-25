@@ -120,8 +120,13 @@ export function RequestQuoteModal({
                 if (onSuccess) {
                     onSuccess(res.data)
                 }
-            } else if ((res as any).details?.whatsappFallback && partner.phone) {
-                const cleanPhone = partner.phone.replace(/\D/g, "")
+            } else if ((res as any).details?.whatsappFallback) {
+                const fallbackPhone = (res as any).details?.whatsappPhone || partner.phone
+                if (!fallbackPhone) {
+                    notifyError("Orçamento pelo WhatsApp", (res as any).error || "O prestador não cadastrou um número de WhatsApp.")
+                    return
+                }
+                const cleanPhone = String(fallbackPhone).replace(/\D/g, "")
                 const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
                 const msg = encodeURIComponent(
                     `Olá! Vi o serviço "${service.name}" na Dudit e gostaria de solicitar um orçamento para o meu caso.\n\n📝 *O que eu preciso:*\n${description.trim()}` +
@@ -131,7 +136,7 @@ export function RequestQuoteModal({
                     `\n\n📱 *Meu WhatsApp:* ${phone}`
                 )
                 window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank")
-                notifyError("Redirecionando para o WhatsApp", "O prestador atingiu o limite de orçamentos do mês. Continuamos pelo WhatsApp.")
+                notifyError("Redirecionando para o WhatsApp", (res as any).error || "Continuamos o orçamento pelo WhatsApp.")
                 handleClose()
             } else {
                 notifyError("Erro ao solicitar", (res as any).error || "Não foi possível enviar a solicitação. Tente novamente.")

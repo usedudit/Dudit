@@ -60,9 +60,24 @@ export async function checkActiveSubscriptionCreateLimit(partnerId: string) {
  */
 export async function getRecurringModuleAccess(
   partnerId: string,
+  options?: { storeId?: string | null },
 ): Promise<{ allowed: boolean; planSlug: string }> {
   const plan = await getPartnerPlan(partnerId)
-  return { allowed: hasMinimumPlan(plan.slug, "escalar"), planSlug: plan.slug }
+  if (!hasMinimumPlan(plan.slug, "escalar")) {
+    return { allowed: false, planSlug: plan.slug }
+  }
+
+  // Recursos desativados no ERP impedem apenas vendas novas. A execução das
+  // assinaturas existentes não passa por aqui.
+  const { resolveMarketplaceCapabilities } = await import("@/lib/marketplace-capabilities")
+  const capabilities = await resolveMarketplaceCapabilities(partnerId, {
+    storeId: options?.storeId || null,
+  })
+
+  return {
+    allowed: capabilities.recurringPlansEnabled && capabilities.recurringSubscriptionsEnabled,
+    planSlug: plan.slug,
+  }
 }
 
 /**
@@ -74,6 +89,7 @@ export async function getRecurringModuleAccess(
 export async function pauseSubscriptionForPlanDowngrade(
   partnerId: string,
   sub: { id: string; mp_preapproval_id?: string | null },
+  reason = "parceiro está abaixo do plano Escalar.",
 ): Promise<boolean> {
   const admin = getAdminClient()
 
@@ -111,7 +127,7 @@ export async function pauseSubscriptionForPlanDowngrade(
       entityType: "recurring_subscription",
       entityId: sub.id,
       actionType: "paused",
-      changeLines: ["assinatura pausada automaticamente: parceiro está abaixo do plano Escalar."],
+      changeLines: [`assinatura pausada automaticamente: ${reason}`],
       source: "system",
     })
   } catch (e) {
@@ -146,4 +162,41 @@ export async function pauseRecurringForPlanDowngrade(partnerId: string): Promise
     if (ok) paused++
   }
   return { paused }
+}
+
+/**
+ * Pausa em lote as assinaturas vivas de um parceiro.
+ *
+ * Usado pelo atalho do modal de impacto quando o lojista decide desativar
+ * um recurso que sustenta as assinaturas. Pausa é reversível; nunca cancela.
+ */
+export async function pauseAllMarketplaceSubscriptions(
+  partnerId: string,
+): Promise<{ paused: number; failed: number }> {
+  const admin = getAdminClient()
+
+  const { data: subs, error } = await admin
+    .from("recurring_subscriptions")
+    .select("id, mp_preapproval_id")
+    .eq("partner_id", partnerId)
+    .in("status", DOWNGRADE_PAUSABLE_STATUSES)
+
+  if (error) {
+    console.error("[RECURRING_LIMITS] Falha ao buscar assinaturas para pausar:", error.message)
+    return { paused: 0, failed: 0 }
+  }
+  if (!subs || subs.length === 0) return { paused: 0, failed: 0 }
+
+  let paused = 0
+  let failed = 0
+  for (const sub of subs) {
+    const ok = await pauseSubscriptionForPlanDowngrade(
+      partnerId,
+      sub as { id: string; mp_preapproval_id?: string | null },
+      "assinaturas pausadas em lote pelo lojista ao desativar recursos no ERP.",
+    )
+    if (ok) paused++
+    else failed++
+  }
+  return { paused, failed }
 }

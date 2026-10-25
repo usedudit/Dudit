@@ -1,14 +1,18 @@
 "use client"
 
 import React, { useCallback } from "react"
-import { Button, FormSection, AlertModal, SavingStatusModal } from "@/components/reusable"
+import { Button, FormSection, AlertModal, SavingStatusModal, DefaultModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
+import { AlertTriangleIcon, ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
-import { updateSystemResourcesAction } from "@/app/actions/erp/system-resources"
+import {
+    getSystemResourcesImpactAction,
+    pauseAllActiveSubscriptionsAction,
+    updateSystemResourcesAction,
+} from "@/app/actions/erp/system-resources"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import {
     SYSTEM_RESOURCES,
@@ -29,12 +33,32 @@ interface SystemResourcesSubPageProps {
     onBack: () => void
 }
 
+const RESOURCE_OFF_IMPACT: Partial<Record<SystemResourceId, string>> = {
+    orders: "O checkout da Dudit será desativado. Novos pedidos e pagamentos online passam a ser combinados pelo WhatsApp.",
+    quotes: "Solicitações de orçamento deixam a Dudit e passam a ser feitas pelo WhatsApp.",
+    returns: "As devoluções deixam o fluxo da Dudit e passam a ser combinadas pelo WhatsApp.",
+    appointments: "Novos agendamentos deixam a Dudit e passam a ser feitos pelo WhatsApp.",
+    deliveries: "Entregas pela Dudit ficam indisponíveis. Pedidos com entrega passam a ser combinados pelo WhatsApp; retirada continua no checkout.",
+    coupons: "Cupons deixam de ser listados, validados e aplicados no checkout.",
+    campaigns: "Campanhas e promoções deixam de ser aplicadas nos preços do marketplace.",
+    recurringPlans: "Novos planos recorrentes deixam de ser vendidos pela Dudit.",
+    recurringSubscriptions: "Novas assinaturas deixam de ser vendidas pela Dudit.",
+    products: "Produtos continuam visíveis, mas novas assinaturas que usam produtos deixam de ser vendidas pela Dudit.",
+    services: "Serviços continuam visíveis, mas novas assinaturas/agendamentos pela Dudit ficam bloqueados.",
+}
+
+const HARD_BLOCK_RESOURCES: SystemResourceId[] = ["orders", "recurringSubscriptions"]
+
 export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: SystemResourcesSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const initialResources = React.useMemo(() => resolveActiveResources(businessInfo), [businessInfo])
     const [selected, setSelected] = React.useState<SystemResourceId[]>(initialResources)
     const [saving, setSaving] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
+    const [impactOpen, setImpactOpen] = React.useState(false)
+    const [impactLoading, setImpactLoading] = React.useState(false)
+    const [impact, setImpact] = React.useState<{ activeSubscriptions: number; activePlans: number } | null>(null)
+    const [pausingAll, setPausingAll] = React.useState(false)
     const scrollContainerRef = React.useRef<HTMLDivElement>(null)
 
     const handleScroll = useCallback(() => {
@@ -87,7 +111,18 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
         })
     }
 
-    const handleSave = async () => {
+    const turnedOffResources = React.useMemo(
+        () => initialResources.filter((id) => !selectedSet.has(id)),
+        [initialResources, selectedSet],
+    )
+    const hardBlockedBySubscriptions = React.useMemo(
+        () => turnedOffResources.some((id) => HARD_BLOCK_RESOURCES.includes(id)),
+        [turnedOffResources],
+    )
+    const activeSubscriptions = impact?.activeSubscriptions ?? 0
+    const saveBlockedBySubscriptions = Boolean(impact) && hardBlockedBySubscriptions && activeSubscriptions > 0
+
+    const performSave = async () => {
         setSaving(true)
         try {
             const result = await updateSystemResourcesAction(selected)
@@ -102,6 +137,66 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
         } finally {
             setSaving(false)
         }
+    }
+
+    const openImpactModal = async () => {
+        setImpactOpen(true)
+        setImpactLoading(true)
+        try {
+            const result = await getSystemResourcesImpactAction()
+            if (!result.success) {
+                toast.error(result.error || "Não foi possível verificar o impacto.")
+                setImpact({ activeSubscriptions: 0, activePlans: 0 })
+                return
+            }
+            setImpact({
+                activeSubscriptions: result.activeSubscriptions,
+                activePlans: result.activePlans,
+            })
+        } catch {
+            toast.error("Erro inesperado ao verificar o impacto.")
+            setImpact({ activeSubscriptions: 0, activePlans: 0 })
+        } finally {
+            setImpactLoading(false)
+        }
+    }
+
+    const handleSave = async () => {
+        if (turnedOffResources.length === 0) {
+            await performSave()
+            return
+        }
+        setImpact(null)
+        await openImpactModal()
+    }
+
+    const handlePauseAllSubscriptions = async () => {
+        setPausingAll(true)
+        try {
+            const result = await pauseAllActiveSubscriptionsAction()
+            if (!result.success) {
+                toast.error(result.error || "Não foi possível pausar as assinaturas.")
+                return
+            }
+            setImpact((current) => ({
+                activeSubscriptions: 0,
+                activePlans: current?.activePlans ?? 0,
+            }))
+            toast.success(
+                "Assinaturas pausadas",
+                `${result.paused} assinatura(s) pausada(s).${result.failed > 0 ? ` ${result.failed} falharam.` : ""}`,
+            )
+        } catch {
+            toast.error("Erro inesperado ao pausar as assinaturas.")
+        } finally {
+            setPausingAll(false)
+        }
+    }
+
+    const handleConfirmImpact = async () => {
+        if (saveBlockedBySubscriptions) return
+        setImpactOpen(false)
+        await performSave()
     }
 
     const handleBack = useCallback(() => {
@@ -230,6 +325,105 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                     variant="warning"
                 />
             )}
+
+            <DefaultModal
+                isOpen={impactOpen}
+                onClose={() => {
+                    if (!saving && !pausingAll) setImpactOpen(false)
+                }}
+                title="Antes de desativar recursos"
+                description="Revise o impacto das alterações antes de salvar."
+                icon={<AlertTriangleIcon className="w-6 h-6 text-brand-yellow" />}
+                maxWidth="lg"
+                footer={
+                    <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => setImpactOpen(false)}
+                            disabled={saving || pausingAll}
+                            className="sm:w-auto w-full"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmImpact}
+                            isLoading={saving}
+                            disabled={impactLoading || pausingAll || saveBlockedBySubscriptions}
+                            className="sm:w-auto w-full"
+                        >
+                            Desativar e salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="space-y-3">
+                        {turnedOffResources.map((resourceId) => {
+                            const resource = SYSTEM_RESOURCES.find((r) => r.id === resourceId)
+                            return (
+                                <div
+                                    key={resourceId}
+                                    className="rounded-xl border border-brand-border dark:border-dark-border p-3"
+                                >
+                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                        {resource?.label || resourceId}
+                                    </p>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                                        {RESOURCE_OFF_IMPACT[resourceId] || "Este recurso deixará de aparecer no sistema."}
+                                    </p>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {impactLoading ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Verificando assinaturas ativas...
+                        </p>
+                    ) : impact ? (
+                        <div className="rounded-xl border border-brand-yellow/40 bg-brand-yellow/10 p-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangleIcon className="w-5 h-5 text-brand-yellow shrink-0 mt-0.5" />
+                                <div className="min-w-0 space-y-1">
+                                    {activeSubscriptions > 0 ? (
+                                        <>
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {activeSubscriptions} assinatura(s) ativa(s)
+                                            </p>
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                {saveBlockedBySubscriptions
+                                                    ? "Pedidos e Assinaturas recorrentes sustentam as assinaturas ativas. Pause todas as assinaturas para continuar."
+                                                    : "Assinaturas existentes continuam cobrando normalmente (são contratos). Novas vendas seguem as regras acima."}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                Nenhuma assinatura ativa
+                                            </p>
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                Não há assinaturas em andamento que dependam destes recursos.
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {activeSubscriptions > 0 && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handlePauseAllSubscriptions}
+                                    isLoading={pausingAll}
+                                    disabled={pausingAll || saving}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Pausar todas as assinaturas ativas
+                                </Button>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+            </DefaultModal>
 
             <SavingStatusModal isOpen={saving} text="Salvando recursos..." />
         </FadeIn>

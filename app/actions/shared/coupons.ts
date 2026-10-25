@@ -6,7 +6,8 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
-import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/lib/services/coupons"
+import { validateCoupon, findBestAutomaticCoupon, validateCouponRow, type CouponValidationResult } from "@/lib/services/coupons"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 import { setCouponStores, getCouponStoreIds } from "@/lib/services/promotions.service"
 
 const CouponSchema = z.object({
@@ -307,9 +308,13 @@ export async function validateMarketplaceCouponAction(input: {
     subtotal: number
     shippingCost?: number
     items?: Array<{ productId?: string | null; serviceId?: string | null }>
-}) {
+}): Promise<CouponValidationResult> {
     // Only require authenticated user - marketplace buyers are NOT partner members
     await requireUser()
+    const capabilities = await resolveMarketplaceCapabilities(input.partnerId)
+    if (!capabilities.couponsEnabled) {
+        return { valid: false, discountAmount: 0, errorMessage: "Cupons estão desativados nesta loja." }
+    }
     // Use admin client to bypass RLS (coupons table only allows partner_users to read)
     const { getAdminClient } = await import("@/lib/supabase/admin")
     const admin = getAdminClient()
@@ -324,6 +329,11 @@ export async function listApplicableMarketplaceCouponsAction(input: {
     items?: Array<{ productId?: string | null; serviceId?: string | null }>
 }) {
     await requireUser()
+
+    const capabilities = await resolveMarketplaceCapabilities(input.partnerId)
+    if (!capabilities.couponsEnabled) {
+        return { success: true, coupons: [] }
+    }
 
     const { getAdminClient } = await import("@/lib/supabase/admin")
     const admin = getAdminClient()

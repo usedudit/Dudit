@@ -8,6 +8,10 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { revalidateCart } from "@/lib/utils/revalidation"
 import type { ServiceBookingMetadata } from "@/lib/types/marketplace-cart"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
+import {
+  resolveMarketplaceCapabilities,
+  resolveRecurringPlanSaleBlock,
+} from "@/lib/marketplace-capabilities"
 
 export async function assertCanBuyFromStore(
   userId: string,
@@ -145,6 +149,17 @@ export async function addServiceBookingToCartAction(
   const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
   const acceptance = await canStoreAcceptOrders(admin, { storeId: effectiveStoreId, partnerId: canonicalPartnerId })
   if (!acceptance.allowed) return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
+
+  const capabilities = await resolveMarketplaceCapabilities(canonicalPartnerId, {
+    storeId: effectiveStoreId,
+  })
+  if (!capabilities.appointmentsViaDudit) {
+    return {
+      error: "Os agendamentos estão desativados nesta loja. Agende diretamente pelo WhatsApp.",
+      whatsappFallback: true,
+      whatsappPhone: capabilities.whatsappPhone,
+    }
+  }
 
   if (
     service.deleted_at ||
@@ -434,6 +449,29 @@ export async function addSubscriptionToCartAction(
   const subLimit = await checkActiveSubscriptionCreateLimit(partnerId)
   if (!subLimit.allowed) {
     return { error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
+  }
+
+  // Recursos desativados no ERP bloqueiam apenas vendas novas. Assinaturas
+  // existentes continuam cobrando normalmente (são contratos).
+  const capabilities = await resolveMarketplaceCapabilities(partnerId, {
+    storeId: plan.store_id || null,
+  })
+  const { data: planItems } = await admin
+    .from("recurring_plan_items")
+    .select("item_type")
+    .eq("plan_id", plan.id)
+
+  const saleBlock = resolveRecurringPlanSaleBlock(
+    capabilities,
+    (planItems || []) as Array<{ item_type: string }>,
+    input.fulfillmentMode || null,
+  )
+  if (saleBlock) {
+    return {
+      error: "Este plano não está disponível para novas assinaturas pela Dudit no momento. Fale pelo WhatsApp.",
+      whatsappFallback: true,
+      whatsappPhone: capabilities.whatsappPhone,
+    }
   }
 
   // A assinatura não fica na sacola: a linha criada aqui é só o suporte do

@@ -11,6 +11,7 @@ import { validateCoupon } from "@/lib/services/coupons"
 import { setPromotionStores, getPromotionStoreIds } from "@/lib/services/promotions.service"
 import { revalidatePath } from "next/cache"
 import { sanitizeInput } from "@/lib/input-validator"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -996,6 +997,10 @@ export async function simulatePromotionsAction(
 // ---------------------------------------------------------------------------
 
 export async function listActivePromotionsForMarketplaceAction(partnerId: string, customerId?: string | null) {
+  // Campanhas/promoções desativadas no ERP não devem precificar o marketplace.
+  const capabilities = await resolveMarketplaceCapabilities(partnerId)
+  if (!capabilities.campaignsEnabled) return []
+
   // Use admin client to query promotions securely, filtering by partnerId
   const supabase = getAdminClient()
   const now = new Date().toISOString()
@@ -1116,13 +1121,20 @@ export async function listActivePromotionsForPartnersAction(partnerIds: string[]
   const promoMap = new Map<string, PricingPromotion[]>()
   if (!partnerIds || partnerIds.length === 0) return promoMap
 
+  const eligiblePartnerIds: string[] = []
+  for (const partnerId of Array.from(new Set(partnerIds))) {
+    const capabilities = await resolveMarketplaceCapabilities(partnerId)
+    if (capabilities.campaignsEnabled) eligiblePartnerIds.push(partnerId)
+  }
+  if (eligiblePartnerIds.length === 0) return promoMap
+
   const supabase = getAdminClient()
   const now = new Date().toISOString()
 
   const { data: campaigns } = await supabase
     .from("campaigns")
     .select("id, partner_id, customer_scope")
-    .in("partner_id", partnerIds)
+    .in("partner_id", eligiblePartnerIds)
     .eq("is_active", true)
     .or(`starts_at.is.null,starts_at.lte.${now}`)
     .or(`ends_at.is.null,ends_at.gte.${now}`)
@@ -1144,7 +1156,7 @@ export async function listActivePromotionsForPartnersAction(partnerIds: string[]
       promotion_categories(category_id),
       promotion_services(service_id)
     `)
-    .in("partner_id", partnerIds)
+    .in("partner_id", eligiblePartnerIds)
     .eq("is_active", true)
     .in("campaign_id", activeCampaignIds)
 
@@ -1307,6 +1319,13 @@ export async function getPromotionScopeDataAction(partnerId: string) {
 export async function listActivePromotionsInBatch(partnerIds: string[], customerId?: string | null) {
   if (!partnerIds || partnerIds.length === 0) return {}
 
+  const eligiblePartnerIds: string[] = []
+  for (const partnerId of Array.from(new Set(partnerIds))) {
+    const capabilities = await resolveMarketplaceCapabilities(partnerId)
+    if (capabilities.campaignsEnabled) eligiblePartnerIds.push(partnerId)
+  }
+  if (eligiblePartnerIds.length === 0) return {}
+
   const supabase = getAdminClient()
   const now = new Date().toISOString()
 
@@ -1314,7 +1333,7 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
   let campaignsQuery = supabase
     .from("campaigns")
     .select("id, partner_id, customer_scope")
-    .in("partner_id", partnerIds)
+    .in("partner_id", eligiblePartnerIds)
     .eq("is_active", true)
     .or(`starts_at.is.null,starts_at.lte.${now}`)
     .or(`ends_at.is.null,ends_at.gte.${now}`)
@@ -1363,7 +1382,7 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
       promotion_categories(category_id),
       promotion_services(service_id)
     `)
-    .in("partner_id", partnerIds)
+    .in("partner_id", eligiblePartnerIds)
     .eq("is_active", true)
     .in("campaign_id", activeCampaignIds)
 

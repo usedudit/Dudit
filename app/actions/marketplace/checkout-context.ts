@@ -19,6 +19,10 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getCachedAddresses } from "@/app/actions/shared/addresses"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import {
+  resolveMarketplaceCapabilities,
+  type MarketplaceCapabilities,
+} from "@/lib/marketplace-capabilities"
 
 export type MarketplaceCheckoutDepositConfig = {
   available: boolean
@@ -36,6 +40,7 @@ export type MarketplaceCheckoutContextResult =
       servicesSubtotal: number
       subscriptionsSubtotal: number
       deposit: MarketplaceCheckoutDepositConfig
+      capabilities: MarketplaceCapabilities
       store?: {
         id: string
         short_id?: string | null
@@ -135,7 +140,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
-  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult, userCartProductsResult] = await Promise.all([
+  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult, userCartProductsResult, marketplaceCapabilities] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -210,6 +215,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       .eq("user_id", user.id)
       .eq("item_type", "product")
       .not("product_id", "is", null),
+    resolveMarketplaceCapabilities(resolved.partnerId, { storeId: targetStoreId || null }),
   ])
 
   // mp_* status fields are sourced from partner_integrations.
@@ -405,6 +411,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     productsSubtotal,
     servicesSubtotal,
     subscriptionsSubtotal,
+    capabilities: marketplaceCapabilities,
     deposit: {
       available: depositAvailable,
       percent: depositPercent,
@@ -429,19 +436,13 @@ export async function getMarketplaceCheckoutContextAction(input: {
       storeName: effectiveStoreName,
       store_name: effectiveStoreName,
       mpConnected,
-      phone: (storeRowData as any)?.phone || partnerRow?.phone || null,
+      phone: (storeRowData as any)?.phone || marketplaceCapabilities.whatsappPhone || partnerRow?.phone || null,
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
-      orderFlow: (() => {
-        const explicitFlow = (partnerRow as any)?.order_flow
-        if (explicitFlow) return explicitFlow
-        // Fallback: no modo quick/vitrine, o fluxo padrão é WhatsApp
-        const rawBizInfo = (partnerRow as any)?.business_info
-        const bizInfo = rawBizInfo && typeof rawBizInfo === "object" ? rawBizInfo : {}
-        const mode = typeof bizInfo.mode === "string" ? bizInfo.mode.toLowerCase() : ""
-        return (mode === "quick" || mode === "showcase") ? "whatsapp" : "dudit"
-      })(),
+      orderFlow: marketplaceCapabilities.checkoutViaDudit
+        ? marketplaceCapabilities.baseOrderFlow
+        : "whatsapp",
       planSlug: plan?.slug || "free",
     },
     delivery: {

@@ -148,6 +148,28 @@ export async function subscribeToRecurringPlanAction(input: {
       return { success: false, error: "Este lojista atingiu o limite de assinaturas ativas no momento." }
     }
 
+    // Dependências do plano: produtos/serviços/agendamentos/entrega precisam
+    // estar ativos para uma venda nova pela Dudit.
+    const { resolveMarketplaceCapabilities, resolveRecurringPlanSaleBlock } = await import("@/lib/marketplace-capabilities")
+    const capabilities = await resolveMarketplaceCapabilities(input.partnerId, {
+      storeId: plan.store_id || null,
+    })
+    const { data: planItems } = await admin
+      .from("recurring_plan_items")
+      .select("item_type")
+      .eq("plan_id", plan.id)
+    const saleBlock = resolveRecurringPlanSaleBlock(
+      capabilities,
+      (planItems || []) as Array<{ item_type: string }>,
+      deliveryType,
+    )
+    if (saleBlock) {
+      return {
+        success: false,
+        error: "Este plano não está disponível para novas assinaturas pela Dudit no momento.",
+      }
+    }
+
     const { data: existing } = await admin
       .from("recurring_subscriptions")
       .select("id, status")
@@ -449,6 +471,25 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       Object.assign(rawPartner, withMpPartnerFields(rawPartner))
     }
     const rawStore = Array.isArray(data.stores) ? data.stores[0] : data.stores
+
+    const { resolveMarketplaceCapabilities, resolveRecurringPlanSaleBlock } = await import("@/lib/marketplace-capabilities")
+    const capabilities = await resolveMarketplaceCapabilities(String(data.partner_id), {
+      storeId: rawStore?.id || data.store_id || null,
+    })
+    const saleBlock = (() => {
+      const planItems = (data.recurring_plan_items || []) as Array<{ item_type: string }>
+      const modes = normalizeFulfillmentModes(data.fulfillment_modes, ["delivery", "pickup"])
+      const pickupBlock = modes.includes("pickup")
+        ? resolveRecurringPlanSaleBlock(capabilities, planItems, "pickup")
+        : "unavailable"
+      const deliveryBlock = modes.includes("delivery")
+        ? resolveRecurringPlanSaleBlock(capabilities, planItems, "delivery")
+        : "unavailable"
+      // Basta um modo de recebimento continuar vendável pela Dudit.
+      if (pickupBlock === null || deliveryBlock === null) return null
+      return pickupBlock === "unavailable" ? deliveryBlock : pickupBlock
+    })()
+
     const isShowcaseActive = (rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true) !== false
     const partner = rawPartner ? {
       ...rawPartner,
@@ -481,6 +522,9 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       stores: rawStore,
       price: Number(data.price ?? 0) > 0 ? Number(data.price) : computedPrice,
       images: planImages,
+      saleViaDudit: !saleBlock,
+      saleBlock,
+      whatsappPhone: capabilities.whatsappPhone,
     }
   } catch (e: unknown) {
     console.error("[getMarketplaceRecurringPlanAction] Error:", e)

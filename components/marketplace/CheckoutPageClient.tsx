@@ -832,11 +832,25 @@ export function CheckoutPageClient() {
     const pickupPolicyFromContext = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
     const isWhatsappFlow = checkoutContext?.partner?.orderFlow === "whatsapp"
-    const carrierDeliveryActive = Boolean(selectedCarrierServiceId) && carrierOptions.length > 0
+    const checkoutCapabilities = checkoutContext?.capabilities
+    const checkoutViaDudit = checkoutCapabilities?.checkoutViaDudit ?? true
+    const couponsEnabled = checkoutCapabilities?.couponsEnabled ?? true
+    // A transportadora só existe no fluxo de entrega. Sem esse guard, uma
+    // seleção antiga de frete continuava valendo após trocar para retirada e
+    // prendia o checkout no Mercado Pago (regra exclusiva da transportadora).
+    const carrierDeliveryActive = formData.deliveryType === "delivery"
+        && Boolean(selectedCarrierServiceId)
+        && carrierOptions.length > 0
+    const selectedCarrierOption = selectedCarrierServiceId != null
+        ? carrierOptions.find((o) => o.serviceId === selectedCarrierServiceId) || null
+        : null
     // Modo carrier: frete próprio sem cobertura ("fora do raio" ou erro) ou
     // transportadora já selecionada. Enquanto isso, o checkout mostra apenas
-    // Mercado Pago.
-    const carrierCheckoutEngaged = carrierDeliveryActive || carrierSectionVisible
+    // Mercado Pago. Quando Pedidos estão desativados, nem a transportadora
+    // libera pagamento online: o fluxo é sempre WhatsApp.
+    const carrierCheckoutEngaged = checkoutViaDudit
+        && formData.deliveryType === "delivery"
+        && (carrierDeliveryActive || carrierSectionVisible)
     // Enquanto aguarda a cotação da transportadora, esconde o erro (sem flash)
     // - a seção de transportadora mostra o estado de cálculo.
     const carrierResolving = carrierQuoteLoading || carrierOptions.length > 0
@@ -909,7 +923,7 @@ export function CheckoutPageClient() {
 
     // Assinatura: o pagamento é recorrente pelo Mercado Pago - deixa o MP já
     // selecionado para o comprador não precisar escolher a forma de pagamento.
-    const mpOptionAvailable = Boolean(partnerInfo.mpConnected) && (!isWhatsappFlow || carrierCheckoutEngaged)
+    const mpOptionAvailable = Boolean(partnerInfo.mpConnected) && checkoutViaDudit && (!isWhatsappFlow || carrierCheckoutEngaged)
     useEffect(() => {
         if (!requirements?.hasSubscriptionLines || !mpOptionAvailable) return
         if (paymentOption !== null || contextLoading) return
@@ -924,6 +938,38 @@ export function CheckoutPageClient() {
             setPayDepositOnly(false)
         }
     }, [checkoutContext?.deposit.available])
+
+    // Troca entrega ↔ retirada. Ao sair da entrega por transportadora, desfaz a
+    // seleção de frete e devolve o checkout de retirada ao fluxo manual quando
+    // a loja permite pagamento na retirada.
+    const handleDeliveryTypeChange = (type: "delivery" | "pickup") => {
+        const wasCarrierFlow = carrierCheckoutEngaged
+        setFormData((prev) => ({ ...prev, deliveryType: type }))
+
+        if (type !== "delivery") {
+            setSelectedCarrierServiceId(null)
+        }
+
+        if (type !== "pickup") return
+
+        if (pickupPolicyFromContext === "require_online_payment") {
+            if (partnerInfo.mpConnected) {
+                setPaymentOption("mercadopago")
+                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+            } else {
+                setPaymentOption(null)
+                setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+            }
+            return
+        }
+
+        // Retirada com pagamento permitido não herda o Mercado Pago obrigatório
+        // da transportadora (o MP só era exigido porque o frete era por carrier).
+        if (wasCarrierFlow && paymentOption === "mercadopago" && !requirements?.hasSubscriptionLines) {
+            setPaymentOption("traditional")
+            setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+        }
+    }
 
     // Show incompatible payment restrictions warning
     useEffect(() => {
@@ -2257,7 +2303,7 @@ export function CheckoutPageClient() {
                 )}
             </div>
 
-            {(displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+            {couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                 <div className="mb-4 space-y-2">
                     <ListItem
                         icon={TagIcon}
@@ -2427,7 +2473,7 @@ export function CheckoutPageClient() {
                         ? "Direcionando..."
                         : paymentPreviewLoading
                             ? "Calculando pagamento..."
-                            : isWhatsappFlow && paymentOption !== "mercadopago"
+                            : (!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago"))
                                 ? `Fazer pedido via WhatsApp - ${formatCurrency(checkoutTotalToCharge)}`
                                 : `Finalizar pedido - ${formatCurrency(checkoutTotalToCharge)}`
                     }
@@ -2464,7 +2510,7 @@ export function CheckoutPageClient() {
     }
 
     const loadApplicableCoupons = async () => {
-        if (!partnerId || !userId) {
+        if (!partnerId || !userId || !couponsEnabled) {
             setAvailableCoupons([])
             return
         }
@@ -2513,7 +2559,20 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         void loadApplicableCoupons()
-    }, [partnerId, userId, totalAmount, couponItemsKey])
+    }, [partnerId, userId, totalAmount, couponItemsKey, couponsEnabled])
+
+    // Cupons desativados: limpa qualquer código aplicado para não enviá-lo ao
+    // checkout nem exibi-lo no resumo/WhatsApp.
+    useEffect(() => {
+        if (couponsEnabled) return
+        setAvailableCoupons([])
+        setCouponCode("")
+        setCouponDiscount(0)
+        setSelectedCouponId("")
+        setCouponError(null)
+        setCouponPartialWarning(false)
+        setShowCouponModal(false)
+    }, [couponsEnabled])
 
     const refreshCouponPartialWarning = async (code: string) => {
         if (!partnerId || !code.trim()) {
@@ -2599,6 +2658,13 @@ export function CheckoutPageClient() {
         if (formData.deliveryType === "delivery") {
             msg += `- Tipo: Entrega\n`
             msg += `- Endereço: ${formData.deliveryAddress || "Não informado"}\n`
+            if (selectedCarrierOption) {
+                const carrierLabel = selectedCarrierOption.companyName
+                    ? `${selectedCarrierOption.companyName} - ${selectedCarrierOption.serviceName}`
+                    : selectedCarrierOption.serviceName
+                msg += `- Transportadora: ${carrierLabel}\n`
+                msg += `- Frete: ${formatCurrency(Number(selectedCarrierOption.price))} (${formatDeliveryDaysRange(selectedCarrierOption.deliveryMinDays, selectedCarrierOption.deliveryMaxDays)})\n`
+            }
         } else {
             msg += `- Tipo: Retirada no estabelecimento\n`
             if (checkoutContext?.partner?.address) {
@@ -2842,7 +2908,7 @@ export function CheckoutPageClient() {
             // Fluxo WhatsApp só fecha o pedido no chat quando o pagamento é manual -
             // com Mercado Pago (ex.: entrega por transportadora) segue o fluxo normal
             // de preferência/pagamento online.
-            if (isWhatsappFlow && paymentOption !== "mercadopago") {
+            if (!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago")) {
                 const message = buildWhatsAppMessage()
                 const phone = checkoutContext?.partner?.phone || partnerInfo.phone
                 let cleanPhone = phone ? phone.replace(/\D/g, "") : ""
@@ -3397,6 +3463,13 @@ export function CheckoutPageClient() {
                             {contextError && (
                                 <InfoCard message={contextError} color="red" />
                             )}
+                            {checkoutContext && !checkoutViaDudit && (
+                                <InfoCard
+                                    color="yellow"
+                                    title="Atendimento pelo WhatsApp"
+                                    message="Esta loja está com o checkout da Dudit desativado. Revise o pedido e finalize pelo WhatsApp do vendedor — os detalhes da entrega e do pagamento serão enviados na mensagem."
+                                />
+                            )}
                             {contextLoading && (
                                 <div className="py-8 flex justify-center">
                                     <Spinner />
@@ -3406,20 +3479,7 @@ export function CheckoutPageClient() {
                                 <CheckoutFulfillmentPanel
                                     requirements={requirements}
                                     deliveryType={formData.deliveryType}
-                                    onDeliveryTypeChange={(type) => {
-                                        setFormData((prev) => ({ ...prev, deliveryType: type }))
-                                        if (type === "pickup" && pickupPolicyFromContext === "require_online_payment") {
-                                            if (partnerInfo.mpConnected) {
-                                                setPaymentOption("mercadopago")
-                                                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
-                                            } else {
-                                                setPaymentOption(null)
-                                                setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
-                                            }
-                                        } else if (type === "pickup" && partnerInfo.mpConnected) {
-                                            setPaymentOption("mercadopago")
-                                        }
-                                    }}
+                                    onDeliveryTypeChange={handleDeliveryTypeChange}
                                      partnerId={partnerId}
                                      deliveryPlanEnabled={deliveryPlanEnabled}
                                      deliveryEnabled={deliveryEnabled}
@@ -3881,6 +3941,13 @@ export function CheckoutPageClient() {
                         {mobileStep === 1 && showMobileFulfillmentStep && (
                             <div className="space-y-6 pb-24">
                                 {contextError && <InfoCard message={contextError} color="red" />}
+                                {checkoutContext && !checkoutViaDudit && (
+                                    <InfoCard
+                                        color="yellow"
+                                        title="Atendimento pelo WhatsApp"
+                                        message="Esta loja está com o checkout da Dudit desativado. Revise o pedido e finalize pelo WhatsApp do vendedor — os detalhes da entrega e do pagamento serão enviados na mensagem."
+                                    />
+                                )}
                                 {contextLoading ? (
                                     <div className="py-8 flex justify-center">
                                         <Spinner />
@@ -3890,20 +3957,7 @@ export function CheckoutPageClient() {
                                         <CheckoutFulfillmentPanel
                                             requirements={requirements}
                                             deliveryType={formData.deliveryType}
-                                            onDeliveryTypeChange={(type) => {
-                                                setFormData((prev) => ({ ...prev, deliveryType: type }))
-                                                if (type === "pickup" && pickupPolicyFromContext === "require_online_payment") {
-                                                    if (partnerInfo.mpConnected) {
-                                                        setPaymentOption("mercadopago")
-                                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
-                                                    } else {
-                                                        setPaymentOption(null)
-                                                        setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
-                                                    }
-                                                } else if (type === "pickup" && partnerInfo.mpConnected) {
-                                                    setPaymentOption("mercadopago")
-                                                }
-                                            }}
+                                            onDeliveryTypeChange={handleDeliveryTypeChange}
                                             deliveryPlanEnabled={deliveryPlanEnabled}
                                             deliveryEnabled={deliveryEnabled}
                                             pickupEnabled={pickupEnabled}
@@ -4278,7 +4332,7 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Coupon Selector */}
-                                {(displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
+                                {couponsEnabled && (displayableCoupons.length > 0 || !!appliedCoupon || couponListLoading) && (
                                     <FormSection title="Cupom de Desconto" hasSeparator>
                                         <ListItem
                                             icon={TagIcon}
@@ -4422,7 +4476,7 @@ export function CheckoutPageClient() {
                                         disabled={disableCheckoutSubmit}
                                         className="flex-1 h-12"
                                     >
-                                        {isWhatsappFlow && paymentOption !== "mercadopago"
+                                        {(!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago"))
                                             ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
                                             : `Finalizar • ${formatCurrency(checkoutTotalToCharge)}`
                                         }
@@ -4497,7 +4551,7 @@ export function CheckoutPageClient() {
                         >
                             {isLoading
                                 ? "Processando..."
-                                : isWhatsappFlow && paymentOption !== "mercadopago"
+                                : (!checkoutViaDudit || (isWhatsappFlow && paymentOption !== "mercadopago"))
                                     ? "Fazer pedido via WhatsApp"
                                     : "Fazer pedido"
                             }

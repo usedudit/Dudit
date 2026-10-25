@@ -571,6 +571,10 @@ export async function createReturnRequestAction(input: unknown) {
         resolution = data.resolution
         addMonitoringBreadcrumb({ domain: "returns", message: "create.started", metadata: { entityId: orderId, partnerId, resolution } })
         await requireMinimumPlan(data.partnerId, "crescer")
+        const returnCapabilities = await getPartnerCapabilities(data.partnerId)
+        if (!returnCapabilities.hasReturns) {
+            throw new Error("O módulo de devoluções está desativado nesta loja.")
+        }
         const access = await requirePermission(data.partnerId, "orders", "edit")
         assertPermission(access, "orders.can_refund")
         const supabase = createAdminClient()

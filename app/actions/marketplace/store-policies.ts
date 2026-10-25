@@ -4,27 +4,22 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { DEFAULT_POLICY, normalizePolicyRow, buildDefaultPolicyText } from "@/lib/returns/policy"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-import { normalizeBusinessInfo } from "@/lib/business-info"
-import { isSystemResourceActive } from "@/lib/system-resources"
-import { getPartnerOrderFlow } from "@/lib/partner-order-flow"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
   try {
     const supabase = getAdminClient()
 
-    const [{ data: policyRow }, { data: store }, { data: partner }, plan, orderFlow] = await Promise.all([
+    const [{ data: policyRow }, { data: store }, plan, capabilities] = await Promise.all([
       supabase.from("partner_return_policies").select("*").eq("partner_id", partnerId).maybeSingle(),
-      supabase.from("stores").select("name, phone, business_info").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("partners").select("business_info, order_flow").eq("id", partnerId).maybeSingle(),
+      supabase.from("stores").select("id, name, phone, business_info").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
       getPartnerPlan(partnerId).catch(() => null),
-      getPartnerOrderFlow(partnerId),
+      resolveMarketplaceCapabilities(partnerId),
     ])
 
-    const businessInfo = normalizeBusinessInfo(store?.business_info || partner?.business_info)
+    // business_info do parceiro manda; o da loja é só fallback legado.
     const planSlug = plan?.slug || "free"
-    const hasReturnsPlan = hasMinimumPlan(planSlug, "crescer")
-    const hasReturnsModule = orderFlow !== "whatsapp" && hasReturnsPlan && isSystemResourceActive(businessInfo, "returns")
+    const hasReturnsModule = capabilities.returnsViaDudit
 
     if (policyRow) {
       const policy = normalizePolicyRow(policyRow, partnerId)
@@ -34,10 +29,10 @@ export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
       return successResponse({
         policy,
         storeName: store?.name || null,
-        phone: store?.phone || null,
+        phone: store?.phone || capabilities.whatsappPhone,
         hasReturnsModule,
         planSlug,
-        orderFlow,
+        orderFlow: capabilities.baseOrderFlow,
       })
     }
 
@@ -49,10 +44,10 @@ export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
     return successResponse({
       policy,
       storeName: store?.name || null,
-      phone: store?.phone || null,
+      phone: store?.phone || capabilities.whatsappPhone,
       hasReturnsModule,
       planSlug,
-      orderFlow,
+      orderFlow: capabilities.baseOrderFlow,
       isDefault: true,
     })
   } catch (e: unknown) {

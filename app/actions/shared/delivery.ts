@@ -4,6 +4,7 @@ import { requirePartnerAccessWithPermission, requireStoreAccess, requireUser } f
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { calculateDeliveryFee, hasDeliveryRatesConfigured, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
 import { calculateDistance, geocodeAddress } from "@/lib/services/location.service"
@@ -263,19 +264,21 @@ export async function resolveStoreFulfillmentCapabilities(
   if (cachedCaps) return cachedCaps
 
   const supabase = getAdminClient()
-  const [plan, config, integration] = await Promise.all([
+  const [plan, config, integration, capabilities] = await Promise.all([
     getPartnerPlan(partnerId),
     getPartnerDeliveryConfigAction(partnerId, storeId),
     findSuperFreteIntegration(supabase, partnerId),
+    getPartnerCapabilities(partnerId, { storeId }),
   ])
 
   const capability = resolveDeliveryPlanCapability(plan.slug)
   const settings = config.success ? config.settings : null
+  const deliveriesEnabled = capabilities.hasDeliveries
 
   const caps: StoreFulfillmentCapabilities = {
-    delivery: capability.deliveryEnabled && Boolean(settings?.isDeliveryEnabled ?? false),
+    delivery: deliveriesEnabled && capability.deliveryEnabled && Boolean(settings?.isDeliveryEnabled ?? false),
     pickup: settings ? Boolean(settings.isPickupEnabled ?? true) : true,
-    shipping: Boolean(
+    shipping: deliveriesEnabled && Boolean(
       integration && integration.status === "connected" && integration.access_token_encrypted,
     ),
   }

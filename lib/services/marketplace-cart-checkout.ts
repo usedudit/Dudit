@@ -26,6 +26,7 @@ import { resolveSubscriptionShipping } from "@/lib/services/recurring/shipping"
 import type { RecurringShippingMode } from "@/lib/types/recurring"
 import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 import type { CheckoutFulfillmentPayload } from "@/lib/types/marketplace-cart"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 export type MarketplaceCartCheckoutPricing = {
   partnerId: string
@@ -87,6 +88,10 @@ export async function priceMarketplaceCartCheckout(
   const storeCaps = cartMeta?.partner_id
     ? await resolveStoreFulfillmentCapabilities(cartMeta.partner_id, cartMeta.store_id || null)
     : undefined
+  const marketplaceCapabilities = cartMeta?.partner_id
+    ? await resolveMarketplaceCapabilities(cartMeta.partner_id, { storeId: cartMeta.store_id || null })
+    : null
+  const couponsEnabled = marketplaceCapabilities?.couponsEnabled ?? true
 
   const resolved = await resolveCheckoutCartLines(
     adminClient,
@@ -238,7 +243,7 @@ export async function priceMarketplaceCartCheckout(
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
   let partialCouponWarning = false
 
-  if (params.couponCode?.trim()) {
+  if (couponsEnabled && params.couponCode?.trim()) {
     const couponResult = await validateCoupon(
       {
         partnerId,
@@ -256,7 +261,7 @@ export async function priceMarketplaceCartCheckout(
       couponPricingData = couponResult.pricingCoupon || null
       partialCouponWarning = Boolean(couponResult.partialApplicabilityWarning)
     }
-  } else {
+  } else if (couponsEnabled) {
     const autoResult = await findBestAutomaticCoupon(
       {
         partnerId,

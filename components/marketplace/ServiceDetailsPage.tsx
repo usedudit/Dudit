@@ -84,6 +84,9 @@ interface ServiceDetailsPageClientProps {
     cartCount?: number
     sponsoredAd?: SponsoredAd | null
     partnerPlanSlug?: string
+    quotesViaDudit?: boolean
+    appointmentsViaDudit?: boolean
+    whatsappPhone?: string | null
 }
 
 type BookingStep = "info" | "schedule" | "confirm"
@@ -166,6 +169,9 @@ export function ServiceDetailsPageClient({
     cartCount,
     sponsoredAd = null,
     partnerPlanSlug = "free",
+    quotesViaDudit = true,
+    appointmentsViaDudit = true,
+    whatsappPhone = null,
 }: ServiceDetailsPageClientProps) {
     const router = useRouter()
     const { user, supabase } = useSupabase()
@@ -271,7 +277,7 @@ export function ServiceDetailsPageClient({
             store_id: storeId,
             name: storeName,
             user_id: p?.user_id,
-            phone: store?.phone || store?.whatsapp_phone || p?.phone,
+            phone: store?.phone || store?.whatsapp_phone || p?.phone || whatsappPhone,
             store_name: storeName,
             city: address?.city || store?.city || p?.city || "Brasil",
             state: address?.state || store?.state || p?.state || "BR",
@@ -289,7 +295,7 @@ export function ServiceDetailsPageClient({
             created_at: store?.created_at || p?.created_at,
             orderFlow,
         }
-    }, [service])
+    }, [service, whatsappPhone])
 
     const isStoreOpenNow = useMemo(() => {
         return isStoreOpen(partner.opening_hours, undefined, partner.timezone)
@@ -1022,7 +1028,7 @@ export function ServiceDetailsPageClient({
         if (isProductOwner) return
         const canUseSystemQuote = hasMinimumPlan(partnerPlanSlug || "free", "crescer")
         const isWhatsappFlow = partner.orderFlow === "whatsapp"
-        if (!canUseSystemQuote || isWhatsappFlow) {
+        if (!canUseSystemQuote || isWhatsappFlow || !quotesViaDudit) {
             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
             const startingPriceFormatted = formatCurrency(Number(service.price || 0))
@@ -1036,7 +1042,7 @@ export function ServiceDetailsPageClient({
             return
         }
         setShowRequestQuoteModal(true)
-    }, [isProductOwner, partnerPlanSlug, partner.phone, partner.orderFlow, service.name, service.price, userId, router])
+    }, [isProductOwner, partnerPlanSlug, partner.phone, partner.orderFlow, service.name, service.price, userId, router, quotesViaDudit])
 
     const handleLearnMoreClick = useCallback(() => {
         const descEl = document.getElementById("service-description")
@@ -1045,6 +1051,14 @@ export function ServiceDetailsPageClient({
             setIsDescriptionExpanded(true)
         }
     }, [])
+
+    const appointmentsWhatsAppUrl = useMemo(() => {
+        const cleanPhone = partner.phone ? String(partner.phone).replace(/\D/g, "") : ""
+        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+        if (!formattedPhone) return null
+        const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de agendar um horário.`)
+        return `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+    }, [partner.phone, service.name])
 
     // ─── Booking Panel ────────────────────────────────────────────────────────
 
@@ -1475,6 +1489,26 @@ export function ServiceDetailsPageClient({
                                 Solicitar orçamento
                             </span>
                         </Button>
+                    </div>
+                ) : !appointmentsViaDudit ? (
+                    <div className="hidden lg:block mb-4">
+                        {appointmentsWhatsAppUrl ? (
+                            <a
+                                href={appointmentsWhatsAppUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                            >
+                                <WhatsappIcon size={20} className="fill-white" />
+                                Agendar pelo WhatsApp
+                            </a>
+                        ) : (
+                            <InfoCard
+                                title="Agendamento pelo WhatsApp"
+                                message="O vendedor não cadastrou um número de WhatsApp. Tente novamente mais tarde."
+                                color="orange"
+                            />
+                        )}
                     </div>
                 ) : (
                     <div className="hidden lg:block space-y-2 mb-4">
@@ -2387,6 +2421,24 @@ export function ServiceDetailsPageClient({
                                     Solicitar orçamento
                                 </Button>
                             </>
+                        ) : !appointmentsViaDudit ? (
+                            <div className="flex-1 min-w-0">
+                                {appointmentsWhatsAppUrl ? (
+                                    <a
+                                        href={appointmentsWhatsAppUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full h-11 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-xs sm:text-sm"
+                                    >
+                                        <WhatsappIcon size={18} className="fill-white" />
+                                        Agendar pelo WhatsApp
+                                    </a>
+                                ) : (
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Agendamento disponível somente pelo WhatsApp do vendedor.
+                                    </span>
+                                )}
+                            </div>
                         ) : (
                             <>
                                 <div className="flex-1 flex flex-col justify-center min-w-0">

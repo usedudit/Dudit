@@ -10,6 +10,10 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { getUserSessionData } from "@/lib/data/user"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { isPartnerWhatsappFlow } from "@/lib/partner-order-flow"
+import {
+  resolveMarketplaceCapabilities,
+  resolveRecurringPlanSaleBlock,
+} from "@/lib/marketplace-capabilities"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
@@ -999,12 +1003,84 @@ export async function checkoutCartAction(
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
 
+  const marketplaceCapabilities = await resolveMarketplaceCapabilities(partnerId, {
+    storeId: storeId || cartMeta?.store_id || null,
+  })
+  const whatsappFallback = (message: string) => ({
+    error: message,
+    whatsappFallback: true,
+    whatsappReason: message,
+    whatsappPhone: marketplaceCapabilities.whatsappPhone,
+    whatsappCode: "RESOURCE_DISABLED",
+  })
+
+  if (!marketplaceCapabilities.checkoutViaDudit) {
+    return whatsappFallback(
+      "Esta loja finaliza os pedidos pelo WhatsApp. Continue o atendimento por lá.",
+    )
+  }
+
+  const hasSubscriptionLine = resolvedLines.some((l: any) => l.itemType === "subscription")
+  const requiresDelivery =
+    deliveryType === "delivery" &&
+    (hasDeliveryLines || hasProducts || hasSubscriptionLine)
+
+  if (requiresDelivery && !marketplaceCapabilities.deliveriesEnabled) {
+    return whatsappFallback(
+      "As entregas estão desativadas nesta loja. Combine a entrega pelo WhatsApp.",
+    )
+  }
+
+  if (
+    resolvedLines.some((l: any) => l.itemType === "service_booking") &&
+    !marketplaceCapabilities.appointmentsViaDudit
+  ) {
+    return whatsappFallback(
+      "Os agendamentos estão desativados nesta loja. Agende pelo WhatsApp.",
+    )
+  }
+
+  if (hasSubscriptionLine) {
+    if (!marketplaceCapabilities.recurringEnabled) {
+      return whatsappFallback(
+        "As assinaturas recorrentes estão desativadas nesta loja. Fale pelo WhatsApp.",
+      )
+    }
+
+    const planIds = Array.from(
+      new Set(
+        resolvedLines
+          .map((l: any) => l.recurringPlanId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
+      ),
+    )
+    if (planIds.length > 0) {
+      const { data: planItems } = await adminClient
+        .from("recurring_plan_items")
+        .select("plan_id, item_type")
+        .in("plan_id", planIds)
+
+      for (const planId of planIds) {
+        const items = (planItems || []).filter((item: any) => item.plan_id === planId)
+        const block = resolveRecurringPlanSaleBlock(
+          marketplaceCapabilities,
+          items as Array<{ item_type: string }>,
+          deliveryType === "delivery" ? "delivery" : "pickup",
+        )
+        if (block) {
+          return whatsappFallback(
+            "Este plano de assinatura não pode ser finalizado pela Dudit no momento. Fale pelo WhatsApp.",
+          )
+        }
+      }
+    }
+  }
+
   const selectionIssue = deliverySelectionIssue(resolvedLines, deliveryType)
   if (selectionIssue) return { error: selectionIssue }
 
   // Assinatura é comprada direto da página do plano (checkout dedicado) e
   // nunca na mesma finalização que produtos/serviços da sacola.
-  const hasSubscriptionLine = resolvedLines.some((l: any) => l.itemType === "subscription")
   const hasRegularLine = resolvedLines.some((l: any) => l.itemType !== "subscription")
   if (hasSubscriptionLine && hasRegularLine) {
     return { error: "Assinaturas devem ser finalizadas separadamente dos outros itens. Finalize a assinatura primeiro e depois os demais itens." }
@@ -1292,7 +1368,7 @@ export async function checkoutCartAction(
   let couponDiscountAmount = 0
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
 
-  if (couponCode?.trim()) {
+  if (marketplaceCapabilities.couponsEnabled && couponCode?.trim()) {
     const couponResult = await validateCoupon({
       partnerId,
       code: couponCode,
@@ -1307,7 +1383,7 @@ export async function checkoutCartAction(
       couponDiscountAmount = couponResult.discountAmount
       couponPricingData = couponResult.pricingCoupon || null
     }
-  } else {
+  } else if (marketplaceCapabilities.couponsEnabled) {
     const autoResult = await findBestAutomaticCoupon({
       partnerId,
       customerId: customerIdForPromo,
