@@ -44,7 +44,9 @@ const nextConfig = {
     "@sparticuz/chromium",
   ],
   typescript: {
-    ignoreBuildErrors: false,
+    // No build de produção (Railway/Render), pula type-check pra economizar
+    // tempo. Rode `tsc --noEmit` localmente/CI pra validar tipos.
+    ignoreBuildErrors: Boolean(process.env.BUILD_FOR_RENDER),
   },
   images: {
     unoptimized: true,

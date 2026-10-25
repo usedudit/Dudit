@@ -1,0 +1,18 @@
+# Contexto de build enxuto para Railpack/Railway.
+# Reduz o volume do "copy ." e evita subir lixo pro builder.
+.git
+.gitignore
+node_modules
+.next
+coverage
+.nyc_output
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode
+.idea
+docs
+*.md
