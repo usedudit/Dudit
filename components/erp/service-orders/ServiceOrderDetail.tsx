@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -7,8 +7,8 @@ import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
-import BottomSheet from "@/components/BottomSheet"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
+import { StatusStepsTimeline, type StatusStep } from "@/components/erp/shared/StatusStepsTimeline"
 import SignatureDialog from "./SignatureDialog"
 import SpecificationsTab from "./SpecificationsTab"
 import AttachmentsTab from "./AttachmentsTab"
@@ -21,7 +21,6 @@ import { SERVICE_ORDER_STATUS_META, getServiceOrderNextStatuses, isServiceOrderB
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
-import { useMediaQuery } from "@/components/erp/hooks"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
@@ -80,8 +79,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; nextStatus: string } | null>(null)
     const [showPrintModal, setShowPrintModal] = useState(false)
-    const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
-    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     useEffect(() => { setOrder(data) }, [data])
 
@@ -367,9 +364,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     }
 
     const timelineSteps = getTimelineSteps() as Array<{ label: string; date?: string; time?: string; active: boolean; isCancelled?: boolean }>
-    const activeSteps = timelineSteps.filter(s => s.active)
     const isCancelled = order.status === "cancelada"
-    const progressPercent = timelineSteps.length <= 1 ? 0 : ((activeSteps.length - 1) / (timelineSteps.length - 1)) * 100
 
     return (
         <FadeIn>
@@ -460,120 +455,29 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                 <div className="lg:hidden">
                                                     <CustomerMobileBar customer={order.customer_snapshot} address={customerPrimaryAddress} billingAddress={customerBillingAddress} showMap={false} />
                                                 </div>
+                                                {/* Responsável header - always visible on all screen sizes */}
                                                 <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                     <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-1">
+                                                        <div className="flex justify-between items-center flex-wrap gap-3">
+                                                            <div className="flex items-center gap-2">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                                                     Responsável pelo serviço:
                                                                 </span>
-                                                                <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                    {assignedName}
-                                                                </div>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{assignedName}</span>
                                                             </div>
                                                             <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order.priority]?.label || "Média"}</strong>
-                                                            </div>
-                                                            <div className="lg:hidden">
-                                                                <button
-                                                                    onClick={() => setIsStepsSheetOpen(true)}
-                                                                    className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
-                                                                >
-                                                                    <span>Ver etapas</span>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                        <div className="relative px-4">
-                                                            <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                                <div
-                                                                    className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                    style={{ width: `${progressPercent}%` }}
-                                                                ></div>
-
-                                                                {timelineSteps.map((step, idx) => {
-                                                                    const isStepCancelled = step.isCancelled
-                                                                    return (
-                                                                        <div key={idx} className="relative flex flex-col items-center">
-                                                                            <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                                <span className={`text-xs font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                                    {step.label}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                            </div>
-                                                                            <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                                {step.date ? (
-                                                                                    <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                                        <span>{step.date}</span>
-                                                                                        {step.time && <span>{step.time}</span>}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )
-                                                                })}
+                                                                Prioridade: <strong className="text-brand-dark dark:text-dark-heading">{PRIORITY_META[order?.priority]?.label || "Média"}</strong>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Mobile/Tablet Timeline - mimics order status timeline */}
-                                                <div className="lg:hidden mb-6">
-                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                        <div className="bg-brand-gray dark:bg-dark-border/50 p-4 border-b border-brand-border dark:border-dark-border flex justify-between items-center">
-                                                            <div className="flex items-center gap-1">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                    Responsável pelo serviço:
-                                                                </span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                    {assignedName}
-                                                                </span>
-                                                            </div>
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                {timelineSteps.filter(s => s.active).length} de {timelineSteps.length} etapas concluídas
-                                                            </span>
-                                                        </div>
-                                                        <div className="bg-white dark:bg-dark-surface p-4">
-                                                            <div className="flex items-center gap-2 mb-3">
-                                                                <div className={`h-2 flex-1 rounded-full bg-gray-100 dark:bg-dark-border/50 overflow-hidden`}>
-                                                                    <div
-                                                                        className={`h-full rounded-full transition-all duration-500 ${isCancelled ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                        style={{ width: `${progressPercent}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                {timelineSteps.map((step: any, idx: number) => {
-                                                                    const isStepCancelled = step.isCancelled
-                                                                    return (
-                                                                        <div key={idx} className="flex items-center gap-3">
-                                                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                            </div>
-                                                                            <div className="flex-1 flex flex-col">
-                                                                                <span className={`text-sm font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                                    {step.label}
-                                                                                </span>
-                                                                                {step.date && (
-                                                                                    <div className="flex items-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                                        <span>{step.date}</span>
-                                                                                        {step.time && <><span>•</span><span>{step.time}</span></>}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                {/* Timeline - shared component (handles desktop + mobile + BottomSheet) */}
+                                                <StatusStepsTimeline
+                                                    steps={timelineSteps as StatusStep[]}
+                                                    sheetTitle="Etapas da Ordem de Serviço"
+                                                    forceDanger={isCancelled}
+                                                />
 
                                                 {/* Details OS FormSection */}
                                                 <FormSection title="Detalhes da OS" hasSeparator>
@@ -1250,45 +1154,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                 variant="danger"
             />
 
-            <BottomSheet
-                isOpen={isStepsSheetOpen}
-                onClose={() => setIsStepsSheetOpen(false)}
-                title="Etapas da Ordem de Serviço"
-            >
-                <div className="space-y-4 my-4">
-                    <div className="flex items-center gap-2 text-sm">
-                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                            Responsável:
-                        </span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {assignedName}
-                        </span>
-                    </div>
-                    <div className="space-y-2">
-                        {timelineSteps.map((step: any, idx: number) => {
-                        const isStepCancelled = step.isCancelled
-                        return (
-                            <div key={idx} className="flex items-center gap-3 p-3 border border-brand-border dark:border-dark-border rounded-lg">
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${step.active ? (isStepCancelled ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                    {step.active && <div className="w-2 h-2 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                </div>
-                                <div className="flex-1">
-                                    <span className={`text-sm font-semibold ${step.active ? (isStepCancelled ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                        {step.label}
-                                    </span>
-                                    {step.date && (
-                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text mt-0.5">
-                                            <span>{step.date}</span>
-                                            {step.time && <span>{step.time}</span>}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    })}
-                    </div>
-                </div>
-            </BottomSheet>
 
             <OSSPrintModal
                 isOpen={showPrintModal}

@@ -1508,7 +1508,7 @@ export default function PromotionFormPage({
                                                                             <InfoCard
                                                                                 title="Erro"
                                                                                 message="Selecione um brinde"
-                                                                                rightElement={
+                                                                                bottomElement={
                                                                                     <Button
                                                                                         variant="link"
                                                                                         className="text-brand-red hover:text-brand-red/70"

@@ -22,70 +22,78 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
         // Basic check for view permission on general modules
         await requirePermission(partnerId, "products", "view")
 
-        const supabase = createAdminClient()
+        // Authorization stays outside the cache. The cached value contains only
+        // partner-scoped read data and is invalidated by the same entity tags as
+        // the ERP mutations. This avoids repeating the dashboard bootstrap on
+        // every navigation while keeping tenant boundaries intact.
+        const data = await getCachedErpPage(
+            ["erp-quick-mode-home", partnerId],
+            [
+                TAGS.partner(partnerId),
+                TAGS.products(partnerId),
+                TAGS.services(partnerId),
+                TAGS.orders(partnerId),
+            ],
+            async () => {
+                const supabase = createAdminClient()
 
-        // Single parallel batch for all partner-scoped queries after authorization is validated
-        const [
-            partnerRes,
-            storeRes,
-            productsCountRes,
-            servicesCountRes,
-            ordersCountRes,
-            recentProductsRes,
-            recentServicesRes,
-            recentOrdersRes
-        ] = await Promise.all([
-            supabase.from("partners").select("business_info").eq("id", partnerId).single(),
-            supabase.from("stores").select("name").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-            scopeActiveOnly(supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
-            scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
-            supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
-            scopeActiveOnly(supabase.from("products")
-                .select("id, name, price, images, is_active, created_at, type:id")
-                .eq("partner_id", partnerId))
-                .order("created_at", { ascending: false })
-                .limit(4),
-            scopeActiveOnly(supabase.from("services")
-                .select("id, name, price, images, is_active, created_at, type:id")
-                .eq("partner_id", partnerId))
-                .order("created_at", { ascending: false })
-                .limit(4),
-            supabase.from("orders")
-                .select("id, order_number, customer_name, total_amount, situation, created_at, delivery_status")
-                .eq("partner_id", partnerId)
-                .order("created_at", { ascending: false })
-                .limit(5)
-        ])
+                // Single parallel batch for all partner-scoped queries after authorization is validated
+                const [
+                    partnerRes,
+                    storeRes,
+                    productsCountRes,
+                    servicesCountRes,
+                    ordersCountRes,
+                    recentProductsRes,
+                    recentServicesRes,
+                    recentOrdersRes
+                ] = await Promise.all([
+                    supabase.from("partners").select("business_info").eq("id", partnerId).single(),
+                    supabase.from("stores").select("name").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+                    scopeActiveOnly(supabase.from("products").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
+                    scopeActiveOnly(supabase.from("services").select("id", { count: "exact", head: true }).eq("partner_id", partnerId).eq("is_active", true)),
+                    supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId),
+                    scopeActiveOnly(supabase.from("products")
+                        .select("id, name, price, images, is_active, created_at, type:id")
+                        .eq("partner_id", partnerId))
+                        .order("created_at", { ascending: false })
+                        .limit(4),
+                    scopeActiveOnly(supabase.from("services")
+                        .select("id, name, price, images, is_active, created_at, type:id")
+                        .eq("partner_id", partnerId))
+                        .order("created_at", { ascending: false })
+                        .limit(4),
+                    supabase.from("orders")
+                        .select("id, order_number, customer_name, total_amount, situation, created_at, delivery_status")
+                        .eq("partner_id", partnerId)
+                        .order("created_at", { ascending: false })
+                        .limit(5)
+                ])
 
-        if (partnerRes.error || !partnerRes.data) throw new Error("Parceiro não encontrado")
+                if (partnerRes.error || !partnerRes.data) throw new Error("Parceiro não encontrado")
 
-        const partner = partnerRes.data
-        const store = storeRes.data
-        const businessInfo = normalizeBusinessInfo(partner.business_info)
+                const businessInfo = normalizeBusinessInfo(partnerRes.data.business_info)
+                const items = [
+                    ...(recentProductsRes.data || []).map((p: any) => ({ ...p, itemType: 'product' })),
+                    ...(recentServicesRes.data || []).map((s: any) => ({ ...s, itemType: 'service' }))
+                ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 8)
 
-        const stats = {
-            activeItems: (productsCountRes.count || 0) + (servicesCountRes.count || 0),
-            receivedOrders: ordersCountRes.count || 0,
-        }
+                return {
+                    stats: {
+                        activeItems: (productsCountRes.count || 0) + (servicesCountRes.count || 0),
+                        receivedOrders: ordersCountRes.count || 0,
+                    },
+                    items,
+                    recentOrders: recentOrdersRes.data || [],
+                    storeName: storeRes.data?.name || "",
+                    businessInfo,
+                }
+            },
+            30,
+        )
 
-        const items = [
-            ...(recentProductsRes.data || []).map((p: any) => ({ ...p, itemType: 'product' })),
-            ...(recentServicesRes.data || []).map((s: any) => ({ ...s, itemType: 'service' }))
-        ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .slice(0, 8)
-
-        const recentOrders = recentOrdersRes.data || []
-
-        return {
-            success: true,
-            data: {
-                stats,
-                items,
-                recentOrders,
-                storeName: store?.name || "",
-                businessInfo
-            }
-        }
+        return { success: true, data }
 
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar dados do Início" }

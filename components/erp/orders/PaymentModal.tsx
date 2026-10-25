@@ -364,6 +364,8 @@ export type PaymentModalProps = {
     isMarketplaceOrder?: boolean
     role?: string
     originalPaymentMethod?: string
+    /** Indica se o pedido foi feito via Mercado Pago (bloqueia troca de método). */
+    originalPaymentProvider?: string
     /** Quando o pedido tem serviços, permite gerar cobrança de sinal via MP antes do pagamento integral. */
     allowDepositCharge?: boolean
     depositChargeAmount?: number
@@ -395,6 +397,7 @@ const PaymentModal = ({
     isMarketplaceOrder = false,
     role = 'staff',
     originalPaymentMethod,
+    originalPaymentProvider,
     allowDepositCharge = false,
     depositChargeAmount = 0,
     depositPercentage: propsDepositPercentage,
@@ -407,6 +410,18 @@ const PaymentModal = ({
     const { theme } = useTheme();
     const isDark = theme === "dark";
     const isFreePlan = !hasMinimumPlan(planSlug, "crescer");
+
+    // MP orders: customer already selected the payment method at checkout.
+    // Lock the method selection to prevent changes.
+    const isMpOrder = useMemo(() => {
+        if (!originalPaymentProvider) return false;
+        const providerNorm = String(originalPaymentProvider).toLowerCase().trim();
+        if (!providerNorm.includes("mercado pago")) return false;
+        // Only lock when a real payment method was already chosen at checkout.
+        const methodNorm = String(originalPaymentMethod || "").toLowerCase().trim();
+        if (!methodNorm || methodNorm === "não informado" || methodNorm === "nao informado") return false;
+        return true;
+    }, [originalPaymentProvider, originalPaymentMethod]);
 
     const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
@@ -1089,14 +1104,14 @@ const PaymentModal = ({
         // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
     }, [isOpen]);
 
-    // Marketplace orders: auto-navigate to the original method (locked).
+    // Marketplace/MP orders: auto-navigate to the original method (locked).
     // Partial/sinal remainder: stay on the methods list so the seller can choose how to receive the rest.
     useEffect(() => {
         if (!isOpen || isLoadingMethods) return;
         // Only auto-navigate if we're on the initial methods screen
         if (view !== 'methods') return;
 
-        const isMarketplace = isMarketplaceOrder && !!originalPaymentMethod;
+        const isMarketplace = (isMarketplaceOrder || isMpOrder) && !!originalPaymentMethod;
         if (!isMarketplace) return;
 
         if (existingPaymentBreakdown && existingPaymentBreakdown.length > 1) {
@@ -1146,7 +1161,7 @@ const PaymentModal = ({
 
         setSelectedMethodType(methodType);
         setView(getTargetViewForMethodType(methodType));
-    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
+    }, [isOpen, isMarketplaceOrder, isMpOrder, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
     useEffect(() => {
@@ -2294,8 +2309,8 @@ const PaymentModal = ({
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
-            } else if (isMarketplaceOrder) {
-                // Marketplace orders: back from payment input closes the modal
+            } else if (isMarketplaceOrder || isMpOrder) {
+                // Marketplace/MP orders: back from payment input closes the modal
                 // since they can't change the payment method
                 onClose();
             } else {
@@ -3007,7 +3022,7 @@ const PaymentModal = ({
                     {paymentStatus === 'input' && (
                         <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                {view !== 'methods' && !isMarketplaceOrder && (
+                                {view !== 'methods' && !isMarketplaceOrder && !isMpOrder && (
                                     <motion.button
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -3175,7 +3190,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("cash")}
                                                             />
                                                         )}
@@ -3183,7 +3198,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("pix")}
                                                             />
                                                         )}
@@ -3191,7 +3206,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("credit_card")}
                                                             />
                                                         )}
@@ -3199,7 +3214,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("debit_card")}
                                                             />
                                                         )}
@@ -3207,7 +3222,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={FileIcon}
                                                                 label="Transferência"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("bank_transfer")}
                                                             />
                                                         )}
@@ -3215,17 +3230,17 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Outros"
-                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("other")}
                                                             />
                                                         )}
                                                         <PaymentMethodCard
                                                             icon={SplitIcon}
                                                             label="Dividir"
-                                                            disabled={isMarketplaceOrder || isAlreadyFullyPaid}
+                                                            disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
                                                             onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                         />
-                                                        {mpConnected && !isMarketplaceOrder && !isAlreadyFullyPaid && (
+                                                        {mpConnected && !isMarketplaceOrder && !isMpOrder && !isAlreadyFullyPaid && (
                                                             <button
                                                                 onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
                                                                 className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
@@ -3361,121 +3376,125 @@ const PaymentModal = ({
                                     {view === 'pix' && (
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
-                                                {isMarketplaceOrder && (
+                                                {(isMarketplaceOrder || isMpOrder) && (
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
-                                                <div className="min-w-0 flex-1">
-                                                    <PaymentAmountLabel
-                                                        label="Valor a receber"
-                                                        calculation={paymentCalculation}
-                                                        baseAllocated={calcBaseAmount}
-                                                    />
-                                                    <MoneyInput
-                                                        value={paymentBaseAmount}
-                                                        onChange={handlePaymentBaseAmountChange}
-                                                    />
-                                                </div>
+                                                {!isMpOrder && (
+                                                    <>
+                                                        <div className="min-w-0 flex-1">
+                                                            <PaymentAmountLabel
+                                                                label="Valor a receber"
+                                                                calculation={paymentCalculation}
+                                                                baseAllocated={calcBaseAmount}
+                                                            />
+                                                            <MoneyInput
+                                                                value={paymentBaseAmount}
+                                                                onChange={handlePaymentBaseAmountChange}
+                                                            />
+                                                        </div>
 
-                                                <></>
-                                                {isSinglePricingBusy && (
-                                                    <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
-                                                        <Spinner />
-                                                        Calculando valor a cobrar...
-                                                    </div>
-                                                )}
-
-                                                {showKeyInputs ? (
-                                                    <div className="space-y-4 text-left">
-                                                        <h5 className="text-sm font-semibold text-brand-dark dark:text-dark-heading pt-4 border-t border-brand-border dark:border-dark-border">
-                                                            Cadastrar Chave Pix temporária/padrão
-                                                        </h5>
-
-                                                        <FormDropdown
-                                                            label="Tipo de chave"
-                                                            placeholder="Selecione o tipo"
-                                                            value={tempPixKeyType}
-                                                            setValue={(val: any) => setTempPixKeyType(val)}
-                                                            options={[
-                                                                { value: "cpf", label: "CPF" },
-                                                                { value: "cnpj", label: "CNPJ" },
-                                                                { value: "email", label: "E-mail" },
-                                                                { value: "phone", label: "Celular" },
-                                                                { value: "random", label: "Chave Aleatória" },
-                                                            ]}
-                                                        />
-
-                                                        {tempPixKeyType === "cpf" && (
-                                                            <CpfCnpjInput
-                                                                label="Chave PIX (CPF)"
-                                                                placeholder="000.000.000-00"
-                                                                value={tempPixKey}
-                                                                onChange={(e) => setTempPixKey(e.target.value)}
-                                                                name="pix_key"
-                                                            />
-                                                        )}
-                                                        {tempPixKeyType === "cnpj" && (
-                                                            <CpfCnpjInput
-                                                                label="Chave PIX (CNPJ)"
-                                                                placeholder="00.000.000/0000-00"
-                                                                value={tempPixKey}
-                                                                onChange={(e) => setTempPixKey(e.target.value)}
-                                                                name="pix_key_cnpj"
-                                                            />
-                                                        )}
-                                                        {tempPixKeyType === "email" && (
-                                                            <EmailInput
-                                                                label="Chave PIX (E-mail)"
-                                                                placeholder="exemplo@email.com"
-                                                                value={tempPixKey}
-                                                                onChange={(e) => setTempPixKey(e.target.value)}
-                                                            />
-                                                        )}
-                                                        {tempPixKeyType === "phone" && (
-                                                            <PhoneInput
-                                                                label="Chave PIX (Celular)"
-                                                                placeholder="(00) 00000-0000"
-                                                                value={tempPixKey}
-                                                                onChange={(e) => setTempPixKey(e.target.value)}
-                                                            />
-                                                        )}
-                                                        {tempPixKeyType === "random" && (
-                                                            <Input
-                                                                label="Chave PIX (Aleatória)"
-                                                                placeholder="123e4567-e89b-12d3-a456-426614174000"
-                                                                value={tempPixKey}
-                                                                onChange={(e) => setTempPixKey(e.target.value)}
-                                                            />
+                                                        <></>
+                                                        {isSinglePricingBusy && (
+                                                            <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
+                                                                <Spinner />
+                                                                Calculando valor a cobrar...
+                                                            </div>
                                                         )}
 
-                                                        <Button
-                                                            variant="filled"
-                                                            className="w-full h-12 mt-2"
-                                                            onClick={async () => {
-                                                                if (tempPixKey) {
-                                                                    if (isFreePlan) {
-                                                                        await handleGeneratePixWithKey(tempPixKey, tempPixKeyType);
-                                                                    } else {
-                                                                        setShowConfirmSaveModal(true);
-                                                                    }
-                                                                }
-                                                            }}
-                                                            isLoading={isGeneratingPix}
-                                                            disabled={paymentBaseAmount <= 0 || !tempPixKey}
-                                                        >
-                                                            Gerar QR Code
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <Button
-                                                        variant="filled"
-                                                        className="w-full h-12"
-                                                        onClick={handleGeneratePix}
-                                                        isLoading={isGeneratingPix}
-                                                        disabled={paymentBaseAmount <= 0}
-                                                    >
-                                                        Gerar QR Code
-                                                    </Button>
+                                                        {showKeyInputs ? (
+                                                            <div className="space-y-4 text-left">
+                                                                <h5 className="text-sm font-semibold text-brand-dark dark:text-dark-heading pt-4 border-t border-brand-border dark:border-dark-border">
+                                                                    Cadastrar Chave Pix temporária/padrão
+                                                                </h5>
+
+                                                                <FormDropdown
+                                                                    label="Tipo de chave"
+                                                                    placeholder="Selecione o tipo"
+                                                                    value={tempPixKeyType}
+                                                                    setValue={(val: any) => setTempPixKeyType(val)}
+                                                                    options={[
+                                                                        { value: "cpf", label: "CPF" },
+                                                                        { value: "cnpj", label: "CNPJ" },
+                                                                        { value: "email", label: "E-mail" },
+                                                                        { value: "phone", label: "Celular" },
+                                                                        { value: "random", label: "Chave Aleatória" },
+                                                                    ]}
+                                                                />
+
+                                                                {tempPixKeyType === "cpf" && (
+                                                                    <CpfCnpjInput
+                                                                        label="Chave PIX (CPF)"
+                                                                        placeholder="000.000.000-00"
+                                                                        value={tempPixKey}
+                                                                        onChange={(e) => setTempPixKey(e.target.value)}
+                                                                        name="pix_key"
+                                                                    />
+                                                                )}
+                                                                {tempPixKeyType === "cnpj" && (
+                                                                    <CpfCnpjInput
+                                                                        label="Chave PIX (CNPJ)"
+                                                                        placeholder="00.000.000/0000-00"
+                                                                        value={tempPixKey}
+                                                                        onChange={(e) => setTempPixKey(e.target.value)}
+                                                                        name="pix_key_cnpj"
+                                                                    />
+                                                                )}
+                                                                {tempPixKeyType === "email" && (
+                                                                    <EmailInput
+                                                                        label="Chave PIX (E-mail)"
+                                                                        placeholder="exemplo@email.com"
+                                                                        value={tempPixKey}
+                                                                        onChange={(e) => setTempPixKey(e.target.value)}
+                                                                    />
+                                                                )}
+                                                                {tempPixKeyType === "phone" && (
+                                                                    <PhoneInput
+                                                                        label="Chave PIX (Celular)"
+                                                                        placeholder="(00) 00000-0000"
+                                                                        value={tempPixKey}
+                                                                        onChange={(e) => setTempPixKey(e.target.value)}
+                                                                    />
+                                                                )}
+                                                                {tempPixKeyType === "random" && (
+                                                                    <Input
+                                                                        label="Chave PIX (Aleatória)"
+                                                                        placeholder="123e4567-e89b-12d3-a456-426614174000"
+                                                                        value={tempPixKey}
+                                                                        onChange={(e) => setTempPixKey(e.target.value)}
+                                                                    />
+                                                                )}
+
+                                                                <Button
+                                                                    variant="filled"
+                                                                    className="w-full h-12 mt-2"
+                                                                    onClick={async () => {
+                                                                        if (tempPixKey) {
+                                                                            if (isFreePlan) {
+                                                                                await handleGeneratePixWithKey(tempPixKey, tempPixKeyType);
+                                                                            } else {
+                                                                                setShowConfirmSaveModal(true);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    isLoading={isGeneratingPix}
+                                                                    disabled={paymentBaseAmount <= 0 || !tempPixKey}
+                                                                >
+                                                                    Gerar QR Code
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button
+                                                                variant="filled"
+                                                                className="w-full h-12"
+                                                                onClick={handleGeneratePix}
+                                                                isLoading={isGeneratingPix}
+                                                                disabled={paymentBaseAmount <= 0}
+                                                            >
+                                                                Gerar QR Code
+                                                            </Button>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </motion.div>
@@ -3682,7 +3701,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("cash")}
                                                             />
                                                         )}
@@ -3690,7 +3709,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("pix")}
                                                             />
                                                         )}
@@ -3698,7 +3717,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("credit_card")}
                                                             />
                                                         )}
@@ -3706,7 +3725,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("debit_card")}
                                                             />
                                                         )}
@@ -3714,7 +3733,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={FileIcon}
                                                                 label="Transferência"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("bank_transfer")}
                                                             />
                                                         )}
@@ -3722,7 +3741,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Crédito do cliente"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => {
                                                                     const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
                                                                     const remainingToPay = Math.max(0, chargeTarget - splitBaseSum);
@@ -3751,7 +3770,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Outros"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isMpOrder}
                                                                 onClick={() => setSplitSelectedType("other")}
                                                             />
                                                         )}

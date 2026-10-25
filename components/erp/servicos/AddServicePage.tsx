@@ -62,7 +62,7 @@ interface AddServicePageProps {
     isSaving?: boolean
     serviceId?: string
     initialData?: any | null
-    onClose?: () => void
+    onClose?: (result?: any) => void
     partnerId?: string
     storeId?: string
     isLoadingDetails?: boolean
@@ -529,7 +529,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 notifyError((result as any).error || "Erro ao salvar")
             } else {
                 notifySuccess(internalMode === "edit" ? "Serviço atualizado!" : "Serviço criado!")
-                onClose?.()
+                onClose?.(result)
                 if (!onClose) onBack()
             }
         } catch (err) { console.error(err); notifyError("Erro ao salvar serviço") }

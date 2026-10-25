@@ -50,7 +50,7 @@ interface NewCustomerPageProps {
     partnerId: string;
     customerId?: string;
     initialData?: any;
-    onSuccess?: (msg: string) => void;
+    onSuccess?: (msg: string, data?: any) => void;
     onError?: (msg: string) => void;
 }
 
@@ -444,7 +444,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 notifyError("Erro ao salvar: " + res.error)
             } else {
                 notifySuccess("Cliente cadastrado com sucesso!")
-                onBack()
+                onSuccess?.("Cliente salvo com sucesso.", res.data)
+                if (!onSuccess) onBack()
             }
         } catch (e) {
             console.error(e)

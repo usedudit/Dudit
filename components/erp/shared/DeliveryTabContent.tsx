@@ -878,7 +878,7 @@ export const DeliverySummarySection: React.FC<DeliverySummarySectionProps> = ({
     )
 
     if (variant === "sidebar") {
-        return <SidebarCard hasTopStrip title="Resumo da Entrega">{content}</SidebarCard>
+        return <SidebarCard hasTopStrip hasSeparator title="Resumo da Entrega">{content}</SidebarCard>
     }
     if (variant === "card") {
         return (

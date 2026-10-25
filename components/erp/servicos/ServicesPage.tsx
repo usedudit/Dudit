@@ -779,11 +779,40 @@ export default function ServicesPage({
     }, [setSearch])
 
     // ── onClose handler for AddServicePage (after save) ──────────────
-    const handleFormClose = useCallback(() => {
-        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
+    const handleFormClose = useCallback((result?: any) => {
+        const savedService = result?.success && result.data && typeof result.data === "object"
+            ? result.data
+            : null
+
+        if (savedService?.id) {
+            if (entityState.entityId) {
+                // The action already returned the updated row; avoid fetching
+                // the same detail again after a successful save.
+                cache.setEntity(savedService.id, savedService)
+            } else {
+                setServices((previous) => [
+                    savedService,
+                    ...previous.filter((service) => service.id !== savedService.id),
+                ])
+                queryClient.setQueryData(servicesQueryKey, (oldData: any) => {
+                    if (!oldData?.pages?.length) return oldData
+                    const firstPage = oldData.pages[0]
+                    return {
+                        ...oldData,
+                        pages: [
+                            { ...firstPage, items: [savedService, ...firstPage.items.filter((item: any) => item.id !== savedService.id)] },
+                            ...oldData.pages.slice(1),
+                        ],
+                    }
+                })
+            }
+            closeEntity()
+            return
+        }
+
         afterMutation(entityState.entityId || undefined)
         closeEntity()
-    }, [entityState.entityId, cache, afterMutation, closeEntity])
+    }, [entityState.entityId, cache, queryClient, servicesQueryKey, afterMutation, closeEntity])
 
     const selectedProds = useMemo(() =>
         services.filter((p) => selection.ids.has(p.id)),

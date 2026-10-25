@@ -364,7 +364,7 @@ export function PaymentsPage({
                                                         <InfoCard
                                                             title="Mercado Pago não conectado"
                                                             message="Para cobrar sinal, é necessário ter o Mercado Pago conectado."
-                                                            rightElement={
+                                                            bottomElement={
                                                                 <Link href="/erp/configuracoes?tab=integracoes">
                                                                     <Button variant="link">Conectar Mercado Pago</Button>
                                                                 </Link>

@@ -293,22 +293,20 @@ export default function CreateTransactionPage({
     const [newContactModalType, setNewContactModalType] = useState<ContactType>("service")
     const pendingSelectContactIdRef = useRef<string | null>(null)
     const pendingCloseRef = useRef<(() => void) | null>(null)
-    const skipTransferBalanceCheckRef = useRef(false)
     const skipBalanceWarningRef = useRef(false)
-    const [transferInsufficientOpen, setTransferInsufficientOpen] = useState(false)
-    const [transferInsufficientMeta, setTransferInsufficientMeta] = useState({ fromBal: 0, amount: 0 })
     const [balanceWarningOpen, setBalanceWarningOpen] = useState(false)
     const [balanceWarningMeta, setBalanceWarningMeta] = useState<{
         accountName: string
         currentBalance: number
         amount: number
         txKind: TxKind
-    }>({ accountName: "", currentBalance: 0, amount: 0, txKind: "expense" })
-    const [adjustFromTransferOpen, setAdjustFromTransferOpen] = useState(false)
-    const [adjustFromTransferNewBalance, setAdjustFromTransferNewBalance] = useState(0)
-    const [adjustFromTransferSaving, setAdjustFromTransferSaving] = useState(false)
+        accountId: string | null
+    }>({ accountName: "", currentBalance: 0, amount: 0, txKind: "expense", accountId: null })
+    const [adjustAccountOpen, setAdjustAccountOpen] = useState(false)
+    const [adjustAccountNewBalance, setAdjustAccountNewBalance] = useState(0)
+    const [adjustAccountSaving, setAdjustAccountSaving] = useState(false)
     const isQuickModalCloseLocked = quickSaving
-    const isAdjustModalCloseLocked = adjustFromTransferSaving
+    const isAdjustModalCloseLocked = adjustAccountSaving
     const defaultDayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), [])
     const defaultRecurrenceNext = useMemo(
         () => ymdAfterAddingPeriod(format(new Date(), "yyyy-MM-dd"), "monthly", 1),
@@ -826,6 +824,7 @@ export default function CreateTransactionPage({
                         currentBalance: curBal,
                         amount,
                         txKind,
+                        accountId: accountId || null,
                     })
                     setBalanceWarningOpen(true)
                     return
@@ -930,16 +929,22 @@ export default function CreateTransactionPage({
         if (txKind === "transfer") {
             const fromBal = getAccountBalance(fromAccountId)
             if (
-                !skipTransferBalanceCheckRef.current &&
+                !skipBalanceWarningRef.current &&
                 status === "paid" &&
                 amount > 0 &&
                 fromBal + 0.005 < amount
             ) {
-                setTransferInsufficientMeta({ fromBal, amount })
-                setTransferInsufficientOpen(true)
+                setBalanceWarningMeta({
+                    accountName: transferFromAccountName,
+                    currentBalance: fromBal,
+                    amount,
+                    txKind: "transfer",
+                    accountId: fromAccountId || null,
+                })
+                setBalanceWarningOpen(true)
                 return
             }
-            skipTransferBalanceCheckRef.current = false
+            skipBalanceWarningRef.current = false
             setIsSaving(true)
             try {
                 const res = await createTransferPairAction({
@@ -2141,8 +2146,11 @@ export default function CreateTransactionPage({
                     </div>
                 </DefaultModal>
                 <DefaultModal
-                    isOpen={transferInsufficientOpen}
-                    onClose={() => setTransferInsufficientOpen(false)}
+                    isOpen={balanceWarningOpen}
+                    onClose={() => {
+                        setBalanceWarningOpen(false)
+                        skipBalanceWarningRef.current = false
+                    }}
                     title="Saldo insuficiente"
                     maxWidth="md"
                     footer={
@@ -2150,17 +2158,17 @@ export default function CreateTransactionPage({
                             <Button
                                 variant="outline"
                                 onClick={() => {
-                                    setTransferInsufficientOpen(false)
-                                    setAdjustFromTransferNewBalance(transferInsufficientMeta.fromBal)
-                                    setAdjustFromTransferOpen(true)
+                                    setBalanceWarningOpen(false)
+                                    setAdjustAccountNewBalance(balanceWarningMeta.currentBalance)
+                                    setAdjustAccountOpen(true)
                                 }}
                             >
                                 Ajustar saldo
                             </Button>
                             <Button
                                 onClick={() => {
-                                    skipTransferBalanceCheckRef.current = true
-                                    setTransferInsufficientOpen(false)
+                                    skipBalanceWarningRef.current = true
+                                    setBalanceWarningOpen(false)
                                     void handleSave()
                                 }}
                             >
@@ -2170,46 +2178,64 @@ export default function CreateTransactionPage({
                     }
                 >
                     <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
-                        <p>A conta de origem selecionada não possui saldo suficiente para essa transferência.</p>
-                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 space-y-2 text-brand-dark dark:text-dark-heading font-medium">
-                            <p>Saldo atual: {formatCurrency(transferInsufficientMeta.fromBal)}</p>
-                            <p>Valor da transferência: {formatCurrency(transferInsufficientMeta.amount)}</p>
+                        <p>A conta selecionada não possui saldo suficiente para esta operação.</p>
+
+                        <div className="flex justify-between items-start text-[14px] gap-4">
+                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Conta:</span>
+                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                {balanceWarningMeta.accountName}
+                            </span>
                         </div>
+
+                        <div className="flex justify-between items-start text-[14px] gap-4">
+                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo atual:</span>
+                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                {formatCurrency(balanceWarningMeta.currentBalance)}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-start text-[14px] gap-4">
+                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da operação:</span>
+                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                {formatCurrency(balanceWarningMeta.amount)}
+                            </span>
+                        </div>
+
                         <InfoCard color="red" title="Atenção!" message="Se continuar, o saldo ficará negativo." />
                     </div>
                 </DefaultModal>
                 <DefaultModal
-                    isOpen={adjustFromTransferOpen}
+                    isOpen={adjustAccountOpen}
                     onClose={() => {
                         if (isAdjustModalCloseLocked) return
-                        setAdjustFromTransferOpen(false)
+                        setAdjustAccountOpen(false)
                     }}
                     title="Ajustar saldo da conta"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setAdjustFromTransferOpen(false)} disabled={isAdjustModalCloseLocked}>
+                            <Button variant="outline" onClick={() => setAdjustAccountOpen(false)} disabled={isAdjustModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button
-                                isLoading={adjustFromTransferSaving}
+                                isLoading={adjustAccountSaving}
                                 onClick={async () => {
-                                    if (!fromAccountId) return
-                                    setAdjustFromTransferSaving(true)
+                                    if (!balanceWarningMeta.accountId) return
+                                    setAdjustAccountSaving(true)
                                     try {
                                         const res = await adjustAccountBalanceViaTransactionAction({
                                             partnerId,
-                                            accountId: fromAccountId,
-                                            newBalance: adjustFromTransferNewBalance,
-                                            description: `Ajuste de saldo - ${transferFromAccountName}`,
+                                            accountId: balanceWarningMeta.accountId,
+                                            newBalance: adjustAccountNewBalance,
+                                            description: `Ajuste de saldo - ${balanceWarningMeta.accountName}`,
                                             transactionDateYmd: dueDate,
                                         })
                                         if (!res.success) return error(res.error || "Erro ao ajustar saldo")
-                                        success("Saldo atualizado. Você pode concluir a transferência.")
-                                        setAdjustFromTransferOpen(false)
+                                        success("Saldo atualizado. Você pode concluir a operação.")
+                                        setAdjustAccountOpen(false)
                                         debouncedRefresh()
                                     } finally {
-                                        setAdjustFromTransferSaving(false)
+                                        setAdjustAccountSaving(false)
                                     }
                                 }}
                             >
@@ -2220,18 +2246,18 @@ export default function CreateTransactionPage({
                 >
                     <div className="space-y-4">
                         <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                            {transferFromAccountName}
+                            {balanceWarningMeta.accountName}
                         </p>
                         <Input
                             label="Saldo atual"
                             readOnly
                             disabled
-                            value={formatCurrency(getAccountBalance(fromAccountId))}
+                            value={formatCurrency(getAccountBalance(balanceWarningMeta.accountId || undefined))}
                         />
                         <MoneyInput
                             label="Novo saldo"
-                            value={adjustFromTransferNewBalance}
-                            onChange={setAdjustFromTransferNewBalance}
+                            value={adjustAccountNewBalance}
+                            onChange={setAdjustAccountNewBalance}
                         />
                     </div>
                 </DefaultModal>
@@ -2284,23 +2310,6 @@ export default function CreateTransactionPage({
                     title="Cancelar recorrência?"
                     description="Nenhum pagamento já registrado será apagado. Novas ocorrências deixarão de ser geradas."
                     confirmText="Cancelar recorrência"
-                    variant="warning"
-                />
-                <AlertModal
-                    isOpen={balanceWarningOpen}
-                    onClose={() => {
-                        setBalanceWarningOpen(false)
-                        skipBalanceWarningRef.current = false
-                    }}
-                    onConfirm={() => {
-                        skipBalanceWarningRef.current = true
-                        setBalanceWarningOpen(false)
-                        void handleSave()
-                    }}
-                    title="Saldo insuficiente na conta"
-                    description={`O valor informado (${formatCurrency(balanceWarningMeta.amount)}) é maior que o saldo atual da conta ${balanceWarningMeta.accountName} (${formatCurrency(balanceWarningMeta.currentBalance)}). Deseja continuar mesmo assim?`}
-                    confirmText="Continuar mesmo assim"
-                    cancelText="Cancelar"
                     variant="warning"
                 />
             </div>

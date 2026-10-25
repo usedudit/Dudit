@@ -2262,8 +2262,7 @@ export default function TransactionsPage({
                         closeEntity()
                     }}
                     onSuccess={() => {
-                        // Invalidate caches + close (same pattern as Products)
-                        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
+                        // afterMutation already refreshes the entity once.
                         afterMutation(entityState.entityId || undefined)
                         closeEntity()
                     }}

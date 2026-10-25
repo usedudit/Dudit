@@ -29,6 +29,8 @@ type PixPaymentViewProps = {
     onTempPixKeyTypeChange?: (val: any) => void
     onConfirmGenerateWithKey?: () => void
     isFreePlan?: boolean
+    /** When true, hides the amount label, MoneyInput, and QR generation controls (used for inline MP flow). */
+    hideQrElements?: boolean
 }
 
 export function PixPaymentView({
@@ -54,6 +56,7 @@ export function PixPaymentView({
     onTempPixKeyTypeChange,
     onConfirmGenerateWithKey,
     isFreePlan = false,
+    hideQrElements = false,
 }: PixPaymentViewProps) {
     const [localGenerated, setLocalGenerated] = useState(false)
     const generated = qrData || (localGenerated && !onGenerateQr)
@@ -70,18 +73,22 @@ export function PixPaymentView({
         <div className="flex flex-col items-center justify-start pt-0 w-full">
             <div className="w-full max-w-sm space-y-4">
                 {totalNeed > 0 ? <CompactPaymentStatusAlert totalPaid={totalPaid} totalNeed={totalNeed} /> : null}
-                <PaymentAmountLabel label="Valor a receber" calculation={calculation} baseAllocated={baseAllocated} flatAmount={flatAmount} />
-                <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
-                {showFeeBearer && onFeeBearerChange && !flatAmount && (
-                    <FormDropdown
-                        label="Quem paga a taxa?"
-                        value={feeBearer}
-                        setValue={(v: any) => onFeeBearerChange(v)}
-                        options={[
-                            { value: "merchant", label: "Empresa (absorve)" },
-                            { value: "customer", label: "Cliente (acrescenta no valor)" },
-                        ]}
-                    />
+                {!hideQrElements && (
+                    <>
+                        <PaymentAmountLabel label="Valor a receber" calculation={calculation} baseAllocated={baseAllocated} flatAmount={flatAmount} />
+                        <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
+                        {showFeeBearer && onFeeBearerChange && !flatAmount && (
+                            <FormDropdown
+                                label="Quem paga a taxa?"
+                                value={feeBearer}
+                                setValue={(v: any) => onFeeBearerChange(v)}
+                                options={[
+                                    { value: "merchant", label: "Empresa (absorve)" },
+                                    { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                ]}
+                            />
+                        )}
+                    </>
                 )}
                 {isLoading && (
                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
@@ -90,7 +97,7 @@ export function PixPaymentView({
                     </div>
                 )}
 
-                {showKeyInputs && !generated ? (
+                {!hideQrElements && showKeyInputs && !generated ? (
                     <div className="space-y-4 text-left">
                         <h5 className="text-sm font-semibold text-brand-dark dark:text-dark-heading pt-4 border-t border-brand-border dark:border-dark-border">
                             {isFreePlan ? "Informar Chave Pix para Cobrança" : "Cadastrar Chave Pix temporária/padrão"}
@@ -163,7 +170,7 @@ export function PixPaymentView({
                             Gerar QR Code
                         </Button>
                     </div>
-                ) : !generated ? (
+                ) : !hideQrElements && !generated ? (
                     <Button variant="filled" className="w-full h-12" onClick={handleGenerate} isLoading={isGenerating} disabled={amount <= 0}>
                         Gerar QR Code
                     </Button>
@@ -179,7 +186,7 @@ export function PixPaymentView({
                             </Button>
                         </div>
                     </div>
-                ) : (
+                ) : hideQrElements ? null : (
                     <div className="flex flex-col items-center">
                         <div className="bg-white p-6 rounded-3xl border border-brand-border mb-4 shadow-sm">
                             <QRCodeIcon size={120} className="text-brand-dark" />

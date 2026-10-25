@@ -150,6 +150,7 @@ export default function CustomersPage({
         cache, getPrefetchProps,
         search, setSearch, debouncedSearch,
         afterMutation,
+        queryClient,
     } = entityPage
 
     // Sidebar reset → close entity view
@@ -523,9 +524,36 @@ export default function CustomersPage({
                             customerId={entityState.entityId || undefined}
                             initialData={isEditingEntity ? currentEntity : undefined}
                             onBack={() => closeEntity()}
-                            onSuccess={(msg) => {
+                            onSuccess={(msg, savedCustomer) => {
                                 toast({ title: "Sucesso", description: msg })
-                                afterMutation()
+                                if (savedCustomer?.id) {
+                                    if (entityState.entityId) {
+                                        cache.setEntity(savedCustomer.id, savedCustomer)
+                                    } else {
+                                        queryClient.setQueryData(queryKey, (oldData: any) => {
+                                            if (!oldData?.pages?.length) return oldData
+                                            const firstPage = oldData.pages[0]
+                                            const existingItems = firstPage.items || []
+                                            return {
+                                                ...oldData,
+                                                pages: [
+                                                    {
+                                                        ...firstPage,
+                                                        items: [
+                                                            savedCustomer,
+                                                            ...existingItems.filter((item: any) => item.id !== savedCustomer.id),
+                                                        ],
+                                                    },
+                                                    ...oldData.pages.slice(1),
+                                                ],
+                                            }
+                                        })
+                                    }
+                                } else {
+                                    // Backward-compatible fallback if an older
+                                    // action response does not include the row.
+                                    afterMutation()
+                                }
                                 closeEntity()
                             }}
                             onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}

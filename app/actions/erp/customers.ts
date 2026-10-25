@@ -251,9 +251,12 @@ export async function createComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
-  // Criar endereÃ§o na tabela addresses
+  const addressJobs: Promise<any>[] = []
+
+  // The two address writes are independent after the customer exists. Running
+  // them together removes one sequential server roundtrip from the save flow.
   if (data.street || data.city) {
-    const addressResult = await createAddressAction({
+    addressJobs.push(createAddressAction({
       entityId: newCustomer.id,
       entityType: "customer",
       zipCode: data.zipCode || "",
@@ -270,16 +273,11 @@ export async function createComprehensiveCustomerAction(data: {
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,
       csrf_token: data.csrf_token,
-    })
-
-    if (addressResult && addressResult.error) {
-      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o principal:", addressResult.error)
-    }
+    }))
   }
 
-  // Criar endereÃ§o de cobranÃ§a se for diferente
   if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
-    const billingResult = await createAddressAction({
+    addressJobs.push(createAddressAction({
       entityId: newCustomer.id,
       entityType: "customer",
       zipCode: data.billingZipCode || "",
@@ -293,16 +291,40 @@ export async function createComprehensiveCustomerAction(data: {
       addressType: "billing",
       isDefault: false,
       csrf_token: data.csrf_token,
-    })
+    }))
+  }
 
-    if (billingResult && billingResult.error) {
-      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o de cobranÃ§a:", billingResult.error)
+  const addressResults = await Promise.all(addressJobs)
+  for (const [index, addressResult] of addressResults.entries()) {
+    if (addressResult?.error) {
+      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereço:", index, addressResult.error)
     }
   }
 
   await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
-  return { success: true }
+  return {
+    success: true,
+    data: {
+      id: newCustomer.id,
+      partner_id: partnerId,
+      name: sanitizeInput(data.name, 150),
+      email: data.email || null,
+      phone: data.phone || null,
+      phone_fixed: data.phoneFixed || null,
+      status: data.status || "ativo",
+      is_active: (data.status || "ativo") === "ativo",
+      store_credit: 0,
+      created_at: new Date().toISOString(),
+      person_type: data.personType,
+      image_url: data.image_url || null,
+      city: data.city || null,
+      state: data.state || null,
+      orders_count: 0,
+      total_spent: 0,
+      last_order_at: null,
+    },
+  }
 }
 
 
@@ -482,35 +504,53 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
-  // Sincronizar endereço na tabela addresses
-  if (data.street || data.city) {
-    const { data: existingAddresses } = await supabase
-      .from("addresses")
-      .select("id")
-      .eq("customer_id", data.customerId)
-      .eq("address_type", "primary")
-      .limit(1)
+  // Fetch both address records together, then run independent writes in
+  // parallel. This removes the sequential address roundtrips from the save
+  // path without changing ownership checks or the existing error behavior.
+  const needsPrimaryAddress = Boolean(data.street || data.city)
+  const needsBillingAddress = Boolean(data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity))
+  const [primaryResult, billingResult] = await Promise.all([
+    needsPrimaryAddress
+      ? supabase
+        .from("addresses")
+        .select("id")
+        .eq("customer_id", data.customerId)
+        .eq("address_type", "primary")
+        .limit(1)
+      : Promise.resolve({ data: [] as Array<{ id: string }> }),
+    needsBillingAddress
+      ? supabase
+        .from("addresses")
+        .select("id")
+        .eq("customer_id", data.customerId)
+        .eq("address_type", "billing")
+        .limit(1)
+      : Promise.resolve({ data: [] as Array<{ id: string }> }),
+  ])
 
-    if (existingAddresses && existingAddresses.length > 0) {
-      const enrichedCustAddr = await enrichAddressData({
-        zip_code: data.zipCode,
-        street: data.street,
-        number: data.number,
-        complement: data.complement || null,
-        neighborhood: data.neighborhood,
-        city: data.city,
-        state: data.state,
-        country: data.country || "BR",
-        municipio_codigo_ibge: data.municipioCodigoIbge || null,
-        latitude: data.latitude ?? null,
-        longitude: data.longitude ?? null,
-      })
-      const { error: addressUpdateError } = await supabase.from("addresses").update(enrichedCustAddr).eq("id", existingAddresses[0].id)
-      if (addressUpdateError) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço principal:", addressUpdateError.message)
-      }
+  const addressJobs: Promise<any>[] = []
+
+  if (needsPrimaryAddress) {
+    const existingPrimary = primaryResult.data?.[0]
+    if (existingPrimary) {
+      addressJobs.push((async () => {
+        const enrichedCustAddr = await enrichAddressData({
+          zip_code: data.zipCode,
+          street: data.street,
+          number: data.number,
+          complement: data.complement || null,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+          country: data.country || "BR",
+          municipio_codigo_ibge: data.municipioCodigoIbge || null,
+          latitude: data.latitude ?? null,
+          longitude: data.longitude ?? null,
+        })
+        return supabase.from("addresses").update(enrichedCustAddr).eq("id", existingPrimary.id)
+      })())
     } else {
-      const addressResult = await createAddressAction({
+      addressJobs.push(createAddressAction({
         entityId: data.customerId,
         entityType: "customer",
         zipCode: data.zipCode || "",
@@ -527,39 +567,27 @@ export async function updateComprehensiveCustomerAction(data: {
         latitude: data.latitude ?? null,
         longitude: data.longitude ?? null,
         csrf_token: data.csrf_token,
-      })
-
-      if (addressResult && addressResult.error) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço principal:", addressResult.error)
-      }
+      }))
     }
   }
 
-  if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
-    const { data: existingBilling } = await supabase
-      .from("addresses")
-      .select("id")
-      .eq("customer_id", data.customerId)
-      .eq("address_type", "billing")
-      .limit(1)
-
-    if (existingBilling && existingBilling.length > 0) {
-      const { error: billingUpdateError } = await supabase.from("addresses").update({
-        zip_code: data.billingZipCode,
-        street: data.billingStreet,
-        number: data.billingNumber,
-        complement: data.billingComplement || null,
-        neighborhood: data.billingNeighborhood,
-        city: data.billingCity,
-        state: data.billingState,
-        country: data.country || "BR",
-      }).eq("id", existingBilling[0].id)
-
-      if (billingUpdateError) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereÃ§o de cobranÃ§a:", billingUpdateError.message)
-      }
+  if (needsBillingAddress) {
+    const existingBilling = billingResult.data?.[0]
+    if (existingBilling) {
+      addressJobs.push(
+        supabase.from("addresses").update({
+          zip_code: data.billingZipCode,
+          street: data.billingStreet,
+          number: data.billingNumber,
+          complement: data.billingComplement || null,
+          neighborhood: data.billingNeighborhood,
+          city: data.billingCity,
+          state: data.billingState,
+          country: data.country || "BR",
+        }).eq("id", existingBilling.id),
+      )
     } else {
-      const billingResult = await createAddressAction({
+      addressJobs.push(createAddressAction({
         entityId: data.customerId,
         entityType: "customer",
         zipCode: data.billingZipCode || "",
@@ -573,24 +601,44 @@ export async function updateComprehensiveCustomerAction(data: {
         addressType: "billing",
         isDefault: false,
         csrf_token: data.csrf_token,
-      })
-
-      if (billingResult && billingResult.error) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereÃ§o de cobranÃ§a:", billingResult.error)
-      }
+      }))
     }
   } else if (!data.hasDifferentBillingAddress) {
-    // Se nÃ£o tiver mais endereÃ§o de cobranÃ§a diferente, remover existente se houver
-    await supabase
-      .from("addresses")
-      .delete()
-      .eq("customer_id", data.customerId)
-      .eq("address_type", "billing")
+    addressJobs.push(
+      supabase
+        .from("addresses")
+        .delete()
+        .eq("customer_id", data.customerId)
+        .eq("address_type", "billing"),
+    )
+  }
+
+  const addressResults = await Promise.all(addressJobs)
+  for (const addressResult of addressResults) {
+    if (addressResult?.error) {
+      console.error("[updateComprehensiveCustomerAction] Erro ao sincronizar endereço:", addressResult.error.message || addressResult.error)
+    }
   }
 
   await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
-  return { success: true }
+  return {
+    success: true,
+    data: {
+      id: data.customerId,
+      partner_id: partnerId,
+      name: sanitizeInput(data.name, 150),
+      email: data.email || null,
+      phone: data.phone || null,
+      phone_fixed: data.phoneFixed || null,
+      status: data.status || "ativo",
+      is_active: (data.status || "ativo") === "ativo",
+      person_type: data.personType,
+      image_url: data.image_url || null,
+      city: data.city || null,
+      state: data.state || null,
+    },
+  }
 }
 
 export async function getCustomerByIdAction(customerId: string) {

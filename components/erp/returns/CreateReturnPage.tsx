@@ -2241,7 +2241,7 @@ export default function CreateReturnPage({
                                                                         title="Cliente não cadastrado"
                                                                         message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
                                                                         color="orange"
-                                                                        rightElement={
+                                                                        bottomElement={
                                                                             <Button
                                                                                 variant="link"
                                                                                 className="text-orange-700 dark:text-orange-300/80"

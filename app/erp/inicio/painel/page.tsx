@@ -43,6 +43,16 @@ export default async function PainelPage() {
         redirect("/erp/inicio")
     }
 
+    return (
+        <FadeIn className="p-4">
+            <Suspense fallback={<QuickModeLoadingSkeleton />}>
+                <DashboardContent partnerId={partnerId} />
+            </Suspense>
+        </FadeIn>
+    )
+}
+
+async function DashboardContent({ partnerId }: { partnerId: string }) {
     const result = await getQuickModeHomeDataAction(partnerId)
 
     if (!result.success) {
@@ -57,13 +67,7 @@ export default async function PainelPage() {
         )
     }
 
-    return (
-        <FadeIn className="p-4">
-            <Suspense fallback={<QuickModeLoadingSkeleton />}>
-                <QuickModeHome data={result.data as any} partnerId={partnerId} />
-            </Suspense>
-        </FadeIn>
-    )
+    return <QuickModeHome data={result.data as any} partnerId={partnerId} />
 }
 
 function QuickModeLoadingSkeleton() {

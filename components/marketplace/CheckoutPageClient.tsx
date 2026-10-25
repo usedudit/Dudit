@@ -3957,7 +3957,7 @@ export function CheckoutPageClient() {
                                     <InfoCard
                                         message="Alguns horários não estão mais disponíveis."
                                         color="orange"
-                                        rightElement={
+                                        bottomElement={
                                             <ChevronRightIcon
                                                 className="text-brand-inactive-text cursor-pointer"
                                                 onClick={() => setShowServiceUnavailableModal(true)}

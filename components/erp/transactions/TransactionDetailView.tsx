@@ -12,6 +12,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { StatusStepsTimeline, type StatusStep } from "@/components/erp/shared/StatusStepsTimeline"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
@@ -107,8 +108,6 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         active: boolean
         danger?: boolean
     }> = [detail.timeline.step1, detail.timeline.step2]
-    const activeCount = timelineSteps.filter((s) => s.active).length
-    const progressPct = timelineSteps.length > 1 ? ((Math.max(activeCount, 1) - 1) / (timelineSteps.length - 1)) * 100 : 0
 
     const subtitleParts: string[] = [detail.paymentMethodSubtitle]
     if (detail.paymentDateSubtitle) {
@@ -239,6 +238,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     </FormSection>
                                                 </div>
                                             )}
+                                            {/* Tipo/Origem card - always visible on all screen sizes */}
                                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                 <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                     <div className="flex justify-between items-center flex-wrap gap-3">
@@ -251,55 +251,15 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                <div className="bg-white dark:bg-dark-surface px-8 md:px-12 pt-12 pb-12">
-                                                    <div className="relative px-4">
-                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                            <div
-                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${detail.timeline.step2.danger ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                style={{ width: `${progressPct}%` }}
-                                                            ></div>
-
-                                                            {timelineSteps.map((step, idx) => (
-                                                                <div key={idx} className="relative flex flex-col items-center">
-                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                        <span
-                                                                            className={`text-xs font-medium ${step.active
-                                                                                ? step.danger
-                                                                                    ? "text-brand-red"
-                                                                                    : "text-brand-dark dark:text-dark-heading"
-                                                                                : "text-gray-400 dark:text-dark-body"
-                                                                                }`}
-                                                                        >
-                                                                            {step.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div
-                                                                        className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
-                                                                            ? step.danger
-                                                                                ? "bg-brand-red border-brand-red"
-                                                                                : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
-                                                                            : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
-                                                                            }`}
-                                                                    >
-                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                    </div>
-                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                        {step.date ? (
-                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                                <span>{step.date}</span>
-                                                                                {step.time && <span>{step.time}</span>}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
                                             </div>
+
+                                            {/* Timeline - shared component (handles desktop + mobile + BottomSheet) */}
+                                            <StatusStepsTimeline
+                                                steps={timelineSteps as StatusStep[]}
+                                                sheetTitle="Status da Transação"
+                                                forceDanger={detail.timeline.step2?.danger || isCancelled}
+                                                sectionTitle="Status"
+                                            />
 
                                             <FormSection title={detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"} hasSeparator>
                                                 <div className="space-y-4">

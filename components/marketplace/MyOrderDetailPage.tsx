@@ -990,7 +990,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <InfoCard
                     message={`Sinal confirmado. Falta pagar ${formatCurrency(depositSummary.remainingBalance)} do saldo para concluir o pedido.`}
                     color="orange"
-                    rightElement={
+                    bottomElement={
                         <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar saldo
@@ -1018,7 +1018,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <InfoCard
                     message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
                     color="red"
-                    rightElement={
+                    bottomElement={
                         <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar agora
@@ -1032,7 +1032,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             <InfoCard
                 message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`}
                 color="orange"
-                rightElement={
+                bottomElement={
                     <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
                         {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                         Pagar agora
@@ -1682,7 +1682,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         )}
                     </span>
                 }
-                rightElement={
+                bottomElement={
                     canReport ? (
                         <Button
                             variant="link"
@@ -1752,7 +1752,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         : "Este pedido foi gerado automaticamente pela sua assinatura recorrente."
                                                 }
                                                 color="blue"
-                                                rightElement={
+                                                bottomElement={
                                                     order.recurring_subscription_id ? (
                                                         <Button
                                                             variant="link"
@@ -2079,7 +2079,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         message={`O valor da diferença para os novos itens é de ${formatCurrency(exchangeShortfall)}. Pague via Pix para aprovar e liberar a entrega/retirada.`}
                                                         color="orange"
                                                         className="mt-4"
-                                                        rightElement={
+                                                        bottomElement={
                                                             <Button
                                                                 size="sm"
                                                                 onClick={handlePixClick}
@@ -2097,7 +2097,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         message={`O valor da diferença é de ${formatCurrency(exchangeShortfall)}. Esta loja não utiliza pagamentos online na Dudit. O pagamento deve ser realizado diretamente no balcão da loja no momento da retirada ou combinado via WhatsApp.`}
                                                         color="blue"
                                                         className="mt-4"
-                                                        rightElement={
+                                                        bottomElement={
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"

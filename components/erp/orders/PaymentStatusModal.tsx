@@ -152,7 +152,8 @@ const TransactionReceiptContent = ({
     <div className="mt-auto pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
       <div className="space-y-2 mb-6">
         {shouldShowSinal(depositSummary) &&
-          depositSummary.initialChargeAmount > 0 && (
+          depositSummary.initialChargeAmount > 0 &&
+          depositSummary.payDepositOnly && (
             <div className="flex justify-between items-center text-sm">
               <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                 Sinal{orderNumber ? ` - ${orderNumber}` : ""} (
@@ -249,6 +250,7 @@ export default function PaymentStatusModal({
     paymentMethod?: string;
     paymentStatus?: string;
     chargeAmount?: number;
+    orderDetails?: { items?: any[] };
   } | null>(null);
   const [copiedMp, setCopiedMp] = useState(false);
   const [showMpPixModal, setShowMpPixModal] = useState(false);
@@ -260,6 +262,7 @@ export default function PaymentStatusModal({
   }>({ loaded: false, enabled: false, canOverride: false, role: null });
   const [showOverrideConfirm, setShowOverrideConfirm] = useState(false);
   const [overrideEnabled, setOverrideEnabled] = useState(false);
+  const [showMpPendingConfirm, setShowMpPendingConfirm] = useState(false);
   const loading = paymentStatus === "processing";
 
   useEffect(() => {
@@ -283,6 +286,7 @@ export default function PaymentStatusModal({
       });
       setShowOverrideConfirm(false);
       setOverrideEnabled(false);
+      setShowMpPendingConfirm(false);
       const id = setTimeout(() => setIsAnimating(true), 50);
       return () => clearTimeout(id);
     } else {
@@ -501,15 +505,23 @@ export default function PaymentStatusModal({
   );
 
   const receiptCart = useMemo(() => {
-    const items = targetOrder?.order_items || targetOrder?.items || [];
+    const items =
+      targetOrder?.order_items ||
+      targetOrder?.items ||
+      mpPaymentData?.orderDetails?.items ||
+      [];
     return items.map((item: any) => ({
       name: item.products?.name || item.product_name || item.name || "Item",
       quantity: Number(item.quantity || 1),
       unitPrice: Number(
-        item.product_price || item.unit_price || item.unitPrice || 0,
+        item.product_price ||
+          item.unit_price ||
+          item.unitPrice ||
+          item.price ||
+          0,
       ),
     }));
-  }, [targetOrder]);
+  }, [targetOrder, mpPaymentData]);
 
   const onLegsReady = useCallback((legs: PaymentBreakdownLeg[]) => {
     setPendingLegs(legs);
@@ -581,6 +593,28 @@ export default function PaymentStatusModal({
       !manualPolicy.enabled &&
       overrideEnabled,
   );
+
+  // MP Pix/Boleto QR code está sendo exibido inline (sem sinal/deposit) —
+  // nesse caso não deve mostrar o BalancePaymentCollector nem permitir
+  // recebimento manual, pois o QR Code já contém o valor definido.
+  const isMpPaymentPendingInline = Boolean(
+    isMpOrder &&
+      !isFullyPaid &&
+      !depositSummary?.usesDeposit &&
+      (mpPaymentData?.pixData || mpPaymentData?.boletoData),
+  );
+
+  // Handler for the "Salvar recebimento" button.
+  // When the order is via Mercado Pago (Pix/Boleto) and the payment hasn't been
+  // confirmed by webhook yet (QR code displayed inline), show a confirmation
+  // modal before saving manually.
+  const handleSaveReceipt = async () => {
+    if (isMpPaymentPendingInline) {
+      setShowMpPendingConfirm(true);
+      return;
+    }
+    await handleSubmit();
+  };
 
   const handleSubmit = async () => {
     const targetOrderId = targetOrder.id || targetOrder.originalId;
@@ -897,7 +931,7 @@ export default function PaymentStatusModal({
                               ? "O recebimento presencial do saldo será registrado com override e ficará registrado no histórico do pedido."
                               : "Ative “Permitir pagamento presencial do saldo” nas configurações de pagamento ou use um override autorizado para registrar o recebimento no local."
                           }
-                          rightElement={
+                          bottomElement={
                             manualPolicy.canOverride && !overrideEnabled ? (
                               <Button
                                 variant="outline"
@@ -1187,7 +1221,8 @@ export default function PaymentStatusModal({
 
                   {!isFullyPaid &&
                   totalRemaining > 0.009 &&
-                  manualBalanceAllowed ? (
+                  manualBalanceAllowed &&
+                  !isMpPaymentPendingInline ? (
                     <BalancePaymentCollector
                       partnerId={partnerId}
                       remainingBalance={totalRemaining}
@@ -1376,8 +1411,12 @@ export default function PaymentStatusModal({
                 </Button>
                 <Button
                   className="flex-1 h-[52px]"
-                  onClick={handleSubmit}
-                  disabled={loading || syncing || !canSubmitBalance}
+                  onClick={handleSaveReceipt}
+                  disabled={
+                    loading ||
+                    syncing ||
+                    (!canSubmitBalance && !isMpPaymentPendingInline)
+                  }
                   isLoading={loading}
                 >
                   Salvar recebimento
@@ -1450,6 +1489,20 @@ export default function PaymentStatusModal({
         title="Autorizar recebimento presencial?"
         message="A configuração de pagamento presencial do saldo está desativada. Ao continuar, o recebimento será registrado com override e ficará no histórico do pedido com o seu usuário."
         confirmText="Autorizar e continuar"
+        cancelText="Cancelar"
+      />
+
+      <AlertModal
+        isOpen={showMpPendingConfirm}
+        onClose={() => setShowMpPendingConfirm(false)}
+        onConfirm={() => {
+          setShowMpPendingConfirm(false);
+          handleSubmit();
+        }}
+        variant="warning"
+        title="Pagamento não detectado ainda?"
+        message="O pagamento via Mercado Pago ainda não foi confirmado automaticamente. Se o cliente já realizou o pagamento, aguarde alguns segundos e clique em 'Verificar' ou sincronize manualmente. Deseja marcar o recebimento manualmente mesmo assim?"
+        confirmText="Sim, marcar como recebido"
         cancelText="Cancelar"
       />
     </div>

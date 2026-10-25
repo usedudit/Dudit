@@ -830,7 +830,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-1">
+                                                    <div className="space-y-4">
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -851,28 +851,28 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                         </div>
 
                                                         {(customer.personType === 'pj' || customer.cnpj) ? (
-                                                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 space-y-2.5">
+                                                            <div className="space-y-4">
                                                                 {customer.cnpj && (
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CNPJ</span>
                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
                                                                     </div>
                                                                 )}
                                                                 {customer.nomeFantasia && (
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Fantasia</span>
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] truncate">{customer.nomeFantasia}</span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fantasia</span>
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading max-w-[60%] truncate">{customer.nomeFantasia}</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="flex justify-between items-center">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Insc. Est.</span>
-                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Insc. Est.</span>
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.inscricaoEstadual || 'Isento'}</span>
                                                                 </div>
                                                             </div>
                                                         ) : (
                                                             customer.cpf && (
                                                                 <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CPF</span>
                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
                                                                 </div>
                                                             )
@@ -1053,10 +1053,10 @@ const OrdersContent = ({
                                     key={o.originalId}
                                     order={o}
                                     selected={false}
-                                    onSelect={() => {}}
+                                    onSelect={() => { }}
                                     onDetails={() => handleDetailsOrder(o)}
-                                    onEdit={() => {}}
-                                    onCancel={() => {}}
+                                    onEdit={() => { }}
+                                    onCancel={() => { }}
                                     canEdit={false}
                                     cancelLabel="Cancelar"
                                 />
@@ -1477,7 +1477,7 @@ function ReviewsContent({ reviews, isLoading }: { reviews: any[]; isLoading: boo
                 <IconPlaceholder
                     title="Nenhuma avaliação encontrada"
                     subtitle="Este cliente ainda não deixou nenhuma avaliação."
-                    imageSrc="https://img.dudit.com.br/static/mascots/SemAvaliacoes.png"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
                     imageAlt="Nenhuma avaliação encontrada"
                     placeholderType="image"
                 />

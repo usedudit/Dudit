@@ -160,7 +160,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             message={caps.bannerMessage}
                             color="orange"
                             className="mb-6"
-                            rightElement={
+                            bottomElement={
                                 <div className="flex items-center gap-2">
                                     {caps.showReopenCta && props.onReopenQuote && (
                                         <Button variant="link" className="p-0 h-auto" onClick={props.onReopenQuote}>

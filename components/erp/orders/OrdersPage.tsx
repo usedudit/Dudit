@@ -122,6 +122,7 @@ interface Order {
     order_shipments?: any[];
     isCarrierDelivery?: boolean;
     carrier_status?: string | null;
+    order_items?: any[];
 }
 
 interface FilterState {
@@ -363,7 +364,6 @@ export default function OrdersPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const invalidateAndRefresh = useCallback(() => {
-        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
         // Ensure URL is fully clean - closeEntity() uses window.history.replaceState
@@ -375,7 +375,7 @@ export default function OrdersPage({
                 router.replace("/erp/pedidos", { scroll: false })
             }
         }
-    }, [entityState.entityId, cache, afterMutation, closeEntity, router])
+    }, [entityState.entityId, afterMutation, closeEntity, router])
 
     useEffect(() => {
         const handleReset = () => closeEntity()
@@ -1030,7 +1030,6 @@ export default function OrdersPage({
                 return
             }
             afterMutation(notesSheet.orderId || undefined)
-            if (notesSheet.orderId) cache.invalidateEntity(notesSheet.orderId)
             setNotesSheet({ open: false, orderId: null, notes: "" })
             toast({ title: "Sucesso", description: "Observação salva com sucesso." })
         } catch (error) {
@@ -1252,6 +1251,7 @@ export default function OrdersPage({
                                             payment_breakdown: order.payment_breakdown || [],
                                             payment_provider: order.payment_provider || "",
                                             checkout_fulfillment: order.checkout_fulfillment || null,
+                                            order_items: order.order_items || [],
                                         })
                                         return
                                     }
@@ -1291,6 +1291,7 @@ export default function OrdersPage({
                                     payment_breakdown: order.payment_breakdown || [],
                                     payment_provider: order.payment_provider || "",
                                     checkout_fulfillment: order.checkout_fulfillment || null,
+                                    order_items: order.order_items || [],
                                 })
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}

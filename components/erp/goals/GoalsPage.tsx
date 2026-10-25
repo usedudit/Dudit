@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { AlertModal, IconPlaceholder, Pagination, Button, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -125,7 +124,6 @@ export default function GoalsPage(props: {
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
     const { toast } = useToast()
-    const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
     const planGate = props.planGate
 
@@ -286,7 +284,6 @@ export default function GoalsPage(props: {
     // Mantém o servidor em sincronia com o estado do cliente após mutações
     async function refreshAll() {
         await refreshData()
-        router.refresh()
     }
 
     // Recarrega o ranking quando o período do filtro muda

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, GridIcon, ListIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, RepeatIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, FilterIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -20,9 +20,8 @@ import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabe
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { pushUrl, replaceUrl } from "@/lib/navigation/history"
 import { ListItem } from "@/components/reusable/ListItem"
-import { SlidersHorizontal } from "lucide-react"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard, RadioButton, FormDropdown } from "@/components/reusable"
+import { Button, DefaultModal, Input, FormSection, InfoCard, RadioButton } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
@@ -893,6 +892,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")
+    // Ref para ler o estado atual do tab ativo fora de callbacks (evita loops de scroll)
+    const activeTagRef = useRef(activeTag)
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
@@ -909,6 +910,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     })
     const categoryViewRef = useRef<string | null>(categoryView)
     categoryViewRef.current = categoryView
+    activeTagRef.current = activeTag
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
@@ -1187,20 +1189,74 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [categoryView])
 
     useEffect(() => {
-        const observer = new IntersectionObserver((entries) => {
-            const visible = entries
-                .filter(entry => entry.isIntersecting)
-                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-            const id = visible?.target.getAttribute("data-category-section")
-            if (id) {
-                setActiveTag(id)
-                const tab = document.getElementById(`vendor-tab-${id}`)
-                tab?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })
-            }
-        }, { rootMargin: "-120px 0px -55% 0px", threshold: [0.1, 0.35, 0.6] })
+        if (categoryViewRef.current) return
 
-        document.querySelectorAll("[data-category-section]").forEach(el => observer.observe(el))
-        return () => observer.disconnect()
+        const sections = Array.from(
+            document.querySelectorAll<HTMLElement>("[data-vendor-category-section]")
+        )
+        if (sections.length === 0) return
+
+        const syncActiveCategoryTag = () => {
+            if (categoryViewRef.current) return
+            const probe = 150 // alinhado ao scroll-mt das seções
+            const scrollY = window.scrollY || window.pageYOffset
+            const atBottom =
+                window.innerHeight + scrollY >=
+                document.documentElement.scrollHeight - 2
+
+            let next: HTMLElement | null = null
+            for (const section of sections) {
+                if (section.getBoundingClientRect().top <= probe) {
+                    next = section
+                } else {
+                    break
+                }
+            }
+
+            // Garante que a última seção fique ativa ao chegar no fim da página,
+            // evitando o "salto" para a penúltima.
+            if (!next && atBottom) {
+                next = sections[sections.length - 1]
+            }
+
+            if (!next) return
+            const id = next.getAttribute("data-vendor-category-section") || ""
+            if (!id || activeTagRef.current === id) return
+
+            activeTagRef.current = id
+            setActiveTag(id)
+
+                // Rola apenas a barra de abas horizontalmente, nunca a página.
+                ; ([`vendor-tab-${id}`, `vendor-tab-${id}-sticky`] as const).forEach((tabId) => {
+                    const tab = document.getElementById(tabId)
+                    const container = tab?.closest<HTMLElement>("[data-vendor-tabs-scroll]")
+                    if (!tab || !container) return
+                    const containerRect = container.getBoundingClientRect()
+                    const tabRect = tab.getBoundingClientRect()
+                    const delta = (tabRect.left - containerRect.left) - (containerRect.width - tabRect.width) / 2
+                    if (Math.abs(delta) > 8) {
+                        container.scrollTo({ left: container.scrollLeft + delta, behavior: "smooth" })
+                    }
+                })
+        }
+
+        // Executa de imediato e a cada scroll/redimensionamento (com throttle via rAF).
+        syncActiveCategoryTag()
+        let ticking = false
+        const onEvent = () => {
+            if (ticking) return
+            ticking = true
+            window.requestAnimationFrame(() => {
+                syncActiveCategoryTag()
+                ticking = false
+            })
+        }
+        window.addEventListener("scroll", onEvent, { passive: true })
+        window.addEventListener("resize", onEvent)
+        return () => {
+            window.removeEventListener("scroll", onEvent)
+            window.removeEventListener("resize", onEvent)
+        }
     }, [groupedItems, categoryView, activeContext])
 
     const updateTabsScrollState = useCallback(() => {
@@ -1503,13 +1559,17 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         updateCategoryUrl(null, false, patch)
     }, [updateCategoryUrl])
 
+    // Só deve aparecer em telas desktop e quando uma categoria/visão "Ver tudo"
+    // está aberta — nem no mobile/tablet e nem na listagem padrão de seções.
     const renderFilterControls = () => (
-        <ExplorarViewControls
-            onOpenFilters={() => setIsCategoryFiltersOpen(true)}
-            onOpenSort={() => setIsCategorySortOpen(true)}
-            hasActiveFilters={categoryActiveFiltersCount > 0}
-            activeFilterChips={vendorFilterChips}
-        />
+        <div className="hidden lg:block mb-6">
+            <ExplorarViewControls
+                onOpenFilters={() => setIsCategoryFiltersOpen(true)}
+                onOpenSort={() => setIsCategorySortOpen(true)}
+                hasActiveFilters={categoryActiveFiltersCount > 0}
+                activeFilterChips={vendorFilterChips}
+            />
+        </div>
     )
 
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
@@ -1639,8 +1699,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-brand-dark dark:text-white"
                         title="Selecionar tipo"
                     >
-                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
+                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
+
+                    <div className="w-px h-5 bg-white/20 shrink-0" />
 
                     {canScrollTabsLeft && (
                         <button
@@ -1651,7 +1713,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </button>
                     )}
 
-                    <div ref={tabsScrollRef} className="flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide">
+                    <div ref={tabsScrollRef} data-vendor-tabs-scroll="true" className="flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide">
                         <Tabs value={activeTag} onValueChange={selectTab} className="h-full">
                             <TabsList className="border-0 p-0 h-full gap-5 bg-transparent flex items-center">
                                 {allTabs.map(tab => (
@@ -1678,19 +1740,17 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
 
                     <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
-                    <button
+                    <Button
                         onClick={() => setIsCategoryFiltersOpen(true)}
-                        className="h-8 px-2.5 shrink-0 flex items-center gap-1.5 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading active:bg-gray-100 dark:active:bg-dark-border transition-colors relative"
-                        title="Filtros"
+                        className="h-8 w-8 px-2.5 relative"
+                        leftIcon={<FilterIcon />}
                     >
-                        <SlidersHorizontal className="w-[15px] h-[15px]" />
-                        <span className="text-[12px] font-semibold">Filtros</span>
                         {categoryActiveFiltersCount > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-green text-white text-[10px] font-bold flex items-center justify-center">
                                 {categoryActiveFiltersCount}
                             </span>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -1701,9 +1761,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
                         title="Selecionar tipo"
                     >
-                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
+                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
-                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full min-w-0">
+                    <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <div data-vendor-tabs-scroll="true" className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full min-w-0">
                         {allTabs.map(tab => (
                             <button
                                 id={`vendor-tab-${tab.id}-sticky`}
@@ -1721,7 +1782,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white relative"
                         title="Filtros"
                     >
-                        <SlidersHorizontal className="w-[15px] h-[15px]" />
+                        <FilterIcon size={16} />
                         {categoryActiveFiltersCount > 0 && (
                             <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-brand-green text-white text-[9px] font-bold flex items-center justify-center">
                                 {categoryActiveFiltersCount}
@@ -1733,60 +1794,60 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20 items-start">
                 <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white dark:bg-dark-surface self-start">
-                        <div>
-                            <div className="mb-8">
-                                <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Sobre {partner.storeName}</h3>
-                                <div className="flex flex-col gap-1">
-                                    {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
-                                        <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                            <span>{b.label}</span>
-                                            {activeSection === b.id && <Check size={16} className="ml-auto" />}
-                                        </button>
-                                    ))}
-                                    <Button variant="filled" onClick={handleWhatsApp} className="mt-3 rounded-full h-10 px-5 gap-2 justify-center">
-                                        <WhatsappIcon size={17} /> Contato
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {(services.length > 0 || hasPlans) && (
-                                <div className="mb-8 border-t border-brand-border pt-6">
-                                    <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Catálogo</h3>
-                                    <div className="flex flex-col gap-1">
-                                        <button onClick={() => switchContext("Produtos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                            <span>Produtos</span>
-                                            {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
-                                        </button>
-                                        {services.length > 0 && (
-                                            <button onClick={() => switchContext("Servicos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                                <span>Serviços</span>
-                                                {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
-                                            </button>
-                                        )}
-                                        {hasPlans && (
-                                            <button onClick={() => switchContext("Planos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                                <span>Assinaturas</span>
-                                                {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-4">Seções</h3>
-                            <div className="flex flex-col gap-1 mb-8">
-                                <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                    <span>Todos</span>
-                                    {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
-                                </button>
-                                {groupedItems.map(group => (
-                                    <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
-                                        <span className="capitalize">{group.name}</span>
-                                        {activeTag === group.id && activeSection === "products" && <Check size={16} />}
+                    <div>
+                        <div className="mb-8">
+                            <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Sobre {partner.storeName}</h3>
+                            <div className="flex flex-col gap-1">
+                                {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
+                                    <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                        <span>{b.label}</span>
+                                        {activeSection === b.id && <Check size={16} className="ml-auto" />}
                                     </button>
                                 ))}
+                                <Button variant="filled" onClick={handleWhatsApp} className="mt-3 rounded-full h-10 px-5 gap-2 justify-center">
+                                    <WhatsappIcon size={17} /> Contato
+                                </Button>
                             </div>
                         </div>
+
+                        {(services.length > 0 || hasPlans) && (
+                            <div className="mb-8 border-t border-brand-border pt-6">
+                                <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-3">Catálogo</h3>
+                                <div className="flex flex-col gap-1">
+                                    <button onClick={() => switchContext("Produtos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                        <span>Produtos</span>
+                                        {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                    </button>
+                                    {services.length > 0 && (
+                                        <button onClick={() => switchContext("Servicos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <span>Serviços</span>
+                                            {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                    )}
+                                    {hasPlans && (
+                                        <button onClick={() => switchContext("Planos")} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                            <span>Assinaturas</span>
+                                            {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <h3 className="font-normal text-brand-dark dark:text-dark-heading text-[16px] mb-4">Seções</h3>
+                        <div className="flex flex-col gap-1 mb-8">
+                            <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                <span>Todos</span>
+                                {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
+                            </button>
+                            {groupedItems.map(group => (
+                                <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green font-semibold" : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/50"}`}>
+                                    <span className="capitalize">{group.name}</span>
+                                    {activeTag === group.id && activeSection === "products" && <Check size={16} />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </aside>
 
                 <main id="vendor-products" className="flex-1 min-w-0 w-full lg:w-auto px-5 lg:px-0 scroll-mt-[170px]">
@@ -1811,20 +1872,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     {renderFilterControls()}
                                     {categoryFilteredItems.length > 0 ? (
                                         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
-                                                {categoryFilteredItems.map((item: any) => (
-                                                    <ItemCard
-                                                        key={item.id}
-                                                        product={normalizeItemForCard(item, partner)}
-                                                        showSeller={false}
-                                                        className="w-full"
-                                                        promotions={partnerPromotions}
-                                                        hidePromoBadge={isCampaignView}
-                                                        hideSalesCount
-                                                    />
-                                                ))}
-                                             </div>
-                                             ) : (
-                                                 <IconPlaceholder
+                                            {categoryFilteredItems.map((item: any) => (
+                                                <ItemCard
+                                                    key={item.id}
+                                                    product={normalizeItemForCard(item, partner)}
+                                                    showSeller={false}
+                                                    className="w-full"
+                                                    promotions={partnerPromotions}
+                                                    hidePromoBadge={isCampaignView}
+                                                    hideSalesCount
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <IconPlaceholder
                                             placeholderType="image"
                                             imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                             imageAlt="Nada encontrado"
@@ -1835,7 +1896,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </section>
                             ) : (
                                 <>
-                                    {renderFilterControls()}
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
 
                                     {/* Seção de Ofertas Relâmpago / Campanhas - mostra no máximo UMA */}
@@ -1881,7 +1941,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
                                     <div className="space-y-6">
                                         {groupedItems.map(group => (
-                                            <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
+                                            <div key={group.id} id={group.id} data-vendor-category-section={group.id} className="scroll-mt-[150px]">
                                                 <HorizontalCarousel
                                                     title={group.name}
                                                     items={group.items.slice(0, 20)}

@@ -2245,7 +2245,7 @@ export default function OrderDetailView({
                               title="Origem do Pedido"
                               message={`Ordem de Serviço #${sourceServiceOrder?.order_number || ""}`}
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"
@@ -2267,7 +2267,7 @@ export default function OrderDetailView({
                               title="Origem do Pedido"
                               message={`Orçamento #${sourceQuote.quote_number}`}
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"
@@ -2293,7 +2293,7 @@ export default function OrderDetailView({
                                   : "Assinatura"
                               }
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"
@@ -2415,7 +2415,7 @@ export default function OrderDetailView({
                               title="Origem do Pedido"
                               message={`Ordem de Serviço #${sourceServiceOrder?.order_number || ""}`}
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"
@@ -2439,7 +2439,7 @@ export default function OrderDetailView({
                               title="Origem do Pedido"
                               message={`Orçamento #${sourceQuote.quote_number}`}
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"
@@ -2467,7 +2467,7 @@ export default function OrderDetailView({
                                   : "Assinatura"
                               }
                               color="blue"
-                              rightElement={
+                              bottomElement={
                                 <Button
                                   variant="link"
                                   className="text-brand-blue hover:text-brand-blue/70"

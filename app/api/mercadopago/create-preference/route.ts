@@ -699,7 +699,12 @@ async function handler(request: NextRequest) {
     if (acceptedMethods.credit_card === false) excludedPaymentTypes.push({ id: "credit_card" })
     if (acceptedMethods.debit_card === false) excludedPaymentTypes.push({ id: "debit_card" })
     if (acceptedMethods.boleto === false || body.payDepositOnly) excludedPaymentTypes.push({ id: "ticket" })
-    if (acceptedMethods.mercado_pago_wallet === false || body.payDepositOnly) excludedPaymentTypes.push({ id: "account_money" })
+    // NOTE: Do NOT exclude "account_money" based on payDepositOnly here — the Mercado Pago API
+    // rejects it with "account_money cannot be excluded". The sinal (deposit) use-case is
+    // already blocked downstream: the frontend Brick hides the mercadoPago option when
+    // payDepositOnly is true, and process-payment/process-erp-payment reject any
+    // account_money payment_method_id for deposit charges.
+    if (acceptedMethods.mercado_pago_wallet === false) excludedPaymentTypes.push({ id: "account_money" })
     if (excludedPaymentTypes.length > 0) {
       preferencePayload.payment_methods = {
         excluded_payment_types: excludedPaymentTypes,

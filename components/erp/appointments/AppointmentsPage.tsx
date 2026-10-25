@@ -331,8 +331,10 @@ const AppointmentsPage = ({
             }
             setIsLoadingAppointments(false);
 
-            // 3. Prefetch adjacent ranges with delay (don't compete with initial load)
-            if (typeof window !== 'undefined') {
+            // 3. Prefetch adjacent ranges only for week/month views. The day
+            // view is the default and prefetching both neighboring days there
+            // doubled the request count without helping most interactions.
+            if (typeof window !== 'undefined' && calendarView !== 'day') {
                 const prefetchFn = () => {
                     if (fetchAbortRef.current !== fetchId) return;
                     const { prev, next } = getAdjacentRanges(currentDate, calendarView);

@@ -2515,6 +2515,7 @@ export default function CreateOrder({
                             isMarketplaceOrder={isMarketplaceOrder}
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}
+                            originalPaymentProvider={originalPaymentProvider}
                             onConfirm={handleConfirmPayment}
                             deliveryMethod={deliveryMethod}
                             allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009 && !isMarketplaceOrder}

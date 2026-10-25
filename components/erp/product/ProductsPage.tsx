@@ -631,9 +631,10 @@ export default function ProductsPage({
             if (res.success) {
                 notifySuccess("Sucesso")
 
-                // Invalidate caches
-                if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
-                afterMutation(entityState.entityId || undefined)
+                // Updates refresh the existing entity once. Creates are
+                // inserted into the list cache below, so avoid a full-list
+                // refetch immediately after the successful mutation.
+                if (entityState.entityId) afterMutation(entityState.entityId)
 
                 if (isNewProduct && res.data) {
                     const addedProduct = res.data

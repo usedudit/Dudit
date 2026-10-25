@@ -887,7 +887,7 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                             ? "red"
                                             : undefined
                                 }
-                                rightElement={
+                                bottomElement={
                                     alert.actionLabel &&
                                     alert.actionHref && (
                                         <Button
