@@ -151,6 +151,42 @@ function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?
   }
 }
 
+/**
+ * Appointments reference customers(id). Marketplace orders, however, carry the
+ * buyer's auth user id in `buyer_id`, which is not a customers.id. Resolve the
+ * real customer id so the insert never fails on the customer FK.
+ */
+async function resolveAppointmentCustomerId(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  partnerId: string,
+  rawCustomerId?: string | null,
+): Promise<string | null> {
+  const candidate = String(rawCustomerId || "").trim()
+  if (!candidate) return null
+
+  // Only UUIDs can be customer ids; this also keeps the PostgREST filter safe.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)
+  if (!isUuid) return null
+
+  const { data: direct } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("id", candidate)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+  if (direct?.id) return direct.id as string
+
+  // `buyer_id` may be the marketplace user id (auth.users.id).
+  const { data: byUser } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .or(`user_id.eq.${candidate},marketplace_user_id.eq.${candidate}`)
+    .limit(1)
+    .maybeSingle()
+  return (byUser?.id as string) || null
+}
+
 async function getPartnerContextWithPermission(permission: "view" | "create" | "edit" | "delete") {
   const user = await requireUser()
   const context = await getCurrentPartnerContext()
@@ -733,7 +769,28 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
     const { user, partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("create")
     const supabase = await getSupabaseServerClient()
-    const rows = payload.map((item) => toDbPayload(item, partnerId, contextStoreId))
+    const rows = await Promise.all(
+      payload.map(async (item) => {
+        const row = toDbPayload(item, partnerId, contextStoreId)
+
+        // Never trust the client-provided customer id: marketplace orders send
+        // the buyer's auth user id, which is not a customers.id and would make
+        // the insert fail with a foreign key violation.
+        row.customer_id = await resolveAppointmentCustomerId(supabase, partnerId, row.customer_id)
+
+        if (!row.customer_id && row.marketplace_order_id) {
+          const { data: linkedOrder } = await supabase
+            .from("orders")
+            .select("customer_id")
+            .eq("id", row.marketplace_order_id)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+          row.customer_id = (linkedOrder?.customer_id as string | null) || null
+        }
+
+        return row
+      }),
+    )
 
     // -- Idempotency guard for order_item_id --
     if (rows[0] && rows[0].order_item_id) {

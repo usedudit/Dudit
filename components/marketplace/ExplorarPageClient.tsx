@@ -1986,7 +1986,7 @@ export function ExplorarPageClient({
                                             {moreDistantSellers.length > 0 && (currentType === 'tudo' || currentType === 'vitrines' || currentType === 'negocios') && (
                                                 <>
                                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Lojas e vitrines</h3>
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
                                                         {moreDistantSellers.map((vitrine) => renderDistantItem(vitrine))}
                                                     </div>
                                                 </>

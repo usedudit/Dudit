@@ -117,7 +117,8 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
     rawPartner.opening_hours = rawStore.opening_hours || rawPartner.opening_hours
     rawPartner.latitude = addr?.latitude || rawPartner.latitude
     rawPartner.longitude = addr?.longitude || rawPartner.longitude
-    rawPartner.business_info = rawStore.business_info || rawPartner.business_info
+    // Recursos do sistema são definidos no parceiro; a loja não os sobrescreve.
+    rawPartner.business_info = rawPartner.business_info || rawStore.business_info
     rawPartner.gallery = rawStore.gallery || rawPartner.gallery
     rawPartner.is_showcase_active = rawStore.is_showcase_active !== false
     rawPartner.rating = rawStore.rating ?? rawPartner.rating ?? 0

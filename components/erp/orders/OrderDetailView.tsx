@@ -3566,9 +3566,9 @@ export default function OrderDetailView({
             }));
           })()}
           preselectedClient={
-            order?.buyer_id || order?.customer_name
+            order?.customer_id || order?.buyer_id || order?.customer_name
               ? {
-                id: order?.buyer_id || null,
+                id: order?.customer_id || order?.buyer_id || null,
                 name: order?.customer_name || "Cliente",
               }
               : null

@@ -5,7 +5,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getOrderPaidAmount } from "@/lib/payments/order-financial-state"
+import { getOrderPaidAmount, getOrderTotalAmount } from "@/lib/payments/order-financial-state"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
 import type {
   CheckoutFulfillmentPayload,
@@ -55,6 +55,40 @@ function computeEndTime(time: string, durationMinutes: number): string {
   return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`
 }
 
+/**
+ * PostgrestError (returned by supabase-js) is a plain object, not an Error
+ * instance. Without this, every database failure would be reported as the
+ * generic "Erro ao concluir fulfillment", hiding the real cause.
+ */
+function describeFulfillmentError(error: unknown): string {
+  if (error instanceof Error) return error.message
+
+  if (error && typeof error === "object") {
+    const err = error as {
+      message?: unknown
+      details?: unknown
+      hint?: unknown
+      code?: unknown
+    }
+    const parts: string[] = []
+    if (typeof err.message === "string" && err.message.trim()) parts.push(err.message.trim())
+    if (typeof err.details === "string" && err.details.trim()) parts.push(err.details.trim())
+    if (typeof err.hint === "string" && err.hint.trim()) parts.push(`hint: ${err.hint.trim()}`)
+    if (typeof err.code === "string" && err.code.trim()) parts.push(`(${err.code.trim()})`)
+    if (parts.length > 0) return parts.join(" ")
+
+    try {
+      const serialized = JSON.stringify(error)
+      if (serialized && serialized !== "{}") return serialized
+    } catch {
+      // ignore circular structures
+    }
+  }
+
+  if (typeof error === "string" && error.trim()) return error.trim()
+  return "Erro ao concluir fulfillment"
+}
+
 type GroupedService = {
   serviceName: string
   serviceId?: string | null
@@ -78,6 +112,34 @@ type ServiceGroup = {
   services: GroupedService[]
   totalPrice: number
   totalDuration: number
+}
+
+/**
+ * Resolves how much of a service group was actually paid.
+ * Deposit-enabled lines used to always be marked as partially paid, even when
+ * the customer paid the full order (common when the sinal is just an option).
+ */
+function resolveGroupPayment(params: {
+  paymentConfirmed: boolean
+  orderFullyPaid: boolean
+  situation: string
+  group: ServiceGroup
+}): { paidAmount: number; paymentStatus: "unpaid" | "partially_paid" | "paid" } {
+  if (!params.paymentConfirmed) return { paidAmount: 0, paymentStatus: "unpaid" }
+
+  const paidAmount = params.orderFullyPaid
+    ? params.group.totalPrice
+    : params.group.services.reduce((sum, s) => {
+        return sum + (s.payDepositOnly ? (s.depositAmount ?? s.unitPrice * s.quantity) : s.unitPrice * s.quantity)
+      }, 0)
+
+  const paymentStatus: "unpaid" | "partially_paid" | "paid" = params.orderFullyPaid
+    ? "paid"
+    : (params.group.services.some((s) => s.payDepositOnly) || params.situation === "partially_paid")
+      ? "partially_paid"
+      : "paid"
+
+  return { paidAmount, paymentStatus }
 }
 
 function groupServiceBookingLines(
@@ -244,8 +306,6 @@ async function createBookingFromMetadata(
     fulfillmentMode?: LineFulfillmentMode | null
     bufferMinutes?: number
     paymentMethod?: string | null
-    travelFee?: number
-    travelFeeBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = params.customerId || await ensureMarketplaceCustomer({
@@ -302,8 +362,6 @@ async function createBookingFromMetadata(
       fulfillment_mode:
         params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
       needs_reschedule: needsReschedule,
-      travel_fee: params.travelFee ?? 0,
-      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
       status: needsReschedule
         ? "Reservado"
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
@@ -312,10 +370,12 @@ async function createBookingFromMetadata(
     }
     if (receivableId) updatePayload.receivable_transaction_id = receivableId
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("appointments")
       .update(updatePayload)
       .eq("id", existing.id)
+
+    if (updateError) throw updateError
 
     const resolvedItems = await resolveAppointmentItemsFromServices(
       supabase,
@@ -357,8 +417,6 @@ async function createBookingFromMetadata(
       fulfillment_mode:
         params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
       needs_reschedule: !slotOk,
-      travel_fee: params.travelFee ?? 0,
-      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
       pricing_unit: "Por Serviço",
       notes: params.meta.notes || null,
       status: !slotOk
@@ -430,8 +488,6 @@ async function createGroupedBookingFromMetadata(
     paidAmount: number
     paymentStatus: "unpaid" | "partially_paid" | "paid"
     paymentMethod?: string | null
-    travelFee?: number
-    travelFeeBreakdown?: Record<string, unknown> | null
   },
 ): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = params.customerId || await ensureMarketplaceCustomer({
@@ -497,15 +553,15 @@ async function createGroupedBookingFromMetadata(
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
           ? "Confirmado"
           : "Reservado",
-      travel_fee: params.travelFee ?? 0,
-      travel_fee_breakdown: params.travelFeeBreakdown ?? null,
     }
     if (receivableId) updatePayload.receivable_transaction_id = receivableId
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("appointments")
       .update(updatePayload)
       .eq("id", existing.id)
+
+    if (updateError) throw updateError
 
     const resolvedItems = await resolveAppointmentItemsFromServices(
       supabase,
@@ -542,13 +598,11 @@ async function createGroupedBookingFromMetadata(
       paid_amount: params.paidAmount,
       payment_status: params.paymentStatus,
       sales_channel: STOREFRONT_CHANNEL,
-       fulfillment_mode:
-         params.group.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
-       needs_reschedule: !slotOk,
-       pricing_unit: "Por Serviço",
-       notes: params.group.services[0]?.notes || null,
-       travel_fee: params.travelFee ?? 0,
-       travel_fee_breakdown: params.travelFeeBreakdown ?? null,
+      fulfillment_mode:
+        params.group.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
+      needs_reschedule: !slotOk,
+      pricing_unit: "Por Serviço",
+      notes: params.group.services[0]?.notes || null,
       status: !slotOk
         ? "Reservado"
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
@@ -879,7 +933,7 @@ export async function fulfillMarketplaceOrder(
     .select(`
       id, partner_id, buyer_id, store_id, situation, customer_id, checkout_fulfillment,
       order_source, finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
-      paid_amount, amount_paid, delivery_fee, delivery_breakdown
+      paid_amount, amount_paid, total_amount, delivery_fee, delivery_breakdown
     `)
     .eq("id", orderId)
     .single()
@@ -909,6 +963,10 @@ export async function fulfillMarketplaceOrder(
   const expectedGroups = serviceGroups.length
 
   const paymentConfirmed = isPaymentConfirmedForFulfillment(order)
+  const orderPaidAmount = getOrderPaidAmount(order)
+  const orderTotalAmount = getOrderTotalAmount(order)
+  const orderFullyPaid =
+    orderTotalAmount > 0.005 && orderPaidAmount >= orderTotalAmount - 0.005
 
   const isMarketplace = isMarketplaceOrderSource(order.order_source)
 
@@ -917,18 +975,12 @@ export async function fulfillMarketplaceOrder(
     if (paymentConfirmed) {
       if (appointmentIds.length >= expectedGroups && payload?.lines) {
         for (const group of serviceGroups) {
-          const groupPaidAmount = paymentConfirmed
-            ? group.services.reduce((sum, s) => {
-                return sum + (s.payDepositOnly
-                  ? (s.depositAmount ?? s.unitPrice * s.quantity)
-                  : s.unitPrice * s.quantity)
-              }, 0)
-            : 0
-          const groupPaymentStatus = !paymentConfirmed
-            ? "unpaid"
-            : group.services.some((s) => s.payDepositOnly) || situation === "partially_paid"
-              ? "partially_paid"
-              : "paid"
+          const { paidAmount: groupPaidAmount, paymentStatus: groupPaymentStatus } = resolveGroupPayment({
+            paymentConfirmed,
+            orderFullyPaid,
+            situation,
+            group,
+          })
 
           await supabase
             .from("appointments")
@@ -1048,18 +1100,12 @@ export async function fulfillMarketplaceOrder(
       serviceGroups.map(async (group) => {
         addMonitoringBreadcrumb({ domain: "orders", message: "fulfillment.started", metadata: { entityId: orderId } })
 
-        const groupPaidAmount = paymentConfirmed
-          ? group.services.reduce((sum, s) => {
-              return sum + (s.payDepositOnly
-                ? (s.depositAmount ?? s.unitPrice * s.quantity)
-                : s.unitPrice * s.quantity)
-            }, 0)
-          : 0
-        const groupPaymentStatus = !paymentConfirmed
-          ? "unpaid"
-          : group.services.some((s) => s.payDepositOnly) || situation === "partially_paid"
-            ? "partially_paid"
-            : "paid"
+        const { paidAmount: groupPaidAmount, paymentStatus: groupPaymentStatus } = resolveGroupPayment({
+          paymentConfirmed,
+          orderFullyPaid,
+          situation,
+          group,
+        })
 
         const bookingResult = await createGroupedBookingFromMetadata(supabase, {
           partnerId: order.partner_id,
@@ -1203,7 +1249,8 @@ export async function fulfillMarketplaceOrder(
 
     return { success: true, result }
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Erro ao concluir fulfillment"
+    const message = describeFulfillmentError(e)
+    console.error("[marketplace fulfillment] failed:", { orderId, message, error: e })
     captureError(e, {
       module: "orders",
       action: "marketplace_fulfillment",

@@ -68,7 +68,7 @@ export const ShowcaseSubPage = ({
         isShowcaseActive: store.is_showcase_active ?? true,
         acceptOrdersWhenClosed: store.accept_orders_when_closed ?? true,
         gallery: store.gallery || [],
-        orderFlow: partnerOrderFlow || store.order_flow || (isQuickMode ? "whatsapp" : "dudit"),
+        orderFlow: partnerOrderFlow || (isQuickMode ? "whatsapp" : "dudit"),
     })
 
     const initialStoreAddr = store.addresses?.[0] || store.address || {}
