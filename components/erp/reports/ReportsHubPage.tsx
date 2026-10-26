@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
 import { ReportTableCard, type TableColumn, type TableRow } from "@/components/erp/reports/widgets/ReportTableCard"
@@ -276,7 +276,7 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   const reports = useMemo(() => createReports(props), [props])
   const availableCategories = useMemo(() => CATEGORIES.filter((category) => reports.some((report) => report.category === category.id)), [reports])
   const [activeCategory, setActiveCategory] = useState<ReportCategory>(availableCategories[0]?.id || "vendas")
-  const categoryReports = reports.filter((report) => report.category === activeCategory)
+  const categoryReports = useMemo(() => reports.filter((report) => report.category === activeCategory), [activeCategory, reports])
   const [selectedId, setSelectedId] = useState(categoryReports[0]?.id || "")
   const selectedReport = categoryReports.find((report) => report.id === selectedId) || categoryReports[0]
 
@@ -287,8 +287,10 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   }, [activeCategory, availableCategories])
 
   useEffect(() => {
-    setSelectedId(categoryReports[0]?.id || "")
-  }, [activeCategory, categoryReports])
+    if (!categoryReports.some((report) => report.id === selectedId)) {
+      setSelectedId(categoryReports[0]?.id || "")
+    }
+  }, [categoryReports, selectedId])
 
   const exportSelected = useCallback(async (format: "csv" | "xlsx") => {
     if (!selectedReport || !hasMinimumPlan(props.planSlug, selectedReport.minimumPlan)) return
@@ -322,10 +324,12 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
             ))}
           </TabsList>
 
-          {availableCategories.map((category) => (
+          {availableCategories.map((category) => {
+            const reportsForCategory = reports.filter((report) => report.category === category.id)
+            return (
             <TabsContent key={category.id} value={category.id} className="mt-0">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {categoryReports.map((report) => {
+                {reportsForCategory.map((report) => {
                   const locked = !hasMinimumPlan(props.planSlug, report.minimumPlan)
                   const Icon = report.icon
                   const selected = report.id === selectedReport?.id
@@ -370,7 +374,8 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
                 </div>
               )}
             </TabsContent>
-          ))}
+            )
+          })}
         </Tabs>
       ) : (
         <div className="rounded-[24px] border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface">

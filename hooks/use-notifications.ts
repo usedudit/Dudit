@@ -21,11 +21,6 @@ import { useStoreOrNull } from "@/lib/store-context"
 const READ_DELAY_MS = 2000
 const READ_INTERVAL_MS = 10000
 
-function getPartnerId(notification: { data: Record<string, unknown> | null }): string | null {
-  const d = (notification.data as Record<string, unknown> | null) || {}
-  return (d.partner_id as string | undefined) || (d.partnerId as string | undefined) || null
-}
-
 function groupNotificationsByDate(items: NotificationRecord[]) {
   const groups: { label: string; items: NotificationRecord[] }[] = []
   const map = new Map<string, NotificationRecord[]>()

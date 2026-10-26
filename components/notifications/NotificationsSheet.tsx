@@ -33,7 +33,6 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
     erpOptions,
     erpFilter,
     setErpFilter,
-    activePartnerId,
   } = notifications
 
   const isMobile = useMediaQuery("(max-width: 1023px)")
@@ -100,7 +99,6 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
           erpOptions={erpOptions}
           erpFilter={erpFilter}
           onErpFilter={setErpFilter}
-          activePartnerId={activePartnerId}
         />
       </div>
     </div>

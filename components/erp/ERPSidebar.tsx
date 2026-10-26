@@ -64,6 +64,7 @@ const navItems: NavItem[] = [
             { label: "Metas", href: "/erp/metas" },
             { label: "Comissões", href: "/erp/comissoes" },
             { label: "Estatísticas", href: "/erp/estatisticas" },
+            { label: "Relatórios", href: "/erp/relatorios" },
         ],
     },
     {

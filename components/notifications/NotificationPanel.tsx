@@ -26,7 +26,6 @@ export function NotificationPanel({
 	erpOptions,
 	erpFilter,
 	onErpFilter,
-	activePartnerId,
 }: {
 	grouped: Group[]
 	isLoading: boolean
@@ -38,10 +37,9 @@ export function NotificationPanel({
 	onMarkAllAsRead?: () => void
 	onDeleteAll?: () => Promise<{ success: boolean; deleted: number }>
 	unreadCount?: number
-	erpOptions: Array<{ id: string; label: string }>
+	erpOptions: Array<{ id: string; label: string; count?: number; unread?: number }>
 	erpFilter: string
 	onErpFilter: (filter: string) => void
-	activePartnerId: string | null
 }) {
 	const [showDeleteAll, setShowDeleteAll] = useState(false)
 	const [isDeleting, setIsDeleting] = useState(false)
@@ -129,10 +127,14 @@ export function NotificationPanel({
 						<Tabs value={erpFilter} onValueChange={onErpFilter} className="flex-1">
 							<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
 								<TabsTrigger value="all">Todos</TabsTrigger>
-								{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
 								{erpOptions.map((opt) => (
 									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
 										{opt.label}
+										{opt.unread ? (
+											<span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 ml-1 text-[10px] font-bold rounded-full bg-brand-red text-white">
+												{opt.unread > 99 ? "99+" : opt.unread}
+											</span>
+										) : null}
 									</TabsTrigger>
 								))}
 							</TabsList>
