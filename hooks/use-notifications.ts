@@ -160,29 +160,69 @@ export function useNotifications() {
     refetchOnWindowFocus: false,
   })
 
-  const erpOptions = useMemo(() => {
+  // Mapa de lojas às quais o usuário tem acesso, indexado por storeId.
+  const accessByStore = useMemo(() => {
     const access = storeAccessQuery.data ?? []
-    const map = new Map<string, { id: string; label: string }>()
+    const map = new Map<string, { label: string; partnerId: string }>()
     for (const a of access) {
-      if (a.partnerId === activePartnerId) continue
-      if (!map.has(a.partnerId)) {
-        const label =
-          a.partnerName || a.storeName || "ERP"
-        const truncated =
-          label.length > 24 ? `${label.slice(0, 23)}…` : label
-        map.set(a.partnerId, { id: a.partnerId, label: truncated })
-      }
+      if (!a.storeId) continue
+      if (map.has(a.storeId)) continue
+      const base = a.storeName || a.partnerName || "Loja"
+      const label = base.length > 24 ? `${base.slice(0, 23)}…` : base
+      map.set(a.storeId, { label, partnerId: a.partnerId })
     }
-    return Array.from(map.values())
-  }, [storeAccessQuery.data, activePartnerId])
+    return map
+  }, [storeAccessQuery.data])
 
-  const [erpFilter, setErpFilter] = useState<"all" | "current" | string>("all")
+  // Mapeia um partnerId para uma loja de acesso (usado quando a notificação
+  // traz apenas o partner_id, sem store_id explícito).
+  const partnerToStoreId = useMemo(() => {
+    const entry = new Map<string, string>()
+    for (const [storeId, info] of accessByStore) {
+      if (!entry.has(info.partnerId)) entry.set(info.partnerId, storeId)
+    }
+    return entry
+  }, [accessByStore])
+
+  // As abas de ERP/loja só aparecem quando o usuário tem acesso a elas E
+  // existe ao menos uma notificação associada. Fora isso, só a aba "Todos".
+  const erpOptions = useMemo(() => {
+    const total = new Map<string, number>()
+    const unread = new Map<string, number>()
+
+    for (const n of allItems) {
+      const d = (n.data as Record<string, unknown> | null) || {}
+      const storeId = (d.store_id as string | undefined) || (d.storeId as string | undefined)
+
+      let targetStore = storeId
+      if (!targetStore) {
+        const pid = (d.partner_id as string | undefined) || (d.partnerId as string | undefined)
+        if (pid) targetStore = partnerToStoreId.get(pid)
+      }
+
+      if (!targetStore || !accessByStore.has(targetStore)) continue
+
+      total.set(targetStore, (total.get(targetStore) ?? 0) + 1)
+      if (!n.is_read) unread.set(targetStore, (unread.get(targetStore) ?? 0) + 1)
+    }
+
+    return Array.from(accessByStore, ([storeId, info]) => ({
+      id: storeId,
+      label: info.label,
+      count: total.get(storeId) ?? 0,
+      unread: unread.get(storeId) ?? 0,
+    })).filter((o) => o.count > 0)
+  }, [allItems, accessByStore, partnerToStoreId])
+
+  const [erpFilter, setErpFilter] = useState<string>("all")
 
   useEffect(() => {
     if (typeof window === "undefined") return
     const saved = window.localStorage.getItem("notifications.erpFilter")
-    if (saved === "all" || saved === "current" || (saved && erpOptions.some((o) => o.id === saved))) {
+    if (saved === "all" || (saved && erpOptions.some((o) => o.id === saved))) {
       setErpFilter(saved)
+    } else {
+      setErpFilter("all")
     }
   }, [erpOptions])
 
@@ -191,15 +231,22 @@ export function useNotifications() {
     window.localStorage.setItem("notifications.erpFilter", String(erpFilter))
   }, [erpFilter])
 
+  const validErpFilter = erpFilter === "all" || erpOptions.some((o) => o.id === erpFilter)
+
   const filteredItems = useMemo(() => {
-    if (erpFilter === "all" || !activePartnerId && erpFilter === "current") {
+    if (!validErpFilter || erpFilter === "all") {
       return allItems
     }
-    if (erpFilter === "current") {
-      return allItems.filter((n) => getPartnerId(n) === activePartnerId)
-    }
-    return allItems.filter((n) => getPartnerId(n) === erpFilter)
-  }, [allItems, erpFilter, activePartnerId])
+    const info = accessByStore.get(erpFilter)
+    if (!info) return allItems
+    return allItems.filter((n) => {
+      const d = (n.data as Record<string, unknown> | null) || {}
+      const storeId = (d.store_id as string | undefined) || (d.storeId as string | undefined)
+      if (storeId === erpFilter) return true
+      const pid = (d.partner_id as string | undefined) || (d.partnerId as string | undefined)
+      return pid === info.partnerId
+    })
+  }, [allItems, erpFilter, accessByStore, validErpFilter])
 
   const grouped = useMemo(() => groupNotificationsByDate(filteredItems), [filteredItems])
 
@@ -302,9 +349,9 @@ export function useNotifications() {
     user,
     panelOpen,
     setPanelOpen,
-    unreadCount: unreadQuery.data ?? 0,
-    grouped,
-    allItems,
+     unreadCount: unreadQuery.data ?? 0,
+     grouped,
+     allItems,
      erpOptions,
      erpFilter,
      setErpFilter,

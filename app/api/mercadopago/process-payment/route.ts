@@ -64,6 +64,10 @@ interface ProcessPaymentRequest {
   }
   existingOrderId?: string
   deviceId?: string | null
+  isWalletPurchase?: boolean
+  selectedPaymentMethod?: string
+  preferenceId?: string
+  initPoint?: string | null
 }
 
 const isServiceItem = (item: { service_id?: string; itemType?: string | null }) =>
@@ -136,8 +140,20 @@ async function handler(request: NextRequest) {
     }
     const normalizedDeliveryType = (deliveryType === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
 
-    // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
-    if (!paymentFormData?.payment_method_id) {
+    const isWalletPurchase = Boolean(
+      body.isWalletPurchase ||
+      body.selectedPaymentMethod === "wallet_purchase" ||
+      body.selectedPaymentMethod === "onboarding_credits" ||
+      paymentFormData?.is_wallet_purchase ||
+      paymentFormData?.payment_method_id === "wallet_purchase" ||
+      paymentFormData?.payment_method_id === "account_money" ||
+      paymentFormData?.payment_method_id === "consumer_credits" ||
+      paymentFormData?.payment_method_id === "mercadopago" ||
+      paymentFormData?.payment_type_id === "wallet_purchase"
+    )
+
+    // Validacao de campos obrigatorios ANTES de qualquer operacao
+    if (!isWalletPurchase && !paymentFormData?.payment_method_id) {
       return NextResponse.json({ error: "Método de pagamento não informado" }, { status: 400 })
     }
 
@@ -148,7 +164,7 @@ async function handler(request: NextRequest) {
       }
       // Bloquear Saldo Mercado Pago (account_money/mercado_pago_wallet) para sinal
       // Sinal deve ser pago imediatamente via PIX, cartão de crédito (1x) ou débito
-      if (depositMethodId === "account_money" || depositMethodId === "mercado_pago_wallet" || depositMethodId === "saldo mercado pago") {
+      if (isWalletPurchase || depositMethodId === "account_money" || depositMethodId === "mercado_pago_wallet" || depositMethodId === "saldo mercado pago") {
         return NextResponse.json({ error: "Saldo Mercado Pago não está disponível para pagamento de sinal. Use PIX, cartão de crédito (1 parcela) ou cartão de débito." }, { status: 400 })
       }
     }
@@ -378,12 +394,14 @@ async function handler(request: NextRequest) {
       const partnerIntegration = await findMercadoPagoIntegration(adminClient, partnerId)
 
       const accepted = mapToMpPartnerFields(partnerIntegration).mp_accepted_payment_methods || ({} as Record<string, boolean>)
-      const methodId = String(paymentFormData.payment_method_id || "").toLowerCase()
+      const methodId = String(paymentFormData?.payment_method_id || "").toLowerCase()
 
-      const methodAllowed = methodId === "pix" ? accepted.pix !== false
-        : methodId === "bolbradesco" ? accepted.boleto !== false
-          : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
-            : true
+      const methodAllowed = isWalletPurchase
+        ? accepted.mercado_pago_wallet !== false
+        : methodId === "pix" ? accepted.pix !== false
+          : methodId === "bolbradesco" ? accepted.boleto !== false
+            : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
+              : true
 
       if (!methodAllowed) {
         return NextResponse.json({ error: "Método de pagamento não habilitado pelo vendedor" }, { status: 400 })
@@ -1113,90 +1131,104 @@ async function handler(request: NextRequest) {
       hasPaymentToken: Boolean(paymentFormData?.token),
     })
 
-    // SEGURANÇA: Idempotency key determinística (protege contra double-click)
-    // Para retries de ordem já existente (payment_failed/cancelled), inclui timestamp
-    // de alta precisão para evitar cache do MP retornando a recusa original.
-    const isRetry = existingOrder && ["payment_failed", "cancelled"].includes(existingOrder.situation)
-    const idempotencyKey = existingOrderId
-      ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData.payment_method_id}_${isRetry ? Date.now() : Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
-      : useUnifiedCart
-        ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
-        : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: (i.product_id || i.service_id) as string, quantity: i.quantity })))
+    let mpPaymentResponse: any = null
+    let mpPaymentId: any = null
+    let pixData: any = null
+    let boletoData: any = null
+    let paymentStatus = "pending"
 
-    // Processar requisição via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
-    const paymentResult = await createMercadoPagoPayment({
-      accessToken: mpAccessToken,
-      paymentPayload: mpPaymentRequest,
-      idempotencyKey,
-      deviceId,
-    })
-
-    if (isDev) console.log("MP SDK Response status:", paymentResult.status)
-
-    if (!paymentResult.success || !paymentResult.data) {
-      SecureLogger.error("MP SDK payment creation failed in process-payment", {
-        status: paymentResult.status,
-        errorCode: paymentResult.errorCode,
-        errorMessage: paymentResult.errorMessage?.slice(0, 160),
-      })
-      return NextResponse.json({
-        error: "Erro ao processar pagamento. Tente novamente."
-      }, { status: paymentResult.status >= 500 ? 500 : 400 })
-    }
-
-    const mpPaymentResponse = paymentResult.data
-
-    // Extrair o ID do pagamento da resposta da API
-    const mpPaymentId = mpPaymentResponse.id
-
-    // GUARD: Se MP não retornou ID, tratar como erro (não criar order órfã)
-    if (!mpPaymentId) {
-      SecureLogger.error("MP returned no payment ID", { status: mpPaymentResponse.status })
-      return NextResponse.json({
-        error: "Erro ao processar pagamento â€” ID não retornado. Tente novamente."
-      }, { status: 500 })
-    }
-
-    // Se for PIX, extrair os dados de QR code
-    let pixData = null
-    if (paymentFormData.payment_method_id === "pix" && mpPaymentResponse.point_of_interaction?.transaction_data) {
-      const transactionData = mpPaymentResponse.point_of_interaction.transaction_data
-      pixData = {
-        qrCode: transactionData.qr_code,
-        qrCodeBase64: transactionData.qr_code_base64,
-        ticketUrl: transactionData.ticket_url,
+    if (isWalletPurchase) {
+      mpPaymentResponse = {
+        id: null,
+        status: "pending",
+        status_detail: "pending_wallet_purchase",
       }
-    }
+      paymentStatus = "pending"
+    } else {
+      // SEGURANÇA: Idempotency key determinística (protege contra double-click)
+      // Para retries de ordem já existente (payment_failed/cancelled), inclui timestamp
+      // de alta precisão para evitar cache do MP retornando a recusa original.
+      const isRetry = existingOrder && ["payment_failed", "cancelled"].includes(existingOrder.situation)
+      const idempotencyKey = existingOrderId
+        ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData?.payment_method_id}_${isRetry ? Date.now() : Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
+        : useUnifiedCart
+          ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
+          : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: (i.product_id || i.service_id) as string, quantity: i.quantity })))
 
-    // Se for Boleto, extrair dados do boleto
-    let boletoData = null
-    if (paymentFormData.payment_method_id === "bolbradesco") {
-      const externalUrl = mpPaymentResponse.transaction_details?.external_resource_url || mpPaymentResponse.point_of_interaction?.transaction_data?.ticket_url;
-      const barcode = mpPaymentResponse.barcode?.content || mpPaymentResponse.point_of_interaction?.transaction_data?.barcode;
+      // Processar requisição via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
+      const paymentResult = await createMercadoPagoPayment({
+        accessToken: mpAccessToken,
+        paymentPayload: mpPaymentRequest,
+        idempotencyKey,
+        deviceId,
+      })
 
-      if (externalUrl || barcode) {
-        boletoData = {
-          ticketUrl: externalUrl,
-          barcode: barcode,
+      if (isDev) console.log("MP SDK Response status:", paymentResult.status)
+
+      if (!paymentResult.success || !paymentResult.data) {
+        SecureLogger.error("MP SDK payment creation failed in process-payment", {
+          status: paymentResult.status,
+          errorCode: paymentResult.errorCode,
+          errorMessage: paymentResult.errorMessage?.slice(0, 160),
+        })
+        return NextResponse.json({
+          error: "Erro ao processar pagamento. Tente novamente."
+        }, { status: paymentResult.status >= 500 ? 500 : 400 })
+      }
+
+      mpPaymentResponse = paymentResult.data
+
+      // Extrair o ID do pagamento da resposta da API
+      mpPaymentId = mpPaymentResponse.id
+
+      // GUARD: Se MP não retornou ID, tratar como erro (não criar order órfã)
+      if (!mpPaymentId) {
+        SecureLogger.error("MP returned no payment ID", { status: mpPaymentResponse.status })
+        return NextResponse.json({
+          error: "Erro ao processar pagamento — ID não retornado. Tente novamente."
+        }, { status: 500 })
+      }
+
+      // Se for PIX, extrair os dados de QR code
+      if (paymentFormData?.payment_method_id === "pix" && mpPaymentResponse.point_of_interaction?.transaction_data) {
+        const transactionData = mpPaymentResponse.point_of_interaction.transaction_data
+        pixData = {
+          qrCode: transactionData.qr_code,
+          qrCodeBase64: transactionData.qr_code_base64,
+          ticketUrl: transactionData.ticket_url,
         }
       }
-    }
 
-    // Atualizar status baseado na resposta
-    let paymentStatus = mpPaymentResponse.status || "pending"
+      // Se for Boleto, extrair dados do boleto
+      if (paymentFormData?.payment_method_id === "bolbradesco") {
+        const externalUrl = mpPaymentResponse.transaction_details?.external_resource_url || mpPaymentResponse.point_of_interaction?.transaction_data?.ticket_url;
+        const barcode = mpPaymentResponse.barcode?.content || mpPaymentResponse.point_of_interaction?.transaction_data?.barcode;
+
+        if (externalUrl || barcode) {
+          boletoData = {
+            ticketUrl: externalUrl,
+            barcode: barcode,
+          }
+        }
+      }
+
+      paymentStatus = mpPaymentResponse.status || "pending"
+    }
 
     // Determinar tipo de pagamento e status
     let paymentMethodDisplayName = "Desconhecido"
 
-    if (paymentFormData.payment_method_id === "pix") {
+    if (isWalletPurchase) {
+      paymentMethodDisplayName = "Mercado Pago"
+    } else if (paymentFormData?.payment_method_id === "pix") {
       paymentMethodDisplayName = "Pix"
-    } else if (paymentFormData.payment_method_id === "bolbradesco") {
+    } else if (paymentFormData?.payment_method_id === "bolbradesco") {
       paymentMethodDisplayName = "Boleto"
-    } else if (mpPaymentResponse.payment_type_id === "debit_card") {
+    } else if (mpPaymentResponse?.payment_type_id === "debit_card") {
       paymentMethodDisplayName = "Cartão de Débito"
-    } else if (mpPaymentResponse.payment_type_id === "account_money" || paymentFormData.payment_method_id === "account_money") {
+    } else if (mpPaymentResponse?.payment_type_id === "account_money" || paymentFormData?.payment_method_id === "account_money") {
       paymentMethodDisplayName = "Saldo Mercado Pago"
-    } else if (mpPaymentResponse.payment_type_id === "digital_currency" || paymentFormData.payment_method_id === "mercado_credito") {
+    } else if (mpPaymentResponse?.payment_type_id === "digital_currency" || paymentFormData?.payment_method_id === "mercado_credito") {
       paymentMethodDisplayName = "Mercado Crédito"
     } else {
       paymentMethodDisplayName = "Crédito"
@@ -1346,21 +1378,23 @@ async function handler(request: NextRequest) {
         ? Number((Number(existingOrder.store_credit_amount || 0) + chargeAmount).toFixed(2))
         : Number(existingOrder.paid_amount || 0)
 
-      const updatedSituation = paymentStatus === "approved"
-        ? resolveSituationFromPaid(totalPaidAmount, fullOrderTotal)
-        : (paymentStatus === "in_process" ? "in_process" : (paymentStatus === "rejected" ? "payment_failed" : existingOrder.situation))
+      const updatedSituation = isWalletPurchase
+        ? "pending"
+        : paymentStatus === "approved"
+          ? resolveSituationFromPaid(totalPaidAmount, fullOrderTotal)
+          : (paymentStatus === "in_process" ? "in_process" : (paymentStatus === "rejected" ? "payment_failed" : existingOrder.situation))
 
       // Atualizar pedido existente com dados do pagamento
       const { data: updatedOrder, error: updateError } = await adminClient
         .from("orders")
         .update({
           payment_provider: "Mercado Pago",
-          mp_payment_id: mpPaymentId.toString(),
+          mp_payment_id: mpPaymentId ? mpPaymentId.toString() : (existingOrder.mp_payment_id || null),
           situation: updatedSituation,
           payment_breakdown: updatedBreakdown,
-          paid_amount: totalPaidAmount,
-          amount_paid: totalPaidAmount,
-          paid_at: paymentStatus === "approved" ? new Date().toISOString() : existingOrder.paid_at,
+          paid_amount: isWalletPurchase ? Number(existingOrder.paid_amount || 0) : totalPaidAmount,
+          amount_paid: isWalletPurchase ? Number(existingOrder.paid_amount || 0) : totalPaidAmount,
+          paid_at: isWalletPurchase ? existingOrder.paid_at : (paymentStatus === "approved" ? new Date().toISOString() : existingOrder.paid_at),
           payment_expires_at: paymentExpiresAt,
           ...(effectiveStoreId && !existingOrder.store_id ? { store_id: effectiveStoreId } : {}),
         })
@@ -1385,10 +1419,10 @@ async function handler(request: NextRequest) {
           delivery_address: resolvedOrderDeliveryAddress,
           notes: notes,
           total_amount: fullOrderTotal,
-          situation: orderSituation,
+          situation: isWalletPurchase ? "pending" : orderSituation,
           payment_method: paymentMethodDisplayName,
           payment_provider: "Mercado Pago",
-          mp_payment_id: mpPaymentId.toString(),
+          mp_payment_id: mpPaymentId ? mpPaymentId.toString() : null,
           coupon_id: couponIdToSave,
           discount_amount: couponDiscountAmount,
           payment_method_discount_amount: paymentMethodDiscountAmount,
@@ -1402,15 +1436,15 @@ async function handler(request: NextRequest) {
             method: paymentMethodDisplayName,
             amount: chargeAmount,
             effectiveAmount: chargeAmount,
-            amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
+            amountReceived: isWalletPurchase ? 0 : (paymentStatus === "approved" ? chargeAmount : 0),
             provider: "Mercado Pago",
             adjustmentType: "none",
             interestAmount: 0,
             feeAmount: 0,
             fixedFeeAmount: 0,
             feeBearer: "merchant",
-            mpPaymentStatus: paymentStatus,
-            mpPaymentStatusDetail: mpPaymentResponse.status_detail ?? null,
+            mpPaymentStatus: isWalletPurchase ? "pending" : paymentStatus,
+            mpPaymentStatusDetail: isWalletPurchase ? "pending_wallet_purchase" : (mpPaymentResponse?.status_detail ?? null),
             checkoutPricing: checkoutPricing || {
               subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
               couponDiscount: couponDiscountAmount,
@@ -1560,18 +1594,56 @@ async function handler(request: NextRequest) {
     // 3. Revalidar carrinho do usuário (SEMPRE, após possível deleção)
     await revalidateCart(buyerId)
 
+    // Se for wallet_purchase, atualizar a preferência do MP com o external_reference = ID do pedido
+    if (isWalletPurchase && body.preferenceId) {
+      try {
+        const updatePrefRes = await fetch(`https://api.mercadopago.com/checkout/preferences/${body.preferenceId}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${mpAccessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            external_reference: newOrder.id,
+          }),
+        })
+        if (!updatePrefRes.ok) {
+          const errBody = await updatePrefRes.text().catch(() => "")
+          SecureLogger.warn("Failed to update MP preference external_reference", {
+            preferenceId: body.preferenceId,
+            orderId: newOrder.id,
+            status: updatePrefRes.status,
+            error: errBody,
+          })
+        } else {
+          SecureLogger.info("MP preference external_reference updated with order ID", {
+            preferenceId: body.preferenceId,
+            orderId: newOrder.id,
+          })
+        }
+      } catch (prefErr: any) {
+        SecureLogger.error("Exception updating MP preference external_reference", {
+          preferenceId: body.preferenceId,
+          orderId: newOrder.id,
+          error: prefErr?.message,
+        })
+      }
+    }
+
     // Retornar sucesso (sem informações internas)
     const successResponse = {
       success: true,
       orderId: newOrder.id,
       orderNumber: newOrder.order_number,
-      paymentStatus: paymentStatus === "approved" ? "approved" : paymentStatus,
-      status: paymentStatus === "approved" ? "approved" : paymentStatus,
-      paymentMethod: paymentFormData.payment_method_id,
-      statusDetail: mpPaymentResponse.status_detail ?? null,
+      paymentStatus: isWalletPurchase ? "pending" : (paymentStatus === "approved" ? "approved" : paymentStatus),
+      status: isWalletPurchase ? "pending" : (paymentStatus === "approved" ? "approved" : paymentStatus),
+      paymentMethod: isWalletPurchase ? "account_money" : (paymentFormData?.payment_method_id || "mercadopago"),
+      isWalletPurchase: isWalletPurchase,
+      initPoint: body.initPoint || null,
+      statusDetail: isWalletPurchase ? "pending_wallet_purchase" : (mpPaymentResponse?.status_detail ?? null),
       pixData: pixData,
       boletoData: boletoData,
-      mpPaymentId: mpPaymentId,
+      mpPaymentId: mpPaymentId ? String(mpPaymentId) : null,
     }
 
     return NextResponse.json(successResponse)

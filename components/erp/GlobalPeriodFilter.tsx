@@ -2,33 +2,15 @@
 
 import { useState, useCallback } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { Button, Dropdown, DropdownItem } from "@/components/reusable"
+import { Button, Dropdown, DropdownItem, InfoCard } from "@/components/reusable"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
-import { FilterIcon, SparklesIcon, DownloadIcon, XIcon } from "@/lib/icons"
+import { FilterIcon, SparklesIcon, DownloadIcon, XIcon, ChevronDownIcon } from "@/lib/icons"
 import { useDashboard } from "./dashboard/DashboardContext"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
-
-function DashboardInsight({ message, color }: { message: string; color: string }) {
-  const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
-    green: { bg: "bg-[#ecfdf5] dark:bg-emerald-900/20", text: "text-emerald-900 dark:text-emerald-100", bar: "bg-emerald-500", border: "border-emerald-100 dark:border-emerald-900/30" },
-    red: { bg: "bg-red-50 dark:bg-red-900/10", text: "text-red-700 dark:text-red-300/80", bar: "bg-red-400", border: "border-red-100 dark:border-red-900/30" },
-    orange: { bg: "bg-[#fff7ed] dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-300/80", bar: "bg-orange-500", border: "border-orange-100 dark:border-orange-900/30" },
-    blue: { bg: "bg-blue-50 dark:bg-blue-900/20", text: "text-blue-700 dark:text-blue-300/80", bar: "bg-blue-500", border: "border-blue-100 dark:border-blue-900/30" },
-  }
-  const c = colors[color] || colors.blue
-  return (
-    <div className={`${c.bg} ${c.border} rounded-2xl p-4 border`}>
-      <div className="flex gap-3 items-start">
-        <div className={`${c.bar} w-1.5 rounded-full self-stretch shrink-0 min-h-6`} />
-        <p className={`text-[14px] font-semibold leading-relaxed ${c.text}`}>{message}</p>
-      </div>
-    </div>
-  )
-}
 
 export function GlobalPeriodFilter() {
   const router = useRouter()
@@ -76,113 +58,146 @@ export function GlobalPeriodFilter() {
   const insightsContent = (
     <div className="space-y-4">
       {insights && insights.map((insight, i) => (
-        <DashboardInsight key={i} message={insight.message} color={insight.color} />
+        <InfoCard key={i} message={insight.message} color={insight.color as "green" | "red" | "orange" | "blue"} className="rounded-2xl p-4 font-semibold text-[14px] leading-relaxed" />
       ))}
     </div>
   )
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3 flex-nowrap overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible md:pb-0">
-      {insights && insights.length > 0 && (
-        <>
-          <Button variant="outline" size="icon" onClick={() => setInsightSheetOpen(true)}>
-            <SparklesIcon size={14} />
-          </Button>
-
-          {isMobile ? (
-            <BottomSheet isOpen={insightSheetOpen} onClose={() => setInsightSheetOpen(false)} title="Insights de Desempenho">
-              <div className="pt-2 pb-4">
-                {insightsContent}
-              </div>
-            </BottomSheet>
-          ) : (
-            <Portal>
-              <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${insightSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                style={{ zIndex: insightSheetZIndex }}
-                onClick={() => setInsightSheetOpen(false)}
+    <div className="min-w-0 -mx-4 px-4 md:mx-0 md:px-0 xl:w-fit xl:max-w-full">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {insights && insights.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => setInsightSheetOpen(true)}
+                aria-label="Ver insights de desempenho"
+                title="Insights"
               >
-                <div
-                  className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${insightSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                    <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                      <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</h2>
-                      <Button variant="filled" onClick={() => setInsightSheetOpen(false)} size="icon">
-                        <XIcon className="h-5 w-5" />
-                      </Button>
-                    </header>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                      {insightsContent}
+                <SparklesIcon size={14} />
+              </Button>
+
+              {isMobile ? (
+                <BottomSheet isOpen={insightSheetOpen} onClose={() => setInsightSheetOpen(false)} title="Insights de Desempenho">
+                  <div className="pt-2 pb-4">
+                    {insightsContent}
+                  </div>
+                </BottomSheet>
+              ) : (
+                <Portal>
+                  <div
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${insightSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    style={{ zIndex: insightSheetZIndex }}
+                    onClick={() => setInsightSheetOpen(false)}
+                  >
+                    <div
+                      className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${insightSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                        <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                          <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</h2>
+                          <Button variant="filled" onClick={() => setInsightSheetOpen(false)} size="icon">
+                            <XIcon className="h-5 w-5" />
+                          </Button>
+                        </header>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                          {insightsContent}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </Portal>
+                </Portal>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      <Dropdown
-        align="right"
-        width="w-40"
-        showChevron={false}
-        trigger={
-          <Button variant="outline" size="icon" disabled={!exportHandler}>
-            <DownloadIcon size={14} />
-          </Button>
-        }
-      >
-        <DropdownItem onClick={() => exportHandler?.("xlsx")}>Excel (.xlsx)</DropdownItem>
-        <DropdownItem onClick={() => exportHandler?.("csv")}>CSV (.csv)</DropdownItem>
-      </Dropdown>
+          <Dropdown
+            align="right"
+            width="w-40"
+            showChevron={false}
+            fullWidth={false}
+            className="inline-block w-fit shrink-0"
+            trigger={
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                disabled={!exportHandler}
+                aria-label="Exportar relatório"
+                title="Exportar"
+              >
+                <DownloadIcon size={14} />
+              </Button>
+            }
+          >
+            <DropdownItem onClick={() => exportHandler?.("xlsx")}>Excel (.xlsx)</DropdownItem>
+            <DropdownItem onClick={() => exportHandler?.("csv")}>CSV (.csv)</DropdownItem>
+          </Dropdown>
+        </div>
 
-      <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full overflow-hidden">
-        <Dropdown
-          align="left"
-          width="w-44"
-          trigger={
-            <button className="flex items-center gap-1.5 text-[13px] font-bold text-brand-dark dark:text-dark-heading pl-4 pr-3 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors whitespace-nowrap cursor-pointer">
-              {PERIOD_LABELS[period]}
-            </button>
-          }
-        >
-          {PERIOD_OPTIONS.map((p) => (
-            <DropdownItem key={p} onClick={() => {
-              updateParams({ period: p, compare: "", compareFrom: "", compareTo: "" })
-            }}>
-              {PERIOD_LABELS[p]}
-            </DropdownItem>
-          ))}
-        </Dropdown>
-        <div className="w-px h-5 bg-brand-border dark:bg-dark-border" />
-        <Dropdown
-          align="right"
-          width="w-52"
-          showChevron={false}
-          trigger={
-            <button className="flex items-center justify-center w-9 h-9 rounded-full p-0 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors cursor-pointer text-brand-dark dark:text-dark-heading">
-              <FilterIcon size={14} />
-            </button>
-          }
-        >
-          {COMPARE_PRESETS.map((c) => (
-            <DropdownItem key={c} onClick={() => handleCompareSelect(c)}>
-              {COMPARE_PRESET_LABELS[c]}
-            </DropdownItem>
-          ))}
-        </Dropdown>
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden rounded-full border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface xl:w-[260px] xl:flex-none">
+          <Dropdown
+            align="left"
+            width="w-44"
+            showChevron={false}
+            className="min-w-0 flex-1"
+            trigger={
+              <button
+                type="button"
+                className="flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-l-full pl-4 pr-3 text-[13px] font-bold text-brand-dark transition-colors hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border cursor-pointer"
+              >
+                <span className="truncate">{PERIOD_LABELS[period]}</span>
+                <ChevronDownIcon className="h-4 w-4 shrink-0 text-brand-inactive-text dark:text-dark-body" />
+              </button>
+            }
+          >
+            {PERIOD_OPTIONS.map((p) => (
+              <DropdownItem key={p} onClick={() => {
+                updateParams({ period: p, compare: "", compareFrom: "", compareTo: "" })
+              }}>
+                {PERIOD_LABELS[p]}
+              </DropdownItem>
+            ))}
+          </Dropdown>
+          <div className="h-5 w-px shrink-0 bg-brand-border dark:bg-dark-border" />
+          <Dropdown
+            align="right"
+            width="w-52"
+            showChevron={false}
+            className="shrink-0"
+            trigger={
+              <button
+                type="button"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full p-0 text-brand-dark transition-colors hover:bg-brand-green-light dark:text-dark-heading dark:hover:bg-dark-border cursor-pointer"
+                aria-label="Comparar com outro período"
+                title="Comparar período"
+              >
+                <FilterIcon size={14} />
+              </button>
+            }
+          >
+            {COMPARE_PRESETS.map((c) => (
+              <DropdownItem key={c} onClick={() => handleCompareSelect(c)}>
+                {COMPARE_PRESET_LABELS[c]}
+              </DropdownItem>
+            ))}
+          </Dropdown>
+        </div>
       </div>
 
       {compare === "custom" && (
-        <div className="flex items-center gap-2">
+        <div className="mt-2 grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:flex xl:w-fit xl:justify-end">
           <input
             type="date"
             value={compareFrom}
             max={maxDate}
             onChange={(e) => handleCustomDateChange("compareFrom", e.target.value)}
-            className="h-8 px-2 text-xs font-medium border border-brand-border dark:border-dark-border rounded-[8px] bg-transparent text-brand-dark dark:text-dark-heading"
+            className="h-8 w-full min-w-0 rounded-[8px] border border-brand-border bg-transparent px-2 text-xs font-medium text-brand-dark dark:border-dark-border dark:text-dark-heading sm:w-[9.5rem]"
+            aria-label="Data inicial do período de comparação"
           />
           <span className="text-[11px] text-brand-inactive-text">até</span>
           <input
@@ -190,7 +205,8 @@ export function GlobalPeriodFilter() {
             value={compareTo}
             max={maxDate}
             onChange={(e) => handleCustomDateChange("compareTo", e.target.value)}
-            className="h-8 px-2 text-xs font-medium border border-brand-border dark:border-dark-border rounded-[8px] bg-transparent text-brand-dark dark:text-dark-heading"
+            className="h-8 w-full min-w-0 rounded-[8px] border border-brand-border bg-transparent px-2 text-xs font-medium text-brand-dark dark:border-dark-border dark:text-dark-heading sm:w-[9.5rem]"
+            aria-label="Data final do período de comparação"
           />
         </div>
       )}

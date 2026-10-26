@@ -12,7 +12,7 @@ export default async function PaymentPendingPage({
   searchParams: Promise<{ order_id?: string }>
 }) {
   const params = await searchParams
-  const orderId = params.order_id
+  const orderId = params.order_id || (params as any).external_reference
 
   if (!orderId) {
     redirect("/")

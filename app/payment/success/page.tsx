@@ -12,8 +12,8 @@ export default async function PaymentSuccessPage({
   searchParams: Promise<{ order_id?: string; payment_id?: string }>
 }) {
   const params = await searchParams
-  const orderId = params.order_id
-  const paymentId = params.payment_id
+  const orderId = params.order_id || (params as any).external_reference
+  const paymentId = params.payment_id || (params as any).collection_id
 
   if (!orderId) {
     redirect("/")

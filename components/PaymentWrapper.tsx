@@ -202,6 +202,7 @@ export function PaymentWrapper({
     const bricksBuilderRef = useRef<any>(null)
     const brickIdRef = useRef<any>(null)
     const brickInitializedRef = useRef(false)
+    const preferenceDataRef = useRef<any>(null)
     const [manualPixQrCode, setManualPixQrCode] = useState<string | null>(null)
     const [manualPixPayload, setManualPixPayload] = useState<string | null>(null)
 
@@ -403,12 +404,15 @@ export function PaymentWrapper({
                 return
             }
 
+            preferenceDataRef.current = preferenceData
+
             const nameParts = (userName || "").split(" ")
             const brickAmount = Math.round((Number(preferenceData.total_amount || amount) + Number.EPSILON) * 100) / 100
             const brickController = await bricksBuilder.create("payment", "paymentBrick_modal_container", {
                 initialization: {
                     amount: brickAmount,
                     preferenceId: preferenceData.preference_id,
+                    redirectMode: "blank",
                     payer: {
                         firstName: nameParts[0] || "",
                         lastName: nameParts.slice(1).join(" ") || "",
@@ -531,13 +535,30 @@ export function PaymentWrapper({
         setIsProcessingBrick(true)
         setBrickError(null)
         try {
-            const resolvedFormData = formData.formData || formData
+            const resolvedFormData = formData?.formData || formData || {}
+            const selectedPaymentMethod = formData?.selectedPaymentMethod || resolvedFormData?.selectedPaymentMethod || ""
+            const isWalletPurchase =
+                selectedPaymentMethod === "wallet_purchase" ||
+                selectedPaymentMethod === "account_money" ||
+                selectedPaymentMethod === "consumer_credits" ||
+                selectedPaymentMethod === "onboarding_credits" ||
+                (!resolvedFormData?.payment_method_id && !resolvedFormData?.token)
+
+            const payloadFormData = {
+                ...resolvedFormData,
+                payment_method_id: resolvedFormData?.payment_method_id || (isWalletPurchase ? "wallet_purchase" : undefined),
+            }
+
             const deviceId = (window as any).MP_DEVICE_SESSION_ID || null
 
             const doSubmit = async () => await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
                 method: "POST",
                 body: {
-                    paymentFormData: resolvedFormData,
+                    paymentFormData: payloadFormData,
+                    isWalletPurchase: Boolean(isWalletPurchase),
+                    selectedPaymentMethod: selectedPaymentMethod || (isWalletPurchase ? "wallet_purchase" : undefined),
+                    preferenceId: preferenceDataRef.current?.preference_id,
+                    initPoint: preferenceDataRef.current?.init_point,
                     deviceId,
                     items: orderDetails.items,
                     partnerId,
@@ -572,12 +593,17 @@ export function PaymentWrapper({
             }
             const status = responseData.paymentStatus || responseData.status
             const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
+            const isWallet = Boolean(responseData.isWalletPurchase || isWalletPurchase)
 
             if (responseData.orderId) setActualOrderId(responseData.orderId)
             if (responseData.orderNumber) setActualOrderNumber(responseData.orderNumber)
 
-            if (status === "approved") {
+            if (isWallet) {
+                setStep("mp_redirect")
+                notification.info("Mercado Pago", "Conclua o pagamento na aba do Mercado Pago.")
+            } else if (status === "approved") {
                 setPaymentConfirmed(true)
+                setStep("success")
                 notification.success("Pagamento Aprovado!", "Seu pedido foi confirmado com sucesso.")
             } else if (status === "pending" && paymentMethod === "pix") {
                 const pix = responseData.pixData
@@ -696,6 +722,7 @@ export function PaymentWrapper({
 
     useEffect(() => {
         if (paymentConfirmed) {
+            setStep("success")
             const duration = 2000
             const animationEnd = Date.now() + duration
             const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 200 }
@@ -723,6 +750,7 @@ export function PaymentWrapper({
             if (record?.situation === "paid" || record?.payment_status === "approved") {
                 if (record.order_number) setActualOrderNumber(record.order_number)
                 setPaymentConfirmed(true)
+                setStep("success")
             }
         },
     })
@@ -752,6 +780,7 @@ export function PaymentWrapper({
                 if (data.newStatus === "paid" || data.paymentStatus === "approved") {
                     if (data.orderNumber) setActualOrderNumber(data.orderNumber)
                     setPaymentConfirmed(true)
+                    setStep("success")
                 } else if (!silent) {
                     // Notifica que ainda está pendente
                     notification.info("Aguardando Aprovação", "Seu pagamento ainda não foi confirmado pelo banco. Se você já pagou, aguarde uns instantes e tente novamente.")
@@ -769,17 +798,17 @@ export function PaymentWrapper({
         }
     }
 
-    // Auto-polling & Tab focus listener while waiting for Pix payment
+    // Auto-polling & Tab focus listener while waiting for Pix or MP Redirect payment
     useEffect(() => {
         const targetOrderId = actualOrderId || orderId
-        if (!open || paymentConfirmed || !targetOrderId || targetOrderId.startsWith("temp-") || step !== "pix") return
+        if (!open || paymentConfirmed || !targetOrderId || targetOrderId.startsWith("temp-") || (step !== "pix" && step !== "mp_redirect")) return
 
         // 1. Gentle background poll every 3.5 seconds
         const pollInterval = setInterval(() => {
             void checkPaymentStatus(true)
         }, 3500)
 
-        // 2. Check immediately when returning to tab (e.g. customer paid in banking app and returned)
+        // 2. Check immediately when returning to tab (e.g. customer paid in banking app or MP tab and returned)
         const handleVisibilityOrFocus = () => {
             if (document.visibilityState === "visible") {
                 void checkPaymentStatus(true)
@@ -1368,23 +1397,76 @@ export function PaymentWrapper({
                                 placeholderType="image"
                                 imageSrc="https://img.dudit.com.br/static/mascots/Aguarde.png"
                                 imageAlt="Aguarde"
-                                title="Finalize o pagamento pelo Mercado Pago"
-                                subtitle="Uma nova aba foi aberta para você concluir o pagamento com segurança pelo Mercado Pago. Assim que tudo estiver certo, seu pedido será confirmado automaticamente!"
+                                title="Finalize no Mercado Pago"
+                                subtitle="Uma nova aba foi aberta para você concluir com Saldo Mercado Pago ou Mercado Parcelado. Assim que você concluir, confirmaremos seu pedido automaticamente!"
                             />
 
                             <div className="w-full max-w-md flex flex-col gap-4 mt-6">
-                                <Button asChild className="w-full h-12">
-                                    <Link href="/pedidos" prefetch={false}>
-                                        Acompanhar meus Pedidos
-                                    </Link>
-                                </Button>
-                                <Separator />
-                                <button
-                                    onClick={handleClose}
-                                    className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors"
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/20">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Pedido</span>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">#{resolvedOrderNumber || "Processando"}</span>
+                                    </div>
+                                    <div className="flex flex-col text-right">
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">Total</span>
+                                        <span className="text-base font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                    </div>
+                                </div>
+
+                                <InfoCard
+                                    message="Assim que você concluir o pagamento no Mercado Pago, esta tela atualizará automaticamente em tempo real."
+                                    color="orange"
+                                    className="w-full"
+                                />
+
+                                {preferenceDataRef.current?.init_point && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (preferenceDataRef.current?.init_point) {
+                                                window.open(preferenceDataRef.current.init_point, "_blank")
+                                            }
+                                        }}
+                                        className="w-full h-11 flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                            <polyline points="15 3 21 3 21 9" />
+                                            <line x1="10" y1="14" x2="21" y2="3" />
+                                        </svg>
+                                        Abrir Mercado Pago novamente
+                                    </Button>
+                                )}
+
+                                <Button
+                                    onClick={() => checkPaymentStatus(false)}
+                                    disabled={isChecking}
+                                    className="w-full h-12 flex items-center justify-center gap-2"
                                 >
-                                    Voltar
-                                </button>
+                                    {isChecking ? (
+                                        <>
+                                            <Spinner className="text-white mr-2" size={18} />
+                                            Verificando pagamento...
+                                        </>
+                                    ) : (
+                                        "Já paguei, verificar agora"
+                                    )}
+                                </Button>
+
+                                <div className="flex flex-col gap-4 mt-2">
+                                    <Separator />
+                                    <Button asChild variant="link" className="w-full">
+                                        <Link href="/pedidos" prefetch={false}>
+                                            Acompanhar meus Pedidos
+                                        </Link>
+                                    </Button>
+                                    <button
+                                        onClick={handleClose}
+                                        className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors"
+                                    >
+                                        Voltar
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     )}

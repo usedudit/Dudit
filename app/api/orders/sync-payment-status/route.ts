@@ -92,11 +92,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!order.mp_payment_id) {
-      SecureLogger.error("Missing Mercado Pago payment id during sync", { orderId })
-      return NextResponse.json({ error: "No Mercado Pago payment info found" }, { status: 400 })
-    }
-
     let mpAccessToken: string
     try {
       mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)
@@ -108,24 +103,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payment configuration unavailable" }, { status: 500 })
     }
 
-    const mpResponse = await fetch(
-      `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${mpAccessToken}`,
+    let paymentData: any = null
+
+    if (order.mp_payment_id) {
+      const mpResponse = await fetch(
+        `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${mpAccessToken}`,
+          },
         },
-      },
-    )
+      )
 
-    if (!mpResponse.ok) {
-      SecureLogger.error("Failed to fetch payment status from MP", {
-        orderId,
-        status: mpResponse.status,
-      })
-      return NextResponse.json({ error: "Failed to fetch payment status" }, { status: 500 })
+      if (!mpResponse.ok) {
+        SecureLogger.error("Failed to fetch payment status from MP", {
+          orderId,
+          status: mpResponse.status,
+        })
+        return NextResponse.json({ error: "Failed to fetch payment status" }, { status: 500 })
+      }
+
+      paymentData = await mpResponse.json()
+    } else {
+      // Payment Brick wallet purchase or redirect fallback: search by external_reference
+      try {
+        const searchResponse = await fetch(
+          `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(order.id)}&sort=date_created&criteria=desc`,
+          {
+            headers: {
+              Authorization: `Bearer ${mpAccessToken}`,
+            },
+          },
+        )
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json()
+          const results = searchData?.results || []
+          if (results.length > 0) {
+            paymentData = results[0]
+            if (paymentData?.id) {
+              await supabaseAdmin
+                .from("orders")
+                .update({ mp_payment_id: String(paymentData.id) })
+                .eq("id", order.id)
+            }
+          }
+        }
+      } catch (err: any) {
+        SecureLogger.error("Failed searching MP payments by external_reference", {
+          orderId,
+          error: err?.message,
+        })
+      }
+
+      if (!paymentData) {
+        return NextResponse.json({
+          success: true,
+          orderId: order.id,
+          orderNumber: order.order_number,
+          previousStatus: order.situation,
+          newStatus: order.situation,
+          updated: false,
+          reason: "awaiting_payment_submission",
+        })
+      }
     }
-
-    const paymentData = await mpResponse.json()
 
     if (paymentData.status === "approved" && paymentData.transaction_amount != null) {
       const { validateMpTransactionAmount } = await import("@/lib/payments/mp-order-payment-update")
