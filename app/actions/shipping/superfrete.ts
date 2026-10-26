@@ -44,6 +44,11 @@ import {
   type PartnerIntegrationRow,
 } from "@/lib/services/shipping/superfrete-integration"
 
+// Versão do fluxo de webhook. A versão 2 passou a salvar o secret_token real
+// devolvido pela SuperFrete na criação; conexões antigas gravaram um UUID local
+// e precisam recriar o webhook para voltar a receber eventos.
+const SUPERFRETE_WEBHOOK_SETUP_VERSION = 2
+
 export interface SuperFreteStatus {
   connected: boolean
   email?: string
@@ -112,7 +117,11 @@ export async function getSuperFreteStatusAction(): Promise<{
         email: userEmail,
         connectedAt: integration?.connected_at,
         balance,
-        webhookConfigured: Boolean(integration?.webhook_id),
+        webhookConfigured: Boolean(
+          integration?.webhook_id &&
+            (integration.config as Record<string, any> | null)?.webhook_version ===
+              SUPERFRETE_WEBHOOK_SETUP_VERSION,
+        ),
         planAllowed,
         config: (integration?.config as SuperFreteConfig) || null,
       },
@@ -129,9 +138,14 @@ export async function getSuperFreteStatusAction(): Promise<{
 
 export async function connectSuperFreteAction(payload: {
   token: string
-  webhookSecret?: string
   environment?: SuperFreteEnvironment
-}): Promise<{ success: boolean; error?: string; balance?: number; email?: string }> {
+}): Promise<{
+  success: boolean
+  error?: string
+  balance?: number
+  email?: string
+  webhookConfigured?: boolean
+}> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
   const user = await requireUser()
@@ -168,10 +182,6 @@ export async function connectSuperFreteAction(payload: {
 
     const encryptedToken = encrypt(token, "superfrete")
 
-    const webhookSecret = payload.webhookSecret
-      ? encrypt(payload.webhookSecret.trim(), "superfrete")
-      : null
-
     const { error } = await supabase.from("partner_integrations").upsert(
       {
         partner_id: ctx.partnerId,
@@ -180,7 +190,11 @@ export async function connectSuperFreteAction(payload: {
         account_id: userInfo.id || null,
         account_email: userInfo.email || null,
         access_token_encrypted: encryptedToken,
-        webhook_secret_encrypted: webhookSecret,
+        // O secret real é gerado pela SuperFrete na criação do webhook e só
+        // pode ser capturado nesse momento. Limpamos o que existia para o
+        // setup abaixo gravar o par webhook_id/secret correto.
+        webhook_id: null,
+        webhook_secret_encrypted: null,
         connected_at: new Date().toISOString(),
         disconnected_at: null,
         config: { ...existingConfig, environment },
@@ -192,8 +206,10 @@ export async function connectSuperFreteAction(payload: {
       return { success: false, error: error.message }
     }
 
+    let webhookConfigured = false
     try {
-      await setupSuperFreteWebhookInternal(ctx.partnerId, token, webhookSecret)
+      await setupSuperFreteWebhookInternal(ctx.partnerId, token)
+      webhookConfigured = true
     } catch (webhookErr: any) {
       console.warn("[SuperFrete] Webhook registration failed (non-blocking):", webhookErr.message)
     }
@@ -205,6 +221,7 @@ export async function connectSuperFreteAction(payload: {
       success: true,
       balance: userInfo.balance,
       email: userInfo.email,
+      webhookConfigured,
     }
   } catch (err: any) {
     captureError(err, {
@@ -235,7 +252,20 @@ export async function disconnectSuperFreteAction(): Promise<{ success: boolean; 
 
     if (client) {
       try {
-        await client.listWebhooks()
+        const webhooks = await client.listWebhooks()
+        const targets = (webhooks || []).filter(
+          (w: any) =>
+            w?.id &&
+            (w.id === integration?.webhook_id ||
+              (typeof w.url === "string" && w.url.includes("api/shipping/superfrete/webhook"))),
+        )
+        for (const webhook of targets) {
+          try {
+            await client.deleteWebhook(String(webhook.id))
+          } catch (delErr) {
+            console.warn("[SuperFrete] Falha ao remover webhook ao desconectar:", delErr)
+          }
+        }
       } catch (err) {
         console.warn("[SuperFrete] Error during disconnect webhook cleanup:", err)
       }
@@ -339,72 +369,89 @@ function clampNumber(value: unknown, min: number, max: number): number | undefin
   return Math.min(max, Math.max(min, num))
 }
 
-async function setupSuperFreteWebhookInternal(
-  partnerId: string,
-  token: string,
-  webhookSecretEncrypted: string | null,
-): Promise<void> {
+async function setupSuperFreteWebhookInternal(partnerId: string, token: string): Promise<void> {
   try {
     const supabase = getAdminClient()
     const integration = await getSuperFreteIntegration(supabase, partnerId)
     const environment = resolveSuperFreteEnvironment((integration?.config as SuperFreteConfig)?.environment)
     const client = createSuperFreteClient(token, undefined, environment)
 
-    // Check if a webhook is already registered
-    const existingWebhooks = await client.listWebhooks().catch(() => [] as any[])
-    const existing = (existingWebhooks || []).find(
-      (w: any) => w.url?.includes("api/shipping/superfrete/webhook"),
-    )
-
-    let learnedSecret: string | null = null
-    let webhookId: string | null = existing?.id || null
-
-    if (existing && webhookSecretEncrypted) {
-      // Secret já conhecido (fornecido na conexão): apenas sincroniza URL/eventos.
-      await client.updateWebhook(existing.id, {
-        name: "Dudit ERP Integration",
-        url: SUPERFRETE_WEBHOOK_URL,
-        events: DEFAULT_SUPERFRETE_EVENTS,
-        is_active: true,
-      })
-    } else {
-      // Sem secret armazenado: (re)criar o webhook para capturar o
-      // secret_token retornado pela API - sem ele a rota de eventos
-      // rejeita todas as notificações (401).
-      if (existing) {
-        try {
-          await client.deleteWebhook(existing.id)
-        } catch (delErr) {
-          console.warn("[SuperFrete] Falha ao remover webhook antigo:", delErr)
-        }
-      }
-      const created: any = await client.createWebhook(
-        "Dudit ERP Integration",
-        SUPERFRETE_WEBHOOK_URL,
-        DEFAULT_SUPERFRETE_EVENTS,
+    try {
+      new URL(SUPERFRETE_WEBHOOK_URL)
+    } catch {
+      throw new Error(
+        "NEXT_PUBLIC_APP_URL/NEXT_PUBLIC_SITE_URL inválida: não é possível registrar o webhook da SuperFrete.",
       )
-      if (created?.id) webhookId = String(created.id)
-      if (created?.secret_token) learnedSecret = String(created.secret_token)
     }
 
-    const patch: Record<string, unknown> = { webhook_id: webhookId || "pending" }
-    if (!webhookSecretEncrypted && learnedSecret) {
-      patch.webhook_secret_encrypted = encrypt(learnedSecret, "superfrete")
+    // A API da SuperFrete só devolve o secret_token na criação do webhook e
+    // não permite consultá-lo depois. Recriamos o webhook da Dudit para
+    // garantir que o secret salvo seja exatamente o usado pela SuperFrete
+    // para assinar os eventos (o fluxo antigo salvava um UUID local e toda
+    // notificação era rejeitada com 401).
+    const existingWebhooks = await client.listWebhooks()
+    const staleWebhooks = (existingWebhooks || []).filter(
+      (w: any) => w?.id && typeof w.url === "string" && w.url.includes("api/shipping/superfrete/webhook"),
+    )
+
+    // Invalida o par antigo antes de remover o webhook: se a recriação falhar,
+    // a integração fica explicitamente "não configurada" (e a UI oferece
+    // reativar) em vez de continuar anunciando um secret que já não existe.
+    const { error: clearError } = await supabase
+      .from("partner_integrations")
+      .update({ webhook_id: null, webhook_secret_encrypted: null })
+      .eq("partner_id", partnerId)
+      .eq("provider_slug", SUPERFRETE_PROVIDER)
+
+    if (clearError) {
+      throw new Error(`Falha ao limpar webhook antigo da SuperFrete: ${clearError.message}`)
+    }
+
+    for (const webhook of staleWebhooks) {
+      try {
+        await client.deleteWebhook(String(webhook.id))
+      } catch (delErr) {
+        console.warn("[SuperFrete] Falha ao remover webhook antigo:", delErr)
+      }
+    }
+
+    const created: any = await client.createWebhook(
+      "Dudit ERP Integration",
+      SUPERFRETE_WEBHOOK_URL,
+      DEFAULT_SUPERFRETE_EVENTS,
+    )
+    const webhookId = created?.id ? String(created.id) : null
+    const secretToken = created?.secret_token ? String(created.secret_token) : null
+
+    if (!webhookId || !secretToken) {
+      // Não deixa um webhook sem secret válido ativo: ele só geraria 401s.
+      if (webhookId) {
+        try {
+          await client.deleteWebhook(webhookId)
+        } catch (delErr) {
+          console.warn("[SuperFrete] Falha ao remover webhook sem secret:", delErr)
+        }
+      }
+      throw new Error(
+        "SuperFrete não retornou id/secret_token do webhook; atualização automática de status indisponível.",
+      )
     }
 
     const { error } = await supabase
       .from("partner_integrations")
-      .update(patch)
+      .update({
+        webhook_id: webhookId,
+        webhook_secret_encrypted: encrypt(secretToken, "superfrete"),
+        config: {
+          ...((integration?.config as Record<string, any> | null) || {}),
+          webhook_version: SUPERFRETE_WEBHOOK_SETUP_VERSION,
+        },
+      })
       .eq("partner_id", partnerId)
       .eq("provider_slug", SUPERFRETE_PROVIDER)
 
     if (error) {
-      console.warn("[SuperFrete] Failed to save webhook ID:", error.message)
-    }
-    if (!webhookSecretEncrypted && !learnedSecret) {
-      console.warn(
-        "[SuperFrete] Webhook criado mas a API não retornou secret_token; reconecte para os eventos serem aceitos.",
-      )
+      throw new Error(`Falha ao salvar webhook da SuperFrete: ${error.message}`)
     }
   } catch (err) {
     console.error("[SuperFrete] Webhook setup failed:", err)
@@ -1075,11 +1122,9 @@ export async function setupSuperFreteWebhookAction(): Promise<{ success: boolean
 
   try {
     const token = decrypt(integration.access_token_encrypted, SUPERFRETE_PROVIDER)
-    await setupSuperFreteWebhookInternal(
-      ctx.partnerId,
-      token,
-      integration.webhook_secret_encrypted,
-    )
+    await setupSuperFreteWebhookInternal(ctx.partnerId, token)
+
+    await revalidatePath("/erp/configuracoes/integracoes")
 
     return { success: true }
   } catch (err: any) {

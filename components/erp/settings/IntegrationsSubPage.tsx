@@ -136,6 +136,7 @@ export const IntegrationsSubPage = ({
     const [sfReceipt, setSfReceipt] = useState(false)
     const [sfServices, setSfServices] = useState<SuperFreteServiceId[]>([1, 2])
     const [sfIsConnecting, setSfIsConnecting] = useState(false)
+    const [sfIsFixingWebhook, setSfIsFixingWebhook] = useState(false)
 
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
@@ -462,13 +463,15 @@ export const IntegrationsSubPage = ({
         try {
             const res = await connectSuperFreteAction({
                 token: sfTokenInput,
-                webhookSecret: crypto.randomUUID(),
                 environment: sfEnvironment,
             })
             if (res.success) {
                 toast.success("SuperFrete conectado com sucesso!")
                 if (res.balance !== undefined) {
                     toast.success(`Saldo atual: R$ ${Number(res.balance).toFixed(2)}`)
+                }
+                if (res.webhookConfigured === false) {
+                    toast.warning("Conta conectada, mas a atualização automática de status não foi ativada. Use \"Ativar agora\" na aba Conectar.")
                 }
                 setActiveModal(null)
                 await fetchSfStatus()
@@ -479,6 +482,23 @@ export const IntegrationsSubPage = ({
             toast.error(`Erro: ${err.message}`)
         } finally {
             setSfIsConnecting(false)
+        }
+    }
+
+    const handleSfSetupWebhook = async () => {
+        setSfIsFixingWebhook(true)
+        try {
+            const res = await setupSuperFreteWebhookAction()
+            if (res.success) {
+                toast.success("Atualização automática de status ativada!")
+                await fetchSfStatus()
+            } else {
+                toast.error(res.error || "Erro ao ativar atualização automática")
+            }
+        } catch (err: any) {
+            toast.error(`Erro: ${err.message}`)
+        } finally {
+            setSfIsFixingWebhook(false)
         }
     }
 
@@ -884,6 +904,11 @@ export const IntegrationsSubPage = ({
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
                                         Conecte sua conta para gerar etiquetas de frete nacional com Correios, JadLog e mais.
                                     </p>
+                                    {(sfStatus?.connected || superfreteConnected) && sfStatus?.webhookConfigured === false && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">
+                                            Atualização automática de status desativada — abra "Configurar" para ativar.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="mt-4">
@@ -969,6 +994,25 @@ export const IntegrationsSubPage = ({
                                         }
                                     />
                                 )}
+                                {(sfStatus?.connected || superfreteConnected) && sfStatus?.webhookConfigured === false && (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4 space-y-2">
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                            Atualização automática de status desativada
+                                        </p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            Sem o webhook, os status de postagem e entrega só mudam manualmente.
+                                            Ative para receber as atualizações da SuperFrete em tempo real.
+                                        </p>
+                                        <Button
+                                            className="w-full"
+                                            isLoading={sfIsFixingWebhook}
+                                            disabled={sfIsFixingWebhook}
+                                            onClick={handleSfSetupWebhook}
+                                        >
+                                            {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
+                                        </Button>
+                                    </div>
+                                )}
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                     Conecte sua conta SuperFrete informando o token de API gerado em https://sandbox.superfrete.com/#/integrations
                                 </p>
@@ -1019,6 +1063,24 @@ export const IntegrationsSubPage = ({
 
                         <TabsContent value="settings" className="mt-0">
                             <div className="space-y-4">
+                                {sfStatus?.connected && sfStatus?.webhookConfigured === false && (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4 space-y-2">
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                            Atualização automática de status desativada
+                                        </p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            Sem o webhook, os status de postagem e entrega só mudam manualmente.
+                                        </p>
+                                        <Button
+                                            className="w-full"
+                                            isLoading={sfIsFixingWebhook}
+                                            disabled={sfIsFixingWebhook}
+                                            onClick={handleSfSetupWebhook}
+                                        >
+                                            {sfIsFixingWebhook ? "Ativando..." : "Ativar agora"}
+                                        </Button>
+                                    </div>
+                                )}
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                     Configure as preferências padrão para geração de etiquetas.
                                 </p>
