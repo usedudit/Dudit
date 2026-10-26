@@ -159,9 +159,10 @@ export async function uploadPlanilhaAction(
       return { success: false, error: "Erro ao persistir sessão de importação. Verifique a conexão com Redis." }
     }
 
-    const previewProducts = readResult.rows.slice(0, 50).map((row, i) =>
-      rowToPreviewEntity(detectedEntity, row, mapping, i)
-    )
+    const previewProducts = readResult.rows.map((row, i) => {
+        const entity = rowToPreviewEntity(detectedEntity, row, mapping, i)
+        return { ...entity, _rowIndex: i }
+    })
 
     return {
       success: true,
@@ -346,9 +347,10 @@ export async function applyMappingAction(
 
     const validation = validateMappingCompatibility(mapping, session.entityType, session.rows)
 
-    const previewProducts = session.rows.slice(0, 50).map((row, i) =>
-      rowToPreviewEntity(session.entityType, row, mapping, i)
-    )
+    const previewProducts = session.rows.slice(0, 50).map((row, i) => {
+        const entity = rowToPreviewEntity(session.entityType, row, mapping, i)
+        return { ...entity, _rowIndex: i }
+    })
 
     return { success: true, previewProducts, validation }
   } catch (err: any) {

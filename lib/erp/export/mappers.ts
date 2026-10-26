@@ -247,16 +247,15 @@ export const PRODUCT_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "Estoque Atual", key: "stock", width: 12, type: "number", total: true },
   { header: "Status", key: "status", width: 12, type: "text" },
   { header: "Visibilidade na Loja", key: "visibility", width: 16, type: "text" },
+  { header: "Tipo de Variação", key: "variantType", width: 18, type: "text" },
+  { header: "Variações (Grade)", key: "variants", width: 40, type: "text" },
 ]
 
 export const PRODUCT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...PRODUCT_EXPORT_COLUMNS,
   { header: "Estoque Mínimo", key: "minStock", width: 14, type: "number" },
   { header: "Unidade de Medida", key: "unit", width: 14, type: "text" },
   { header: "Marca", key: "brand", width: 20, type: "text" },
-  { header: "Tipo de Variação", key: "variantType", width: 18, type: "text" },
-  { header: "Variações (Grade)", key: "variants", width: 40, type: "text" },
   { header: "Descrição", key: "description", width: 40, type: "text" },
   { header: "Tipo de Produto", key: "productType", width: 16, type: "text" },
   { header: "Condição", key: "condition", width: 14, type: "text" },
@@ -303,6 +302,8 @@ function resolveProductVariants(row: any): { variantType: string; variants: stri
 }
 
 export function mapProductRow(row: any, includeAllColumns?: boolean): ExportRow {
+  const { variantType, variants } = resolveProductVariants(row)
+
   const base = {
     name: row.name || "-",
     sku: row.sku || "-",
@@ -313,15 +314,14 @@ export function mapProductRow(row: any, includeAllColumns?: boolean): ExportRow 
     stock: Number(row.stock_quantity ?? 0),
     status: row.is_active ? "Ativo" : "Inativo",
     visibility: row.show_in_marketplace === false ? "Não" : "Sim",
+    variantType,
+    variants,
   }
 
   if (!includeAllColumns) return base
 
-  const { variantType, variants } = resolveProductVariants(row)
-
   return {
     ...base,
-    id: row.id || "-",
     minStock: Number(row.min_stock ?? 0),
     unit: row.unit || "-",
     brand: row.brand_rel?.name || row.brand || "-",
@@ -354,7 +354,6 @@ export const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...CUSTOMER_EXPORT_COLUMNS,
   { header: "Telefone Fixo", key: "phoneFixed", width: 18, type: "text" },
   { header: "Data de Nascimento", key: "birthDate", width: 16, type: "date" },
@@ -388,7 +387,6 @@ export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow
 
   return {
     ...base,
-    id: row.id || "-",
     phoneFixed: row.phone_fixed || "-",
     birthDate: row.birth_date ? formatDate(row.birth_date) : "-",
     zipCode: addr.zip_code || "-",
@@ -448,7 +446,6 @@ export const APPOINTMENT_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const APPOINTMENT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...APPOINTMENT_EXPORT_COLUMNS,
   { header: "Telefone / Celular", key: "customerPhone", width: 18, type: "text" },
   { header: "E-mail do Cliente", key: "customerEmail", width: 28, type: "text" },
@@ -491,7 +488,6 @@ export function mapAppointmentRow(row: any, includeAllColumns?: boolean): Export
 
   return {
     ...base,
-    id: row.id || "-",
     customerPhone: cust?.phone || row.customer_phone || "-",
     customerEmail: cust?.email || row.customer_email || "-",
     endDate: row.end_date || "-",
@@ -515,7 +511,6 @@ export const SUBSCRIPTION_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const SUBSCRIPTION_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...SUBSCRIPTION_EXPORT_COLUMNS,
   { header: "Última Cobrança", key: "lastExecution", width: 20, type: "date" },
   { header: "Pausada em", key: "pausedAt", width: 20, type: "date" },
@@ -545,7 +540,6 @@ export function mapSubscriptionRow(row: any, includeAllColumns?: boolean): Expor
 
   return {
     ...base,
-    id: row.id || "-",
     lastExecution: row.last_execution_at ? formatDate(row.last_execution_at) : "-",
     pausedAt: row.paused_at ? formatDate(row.paused_at) : "-",
     cancelledAt: row.cancelled_at ? formatDate(row.cancelled_at) : "-",
@@ -570,7 +564,6 @@ export function applyCustomerStatusFilter(row: any, labels: string[]): boolean {
 // ── Returns (Devoluções) ─────────────────────────────────────────────
 
 export const RETURN_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 12, type: "text" },
   { header: "Data", key: "date", width: 20, type: "datetime" },
   { header: "Cliente", key: "customer", width: 28, type: "text" },
   { header: "Pedido", key: "orderNumber", width: 18, type: "text" },
@@ -673,7 +666,6 @@ export const STOCK_MOVEMENT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   ...STOCK_MOVEMENT_EXPORT_COLUMNS,
   { header: "Observações", key: "notes", width: 30, type: "text" },
   { header: "Tipo Referência", key: "referenceType", width: 18, type: "text" },
-  { header: "ID", key: "id", width: 36, type: "text" },
 ]
 
 const MOVEMENT_TYPE_LABELS: Record<string, string> = {
@@ -734,7 +726,6 @@ export const TRANSACTION_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const TRANSACTION_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...TRANSACTION_EXPORT_COLUMNS,
   { header: "Observações", key: "notes", width: 30, type: "text" },
   { header: "Contato", key: "contact", width: 24, type: "text" },
@@ -784,7 +775,6 @@ export function mapTransactionRow(row: any, includeAllColumns?: boolean): Export
 
   return {
     ...base,
-    id: row.id || "-",
     notes: row.notes || "-",
     contact: contactName,
     contactType: row.contact_type || "-",
@@ -811,7 +801,6 @@ export const SUPPLIER_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const SUPPLIER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...SUPPLIER_EXPORT_COLUMNS,
   { header: "Código", key: "supplierCode", width: 14, type: "text" },
   { header: "Pessoa", key: "personType", width: 8, type: "text" },
@@ -846,7 +835,6 @@ export function mapSupplierRow(row: any, includeAllColumns?: boolean): ExportRow
   const addressParts = [row.street, row.number, row.complement, row.neighborhood].filter(Boolean)
   return {
     ...base,
-    id: row.id || "-",
     supplierCode: row.supplier_code || "-",
     personType: isPJ ? "PJ" : "PF",
     fantasyName: row.nome_fantasia || "-",
@@ -882,7 +870,6 @@ export const SERVICE_ORDER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   { header: "Total Serviços", key: "totalServiceAmount", width: 16, type: "currency", total: true },
   { header: "Total Produtos", key: "totalProductAmount", width: 16, type: "currency", total: true },
   { header: "Concluída em", key: "completedAt", width: 20, type: "datetime" },
-  { header: "ID", key: "id", width: 36, type: "text" },
 ]
 
 const SERVICE_ORDER_STATUS_LABELS: Record<string, string> = {
@@ -938,7 +925,6 @@ export const CASH_REGISTER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   ...CASH_REGISTER_EXPORT_COLUMNS,
   { header: "Valor Calculado", key: "calculatedAmount", width: 16, type: "currency", total: true },
   { header: "Fechado por", key: "closedBy", width: 22, type: "text" },
-  { header: "ID", key: "id", width: 36, type: "text" },
 ]
 
 export function mapCashRegisterRow(row: any, includeAllColumns?: boolean): ExportRow {
@@ -976,7 +962,6 @@ export const XML_IMPORT_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const XML_IMPORT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...XML_IMPORT_EXPORT_COLUMNS,
   { header: "CNPJ/CPF Fornecedor", key: "supplierDocument", width: 18, type: "text" },
   { header: "Data Emissão", key: "invoiceDate", width: 20, type: "datetime" },
@@ -1018,7 +1003,6 @@ export function mapXmlImportRow(row: any, includeAllColumns?: boolean): ExportRo
 
   return {
     ...base,
-    id: row.id || "-",
     supplierDocument: row.supplier_document || "-",
     invoiceDate: row.invoice_date ? formatDateTime(row.invoice_date) : "-",
     model: row.modelo || "-",
@@ -1058,7 +1042,6 @@ export const QUOTE_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   { header: "Observações", key: "notes", width: 30, type: "text" },
   { header: "Criado em", key: "createdAt", width: 20, type: "datetime" },
   { header: "Atualizado em", key: "updatedAt", width: 20, type: "datetime" },
-  { header: "ID", key: "id", width: 36, type: "text" },
 ]
 
 const QUOTE_STATUS_LABELS: Record<string, string> = {
@@ -1105,7 +1088,6 @@ export function mapQuoteRow(row: any, includeAllColumns?: boolean): ExportRow {
     notes: row.notes || "-",
     createdAt: row.created_at ? formatDateTime(row.created_at) : "-",
     updatedAt: row.updated_at ? formatDateTime(row.updated_at) : "-",
-    id: row.id || "-",
   }
 }
 
@@ -1152,7 +1134,6 @@ export const COUPON_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const COUPON_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...COUPON_EXPORT_COLUMNS,
   { header: "Cumulativo", key: "allowCombination", width: 12, type: "text" },
   { header: "Máximo de Desconto", key: "maxDiscountValue", width: 18, type: "currency" },
@@ -1181,7 +1162,6 @@ export function mapCouponRow(row: any, includeAllColumns?: boolean): ExportRow {
 
   return {
     ...base,
-    id: row.id || "-",
     allowCombination: row.allow_combination === false ? "Não" : "Sim",
     maxDiscountValue:
       row.max_discount_value != null ? formatCurrency(Number(row.max_discount_value)) : "-",
@@ -1214,7 +1194,6 @@ export const DELIVERY_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const DELIVERY_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...DELIVERY_EXPORT_COLUMNS,
   { header: "Concluído em", key: "completedAt", width: 18, type: "datetime" },
   { header: "Endereços", key: "addresses", width: 40, type: "text" },
@@ -1246,7 +1225,6 @@ export function mapDeliveryRow(row: any, includeAllColumns?: boolean): ExportRow
 
   return {
     ...base,
-    id: row.id || "-",
     completedAt: row.completed_at ? formatDateTime(row.completed_at) : "-",
     addresses:
       [...new Set(orders.map((o) => o.delivery_address).filter(Boolean))].join(" | ") || "-",
@@ -1267,11 +1245,7 @@ export const REVIEW_EXPORT_COLUMNS: ExportColumnDef[] = [
 ]
 
 export const REVIEW_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "ID", key: "id", width: 36, type: "text" },
   ...REVIEW_EXPORT_COLUMNS,
-  { header: "ID do Pedido", key: "orderId", width: 36, type: "text" },
-  { header: "ID do Produto", key: "productId", width: 36, type: "text" },
-  { header: "ID do Serviço", key: "serviceId", width: 36, type: "text" },
 ]
 
 export function mapReviewRow(row: any, includeAllColumns?: boolean): ExportRow {
@@ -1292,9 +1266,5 @@ export function mapReviewRow(row: any, includeAllColumns?: boolean): ExportRow {
 
   return {
     ...base,
-    id: row.id || "-",
-    orderId: row.order_id || "-",
-    productId: row.product_id || "-",
-    serviceId: row.service_id || "-",
   }
 }

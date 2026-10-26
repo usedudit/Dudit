@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Combobox, FormSection, Input, ListItem, RadioButton, InfoCard, FloatingActionBar } from "@/components/reusable"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Combobox, FormSection, Input, ListItem, RadioButton, InfoCard, FloatingActionBar, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, DownloadIcon, AlertCircleIcon, SearchIcon, GridIcon, ListIcon, TrashIcon, XIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
@@ -225,6 +225,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
     const [mapping, setMapping] = useState<ColumnMapping[]>([])
     const [availableFields, setAvailableFields] = useState<FieldOption[]>([])
     const [parsedProducts, setParsedProducts] = useState<Product[]>([])
+    const [excludedRowIndexes, setExcludedRowIndexes] = useState<number[]>([])
 
     // Options
     const [duplicateStrategy, setDuplicateStrategy] = useState<"update" | "skip">("update")
@@ -250,6 +251,9 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
     const [selection, setSelection] = useState<Set<string>>(new Set())
     const [viewMode, setViewMode] = useState<"grid" | "list">("list")
     const [activeTab, setActiveTab] = useState<"all" | "normal" | "low" | "out_of_stock" | "archived">("all")
+
+    // Confirmation modal for bulk removal
+    const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false)
 
     // UI Scroll States
     const [isScrolled, setIsScrolled] = useState(false)
@@ -448,6 +452,7 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
             autoCreateBrands,
             autoCreateSuppliers,
             skipErrors: true,
+            excludeRowIndexes: Array.from(new Set(excludedRowIndexes)),
         })
 
         if (!result.success && !result.result) {
@@ -490,16 +495,17 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
 
     // Remove selected items from the import list
     const removeSelectedItems = useCallback(() => {
-        setSelection((prev) => {
-            const next = new Set(prev)
-            const idsToRemove = Array.from(next)
-            next.clear()
-            setParsedProducts((prevProducts) =>
-                prevProducts.filter((p: any) => !idsToRemove.includes(p.id))
-            )
-            return next
+        setParsedProducts((prevProducts) => {
+            const indexesToRemove = prevProducts
+                .filter((p: any) => selection.has(p.id))
+                .map((p: any) => p._rowIndex)
+                .filter((index: number | undefined) => index !== undefined) as number[]
+            setExcludedRowIndexes((prev) => Array.from(new Set([...prev, ...indexesToRemove])))
+            return prevProducts.filter((p: any) => !selection.has(p.id))
         })
-    }, [])
+        setSelection(new Set())
+        setIsRemoveModalOpen(false)
+    }, [selection])
 
     if (importDone && importStats) {
         return (
@@ -838,13 +844,26 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                         >
                                             <Button
                                                 variant="ghostred"
-                                                onClick={removeSelectedItems}
+                                                onClick={() => setIsRemoveModalOpen(true)}
                                                 leftIcon={<TrashIcon size={18} />}
                                                 className="h-10 px-3"
                                             >
                                                 Remover
                                             </Button>
                                         </FloatingActionBar>
+
+                                            <AlertModal
+                                                isOpen={isRemoveModalOpen}
+                                                onClose={() => setIsRemoveModalOpen(false)}
+                                                onConfirm={() => {
+                                                    removeSelectedItems()
+                                                    setIsRemoveModalOpen(false)
+                                                }}
+                                                title="Remover itens selecionados?"
+                                                message={`${selection.size} produto(s) serão removidos da lista de importação.`}
+                                                variant="danger"
+                                                confirmText="Remover"
+                                            />
 
                                         {viewMode === "grid" ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">

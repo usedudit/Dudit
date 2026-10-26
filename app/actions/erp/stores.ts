@@ -14,6 +14,7 @@ import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { validateBrazilMobile, sanitizeInput } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { getFiscalPublishBlockReason } from "@/lib/fiscal/publish-gate"
 
 export async function listStoresAction(partnerId: string) {
     const user = await requireUser()
@@ -288,6 +289,18 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
 
         const admin = createAdminClient()
         const supabase = await getSupabaseServerClient()
+
+        // Gate de publicação: MEI sem CNPJ não consegue emitir documento fiscal
+        // para cliente PJ, então a loja não deve ir ao ar nesse estado.
+        if (input.is_active === true || input.is_showcase_active === true) {
+            const publishBlock = await getFiscalPublishBlockReason(admin, input.storeId, {
+                isActive: input.is_active,
+                isShowcaseActive: input.is_showcase_active,
+            })
+            if (publishBlock) {
+                return { success: false, error: publishBlock }
+            }
+        }
 
         // SEO cooldown: store name, city, and state can only be changed every 15 days
         const { data: currentStore } = await admin

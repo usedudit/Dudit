@@ -15,11 +15,18 @@ export async function generateFailedRowsReport(
     views: [{ state: "frozen", ySplit: 1 }],
   })
 
-  // Columns: Linha Original, Motivo do Erro, followed by all original headers
+  // Internal identifiers must not be propagated even when the uploaded file
+  // came from an older export that still contained an ID column.
+  const safeHeaders = headers.filter((header) => {
+    const value = header.trim()
+    return !/(^|\s)id(?:\s|$)/i.test(value)
+  })
+
+  // Columns: Linha Original, Motivo do Erro, followed by safe original headers
   const columns = [
     { header: "Linha Planilha", key: "_row_num", width: 14 },
     { header: "Motivo da Falha / Correção Necessária", key: "_error_reason", width: 45 },
-    ...headers.map((h) => ({
+    ...safeHeaders.map((h) => ({
       header: h,
       key: h,
       width: Math.max(h.length + 4, 18),
@@ -46,7 +53,7 @@ export async function generateFailedRowsReport(
       _row_num: failed.rowIndex,
       _error_reason: failed.errorMessage,
     }
-    for (const h of headers) {
+    for (const h of safeHeaders) {
       rowValues[h] = failed.data[h] ?? ""
     }
 

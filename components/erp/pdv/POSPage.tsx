@@ -319,8 +319,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     )
     const depositChargeAmount = useMemo(() => {
         if (!depositSettings.depositEnabled) return 0
+        if (serviceSubtotal <= 0) return 0
         const pct = (depositSettings.depositPercentage || 50) / 100
-        return Math.round(serviceSubtotal * pct * 100) / 100
+        const raw = Math.round(serviceSubtotal * pct * 100) / 100
+        return Math.max(0.01, raw)
     }, [serviceSubtotal, depositSettings])
 
     const filteredPreSales = useMemo(() => {

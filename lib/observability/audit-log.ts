@@ -23,6 +23,9 @@ type AuditEvent =
   | "coupon.updated"
   | "coupon.deleted"
   | "coupon.stores_updated"
+  | "fiscal.profile_updated"
+  | "order.nfe_saved"
+  | "order.nfe_override"
 
 export function logAudit(event: AuditEvent, data: Record<string, unknown>): void {
   const payload = {

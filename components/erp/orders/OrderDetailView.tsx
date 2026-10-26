@@ -38,6 +38,7 @@ import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries";
 import { OrderHistoryTab } from "./OrderHistoryTab";
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab";
 import { CarrierLabelAction } from "./CarrierLabelAction";
+import { OrderFiscalSection } from "./OrderFiscalSection";
 import { useNotification } from "@/hooks/use-notification";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import {
@@ -3351,6 +3352,8 @@ export default function OrderDetailView({
                                 orderUpdatedAt={order.updated_at}
                                 carrier={carrier}
                               />
+
+                              <OrderFiscalSection orderId={orderId} />
 
                               {!isPickup && (
                                 <DeliveryDriverSection

@@ -202,6 +202,29 @@ function formatCsvValue(value: unknown, col: ExportColumnDef): string {
   }
 }
 
+/**
+ * IDs are implementation details and must never be part of a downloaded
+ * report. Keep this guard at the workbook boundary so a new mapper cannot
+ * accidentally leak an internal identifier into XLSX or CSV.
+ */
+function isInternalIdColumn(column: ExportColumnDef): boolean {
+  const key = column.key.trim()
+  const header = column.header.trim()
+  return key === "id" || /(?:Id|_id)$/.test(key) || /(^|\s)id(?:\s|$)/i.test(header)
+}
+
+function sanitizeExportPayload(columns: ExportColumnDef[], rows: ExportRow[]) {
+  const safeColumns = columns.filter((column) => !isInternalIdColumn(column))
+  const safeRows = rows.map((row) => {
+    const safeRow: ExportRow = {}
+    for (const column of safeColumns) {
+      safeRow[column.key] = row[column.key]
+    }
+    return safeRow
+  })
+  return { columns: safeColumns, rows: safeRows }
+}
+
 function csvEscape(value: string, protectFormula = false): string {
   const raw = String(value)
   const v = protectFormula && /^[\t ]*[=+\-@]/.test(raw) ? `'${raw}` : raw
@@ -415,13 +438,14 @@ export async function buildExportFile(params: {
   format: ErpExportFormat
   meta?: ExportMeta
 }): Promise<{ buffer: Buffer; mimeType: string; extension: string }> {
+  const safePayload = sanitizeExportPayload(params.columns, params.rows)
+
   if (params.format === "csv") {
-    return buildCsv({ columns: params.columns, rows: params.rows, meta: params.meta })
+    return buildCsv({ ...safePayload, meta: params.meta })
   }
   return buildXlsx({
     sheetName: params.sheetName,
-    columns: params.columns,
-    rows: params.rows,
+    ...safePayload,
     meta: params.meta,
   })
 }

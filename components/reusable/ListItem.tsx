@@ -32,9 +32,44 @@ export const ListItem: React.FC<ListItemProps> = ({
         typeof icon === "function" ||
         (typeof icon === "object" && icon !== null && !React.isValidElement(icon))
 
+    // Ref para rastrear a área do conteúdo "right" (checkbox/radio/etc)
+    const rightRef = React.useRef<HTMLDivElement>(null)
+
+    /**
+     * Quando o ListItem contém um checkbox ou radio no prop `right`,
+     * clicar em qualquer parte do item (não apenas no input) deve selecionar
+     * esse controle. Isso evita o bug onde o usuário precisa clicar
+     * exatamente no radio/checkbox para que a seleção aconteça.
+     */
+    const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        const target = e.target as Node
+
+        // Se o clique veio do próprio conteúdo "right", deixa o controle
+        // tratar naturalmente (evita double-fire com onClick + onChange)
+        if (rightRef.current?.contains(target)) {
+            onClick?.()
+            return
+        }
+
+        // Se não há onClick no ListItem mas o "right" tem um checkbox/radio,
+        // encaminha o clique para o input para que ele seja selecionado
+        if (!onClick && rightRef.current) {
+            const input = rightRef.current.querySelector(
+                'input[type="checkbox"], input[type="radio"]'
+            ) as HTMLInputElement | null
+            if (input && !input.disabled) {
+                input.click()
+                return
+            }
+        }
+
+        // Padrão: chama onClick se existir
+        onClick?.()
+    }
+
     return (
         <div
-            onClick={onClick}
+            onClick={right ? handleContainerClick : onClick}
             className={`group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer ${className}`}
         >
             {left && <div className="shrink-0">{left}</div>}
@@ -68,7 +103,9 @@ export const ListItem: React.FC<ListItemProps> = ({
             </div>
 
             {right ? (
-                right
+                <div ref={rightRef} className="shrink-0">
+                    {right}
+                </div>
             ) : showChevron ? (
                 <ChevronRightIcon className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors shrink-0" />
             ) : null}

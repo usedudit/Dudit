@@ -69,7 +69,7 @@ async function main() {
 
   const { data: partner } = await supabase
     .from("partners")
-    .select("order_flow, business_info, phone")
+    .select("order_flow, business_info")
     .eq("id", partnerId)
     .maybeSingle()
   console.log("\nPartner:", { order_flow: partner?.order_flow, business_info: partner?.business_info })

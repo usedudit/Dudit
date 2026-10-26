@@ -393,6 +393,8 @@ export async function createProductComprehensiveAction(data: {
     cfop_internal?: string
     cfop_external?: string
     csosn?: string
+    cst_ibs_cbs?: string | null
+    c_class_trib?: string | null
     tax_percentage?: number | null
     pis_cst?: string
     pis_rate?: number
@@ -729,6 +731,20 @@ export async function createProductComprehensiveAction(data: {
 
         const createdProductId = insertedProduct.id
 
+        // IBS/CBS (2027) ainda não fazem parte da RPC de criação: grava direto.
+        // Defaults da operação padrão de 2027 (CST 000 / cClassTrib 000001).
+        // Upsert porque a RPC só cria a linha fiscal quando há dados fiscais.
+        await admin
+            .from("product_fiscal_profiles")
+            .upsert(
+                {
+                    product_id: createdProductId,
+                    cst_ibs_cbs: data.cst_ibs_cbs || "000",
+                    c_class_trib: data.c_class_trib || "000001",
+                },
+                { onConflict: "product_id" },
+            )
+
         // 6. INSERÇÃO ATÔMICA DE VARIANTES (Se houver)
         let insertedVariants: any[] = []
         if (hasVariants) {
@@ -896,6 +912,8 @@ interface UpdateProductData {
     cest?: string
     origin?: string
     csosn?: string
+    cst_ibs_cbs?: string
+    c_class_trib?: string
     pis_cst?: string
     cofins_cst?: string
     ipi_cst?: string
@@ -948,6 +966,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         const fiscalMapFields = [
             'ncm', 'cest', 'origin', 'csosn', 'pis_cst', 'cofins_cst', 'ipi_cst',
+            'cst_ibs_cbs', 'c_class_trib',
             'item_type', 'cfop_internal', 'cfop_external', 'tax_percentage',
             'pis_rate', 'cofins_rate', 'ipi_code', 'product_situation',
             'c_benef', 'inf_ad_prod'
@@ -1076,6 +1095,20 @@ export async function updateProductComprehensiveAction(productId: string, data: 
                 if (payload[field] !== undefined) directProductPatch[field] = payload[field]
             })
         await adminUpdate.from('products').update(directProductPatch).eq('id', productId)
+
+        // IBS/CBS (2027) ainda não fazem parte da RPC de update: grava direto.
+        // Upsert porque produtos antigos podem não ter linha fiscal.
+        const fiscalExtra: Record<string, unknown> = {}
+        if (fiscalPayload.cst_ibs_cbs !== undefined) fiscalExtra.cst_ibs_cbs = fiscalPayload.cst_ibs_cbs
+        if (fiscalPayload.c_class_trib !== undefined) fiscalExtra.c_class_trib = fiscalPayload.c_class_trib
+        if (Object.keys(fiscalExtra).length > 0) {
+            await adminUpdate
+                .from('product_fiscal_profiles')
+                .upsert(
+                    { product_id: productId, ...fiscalExtra },
+                    { onConflict: 'product_id' },
+                )
+        }
 
         // Fire-and-forget: R2 image cleanup para imagens removidas
         if (product.images && Array.isArray(product.images)) {

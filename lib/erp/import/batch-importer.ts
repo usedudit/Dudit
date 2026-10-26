@@ -86,6 +86,17 @@ export async function executeImport(
   const autoCreateBrands = options.autoCreateBrands !== false
   const autoCreateSuppliers = options.autoCreateSuppliers !== false
 
+  // Apply client-side row exclusions (e.g. items the user removed from the import list)
+  const excludedRows = new Set<number>(
+    (options.excludeRowIndexes || []).filter((index) => index >= 0 && index < rows.length),
+  )
+  if (excludedRows.size > 0) {
+    const keepIndices = rows
+      .map((_, index) => index)
+      .filter((index) => !excludedRows.has(index))
+    rows = keepIndices.map((index) => rows[index])
+  }
+
   const mappedRows = rows.map((row) => mapRowToObject(row, mapping))
   const rawRowsObjects = rows.map((row) => mapRowToRawHeaderObject(row, headers))
 
@@ -339,7 +350,11 @@ export async function executeImport(
 
     if (entityType === "products") {
       const result = await importProductBatch(
-        supabase,
+        // The action already authenticated/authorized the import. Use the
+        // service-role client for the multi-table write so team members whose
+        // role can import products are not blocked by the stricter direct
+        // product_variants RLS policy.
+        admin,
         partnerId,
         storeId,
         batch,
@@ -725,7 +740,56 @@ async function importProductBatch(
       .in("sku", skus)
 
     for (const p of existing || []) {
-      existingProductMap.set(p.sku, p)
+      existingProductMap.set(String(p.sku).trim().toLowerCase(), p)
+    }
+  }
+
+  // A product with variants often has no parent SKU. In that case the
+  // variant SKUs are the only stable identifiers available in an exported
+  // sheet. Resolve them before creating products so re-importing an export
+  // updates the existing product instead of creating a duplicate parent and
+  // then failing on the product_variants.sku unique constraint.
+  const variantSkusByRow = batch.map((row) => {
+    const rawVariants = row["variants"]?.trim()
+    if (!rawVariants) return []
+    const parsed = parseProductVariants(rawVariants, row["variant_type"]?.trim(), {
+      sku: row["sku"]?.trim() || generateSKUBase(row["name"]?.trim() || "Produto"),
+      price: parseNumber(row["price"]) ?? 0,
+      stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+    })
+    return parsed.map((variant) => variant.sku.trim()).filter(Boolean)
+  })
+  const variantSkus = [...new Set(variantSkusByRow.flat())]
+  const existingVariantProductIds = new Map<string, string>()
+  const existingProductsById = new Map<string, any>()
+
+  if (variantSkus.length > 0) {
+    const { data: existingVariants, error: existingVariantsError } = await supabase
+      .from("product_variants")
+      .select("sku, product_id")
+      .in("sku", variantSkus)
+
+    if (existingVariantsError) {
+      console.warn("[BatchImport] Não foi possível consultar SKUs de variantes existentes:", existingVariantsError)
+    }
+
+    for (const variant of existingVariants || []) {
+      if (variant.sku && variant.product_id) {
+        existingVariantProductIds.set(String(variant.sku).trim().toLowerCase(), String(variant.product_id))
+      }
+    }
+
+    const productIds = [...new Set(existingVariantProductIds.values())]
+    if (productIds.length > 0) {
+      const { data: existingProducts } = await supabase
+        .from("products")
+        .select("id, sku, name")
+        .eq("partner_id", partnerId)
+        .in("id", productIds)
+
+      for (const product of existingProducts || []) {
+        existingProductsById.set(String(product.id), product)
+      }
     }
   }
 
@@ -790,7 +854,10 @@ async function importProductBatch(
       }
     }
 
-    let sku = hasVariants ? null : (row["sku"]?.trim() || generateSKUBase(name))
+    // Keep an explicitly supplied parent SKU. For new variant products with
+    // no parent SKU, leaving it null is valid because every variant has its
+    // own SKU.
+    let sku = row["sku"]?.trim() || (hasVariants ? null : generateSKUBase(name))
     if (sku && sku.length > 100) {
       sku = sku.substring(0, 100)
     }
@@ -887,7 +954,23 @@ async function importProductBatch(
       preparation_days: parseNumber(row["preparation_days"]) ?? 0,
     }
 
-    const existing = sku ? existingProductMap.get(sku) : null
+    let existing = sku ? existingProductMap.get(sku.toLowerCase()) : null
+
+    if (!existing && parsedVariants.length > 0) {
+      const productIdsFromVariants = [
+        ...new Set(
+          parsedVariants
+            .map((variant) => existingVariantProductIds.get(variant.sku.toLowerCase()))
+            .filter(Boolean),
+        ),
+      ] as string[]
+
+      // Only resolve by variant SKU when all matching variants point to the
+      // same parent. A mixed row should never silently merge products.
+      if (productIdsFromVariants.length === 1) {
+        existing = existingProductsById.get(productIdsFromVariants[0]) || null
+      }
+    }
     if (existing) {
       if (duplicateStrategy === "update") {
         toUpdate.push({ id: existing.id, data: productData, fiscal, logistics, variants: parsedVariants })

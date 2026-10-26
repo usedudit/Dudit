@@ -55,6 +55,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelling, setCancelling] = useState(false)
     const [docModalOpen, setDocModalOpen] = useState(false)
+    const [nfeModalOpen, setNfeModalOpen] = useState(false)
     const [quoteOptions, setQuoteOptions] = useState<any[]>([])
     const [quotesLoading, setQuotesLoading] = useState(false)
     const [quotesError, setQuotesError] = useState<string | null>(null)
@@ -163,7 +164,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
         }
     }, [needsQuoteSelection, shipmentLoaded, gateLoaded, orderId, order?.delivery_breakdown?.source])
 
-    const handleCreate = async () => {
+    const handleCreate = async (allowMissingNfe = false) => {
         setCreating(true)
         try {
             const service = !serviceIdFromBreakdown && selectedService
@@ -173,7 +174,11 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 toast.error("Selecione um serviço de frete para gerar a etiqueta.")
                 return
             }
-            const res = await createOrderShippingLabelAction({ orderId, ...(service ? { service } : {}) })
+            const res = await createOrderShippingLabelAction({
+                orderId,
+                ...(service ? { service } : {}),
+                ...(allowMissingNfe ? { allowMissingNfe: true } : {}),
+            })
             if (res.success) {
                 const payRes = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: res.label.id })
                 if (payRes.success) {
@@ -195,6 +200,8 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 await refresh()
             } else if (res.code === "missing_document") {
                 setDocModalOpen(true)
+            } else if (res.code === "missing_nfe") {
+                setNfeModalOpen(true)
             } else {
                 toast.error(res.error || "Erro ao gerar etiqueta.")
             }
@@ -338,7 +345,7 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
 
                     <Button
                         type="button"
-                        onClick={handleCreate}
+                        onClick={() => handleCreate()}
                         isLoading={creating}
                         disabled={needsQuoteSelection && (quotesLoading || !selectedService)}
                         leftIcon={<TruckIcon className="w-4 h-4" />}
@@ -434,6 +441,23 @@ export function OrderShippingSection({ orderId, partnerId, order, onRefresh }: O
                 variant="danger"
                 isDestructive
                 isLoading={cancelling}
+            />
+
+            <AlertModal
+                isOpen={nfeModalOpen}
+                onClose={() => {
+                    if (!creating) setNfeModalOpen(false)
+                }}
+                onConfirm={async () => {
+                    setNfeModalOpen(false)
+                    await handleCreate(true)
+                }}
+                title="Gerar etiqueta sem NF-e"
+                message="O comprador é pessoa jurídica e a NF-e é obrigatória. Se continuar, a etiqueta é gerada e o pedido fica registrado como enviado sem nota fiscal."
+                confirmText="Gerar mesmo assim"
+                cancelText="Voltar"
+                variant="danger"
+                isLoading={creating}
             />
 
             <RecipientDocumentModal

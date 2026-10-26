@@ -94,6 +94,8 @@ export interface ImportOptions {
   autoCreateCategories?: boolean
   autoCreateBrands?: boolean
   autoCreateSuppliers?: boolean
+  /** Zero-based row indexes (from the uploaded sheet) to skip during import. */
+  excludeRowIndexes?: number[]
 }
 
 export interface ImportResult {

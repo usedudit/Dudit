@@ -28,8 +28,13 @@ import {
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { updateStoreAction } from "@/app/actions/erp/stores"
+import {
+    getFiscalProfileAction,
+    saveFiscalProfileAction,
+} from "@/app/actions/erp/fiscal-entity"
 import { ChevronLeftIcon, SaveIcon, Store, ChevronRightIcon, UserIcon, StoreIcon, TagIcon, BriefcaseIcon, ClockIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
+import { FiscalProfileSection } from "./FiscalProfileSection"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
@@ -188,7 +193,7 @@ export const BusinessDataSubPage = ({
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
-        crt: store?.crt || "1",
+        crt: store?.crt || "",
         contribuinte: store?.contribuinte || "9",
         inscricaoEstadual: store?.inscricao_estadual || "",
         ieIsento: store?.ie_isento ?? false,
@@ -262,7 +267,6 @@ export const BusinessDataSubPage = ({
                         return prev
                     })
                     setFiscalInfo(prev => {
-                        if (data.simples_optante) return { ...prev, crt: "1" }
                         if (data.simei_optante) return { ...prev, crt: "4" }
                         return prev
                     })
@@ -280,6 +284,25 @@ export const BusinessDataSubPage = ({
 
     const setMode = (mode: BusinessMode) =>
         setGeneralInfo((prev: any) => ({ ...prev, mode }))
+
+    // Troca o tipo de pessoa alinhando o documento e o CRT, para o formulário
+    // legado não enviar CPF como CNPJ (ou um CRT de MEI em loja PF).
+    const handlePersonTypeChange = (next: "pf" | "pj") => {
+        const digits = generalInfo.cnpj.replace(/\D/g, "")
+        setGeneralInfo(prev => ({
+            ...prev,
+            personType: next,
+            cnpj:
+                next === "pf" && digits.length === 14
+                    ? ""
+                    : next === "pj" && digits.length === 11
+                        ? ""
+                        : prev.cnpj,
+        }))
+        if (next === "pf") {
+            setFiscalInfo(prev => ({ ...prev, crt: "" }))
+        }
+    }
 
     const validate = useCallback(() => {
         const errors = new Set<string>()
@@ -352,6 +375,72 @@ export const BusinessDataSubPage = ({
                     mode: generalInfo.mode,
                 }
 
+                // O formulário legado ainda permite editar CNPJ/CPF. Antes de
+                // salvar a loja, alinha a identidade fiscal (fonte da verdade
+                // do limite) para os dois cadastros não divergirem.
+                let persistedCrt: string | undefined
+                const documentDigits = generalInfo.cnpj.replace(/\D/g, "")
+                const initialDocumentDigits = initialState.generalInfo.cnpj.replace(/\D/g, "")
+                const documentChanged =
+                    documentDigits !== initialDocumentDigits ||
+                    generalInfo.personType !== initialState.generalInfo.personType
+                const crtChanged = fiscalInfo.crt !== initialState.fiscalInfo.crt
+
+                if ((documentChanged || crtChanged) && store?.id) {
+                    const profileRes = await getFiscalProfileAction({ storeId: store.id })
+                    if (!profileRes.success || !profileRes.data) {
+                        notifyError(profileRes.error || "Erro ao carregar o perfil fiscal.")
+                        setIsLoading(false)
+                        return
+                    }
+
+                    const current = profileRes.data
+
+                    // O formulário legado (tipo de pessoa + CRT) é traduzido para
+                    // o perfil fiscal: PJ com CRT 4 é MEI; PJ sem CRT 4 é PF
+                    // contribuinte; PF deixa de ser MEI ao remover o CNPJ.
+                    const targetProfile =
+                        generalInfo.personType === "pj"
+                            ? fiscalInfo.crt === "4"
+                                ? "mei"
+                                : "pf_contribuinte"
+                            : current.taxProfile === "mei" || current.taxProfile === "pf_contribuinte"
+                                ? "nano"
+                                : current.taxProfile
+                    const profileChanged = targetProfile !== current.taxProfile
+
+                    if (current.document !== documentDigits || profileChanged) {
+                        const syncRes = await saveFiscalProfileAction({
+                            storeId: store.id,
+                            taxProfile: targetProfile,
+                            document: documentDigits || null,
+                            cnaePrimary: current.cnaePrimary,
+                            cnaeSecondary: current.cnaeSecondary,
+                            // Ao trocar de perfil, deixa o limite padrão do novo
+                            // enquadramento valer (ex.: nano -> MEI).
+                            annualRevenueLimit: profileChanged ? null : current.annualRevenueLimit,
+                            openingDate: current.openingDate,
+                        })
+                        if (!syncRes.success) {
+                            notifyError(syncRes.error || "Erro ao sincronizar o perfil fiscal.")
+                            setIsLoading(false)
+                            return
+                        }
+
+                        const synced = syncRes.data
+                        if (synced) {
+                            const nextCrt =
+                                synced.taxProfile === "mei"
+                                    ? "4"
+                                    : synced.taxProfile === "pf_contribuinte"
+                                        ? "3"
+                                        : ""
+                            persistedCrt = nextCrt
+                            setFiscalInfo(prev => ({ ...prev, crt: nextCrt }))
+                        }
+                    }
+                }
+
                 // Store-level fields → updateStoreAction
                 if (store?.id) {
                     const storeResult = await updateStoreAction({
@@ -382,7 +471,9 @@ export const BusinessDataSubPage = ({
                         cpf: generalInfo.personType === "pf" ? (generalInfo.cnpj || null) : null,
                         razaoSocial: generalInfo.personType === "pj" ? (generalInfo.razaoSocial || null) : null,
                         nomeFantasia: generalInfo.personType === "pj" ? (generalInfo.nomeFantasia || null) : null,
-                        crt: fiscalInfo.crt,
+                        // persistedCrt reflete o CRT que a sincronização fiscal
+                        // acabou de gravar; o state ainda pode estar atrasado.
+                        crt: (persistedCrt ?? fiscalInfo.crt) || undefined,
                         contribuinte: fiscalInfo.contribuinte,
                         inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
                         ieIsento: fiscalInfo.ieIsento,
@@ -415,7 +506,12 @@ export const BusinessDataSubPage = ({
                     setInitialState({
                         generalInfo: { ...generalInfo },
                         addresses: { ...addresses },
-                        fiscalInfo: { ...fiscalInfo },
+                        // Usa o CRT realmente persistido (a sincronização fiscal
+                        // pode ter mudado o regime durante o save).
+                        fiscalInfo: {
+                            ...fiscalInfo,
+                            crt: persistedCrt ?? fiscalInfo.crt,
+                        },
                         taxInfo: { ...taxInfo },
                         hours: { ...hours },
                         timezone: timezone || "America/Sao_Paulo",
@@ -569,14 +665,14 @@ export const BusinessDataSubPage = ({
                                                                 icon={UserIcon}
                                                                 title="Pessoa Física"
                                                                 description="Usado para pessoas"
-                                                                onClick={() => setGeneralInfo({ ...generalInfo, personType: "pf" })}
+                                                                onClick={() => handlePersonTypeChange("pf")}
                                                                 className={`px-4 py-3 gap-4 ${generalInfo.personType === "pf" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                 right={
                                                                     <RadioButton
                                                                         name="personType"
                                                                         value="pf"
                                                                         checked={generalInfo.personType === "pf"}
-                                                                        onChange={() => setGeneralInfo({ ...generalInfo, personType: "pf" })}
+                                                                        onChange={() => handlePersonTypeChange("pf")}
                                                                     />
                                                                 }
                                                             />
@@ -584,14 +680,14 @@ export const BusinessDataSubPage = ({
                                                                 icon={StoreIcon}
                                                                 title="Pessoa Jurídica"
                                                                 description="Usado para empresas"
-                                                                onClick={() => setGeneralInfo({ ...generalInfo, personType: "pj" })}
+                                                                onClick={() => handlePersonTypeChange("pj")}
                                                                 className={`px-4 py-3 gap-4 ${generalInfo.personType === "pj" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                 right={
                                                                     <RadioButton
                                                                         name="personType"
                                                                         value="pj"
                                                                         checked={generalInfo.personType === "pj"}
-                                                                        onChange={() => setGeneralInfo({ ...generalInfo, personType: "pj" })}
+                                                                        onChange={() => handlePersonTypeChange("pj")}
                                                                     />
                                                                 }
                                                             />
@@ -642,10 +738,10 @@ export const BusinessDataSubPage = ({
                                                                     value={fiscalInfo.crt}
                                                                     setValue={(v) => setFiscalInfo({ ...fiscalInfo, crt: v })}
                                                                     options={[
-                                                                        { value: "1", label: "1 - Simples Nacional" },
-                                                                        { value: "2", label: "2 - Simples Nacional (excesso sublimite)" },
-                                                                        { value: "3", label: "3 - Regime Normal" },
-                                                                        { value: "4", label: "4 - MEI" },
+                                                                        { value: "4", label: "4 - MEI (SIMEI)" },
+                                                                        ...(fiscalInfo.crt && fiscalInfo.crt !== "4"
+                                                                            ? [{ value: fiscalInfo.crt, label: `Configuração legada (CRT ${fiscalInfo.crt})` }]
+                                                                            : []),
                                                                     ]}
                                                                 />
                                                                 <FormDropdown
@@ -719,6 +815,48 @@ export const BusinessDataSubPage = ({
                                                     )}
                                                 </div>
                                             </FormSection>
+
+                                            {store?.id && (
+                                                <FiscalProfileSection
+                                                    storeId={store.id}
+                                                    onSaved={(data) => {
+                                                        const nextPersonType = data.documentType === "cnpj" ? "pj" : "pf"
+                                                        const nextDocument = data.document || ""
+                                                        // Mesmo mapeamento do CRT gravado pela action:
+                                                        // MEI = 4, PF contribuinte = 3.
+                                                        const nextCrt =
+                                                            data.taxProfile === "mei"
+                                                                ? "4"
+                                                                : data.taxProfile === "pf_contribuinte"
+                                                                    ? "3"
+                                                                    : ""
+
+                                                        setGeneralInfo(prev => ({
+                                                            ...prev,
+                                                            personType: nextPersonType,
+                                                            cnpj: nextDocument,
+                                                        }))
+                                                        setFiscalInfo(prev => ({
+                                                            ...prev,
+                                                            crt: nextCrt,
+                                                        }))
+                                                        // O perfil salvo já está persistido: não deve
+                                                        // marcar o formulário como "não salvo".
+                                                        setInitialState(prev => ({
+                                                            ...prev,
+                                                            generalInfo: {
+                                                                ...prev.generalInfo,
+                                                                personType: nextPersonType,
+                                                                cnpj: nextDocument,
+                                                            },
+                                                            fiscalInfo: {
+                                                                ...prev.fiscalInfo,
+                                                                crt: nextCrt,
+                                                            },
+                                                        }))
+                                                    }}
+                                                />
+                                            )}
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">

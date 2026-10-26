@@ -19,6 +19,7 @@ import { enrichAddressData } from "@/lib/services/location.service"
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { withMpPartnerFields } from "@/lib/services/payments/mercadopago-integration"
+import { getFiscalPublishBlockReason } from "@/lib/fiscal/publish-gate"
 
 // --- CLIENTES ---
 
@@ -736,6 +737,14 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     }
 
     if (hqStore?.id) {
+      // Mesmo gate de publicação do updateStoreAction: a vitrine não pode ser
+      // ligada por um caminho alternativo quando o MEI está sem CNPJ.
+      if (data.isShowcaseActive === true) {
+        const publishBlock = await getFiscalPublishBlockReason(admin, hqStore.id, {
+          isShowcaseActive: true,
+        })
+        if (publishBlock) return { error: publishBlock }
+      }
       await admin.from("stores").update(storeUpdateData).eq("id", hqStore.id)
     }
   }

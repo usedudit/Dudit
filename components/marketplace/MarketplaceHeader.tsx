@@ -7,7 +7,7 @@ import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon, PlusIcon } from "@/lib/icons"
-import { MapPin, Check } from "lucide-react"
+import { MapPin, Check, ChevronDown } from "lucide-react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable/Button"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -22,6 +22,7 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getCitiesData } from "@/lib/data/cities-loader"
+import { ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 import { IconPlaceholder } from "../reusable"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
@@ -192,6 +193,7 @@ const Header: React.FC<HeaderProps> = ({
     const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
 
     const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
+    const [showStateList, setShowStateList] = useState(false)
     const [visitorSearchQuery, setVisitorSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
     const [citiesList, setCitiesList] = useState<string[]>([])
@@ -286,7 +288,8 @@ const Header: React.FC<HeaderProps> = ({
         if (!slug) return ""
         if (slug === "brasil") return "Brasil"
         if (slug.startsWith("estado-")) {
-            return slug.replace("estado-", "").toUpperCase()
+            const uf = slug.replace("estado-", "").toLowerCase()
+            return ESTADO_MAP[uf] || uf.toUpperCase()
         }
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
@@ -395,29 +398,70 @@ const Header: React.FC<HeaderProps> = ({
                     </p>
 
                     <div className="space-y-4">
-                        <div className="relative">
-                            <Input
-                                placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
-                                value={visitorSearchQuery}
-                                onChange={(e) => setVisitorSearchQuery(e.target.value)}
-                                className="h-[42px] w-full"
-                                variant="full-rounded"
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                            />
-                            {filteredCities.length > 0 && (
-                                <div className="flex flex-col gap-1 border-t pt-2">
-                                    {filteredCities.map((slug) => (
+                        {/* Quick location scope options: Brasil, Estado e Cidade */}
+                        <div className="border-t pt-2 space-y-1">
+                            <button
+                                onClick={() => {
+                                    handleSelectCitySlug("brasil")
+                                }}
+                                className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
+                            >
+                                <MapPin className="w-4 h-4 text-brand-green" />
+                                <span>Brasil</span>
+                            </button>
+
+                            {/* Estado button - opens state selection */}
+                            <button
+                                onClick={() => setShowStateList(!showStateList)}
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
+                            >
+                                <span className="flex items-center gap-3">
+                                    <MapPin className="w-4 h-4 text-brand-green" />
+                                    <span>Outros estados</span>
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-brand-inactive-text transition-transform ${showStateList ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showStateList && (
+                                <div className="pl-4 border-t pt-1 space-y-1 max-h-60 overflow-y-auto">
+                                    {Object.entries(ESTADO_MAP).map(([uf, name]) => (
                                         <button
-                                            key={slug}
-                                            onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
+                                            key={uf}
+                                            onClick={() => handleSelectCitySlug(`estado-${uf}`)}
+                                            className="w-full text-left px-3 py-2 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
                                         >
-                                            <span>{formatCitySlugForDisplay(slug)}</span>
-                                            {citySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
+                                            <span>{name}</span>
+                                            {citySlug === `estado-${uf}` && <Check className="w-4 h-4 text-brand-green" />}
                                         </button>
                                     ))}
                                 </div>
                             )}
+
+                            {/* City search */}
+                            <div className="relative pt-2">
+                                <Input
+                                    placeholder="Buscar cidade... (ex: São Paulo, Bauru)"
+                                    value={visitorSearchQuery}
+                                    onChange={(e) => setVisitorSearchQuery(e.target.value)}
+                                    className="h-[42px] w-full"
+                                    variant="full-rounded"
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                />
+                                {filteredCities.length > 0 && (
+                                    <div className="flex flex-col gap-1 border-t pt-2">
+                                        {filteredCities.map((slug) => (
+                                            <button
+                                                key={slug}
+                                                onClick={() => handleSelectCitySlug(slug)}
+                                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
+                                            >
+                                                <span>{formatCitySlugForDisplay(slug)}</span>
+                                                {citySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <Button
@@ -430,21 +474,24 @@ const Header: React.FC<HeaderProps> = ({
                             <span>Usar minha localização</span>
                         </Button>
 
-                        <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Já tem uma conta cadastrada com endereço salvo?
-                            </p>
-                            <Button
-                                onClick={() => {
-                                    setIsVisitorModalOpen(false)
-                                    router.push("/auth/login")
-                                }}
-                                variant="link"
-                                className="text-sm mt-1 inline-block"
-                            >
-                                Entrar na minha conta
-                            </Button>
-                        </div>
+                        {/* Only show login link when user is NOT logged in */}
+                        {!user && (
+                            <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Já tem uma conta cadastrada com endereço salvo?
+                                </p>
+                                <Button
+                                    onClick={() => {
+                                        setIsVisitorModalOpen(false)
+                                        router.push("/auth/login")
+                                    }}
+                                    variant="link"
+                                    className="text-sm mt-1 inline-block"
+                                >
+                                    Entrar na minha conta
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </DefaultModal>

@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@/components/reusable"
-import { ChevronLeft } from "lucide-react"
+import { Button, Badge } from "@/components/reusable"
+import { ChevronLeft, MapPin } from "lucide-react"
 
 interface ExplorarHeaderSectionProps {
     title: string
@@ -9,6 +9,8 @@ interface ExplorarHeaderSectionProps {
     showBackButton?: boolean
     onBack?: () => void
     isLoading?: boolean
+    citySlug?: string | null
+    formatCitySlug?: (slug: string | null) => string
 }
 
 export function ExplorarHeaderSection({
@@ -17,7 +19,11 @@ export function ExplorarHeaderSection({
     showBackButton = false,
     onBack,
     isLoading = false,
+    citySlug,
+    formatCitySlug,
 }: ExplorarHeaderSectionProps) {
+    const cityLabel = citySlug && formatCitySlug ? formatCitySlug(citySlug) : null
+
     return (
         <div className="mb-6">
             <div className="flex items-start gap-3">
@@ -32,8 +38,17 @@ export function ExplorarHeaderSection({
                         </Button>
                     </div>
                 )}
+
+                {/* Badge de localização - aparece quando tem cidade definida */}
+                {cityLabel && (
+                    <Badge variant="gray" className="shrink-0">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>{cityLabel}</span>
+                    </Badge>
+                )}
+
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1">
+                    <h1 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1 truncate">
                         {title}
                     </h1>
                     {isLoading ? (

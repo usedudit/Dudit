@@ -125,18 +125,19 @@ export async function getMarketplaceCheckoutContextAction(input: {
   let productsSubtotal = 0
   let servicesSubtotal = 0
   let subscriptionsSubtotal = 0
+  // Usa fullPrice (preço original) para calcular o depósito, evitando aplicar
+  // o percentual do sinal duas vezes quando payDepositOnly=true (ajusta unitPrice
+  // já no resolver do carrinho). Alinhado com marketplace-checkout-amounts.ts.
+  let originalServicesSubtotal = 0
 
   for (const line of resolved.lines) {
     const total = line.unitPrice * line.quantity
     if (line.itemType === "product") productsSubtotal += total
     else if (line.itemType === "service_booking") {
       servicesSubtotal += total
+      originalServicesSubtotal += Number(line.fullPrice || line.unitPrice) * line.quantity
     } else subscriptionsSubtotal += total
   }
-
-  // Preserva o subtotal ORIGINAL de serviços (sem descontos de campanha/promoção)
-  // para usar no cálculo do depósito, alinhado com o que o resolver do carrinho usa
-  const originalServicesSubtotal = servicesSubtotal
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
@@ -365,8 +366,14 @@ export async function getMarketplaceCheckoutContextAction(input: {
     serviceDepositMpEnabled &&
     mpConnected
 
+  const rawPreviewAmount = depositAvailable
+    ? Math.round(originalServicesSubtotal * (depositPercent / 100) * 100) / 100
+    : 0
+  // Garante mínimo de 1 centavo quando há sinal disponível e subtotal > 0
   const previewAmount =
-    depositAvailable ? Math.round(originalServicesSubtotal * (depositPercent / 100) * 100) / 100 : 0
+    depositAvailable && originalServicesSubtotal > 0
+      ? Math.max(0.01, rawPreviewAmount)
+      : rawPreviewAmount
 
   const addresses = partnerRow?.addresses
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses
@@ -436,7 +443,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       storeName: effectiveStoreName,
       store_name: effectiveStoreName,
       mpConnected,
-      phone: (storeRowData as any)?.phone || marketplaceCapabilities.whatsappPhone || partnerRow?.phone || null,
+      phone: (storeRowData as any)?.phone || marketplaceCapabilities.whatsappPhone || null,
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",

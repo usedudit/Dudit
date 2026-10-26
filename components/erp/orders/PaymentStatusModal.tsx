@@ -48,7 +48,7 @@ import type { PaymentBreakdownLeg } from "@/components/erp/payments/shared/payme
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { ReceiptScallopEdge } from "../POSComponents";
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal";
-import { PixQrDisplayModal } from "@/components/erp/payments/shared/PixQrDisplayModal";
+import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf";
 
 const standardTransition = {
   type: "spring" as const,
@@ -247,13 +247,13 @@ export default function PaymentStatusModal({
       ticketUrl?: string;
     } | null;
     boletoData?: { barcode: string; ticketUrl: string } | null;
+    paymentId?: string | number;
     paymentMethod?: string;
     paymentStatus?: string;
     chargeAmount?: number;
     orderDetails?: { items?: any[] };
   } | null>(null);
   const [copiedMp, setCopiedMp] = useState(false);
-  const [showMpPixModal, setShowMpPixModal] = useState(false);
   const [manualPolicy, setManualPolicy] = useState<{
     loaded: boolean;
     enabled: boolean;
@@ -263,6 +263,8 @@ export default function PaymentStatusModal({
   const [showOverrideConfirm, setShowOverrideConfirm] = useState(false);
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [showMpPendingConfirm, setShowMpPendingConfirm] = useState(false);
+  const [showConfirmSinalModal, setShowConfirmSinalModal] = useState(false);
+  const [confirmingSinal, setConfirmingSinal] = useState(false);
   const loading = paymentStatus === "processing";
 
   useEffect(() => {
@@ -287,6 +289,8 @@ export default function PaymentStatusModal({
       setShowOverrideConfirm(false);
       setOverrideEnabled(false);
       setShowMpPendingConfirm(false);
+      setShowConfirmSinalModal(false);
+      setConfirmingSinal(false);
       const id = setTimeout(() => setIsAnimating(true), 50);
       return () => clearTimeout(id);
     } else {
@@ -362,7 +366,16 @@ export default function PaymentStatusModal({
     const fullyPaid =
       targetOrder.situation === "paid" || totalRemaining <= 0.009;
 
-    if (isMpOrder && !fullyPaid && targetOrderId) {
+    // Busca a cobrança do MP apenas quando ainda há algo a pagar online:
+    // sinal pendente (QR já gerado) ou pedido sem sinal.
+    const shouldFetchMpPayment = Boolean(
+      !fullyPaid &&
+        targetOrderId &&
+        (canPaySinal(depositSummary) ||
+          (isMpOrder && !depositSummary?.usesDeposit)),
+    );
+
+    if (shouldFetchMpPayment) {
       setMpLoading(true);
       fetch("/api/orders/retry-payment", {
         method: "POST",
@@ -400,6 +413,9 @@ export default function PaymentStatusModal({
     targetOrder?.situation,
     totalRemaining,
     isMpOrder,
+    depositSummary?.usesDeposit,
+    depositSummary?.sinalPaid,
+    depositSummary?.depositStatus,
   ]);
 
   const displayOrderNumber = useMemo(() => {
@@ -575,6 +591,56 @@ export default function PaymentStatusModal({
       });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleConfirmSinalReceipt = async () => {
+    const targetOrderId = targetOrder.id || targetOrder.originalId;
+    if (!targetOrderId || confirmingSinal) return;
+
+    setConfirmingSinal(true);
+    try {
+      const data = await fetchJSONWithCSRF<any>("/api/orders/confirm-deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: {
+          orderId: targetOrderId,
+          ...(mpPaymentData?.paymentId
+            ? { mpPaymentId: mpPaymentData.paymentId }
+            : {}),
+        },
+      });
+
+      if (data?.success) {
+        setCurrentOrder((prev: any) => ({
+          ...prev,
+          situation: data.situation,
+          paid_amount: data.paidAmount,
+          paidAmount: data.paidAmount,
+          payment_method: data.paymentMethod,
+          payment_breakdown: data.paymentBreakdown,
+          ...(data.checkoutFulfillment
+            ? { checkout_fulfillment: data.checkoutFulfillment }
+            : {}),
+        }));
+        setMpPaymentData(null);
+        setShowConfirmSinalModal(false);
+        toast({
+          title: "Sinal confirmado",
+          description: "O recebimento do sinal foi registrado manualmente.",
+        });
+        onSuccess?.();
+      }
+    } catch (err: any) {
+      console.error("Error confirming deposit in PaymentStatusModal:", err);
+      toast({
+        title: "Erro ao confirmar",
+        description:
+          err?.message || "Não foi possível confirmar o recebimento do sinal.",
+        variant: "destructive",
+      });
+    } finally {
+      setConfirmingSinal(false);
     }
   };
 
@@ -946,50 +1012,144 @@ export default function PaymentStatusModal({
                       )}
                   </div>
 
-                  {isMpOrder && !isFullyPaid && canPaySinal(depositSummary) && (
-                    <ListItem
-                      icon={
-                        <img
-                          src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                          alt="Mercado Pago"
-                          className="w-5 h-5 object-contain shrink-0"
+                  {!isFullyPaid && canPaySinal(depositSummary) && (
+                    <div className="flex flex-col gap-4 rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
+                          <img
+                            src="https://img.dudit.com.br/static/icons/payments/Pix.png"
+                            alt="Pix"
+                            className="w-5 h-5 object-contain"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5 flex-wrap">
+                            Pix do sinal
+                            <Badge
+                              variant="orange"
+                              className="whitespace-nowrap scale-90"
+                            >
+                              Pendente
+                            </Badge>
+                          </h4>
+                          <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                            Escaneie o QR Code ou copie o código Pix
+                          </p>
+                        </div>
+                      </div>
+
+                      {mpLoading && !mpPaymentData?.pixData ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                          <Spinner
+                            size={20}
+                            className="mb-2 text-brand-primary"
+                          />
+                          <span className="text-xs">
+                            Carregando cobrança do sinal...
+                          </span>
+                        </div>
+                      ) : mpPaymentData?.pixData ? (
+                        <div className="flex flex-col items-center gap-4">
+                          {mpPaymentData.pixData.qrCodeBase64 && (
+                            <div className="w-48 h-48 p-2 bg-white flex items-center justify-center">
+                              <img
+                                src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
+                                alt="PIX QR Code"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          )}
+                          <div className="text-center">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block">
+                              Valor do sinal
+                            </span>
+                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                              {formatCurrency(
+                                depositSummary?.initialChargeAmount ||
+                                  depositSummary?.depositAmount ||
+                                  mpPaymentData.chargeAmount ||
+                                  0,
+                              )}
+                            </span>
+                          </div>
+                          {mpPaymentData.pixData.qrCode && (
+                            <div className="w-full max-w-md flex gap-2">
+                              <Input
+                                variant="full-rounded"
+                                readOnly
+                                value={mpPaymentData.pixData.qrCode}
+                                className="flex-1 h-10 truncate"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (mpPaymentData?.pixData?.qrCode) {
+                                    navigator.clipboard.writeText(
+                                      mpPaymentData.pixData.qrCode,
+                                    );
+                                    setCopiedMp(true);
+                                    toast({
+                                      title: "Copiado!",
+                                      description:
+                                        "Código Pix copiado para a área de transferência.",
+                                    });
+                                    setTimeout(
+                                      () => setCopiedMp(false),
+                                      2000,
+                                    );
+                                  }
+                                }}
+                                className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                title="Copiar chave Pix"
+                              >
+                                {copiedMp ? (
+                                  <CheckCircleIcon
+                                    size={16}
+                                    className="text-brand-green"
+                                  />
+                                ) : (
+                                  <CopyIcon size={16} />
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : !mpLoading ? (
+                        <InfoCard
+                          color="orange"
+                          title="Cobrança não encontrada"
+                          message="Não encontramos o Pix do sinal no Mercado Pago. Você ainda pode confirmar o recebimento manualmente se o cliente já pagou."
                         />
-                      }
-                      title={`Sinal - ${formatCurrency(depositSummary?.initialChargeAmount || depositSummary?.depositAmount || 0)}`}
-                      description="Mercado Pago"
-                      onClick={() => {
-                        if (
-                          mpPaymentData?.pixData ||
-                          mpPaymentData?.boletoData
-                        ) {
-                          setShowMpPixModal(true);
-                        }
-                      }}
-                      right={
+                      ) : null}
+
+                      <InfoCard
+                        color="orange"
+                        message="A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
+                      />
+
+                      <div className="flex gap-2">
                         <Button
-                          variant="link"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (
-                              mpPaymentData?.pixData ||
-                              mpPaymentData?.boletoData
-                            ) {
-                              setShowMpPixModal(true);
-                            }
-                          }}
-                          disabled={
-                            !mpPaymentData?.pixData &&
-                            !mpPaymentData?.boletoData
-                          }
+                          variant="outline"
+                          className="flex-1 h-11"
+                          onClick={handleSyncMpPayment}
+                          disabled={syncing || confirmingSinal}
                         >
-                          {mpLoading ? (
+                          {syncing ? (
                             <Spinner size={12} className="mr-1.5" />
                           ) : null}
-                          Pagar agora
+                          Verificar
                         </Button>
-                      }
-                    />
+                        <Button
+                          className="flex-1 h-11"
+                          onClick={() => setShowConfirmSinalModal(true)}
+                          isLoading={confirmingSinal}
+                          disabled={syncing}
+                        >
+                          Confirmar recebimento
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {isMpOrder &&
@@ -1399,7 +1559,8 @@ export default function PaymentStatusModal({
           {/* Bottom Action Bar */}
           {paymentStatus === "input" &&
             !isFullyPaid &&
-            totalRemaining > 0.009 && (
+            totalRemaining > 0.009 &&
+            !mustPaySinalOnline && (
               <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
                 <Button
                   variant="outline"
@@ -1457,27 +1618,6 @@ export default function PaymentStatusModal({
         />
       )}
 
-      {showMpPixModal && mpPaymentData && (
-        <PixQrDisplayModal
-          isOpen={showMpPixModal}
-          onClose={() => setShowMpPixModal(false)}
-          qrCode={
-            mpPaymentData.pixData?.qrCodeBase64
-              ? `data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`
-              : ""
-          }
-          payload={
-            mpPaymentData.pixData?.qrCode ||
-            mpPaymentData.boletoData?.barcode ||
-            ""
-          }
-          amount={mpPaymentData.chargeAmount || totalRemaining}
-          subtitle={`${depositSummary?.sinalPaid ? "Saldo" : "Sinal"}${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}`}
-          onVerifyPayment={handleSyncMpPayment}
-          isVerifying={syncing}
-        />
-      )}
-
       <AlertModal
         isOpen={showOverrideConfirm}
         onClose={() => setShowOverrideConfirm(false)}
@@ -1504,6 +1644,20 @@ export default function PaymentStatusModal({
         message="O pagamento via Mercado Pago ainda não foi confirmado automaticamente. Se o cliente já realizou o pagamento, aguarde alguns segundos e clique em 'Verificar' ou sincronize manualmente. Deseja marcar o recebimento manualmente mesmo assim?"
         confirmText="Sim, marcar como recebido"
         cancelText="Cancelar"
+      />
+
+      <AlertModal
+        isOpen={showConfirmSinalModal}
+        onClose={() => {
+          if (!confirmingSinal) setShowConfirmSinalModal(false);
+        }}
+        onConfirm={handleConfirmSinalReceipt}
+        variant="warning"
+        title="Pagamento não detectado"
+        message="Ainda não identificamos o pagamento do sinal via Mercado Pago. Confirme apenas se o cliente já realizou o Pix. O sinal será marcado como recebido manualmente e não será cancelado por expiração."
+        confirmText="Sim, confirmar recebimento"
+        cancelText="Cancelar"
+        isLoading={confirmingSinal}
       />
     </div>
   );

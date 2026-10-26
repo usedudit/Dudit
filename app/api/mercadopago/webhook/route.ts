@@ -754,6 +754,19 @@ async function processWebhookWithRetry(
     const orderId = orderData.id
     console.log(`[WEBHOOK] Order found: ${orderId}, current situation: ${orderData.situation}`)
 
+    // ── Idempotência por pagamento: já registrado manualmente? ──
+    // Ex.: sinal confirmado manualmente pelo vendedor. Eventos posteriores
+    // (aprovação tardia, cancelamento ou expiração do Pix) não devem alterar
+    // o pedido nem somar o valor novamente. Pagamentos registrados pelo fluxo
+    // normal continuam sendo processados (ex.: estorno/cancelamento).
+    {
+      const { isMpPaymentManuallyRecorded } = await import("@/lib/payments/mp-order-payment-update")
+      if (isMpPaymentManuallyRecorded(orderData, paymentId.toString())) {
+        console.log(`[WEBHOOK] Payment ${paymentId} already recorded on order ${orderId}, skipping`)
+        return
+      }
+    }
+
     // ── Validate payment amount (fraud detection) ──
     if (paymentInfo.status === "approved" && paymentInfo.transaction_amount != null) {
       const { validateMpTransactionAmount } = await import("@/lib/payments/mp-order-payment-update")

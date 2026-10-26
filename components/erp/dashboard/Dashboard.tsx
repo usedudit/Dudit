@@ -3,6 +3,7 @@ import { SummaryCards, NeedsAttention } from "./LeftColumn"
 import { RecentActivities } from "./RightColumn"
 import { LatestOrdersCard, CriticalStockCard, NextAppointmentsCard } from "./BottomCards"
 import { InsightsRegister } from "./InsightsRegister"
+import { RevenueLimitCard } from "./widgets/general/RevenueLimitCard"
 import {
   DashboardLineChart,
   DashboardDonutChart,
@@ -222,6 +223,9 @@ export async function Dashboard({
           <SummaryCards metrics={metrics} variant="horizontal" />
         </div>
       </div>
+
+      {/* Limite de faturamento (MEI / nano). Oculto quando o perfil não foi informado. */}
+      <RevenueLimitCard />
 
       {/* Row 2: Faturamento (8) + Origem da Receita (4) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">

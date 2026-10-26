@@ -92,6 +92,7 @@ interface PixPaymentWrapperProps {
     pixKey?: string | null
     pixKeyType?: string | null
     payDepositOnly?: boolean
+    returnPath?: string
 }
 
 function isValidOrderNumber(num?: string | null): boolean {
@@ -165,7 +166,7 @@ export function PaymentWrapper({
     orderDetails, orderNumber, sellerName, buyerId,
     useMercadoPago = false, partnerId, mpPublicKey, userEmail, userName, userAddress,
     mpAcceptedPaymentMethods,
-    partnerPhone, pixKey, pixKeyType, payDepositOnly,
+    partnerPhone, pixKey, pixKeyType, payDepositOnly, returnPath,
 }: PixPaymentWrapperProps) {
     const { theme } = useTheme()
     const isDark = theme === "dark"
@@ -252,7 +253,11 @@ export function PaymentWrapper({
         setTimeout(() => {
             setIsClosing(false)
             onClose()
-            router.back()
+            if (returnPath) {
+                router.replace(returnPath)
+            } else {
+                router.back()
+            }
         }, 300)
     }
 

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { buildMpApprovedPaymentUpdate } from "./mp-order-payment-update"
+import {
+  buildMpApprovedPaymentUpdate,
+  isMpPaymentAlreadyRecorded,
+  isMpPaymentManuallyRecorded,
+} from "./mp-order-payment-update"
 
 describe("buildMpApprovedPaymentUpdate", () => {
   const baseOrder = {
@@ -39,6 +43,75 @@ describe("buildMpApprovedPaymentUpdate", () => {
 
     const breakdown = update.payment_breakdown as any[]
     expect(breakdown[0].paymentMethodId).toBe(validUuid)
+  })
+
+  const manuallyConfirmedOrder = {
+    total_amount: 100,
+    paid_amount: 30,
+    situation: "partially_paid",
+    checkout_fulfillment: {
+      depositCheckout: {
+        usesDeposit: true,
+        payDepositOnly: true,
+        depositAmount: 30,
+        initialChargeAmount: 30,
+        fullOrderTotal: 100,
+        sinalPaid: true,
+        depositStatus: "partially_paid",
+      },
+    },
+    payment_breakdown: [
+      {
+        method: "Pix (Mercado Pago)",
+        amount: 30,
+        amountReceived: 30,
+        provider: "Mercado Pago",
+        paymentKind: "deposit",
+        paymentStatus: "approved",
+        paymentStatusDetail: "manually_confirmed",
+        manuallyConfirmed: true,
+        mpPaymentId: "999",
+      },
+    ],
+  }
+
+  it("identifies a manually recorded MP payment", () => {
+    expect(isMpPaymentAlreadyRecorded(manuallyConfirmedOrder, "999")).toBe(true)
+    expect(isMpPaymentManuallyRecorded(manuallyConfirmedOrder, "999")).toBe(true)
+    expect(isMpPaymentManuallyRecorded(manuallyConfirmedOrder, "123")).toBe(false)
+  })
+
+  it("does not treat a normal MP payment as manually recorded", () => {
+    const normalOrder = {
+      ...manuallyConfirmedOrder,
+      payment_breakdown: [
+        {
+          ...manuallyConfirmedOrder.payment_breakdown[0],
+          manuallyConfirmed: false,
+          paymentStatusDetail: null,
+        },
+      ],
+    }
+
+    expect(isMpPaymentAlreadyRecorded(normalOrder, "999")).toBe(true)
+    expect(isMpPaymentManuallyRecorded(normalOrder, "999")).toBe(false)
+  })
+
+  it("does not add the amount again when the payment was manually confirmed", () => {
+    const update = buildMpApprovedPaymentUpdate({
+      order: manuallyConfirmedOrder,
+      transactionAmount: 30,
+      paymentMethodName: "Pix",
+      mpPaymentId: "999",
+      mpPaymentMethodId: "pix",
+      existingBreakdown: manuallyConfirmedOrder.payment_breakdown,
+    })
+
+    expect(update.paid_amount).toBe(30)
+    expect(update.amount_paid).toBe(30)
+    expect(update.situation).toBe("partially_paid")
+    expect(update.payment_breakdown).toHaveLength(1)
+    expect((update.payment_breakdown as any[])[0].manuallyConfirmed).toBe(true)
   })
 
   it("cleans existing breakdown with non-uuid paymentMethodId", () => {

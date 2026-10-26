@@ -11,6 +11,7 @@ import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
     MapPin,
     Check,
+    ChevronDown,
 } from "lucide-react"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
@@ -246,6 +247,7 @@ export function ExplorarPageClient({
 
     // Modal states
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
+    const [showStateList, setShowStateList] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
@@ -1712,7 +1714,7 @@ export function ExplorarPageClient({
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
                     {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && (
                         <div className="mb-6 lg:mb-8">
-                            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
+                            <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 {categoryCircles.map((cat) => (
                                     <button
@@ -1790,6 +1792,8 @@ export function ExplorarPageClient({
                                 resultsCount={filteredResults.length}
                                 isLoading={isContentLoading}
                                 showBackButton={!!query || !!selectedSection || isCategoryMode}
+                                citySlug={selectedCitySlug}
+                                formatCitySlug={formatCitySlug}
                                 onBack={() => {
                                     if (selectedSection) {
                                         triggerFilterLoading()
@@ -2093,17 +2097,44 @@ export function ExplorarPageClient({
                     </p>
 
                     <div className="space-y-4">
+                        {/* Quick location scope options */}
+                        <div className="flex flex-col gap-2 border-t pt-2">
+                            <button
+                                onClick={() => {
+                                    handleSelectCity("brasil")
+                                    setIsCityModalOpen(false)
+                                }}
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-brand-green" />
+                                    Brasil
+                                </span>
+                            </button>
+                            {Object.entries(ESTADO_MAP).map(([uf, name]) => (
+                                <button
+                                    key={uf}
+                                    onClick={() => {
+                                        handleSelectCity(`estado-${uf}`)
+                                        setIsCityModalOpen(false)
+                                    }}
+                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
+                                >
+                                    <span>{name}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* City search (show when user starts typing) */}
                         <div className="relative">
-                            {selectedCitySlug && (
-                                <Input
-                                    placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
-                                    value={citySearchText}
-                                    onChange={(e) => setCitySearchText(e.target.value)}
-                                    className="h-[42px] w-full"
-                                    variant="full-rounded"
-                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                />
-                            )}
+                            <Input
+                                placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
+                                value={citySearchText}
+                                onChange={(e) => setCitySearchText(e.target.value)}
+                                className="h-[42px] w-full"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            />
                             {filteredCitiesSuggestions.length > 0 && (
                                 <div className="flex flex-col gap-1 border-t pt-2">
                                     {filteredCitiesSuggestions.map((slug) => (
@@ -2135,21 +2166,24 @@ export function ExplorarPageClient({
                             <span>Usar minha localização</span>
                         </Button>
 
-                        <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Já tem uma conta cadastrada com endereço salvo?
-                            </p>
-                            <Button
-                                onClick={() => {
-                                    setIsCityModalOpen(false)
-                                    router.push("/auth/login")
-                                }}
-                                variant="link"
-                                className="text-sm mt-1 inline-block"
-                            >
-                                Entrar na minha conta
-                            </Button>
-                        </div>
+                        {/* Only show login link when user is NOT logged in */}
+                        {!userProfile && (
+                            <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Já tem uma conta cadastrada com endereço salvo?
+                                </p>
+                                <Button
+                                    onClick={() => {
+                                        setIsCityModalOpen(false)
+                                        router.push("/auth/login")
+                                    }}
+                                    variant="link"
+                                    className="text-sm mt-1 inline-block"
+                                >
+                                    Entrar na minha conta
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </DefaultModal>

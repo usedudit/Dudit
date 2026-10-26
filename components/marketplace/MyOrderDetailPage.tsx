@@ -1204,7 +1204,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const handleWhatsAppExchangeDifference = () => {
-        const rawPhone = sellerReturnCapabilities.phone || store?.phone || order.partners?.phone || "";
+        const rawPhone = sellerReturnCapabilities.phone || store?.phone || "";
         const cleanPhone = rawPhone.replace(/\D/g, "");
         if (!cleanPhone) {
             toast({
@@ -1363,7 +1363,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
         // WhatsApp fallback flow when seller doesn't have the returns module or is on free plan
         if (!sellerReturnCapabilities.hasReturnsModule) {
-            const rawPhone = sellerReturnCapabilities.phone || store?.phone || order.partners?.phone || "";
+            const rawPhone = sellerReturnCapabilities.phone || store?.phone || "";
             const cleanPhone = rawPhone.replace(/\D/g, "");
             if (!cleanPhone) {
                 toast({
@@ -2544,6 +2544,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         orderDetails={pixOrderDetails}
                         orderNumber={order.order_number}
                         sellerName={store?.name}
+                        returnPath={`/pedidos?tab=details&order_number=${order.order_number || orderNumber}`}
                     />
                 )}
 

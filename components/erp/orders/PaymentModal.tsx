@@ -370,6 +370,12 @@ export type PaymentModalProps = {
     allowDepositCharge?: boolean
     depositChargeAmount?: number
     depositPercentage?: number
+    /** Pedido existente com sinal pendente: exibe somente o Pix do sinal e a confirmação manual. */
+    existingDepositPending?: boolean
+    /** Valor do sinal já gerado no pedido existente. */
+    existingDepositAmount?: number
+    /** Chamado após confirmar manualmente o recebimento do sinal. */
+    onDepositConfirmed?: (data: any) => void
     deliveryBreakdown?: Record<string, unknown> | null
     orderId?: string
 }
@@ -399,11 +405,17 @@ const PaymentModal = ({
     originalPaymentMethod,
     originalPaymentProvider,
     allowDepositCharge = false,
-    depositChargeAmount = 0,
+    depositChargeAmount: depositChargeAmountProp = 0,
     depositPercentage: propsDepositPercentage,
+    existingDepositPending = false,
+    existingDepositAmount = 0,
+    onDepositConfirmed,
     deliveryBreakdown,
     orderId,
 }: PaymentModalProps) => {
+    const hasPendingExistingDeposit = Boolean(existingDepositPending && existingDepositAmount > 0.009)
+    // Para pedidos existentes, usa o valor real do sinal gravado no pedido.
+    const depositChargeAmount = hasPendingExistingDeposit ? existingDepositAmount : depositChargeAmountProp
     const { toast } = useToast();
     const { selectedStore } = useStore();
     const { planSlug } = usePermissions();
@@ -538,10 +550,15 @@ const PaymentModal = ({
     const [isRegeneratingBoleto, setIsRegeneratingBoleto] = useState(false);
     const mpBrickFormDataRef = useRef<any>(null);
     const [existingSinalLoaded, setExistingSinalLoaded] = useState(false);
+    const [existingSinalMissing, setExistingSinalMissing] = useState(false);
+    const [showConfirmSinalModal, setShowConfirmSinalModal] = useState(false);
+    const [isConfirmingSinal, setIsConfirmingSinal] = useState(false);
+    const [copiedSinalPix, setCopiedSinalPix] = useState(false);
 
     // Load existing sinal QR code data from MP when order already has a deposit
     useEffect(() => {
-        if (!isOpen || !orderId || !allowDepositCharge) return;
+        if (!isOpen || !orderId) return;
+        if (!hasPendingExistingDeposit && !allowDepositCharge) return;
         if (existingPaidAmount > 0.009 || existingSinalLoaded) return;
 
         fetch("/api/orders/retry-payment", {
@@ -549,17 +566,26 @@ const PaymentModal = ({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ orderId }),
         })
-            .then(async (res) => { return res.ok ? res.json() : null; })
+            .then(async (res) => {
+                if (res.ok) return res.json();
+                if (res.status === 404 && hasPendingExistingDeposit) setExistingSinalMissing(true);
+                return null;
+            })
             .then((data) => {
                 if (data && data.pixData && depositChargeAmount > 0.009) {
                     setDepositMpPixData({ qrCode: data.pixData.qrCode, qrCodeBase64: data.pixData.qrCodeBase64 });
                     setDepositPixGeneratedAt(Date.now());
                     setDepositMpPaymentId(data.paymentId || data.mpPaymentId || null);
                     setExistingSinalLoaded(true);
+                    setExistingSinalMissing(false);
+                } else if (hasPendingExistingDeposit) {
+                    setExistingSinalMissing(true);
                 }
             })
-            .catch(() => { })
-    }, [isOpen, orderId, allowDepositCharge, existingPaidAmount, existingSinalLoaded, depositChargeAmount]);
+            .catch(() => {
+                if (hasPendingExistingDeposit) setExistingSinalMissing(true);
+            })
+    }, [isOpen, orderId, allowDepositCharge, existingPaidAmount, existingSinalLoaded, hasPendingExistingDeposit, depositChargeAmount]);
 
     const handleVerifyDepositPayment = async () => {
         if (!depositMpPaymentId) return;
@@ -609,6 +635,44 @@ const PaymentModal = ({
             toast({ title: "Erro", description: "Ocorreu um erro ao verificar o pagamento.", variant: "destructive" });
         } finally {
             setIsCheckingDepositStatus(false);
+        }
+    };
+
+    const handleConfirmSinalReceipt = async () => {
+        if (!orderId || isConfirmingSinal) return;
+        setIsConfirmingSinal(true);
+        try {
+            const res = await fetchJSONWithCSRF<any>("/api/orders/confirm-deposit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: { orderId, ...(depositMpPaymentId ? { mpPaymentId: depositMpPaymentId } : {}) },
+            });
+
+            if (res?.success) {
+                setDepositPaid(true);
+                setShowConfirmSinalModal(false);
+                toast({
+                    title: "Sinal confirmado",
+                    description: "O recebimento do sinal foi registrado manualmente.",
+                });
+                onDepositConfirmed?.(res);
+                onClose();
+            } else {
+                toast({
+                    title: "Erro ao confirmar",
+                    description: res?.error || "Não foi possível confirmar o recebimento do sinal.",
+                    variant: "destructive",
+                });
+            }
+        } catch (err: any) {
+            console.error("Error confirming deposit:", err);
+            toast({
+                title: "Erro ao confirmar",
+                description: err?.message || "Não foi possível confirmar o recebimento do sinal.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsConfirmingSinal(false);
         }
     };
 
@@ -710,7 +774,7 @@ const PaymentModal = ({
                     initialChargeAmount: depositChargeAmount,
                     paymentProvider: "Mercado Pago",
                 }));
-                setShowDepositPixModal(true);
+                if (!hasPendingExistingDeposit) setShowDepositPixModal(true);
                 toast({ title: "Pix gerado", description: "Cobrança de sinal criada via Mercado Pago." });
             } else {
                 toast({ title: "Erro", description: res?.error || "Falha ao gerar Pix.", variant: "destructive" });
@@ -1078,6 +1142,9 @@ const PaymentModal = ({
             setIsPaymentCalculationLoading(false);
             setSplitPreview(null);
             setSuccessSnapshot(null);
+            setShowConfirmSinalModal(false);
+            setIsConfirmingSinal(false);
+            setCopiedSinalPix(false);
 
             // Reset MP state
             setMpStep("brick");
@@ -2273,6 +2340,8 @@ const PaymentModal = ({
             ? ` (${selectedMethodObj.name})`
             : '';
 
+        if (hasPendingExistingDeposit && view === 'methods') return 'Sinal';
+
         switch (view) {
             case 'methods': return 'Método de Pagamento';
             case 'method_type_select': return `Selecionar ${selectedTypeLabel}`;
@@ -3084,7 +3153,94 @@ const PaymentModal = ({
                                                 </div>
                                             </div>
 
-                                            {isLoadingMethods && activeMethods.length === 0 ? (
+                                            {hasPendingExistingDeposit ? (
+                                                <div className="w-full max-w-md mx-auto flex flex-col items-center">
+                                                    <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
+                                                        <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-8 h-8 object-contain" />
+                                                    </div>
+
+                                                    <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
+                                                        Agora é só pagar com Pix
+                                                    </h1>
+                                                    <p className="text-md text-brand-inactive-text dark:text-dark-body text-center mb-4">
+                                                        Escaneie o QR Code ou copie o código Pix do sinal e pague pelo app do seu banco.
+                                                    </p>
+
+                                                    {(generatingDepositPix || (!depositMpPixData && !existingSinalMissing)) ? (
+                                                        <div className="flex flex-col items-center justify-center py-10 text-brand-inactive-text">
+                                                            <Spinner size={20} className="mb-2 text-brand-primary" />
+                                                            <span className="text-xs">Carregando cobrança do sinal...</span>
+                                                        </div>
+                                                    ) : existingSinalMissing && !depositMpPixData ? (
+                                                        <div className="w-full my-6 flex flex-col gap-4">
+                                                            <InfoCard
+                                                                color="orange"
+                                                                title="Cobrança não encontrada"
+                                                                message="O Pix do sinal não está mais disponível no Mercado Pago. Gere uma nova cobrança para continuar."
+                                                            />
+                                                            <Button
+                                                                className="w-full h-12"
+                                                                onClick={handleGenerateDepositCharge}
+                                                                disabled={generatingDepositPix}
+                                                                isLoading={generatingDepositPix}
+                                                            >
+                                                                Gerar nova cobrança
+                                                            </Button>
+                                                        </div>
+                                                    ) : depositMpPixData ? (
+                                                        <>
+                                                            <div className="mb-6 relative">
+                                                                <div className="w-64 h-64 p-2 bg-transparent flex items-center justify-center isolate">
+                                                                    <img
+                                                                        src={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
+                                                                        alt="PIX QR Code"
+                                                                        className="w-full h-full object-contain mix-blend-multiply"
+                                                                    />
+                                                                </div>
+                                                                <div className="mt-4 flex flex-col items-center">
+                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Valor do sinal</span>
+                                                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(depositChargeAmount)}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="w-full">
+                                                                <div className="flex items-center gap-4 mb-6">
+                                                                    <div className="flex-1 h-px bg-brand-border dark:bg-dark-border" />
+                                                                    <span className="text-xs text-brand-inactive-text">ou copie manualmente</span>
+                                                                    <div className="flex-1 h-px bg-brand-border dark:bg-dark-border" />
+                                                                </div>
+
+                                                                <div className="flex gap-2 w-full mb-6">
+                                                                    <Input
+                                                                        value={depositMpPixData.qrCode}
+                                                                        readOnly
+                                                                        onChange={() => { }}
+                                                                        className="flex-1"
+                                                                    />
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        className="gap-2 shrink-0 h-[42px] w-[42px]"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(depositMpPixData.qrCode);
+                                                                            setCopiedSinalPix(true);
+                                                                            toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." });
+                                                                            setTimeout(() => setCopiedSinalPix(false), 2000);
+                                                                        }}
+                                                                    >
+                                                                        {copiedSinalPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                                                    </Button>
+                                                                </div>
+
+                                                                <InfoCard
+                                                                    message="A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
+                                                                    color="orange"
+                                                                    className="w-full"
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    ) : null}
+                                                </div>
+                                            ) : isLoadingMethods && activeMethods.length === 0 ? (
                                                 <div className="grid grid-cols-2 gap-4">
                                                     {[1, 2, 3, 4, 5, 6].map((i) => (
                                                         <div key={i} className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50 dark:bg-dark-border/10 animate-pulse">
@@ -4125,7 +4281,19 @@ const PaymentModal = ({
                         <div className="relative">
                             {/* 1. Main View (Methods) Footer Logic */}
                             {view === 'methods' && (
-                                <ActionFooter showConfirm={false} />
+                                hasPendingExistingDeposit ? (
+                                    <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30">
+                                        <Button
+                                            className="w-full h-[52px]"
+                                            onClick={() => setShowConfirmSinalModal(true)}
+                                            isLoading={isConfirmingSinal}
+                                        >
+                                            Confirmar recebimento
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <ActionFooter showConfirm={false} />
+                                )
                             )}
 
                             {/* 2. Split View Footer Logic */}
@@ -4227,6 +4395,22 @@ const PaymentModal = ({
             </div>
 
 
+
+            {showConfirmSinalModal && (
+                <AlertModal
+                    isOpen={showConfirmSinalModal}
+                    onClose={() => {
+                        if (!isConfirmingSinal) setShowConfirmSinalModal(false);
+                    }}
+                    onConfirm={handleConfirmSinalReceipt}
+                    variant="warning"
+                    title="Pagamento não detectado"
+                    message="Ainda não identificamos o pagamento do sinal via Mercado Pago. Confirme apenas se o cliente já realizou o Pix. O sinal será marcado como recebido manualmente e não será cancelado por expiração."
+                    confirmText="Sim, confirmar recebimento"
+                    cancelText="Cancelar"
+                    isLoading={isConfirmingSinal}
+                />
+            )}
 
             {showWarningModal && (
                 <AlertModal

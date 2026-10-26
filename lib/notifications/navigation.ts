@@ -52,6 +52,10 @@ export function getNotificationHref(params: {
     return "/sacola"
   }
 
+  if (type === "revenue_limit_alert") {
+    return "/erp/configuracoes?tab=dados-do-negocio"
+  }
+
   if (entityType === "quote") {
     if (audience === "seller" || audience === "admin") {
       return entityId ? `/erp/orcamentos?view=${encodeURIComponent(entityId)}` : `/erp/orcamentos`

@@ -47,6 +47,9 @@ export const NOTIFICATION_TYPE_URGENCY_MAP: Record<NotificationType, Notificatio
   low_stock: "low",
   replenishment_suggested: "low",
   cart_abandoned: "low",
+
+  // Fiscal / compliance
+  revenue_limit_alert: "high",
 }
 
 export function getNotificationUrgency(type: NotificationType): NotificationUrgency {

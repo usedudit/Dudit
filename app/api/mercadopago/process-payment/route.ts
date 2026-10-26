@@ -579,11 +579,13 @@ async function handler(request: NextRequest) {
             .filter((line) => line.itemType === "service_booking")
             .reduce((sum, line) => sum + Number(line.fullPrice || line.unitPrice || 0) * Number(line.quantity || 1), 0)
 
-          const serviceDepositDelta = serviceFullTotal > 0
-            ? Math.round(serviceFullTotal * (1 - depositPercent / 100) * 100) / 100
+          // Calcula o sinal diretamente (não via delta) para evitar perda de 1 centavo
+          // em arredondamentos, e garante mínimo de 1 centavo quando há serviço a cobrar.
+          const serviceDepositAmount = serviceFullTotal > 0
+            ? Math.max(0.01, Math.round(serviceFullTotal * (depositPercent / 100) * 100) / 100)
             : 0
 
-          const serviceDepositAmount = Math.max(0, serviceFullTotal - serviceDepositDelta)
+          const serviceDepositDelta = Math.max(0, Math.round((serviceFullTotal - serviceDepositAmount) * 100) / 100)
 
           // Only subtract the delta if the resolver actually adjusted unitPrice.
           // When depositAmount is null (services with payment_requirement "full_payment"),

@@ -14,6 +14,50 @@ import { isUuid } from "@/lib/utils/short-id"
 
 const AMOUNT_TOLERANCE = 0.01
 
+/**
+ * Verifica se um pagamento do Mercado Pago já foi registrado no ledger do
+ * pedido (ex.: sinal confirmado manualmente). Nesse caso, eventos posteriores
+ * do MP (aprovação, cancelamento, expiração) não devem alterar o pedido nem
+ * somar o valor novamente.
+ */
+export function isMpPaymentAlreadyRecorded(
+  order: OrderFinancialSnapshot,
+  mpPaymentId: string | number | null | undefined,
+): boolean {
+  return findRecordedMpPaymentEntry(order, mpPaymentId) !== null
+}
+
+/**
+ * Mesmo que `isMpPaymentAlreadyRecorded`, mas exige que o registro tenha sido
+ * feito manualmente pelo vendedor ("Confirmar recebimento"). Usado para
+ * bloquear eventos do MP (aprovação tardia, cancelamento, expiração) que
+ * poderiam cancelar o pedido ou duplicar o valor do sinal.
+ */
+export function isMpPaymentManuallyRecorded(
+  order: OrderFinancialSnapshot,
+  mpPaymentId: string | number | null | undefined,
+): boolean {
+  const entry = findRecordedMpPaymentEntry(order, mpPaymentId)
+  return Boolean(entry?.manuallyConfirmed)
+}
+
+function findRecordedMpPaymentEntry(
+  order: OrderFinancialSnapshot,
+  mpPaymentId: string | number | null | undefined,
+): Record<string, any> | null {
+  const id = String(mpPaymentId || "").trim()
+  if (!id) return null
+
+  const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+  const entry = breakdown.find((item: any) => {
+    if (!item?.mpPaymentId) return false
+    if (String(item.mpPaymentId) !== id) return false
+    return Number(item?.amountReceived ?? 0) > AMOUNT_TOLERANCE
+  })
+
+  return (entry as Record<string, any> | undefined) ?? null
+}
+
 export function validateMpTransactionAmount(
   order: OrderFinancialSnapshot,
   transactionAmount: number,
@@ -57,6 +101,34 @@ export function buildMpApprovedPaymentUpdate(params: {
 } {
   const totalAmount = getOrderTotalAmount(params.order)
   const currentPaid = getOrderPaidAmount(params.order)
+
+  // Idempotência: o mesmo pagamento já está registrado (ex.: sinal confirmado
+  // manualmente). Não soma o valor novamente nem altera o status.
+  if (isMpPaymentAlreadyRecorded(params.order, params.mpPaymentId)) {
+    const currentBreakdown = Array.isArray(params.order.payment_breakdown)
+      ? [...(params.order.payment_breakdown as any[])]
+      : []
+    const currentMethodLabel = buildOrderPaymentMethodLabel(currentBreakdown, {
+      fallbackMethod: params.paymentMethodName,
+      usesDeposit: Boolean((params.order.checkout_fulfillment as any)?.depositCheckout),
+      paidAmount: currentPaid,
+      totalAmount,
+    })
+
+    return {
+      situation: String(params.order.situation || resolveSituationFromPaid(currentPaid, totalAmount)),
+      paid_amount: currentPaid,
+      amount_paid: currentPaid,
+      payment_breakdown: currentBreakdown,
+      payment_method: currentMethodLabel,
+      payment_provider: "Mercado Pago",
+      mp_payment_id: params.mpPaymentId,
+      ...(params.order.checkout_fulfillment
+        ? { checkout_fulfillment: params.order.checkout_fulfillment }
+        : {}),
+    }
+  }
+
   const chargeAmount = Math.max(0, Number(params.transactionAmount || 0))
   const nextPaid = Math.min(totalAmount, currentPaid > 0.009 ? currentPaid + chargeAmount : chargeAmount)
   const situation = resolveSituationFromPaid(nextPaid, totalAmount)

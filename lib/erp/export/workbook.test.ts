@@ -16,6 +16,26 @@ const rows: ExportRow[] = [
 ]
 
 describe("buildExportFile", () => {
+  it("remove colunas de ID de qualquer exportação", async () => {
+    const idColumns: ExportColumnDef[] = [
+      { header: "ID", key: "id", type: "text" },
+      { header: "ID do Pedido", key: "orderId", type: "text" },
+      { header: "Nome", key: "name", type: "text" },
+    ]
+    const file = await buildExportFile({
+      sheetName: "Teste",
+      columns: idColumns,
+      rows: [{ id: "internal-product-id", orderId: "internal-order-id", name: "Produto" }],
+      format: "csv",
+    })
+
+    const text = file.buffer.toString("utf-8")
+    expect(text).toContain("Nome")
+    expect(text).not.toContain("ID")
+    expect(text).not.toContain("internal-product-id")
+    expect(text).not.toContain("internal-order-id")
+  })
+
   it("gera CSV pt-BR com BOM, ponto e vírgula e decimal vírgula", async () => {
     const file = await buildExportFile({ sheetName: "Produtos", columns, rows, format: "csv" })
     expect(file.extension).toBe("csv")

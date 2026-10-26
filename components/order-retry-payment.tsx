@@ -113,6 +113,7 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider, or
           orderDetails={orderDetails}
           orderNumber={orderNumber || orderDetails?.orderNumber}
           sellerName={orderDetails?.sellerName}
+          returnPath="/pedidos"
         />
       )}
     </>

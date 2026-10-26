@@ -57,6 +57,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Idempotência: pagamento já registrado manualmente (ex.: sinal confirmado).
+    // Não sincroniza de novo, não soma valor e não cancela o pedido.
+    {
+      const { isMpPaymentManuallyRecorded } = await import("@/lib/payments/mp-order-payment-update")
+      if (isMpPaymentManuallyRecorded(order, order.mp_payment_id)) {
+        return NextResponse.json({
+          success: true,
+          orderId: order.id,
+          orderNumber: order.order_number,
+          previousStatus: order.situation,
+          newStatus: order.situation,
+          updated: false,
+          skipped: true,
+          reason: "payment_already_recorded",
+        })
+      }
+    }
+
     // Zombie protection: check if order is expired
     if ((order.situation === "pending" || order.situation === "payment_failed") && order.payment_expires_at) {
       if (new Date() > new Date(order.payment_expires_at)) {

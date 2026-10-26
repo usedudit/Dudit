@@ -922,6 +922,8 @@ export default function OrdersPage({
                 }
                 toast({ title: "Sinal cancelado", description: "O pedido agora pode ser pago normalmente." })
                 afterMutation(order.originalId)
+                // Abre o pagamento normal do pedido (sem sinal).
+                router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
             } catch (err: any) {
                 toast({ title: "Erro", description: err?.message || "Não foi possível cancelar o sinal.", variant: "destructive" })
             }

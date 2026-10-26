@@ -111,16 +111,16 @@ export async function computeMarketplaceCheckoutAmounts(
     }
   }
 
-  // Compute deposit delta directly from the partner's deposit percentage.
+  // Compute deposit amount directly from the partner's deposit percentage.
   // We do NOT rely on line.depositAmount from the resolver because the resolver
   // skips computing it when the service's payment_requirement is "full_payment"
   // (or null, which defaults to "full_payment" in capabilities). The deposit
   // option is still valid for these services - the partner enabled it globally.
-  const serviceDepositDelta = params.depositAvailable && serviceFullTotal > 0
-    ? Math.round(serviceFullTotal * (1 - params.depositPercent / 100) * 100) / 100
+  const serviceDepositAmount = params.depositAvailable && serviceFullTotal > 0
+    ? Math.max(0.01, Math.round(serviceFullTotal * (params.depositPercent / 100) * 100) / 100)
     : 0
 
-  const serviceDepositAmount = Math.max(0, serviceFullTotal - serviceDepositDelta)
+  const serviceDepositDelta = Math.max(0, Math.round((serviceFullTotal - serviceDepositAmount) * 100) / 100)
 
   // Full order total based on pricing calculation
   const calculatedTotal = Number(priced.data.totalAmount || 0)
@@ -137,7 +137,7 @@ export async function computeMarketplaceCheckoutAmounts(
   let fullOrderTotal = calculatedTotal
   let depositChargeTotal = calculatedTotal
 
-  if (params.depositAvailable && serviceDepositDelta > 0) {
+  if (params.depositAvailable && serviceDepositAmount > 0) {
     if (hasActiveDepositInLines) {
       // calculatedTotal already uses deposit-adjusted unitPrices from the resolver
       depositChargeTotal = calculatedTotal

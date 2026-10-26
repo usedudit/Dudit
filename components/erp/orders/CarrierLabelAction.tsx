@@ -33,6 +33,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     const [cancelOpen, setCancelOpen] = useState(false)
     const [cancelReason, setCancelReason] = useState("")
     const [docModalOpen, setDocModalOpen] = useState(false)
+    const [nfeModalOpen, setNfeModalOpen] = useState(false)
 
     // Uma única action rápida: gate + shipment numa cadeia de auth só e sem
     // chamada remota ao SuperFrete.
@@ -64,10 +65,13 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
         load()
     }, [onRefresh, load])
 
-    const handleCreate = async () => {
+    const handleCreate = async (allowMissingNfe = false) => {
         setCreating(true)
         try {
-            const res = await createOrderShippingLabelAction({ orderId })
+            const res = await createOrderShippingLabelAction({
+                orderId,
+                ...(allowMissingNfe ? { allowMissingNfe: true } : {}),
+            })
             if (res.success) {
                 const payRes = await checkoutSuperFreteLabelAction({ partnerId, orderId, labelId: res.label.id })
                 if (payRes.success) {
@@ -89,6 +93,8 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
                 await refresh()
             } else if (res.code === "missing_document") {
                 setDocModalOpen(true)
+            } else if (res.code === "missing_nfe") {
+                setNfeModalOpen(true)
             } else {
                 toast.error(res.error || "Erro ao gerar etiqueta.")
             }
@@ -171,7 +177,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     if (!shipment) {
         if (gate?.connected && gate?.planAllowed) {
             content = (
-                <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
+                <Button variant="link" type="button" onClick={() => handleCreate()} isLoading={creating} className="shrink-0">
                     Gerar etiqueta
                 </Button>
             )
@@ -206,7 +212,7 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     } else if (shipment.status === "cancelled" || shipment.status === "failed") {
         if (gate?.connected && gate?.planAllowed) {
             content = (
-                <Button variant="link" type="button" onClick={handleCreate} isLoading={creating} className="shrink-0">
+                <Button variant="link" type="button" onClick={() => handleCreate()} isLoading={creating} className="shrink-0">
                     Gerar etiqueta
                 </Button>
             )
@@ -253,6 +259,22 @@ export function CarrierLabelAction({ orderId, partnerId, onRefresh }: CarrierLab
     return (
         <>
             {content}
+            <AlertModal
+                isOpen={nfeModalOpen}
+                onClose={() => {
+                    if (!creating) setNfeModalOpen(false)
+                }}
+                onConfirm={async () => {
+                    setNfeModalOpen(false)
+                    await handleCreate(true)
+                }}
+                title="Gerar etiqueta sem NF-e"
+                message="O comprador é pessoa jurídica e a NF-e é obrigatória. Se continuar, a etiqueta é gerada e o pedido fica registrado como enviado sem nota fiscal."
+                confirmText="Gerar mesmo assim"
+                cancelText="Voltar"
+                variant="danger"
+                isLoading={creating}
+            />
             <RecipientDocumentModal
                 isOpen={docModalOpen}
                 onClose={() => setDocModalOpen(false)}

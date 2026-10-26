@@ -43,6 +43,7 @@ import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
+import { canPaySinal, getOrderDepositSummary } from "@/lib/payments/order-financial-state"
 import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { normalizeCustomerForCard } from "@/lib/utils/customer"
 
@@ -288,6 +289,8 @@ export default function CreateOrder({
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
     const [originalPaymentProvider, setOriginalPaymentProvider] = useState("")
     const [originalPaymentBreakdown, setOriginalPaymentBreakdown] = useState<PaymentBreakdownEntry[]>([])
+    const [originalCheckoutFulfillment, setOriginalCheckoutFulfillment] = useState<Record<string, unknown> | null>(null)
+    const [originalPaymentExpiresAt, setOriginalPaymentExpiresAt] = useState<string | null>(null)
     const [originalOrderSource, setOriginalOrderSource] = useState<string | null>(null)
     const [paymentMethodDiscountAmount, setPaymentMethodDiscountAmount] = useState(0)
     const [paymentMethodExtraAmount, setPaymentMethodExtraAmount] = useState(0)
@@ -441,8 +444,10 @@ export default function CreateOrder({
     )
     const depositChargeAmount = useMemo(() => {
         if (!depositSettings.depositEnabled) return 0
+        if (serviceSubtotal <= 0) return 0
         const pct = (depositSettings.depositPercentage || 50) / 100
-        return Math.round(serviceSubtotal * pct * 100) / 100
+        const raw = Math.round(serviceSubtotal * pct * 100) / 100
+        return Math.max(0.01, raw)
     }, [serviceSubtotal, depositSettings])
 
     const hasWinningDiscount = useMemo(() => {
@@ -486,6 +491,19 @@ export default function CreateOrder({
     const remainingAmount = useMemo(() => {
         return Math.max(0, totalAmount - originalPaidAmount)
     }, [totalAmount, originalPaidAmount])
+
+    const existingDepositSummary = useMemo(() => getOrderDepositSummary({
+        total_amount: originalTotalAmount,
+        paid_amount: originalPaidAmount,
+        payment_breakdown: originalPaymentBreakdown,
+        checkout_fulfillment: originalCheckoutFulfillment,
+        payment_expires_at: originalPaymentExpiresAt,
+    }), [originalTotalAmount, originalPaidAmount, originalPaymentBreakdown, originalCheckoutFulfillment, originalPaymentExpiresAt])
+
+    const hasPendingExistingDeposit = Boolean(editOrderId && canPaySinal(existingDepositSummary))
+    const existingDepositAmount = existingDepositSummary.initialChargeAmount > 0.009
+        ? existingDepositSummary.initialChargeAmount
+        : existingDepositSummary.depositAmount
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
     const isPaidOrderLocked = !adminContext && Boolean(editOrderId && originalPaymentStatus === "paid")
@@ -584,6 +602,12 @@ export default function CreateOrder({
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
                 setOriginalPaymentProvider(order.payment_provider || "")
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
+                setOriginalCheckoutFulfillment(
+                    order.checkout_fulfillment && typeof order.checkout_fulfillment === "object"
+                        ? order.checkout_fulfillment
+                        : null,
+                )
+                setOriginalPaymentExpiresAt(order.payment_expires_at || null)
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setOriginalDeliveryStatus(order.delivery_status || "not_sent")
                 if (order.platform_driver) setPlatformDriver(order.platform_driver)
@@ -1703,6 +1727,24 @@ export default function CreateOrder({
         return result
     }
 
+    const handleDepositConfirmed = useCallback((data: any) => {
+        const nextPaid = Number(data?.paidAmount ?? originalPaidAmount)
+        const nextStatus = data?.situation === "paid"
+            ? "paid"
+            : data?.situation === "partially_paid" || nextPaid > 0.009
+                ? "partially_paid"
+                : "unpaid"
+        setOriginalPaidAmount(nextPaid)
+        setOriginalPaymentStatus(nextStatus)
+        setPaymentStatus(nextStatus)
+        if (Array.isArray(data?.paymentBreakdown)) {
+            setOriginalPaymentBreakdown(data.paymentBreakdown)
+        }
+        if (data?.checkoutFulfillment && typeof data.checkoutFulfillment === "object") {
+            setOriginalCheckoutFulfillment(data.checkoutFulfillment)
+        }
+    }, [originalPaidAmount])
+
     const handleDirectSaveOrder = async () => {
         if (!validateOrderBeforeSubmit()) {
             return
@@ -2521,6 +2563,9 @@ export default function CreateOrder({
                             allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009 && !isMarketplaceOrder}
                             depositChargeAmount={depositChargeAmount}
                             depositPercentage={depositSettings.depositPercentage}
+                            existingDepositPending={hasPendingExistingDeposit}
+                            existingDepositAmount={existingDepositAmount}
+                            onDepositConfirmed={handleDepositConfirmed}
                         />
                     )}
                 </AnimatePresence>

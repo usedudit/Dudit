@@ -77,7 +77,7 @@ export const resolveMarketplaceCapabilities = cache(
     const [{ data: partner }, plan] = await Promise.all([
       admin
         .from("partners")
-        .select("id, order_flow, business_info, phone")
+        .select("id, order_flow, business_info")
         .eq("id", partnerId)
         .maybeSingle(),
       getPartnerPlan(partnerId).catch(() => null),
@@ -106,7 +106,7 @@ export const resolveMarketplaceCapabilities = cache(
       storePhone = null
     }
 
-    const whatsappPhone = storePhone || normalizePhone((partner as any)?.phone)
+    const whatsappPhone = storePhone || null
 
     const productsEnabled = hasResource("products")
     const servicesEnabled = hasResource("services")

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { mapCustomerRow } from "./mappers"
+import { mapCustomerRow, mapProductRow, PRODUCT_EXPORT_COLUMNS, PRODUCT_EXPORT_ALL_COLUMNS } from "./mappers"
 
 describe("mapCustomerRow", () => {
   const baseCustomer = {
@@ -79,5 +79,39 @@ describe("mapCustomerRow", () => {
 
     expect(result.city).toBe("São Paulo")
     expect(result.state).toBe("SP")
+  })
+})
+
+describe("mapProductRow", () => {
+  it("inclui variantes nas colunas padrão e preserva os dados para reimportação", () => {
+    const result = mapProductRow({
+      id: "internal-product-id",
+      name: "Camiseta",
+      sku: null,
+      price: 49.9,
+      stock_quantity: 3,
+      cost_price: 20,
+      is_active: true,
+      show_in_marketplace: true,
+      product_variants: [
+        {
+          variant_name: "P",
+          variant_type: "Tamanho",
+          variant_value: "P",
+          sku: "CAM-P",
+          price_adjustment: 49.9,
+          stock_quantity: 3,
+          is_active: true,
+        },
+      ],
+    })
+
+    expect(PRODUCT_EXPORT_COLUMNS.some((column) => column.key === "variants")).toBe(true)
+    expect(PRODUCT_EXPORT_COLUMNS.some((column) => column.key === "variantType")).toBe(true)
+    expect(PRODUCT_EXPORT_ALL_COLUMNS.some((column) => column.key === "id")).toBe(false)
+    expect(result).not.toHaveProperty("id")
+    expect(result.variantType).toBe("Tamanho")
+    expect(result.variants).toContain("P")
+    expect(result.variants).toContain("CAM-P")
   })
 })

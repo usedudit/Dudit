@@ -13,6 +13,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { revalidateOrders, revalidateTransactions, safeRevalidateTag } from "@/lib/utils/revalidation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { logAudit } from "@/lib/observability/audit-log"
+import { resolveOrderBuyerFiscal } from "@/lib/orders/buyer-fiscal"
 import type { ReturnShippingPayer } from "@/lib/returns/policy"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
@@ -1167,7 +1169,7 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
     supabase
       .from("orders")
       .select(
-        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, delivery_address, delivery_breakdown, stores(name), order_items(product_name, quantity, product_price, products(name), services(name))",
+        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, partner_id, nfe_number, delivery_address, delivery_breakdown, stores(name), order_items(product_name, quantity, product_price, products(name), services(name))",
       )
       .eq("id", orderId)
       .eq("partner_id", partnerId)
@@ -1556,13 +1558,15 @@ export async function getOrderShippingQuoteAction(payload: { orderId: string }):
 export async function createOrderShippingLabelAction(payload: {
   orderId: string
   service?: SuperFreteServiceId
+  /** Permite gerar a etiqueta de pedido PJ sem NF-e informada (fica registrado). */
+  allowMissingNfe?: boolean
 }): Promise<{
   success: true
   label: { id: string; price: number; status: string; serviceId: number }
   priceMismatch: boolean
   checkoutPrice: number
   labelPrice: number | null
-} | { success: false; error: string; code?: "missing_document" }> {
+} | { success: false; error: string; code?: "missing_document" | "missing_nfe" }> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   const user = await requireUser()
   const ctx = await getCurrentPartnerContext()
@@ -1581,6 +1585,23 @@ export async function createOrderShippingLabelAction(payload: {
 
     const client = createClientFromIntegration(integration)
     if (!client) return { success: false, error: "SuperFrete não conectado." }
+
+    // Gate fiscal: comprador PJ exige NF-e. O envio pode ser liberado com
+    // registro (payload.allowMissingNfe), mas nunca silenciosamente.
+    const buyer = await resolveOrderBuyerFiscal(supabase, {
+      ...order,
+      partner_id: ctx.partnerId,
+    })
+    const buyerIsPj = buyer.personType === "pj"
+    const missingNfe = buyerIsPj && !order.nfe_number
+
+    if (missingNfe && !payload.allowMissingNfe) {
+      return {
+        success: false,
+        code: "missing_nfe",
+        error: "Este pedido é para pessoa jurídica. Informe o número da NF-e antes de gerar a etiqueta.",
+      }
+    }
 
     // Tudo em paralelo: checagem de saldo + origem + destino. Em sandbox a
     // checagem de saldo é dispensável (nunca bloqueia) - pula 1 roundtrip.
@@ -1697,6 +1718,27 @@ export async function createOrderShippingLabelAction(payload: {
         price_mismatch: priceMismatch,
       },
     })
+
+    // Só registra a liberação depois que a etiqueta realmente foi criada.
+    if (missingNfe) {
+      const reason = "Etiqueta gerada sem informar o número da NF-e."
+      await supabase
+        .from("orders")
+        .update({
+          nfe_override_by: user.id,
+          nfe_override_at: new Date().toISOString(),
+          nfe_override_reason: reason,
+        })
+        .eq("id", order.id)
+
+      logAudit("order.nfe_override", {
+        partnerId: ctx.partnerId,
+        orderId: order.id,
+        reason,
+        userId: user.id,
+        source: "shipping_label",
+      })
+    }
 
     revalidateOrders(ctx.partnerId)
 

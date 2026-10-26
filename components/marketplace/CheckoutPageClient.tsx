@@ -4813,6 +4813,7 @@ export function CheckoutPageClient() {
                     pixKey={pixPaymentData.pixKey}
                     pixKeyType={pixPaymentData.pixKeyType}
                     payDepositOnly={pixPaymentData.payDepositOnly}
+                    returnPath="/pedidos"
                 />
             )}
 

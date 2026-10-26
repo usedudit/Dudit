@@ -309,14 +309,17 @@ export async function resolveCheckoutCartLines(
       let depositAmount: number | null = null
       if (depositAllowed && partner?.service_deposit_enabled && caps.paymentRequirement !== "full_payment") {
         const pct = Number(partner.service_deposit_percentage || 50) / 100
-        depositAmount = Math.round(fullPrice * qty * pct * 100) / 100
+        const rawDeposit = Math.round(fullPrice * qty * pct * 100) / 100
+        // Mínimo de 1 centavo quando há valor positivo a cobrar
+        depositAmount = fullPrice > 0 && rawDeposit === 0 ? 0.01 : rawDeposit
       }
 
       if (payDepositOnly && depositAmount) {
         if (!depositAllowed || !partner?.service_deposit_enabled) {
           return { success: false, error: "Entrada não disponível para esta loja." }
         }
-        unitPrice = Math.round(fullPrice * (Number(partner.service_deposit_percentage || 50) / 100) * 100) / 100
+        const rawUnitPrice = Math.round(fullPrice * (Number(partner.service_deposit_percentage || 50) / 100) * 100) / 100
+        unitPrice = fullPrice > 0 && rawUnitPrice === 0 ? 0.01 : rawUnitPrice
       }
 
       const subtotal = unitPrice * qty

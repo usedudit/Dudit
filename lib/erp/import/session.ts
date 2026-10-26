@@ -63,3 +63,23 @@ export async function deleteImportSession(
   const key = buildKey(partnerId, sessionId)
   await redis.del(key)
 }
+
+export async function updateImportSession(
+  partnerId: string,
+  sessionId: string,
+  data: Partial<Omit<ImportSession, "createdAt">>,
+): Promise<boolean> {
+  const key = buildKey(partnerId, sessionId)
+  try {
+    const session = await redis.get<ImportSession>(key)
+    if (!session || (session.partnerId && session.partnerId !== partnerId)) {
+      return false
+    }
+    const updated = { ...session, ...data }
+    await redis.set(key, updated, { ex: TTL })
+    return true
+  } catch (err) {
+    console.error(`[ImportSession] Failed to update session ${sessionId}:`, err)
+    return false
+  }
+}

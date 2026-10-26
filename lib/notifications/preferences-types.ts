@@ -54,6 +54,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
       "low_stock",
       "replenishment_suggested",
       "subscription_price_change_expired",
+      "revenue_limit_alert",
     ],
   },
   system: {
@@ -106,4 +107,5 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   replenishment_suggested: "Sugestões de reposição",
   service_return_reminder: "Lembrete de retorno",
   cart_abandoned: "Carrinho abandonado",
+  revenue_limit_alert: "Limite de faturamento",
 }

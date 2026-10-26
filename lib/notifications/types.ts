@@ -20,6 +20,7 @@ export const NOTIFICATION_TYPES = [
   "replenishment_suggested",
   "service_return_reminder",
   "cart_abandoned",
+  "revenue_limit_alert",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
