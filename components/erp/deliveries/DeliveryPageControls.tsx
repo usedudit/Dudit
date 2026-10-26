@@ -2,9 +2,7 @@ import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Dropdown, DropdownItem, Input } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
-import { TabCountBadge } from "@/components/reusable/TabCountBadge"
-import { SearchIcon, FilterIcon, PlusIcon, TruckIcon, BlockedIcon, SparklesIcon, Settings2Icon, CalendarIcon } from "@/lib/icons"
+import { SearchIcon, FilterIcon, PlusIcon, SparklesIcon, Settings2Icon, CalendarIcon } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
 
@@ -41,8 +39,6 @@ function BadgeList({ filters, setFilters }: BadgeListProps) {
 }
 
 interface DeliveryPageControlsProps {
-    activeTab: "active" | "closed"
-    onActiveTabChange: (tab: "active" | "closed") => void
     search: string
     onSearchChange: (v: string) => void
     onOpenFilter: () => void
@@ -50,7 +46,6 @@ interface DeliveryPageControlsProps {
     onOpenSuggestions?: () => void
     canSmartSuggest?: boolean
     addDisabled?: boolean
-    tabCounts?: { active: number; closed: number }
     userRole?: string | null
     filters: { status: string[]; datePeriod: DatePeriodFilterValue }
     setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
@@ -58,8 +53,6 @@ interface DeliveryPageControlsProps {
 }
 
 export default function DeliveryPageControls({
-    activeTab,
-    onActiveTabChange,
     search,
     onSearchChange,
     onOpenFilter,
@@ -67,7 +60,6 @@ export default function DeliveryPageControls({
     onOpenSuggestions,
     canSmartSuggest = false,
     addDisabled = false,
-    tabCounts,
     userRole,
     filters,
     setFilters,
@@ -93,31 +85,6 @@ export default function DeliveryPageControls({
 
     return (
         <>
-            {/* --- TABS --- */}
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs
-                    value={activeTab}
-                    onValueChange={(val) => onActiveTabChange(val as any)}
-                >
-                    <TabsList className="px-0">
-                        <TabsTrigger
-                            value="active"
-                            icon={TruckIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.active} variant="blue" />}
-                        >
-                            Entregas Ativas
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="closed"
-                            icon={BlockedIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.closed} variant="gray" />}
-                        >
-                            Canceladas / Falhas
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-            </div>
-
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 {/* MOBILE CONTROLS */}

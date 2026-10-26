@@ -586,11 +586,12 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                         {readOnly ? (
                             <>
                                 <ActionsDropdown
+                                    fullWidth={!onEdit}
                                     onDelete={onDelete}
                                     trigger={
                                         <Button
                                             variant="outline"
-                                            className="flex-1 h-12"
+                                            className="w-full h-12"
                                             leftIcon={<ThreeDotsIcon size={18} />}
                                         >
                                             Opções

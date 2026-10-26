@@ -191,9 +191,19 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
 // ─── Path-to-RouteKey Lookup ────────────────────────────────────────────────
 
+// Algumas telas têm mais de uma rota e compartilham a mesma permissão.
+// Ex.: o hub de Relatórios ("/erp/relatorios") e as Estatísticas
+// ("/erp/estatisticas") são controlados pela mesma chave "reports".
+const ROUTE_PATH_ALIASES: Record<string, RouteKey> = {
+    "/erp/relatorios": "reports",
+}
+
 const pathToRouteKey: Record<string, RouteKey> = {}
 for (const [key, info] of Object.entries(ROUTE_MAP)) {
     pathToRouteKey[info.path] = key as RouteKey
+}
+for (const [path, key] of Object.entries(ROUTE_PATH_ALIASES)) {
+    pathToRouteKey[path] = key
 }
 
 /**

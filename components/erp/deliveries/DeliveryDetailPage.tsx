@@ -604,6 +604,7 @@ export default function DeliveryDetailPage({
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
                     <ActionsDropdown
+                        fullWidth
                         onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
                         onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
                         cancelLabel="Cancelar entrega"

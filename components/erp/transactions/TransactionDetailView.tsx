@@ -593,9 +593,10 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         <ActionsDropdown
+                            fullWidth={!detail.canEdit}
                             onPrint={() => setPrintModalOpen(true)}
                             trigger={
-                                <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
+                                <Button variant="outline" className="w-full whitespace-nowrap" leftIcon={<ThreeDotsIcon size={18} />}>
                                     Opções
                                 </Button>
                             }

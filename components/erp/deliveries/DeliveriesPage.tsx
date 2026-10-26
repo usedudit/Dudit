@@ -9,10 +9,10 @@ import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/comp
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, PackageIcon, SearchIcon, TruckIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon, SearchIcon, TruckIcon, MotorbikeIcon, BlockedIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction, getERPCarrierDeliveriesPageAction, getERPCarrierDeliveriesEnabledAction, type ERPCarrierDeliveryListCursor } from "@/app/actions/erp/deliveries"
+import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getSmartDeliverySuggestionsAction, getERPCarrierDeliveriesPageAction, type ERPCarrierDeliveryListCursor } from "@/app/actions/erp/deliveries"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
@@ -63,6 +63,8 @@ export default function DeliveriesPage({
     initialHasMore = false,
     planGate: propPlanGate,
     userRole: initialUserRole,
+    planSlug: initialPlanSlug,
+    carrierEnabled: initialCarrierEnabled = false,
 }: {
     partnerId: string
     deliveries?: any[]
@@ -70,6 +72,8 @@ export default function DeliveriesPage({
     initialHasMore?: boolean
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
     userRole?: string
+    planSlug?: string
+    carrierEnabled?: boolean
 }) {
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -108,9 +112,9 @@ export default function DeliveriesPage({
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [viewMode, setViewMode] = useState<"kanban">("kanban")
 
-    const [activeTab, setActiveTabState] = useState<"active" | "closed">("active")
-    const [mode, setMode] = useState<"deliveries" | "carriers">("deliveries")
-    const [carrierEnabled, setCarrierEnabled] = useState(false)
+    const [mode, setMode] = useState<"deliveries" | "carriers" | "failed">("deliveries")
+    const carrierEnabled = initialCarrierEnabled
+    const planSlug = initialPlanSlug || "free"
 
     // Sync search with URL searchParams
     useEffect(() => {
@@ -121,12 +125,8 @@ export default function DeliveriesPage({
         }
     }, [searchParams])
 
-    const setActiveTab = useCallback((tab: "active" | "closed") => {
-        setActiveTabState(tab)
-    }, [])
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
-    const [planSlug, setPlanSlug] = useState<string>("free")
     const [suggestionsOpen, setSuggestionsOpen] = useState(false)
     const [suggestionsLoading, setSuggestionsLoading] = useState(false)
     const [suggestions, setSuggestions] = useState<any[]>([])
@@ -150,7 +150,7 @@ export default function DeliveriesPage({
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const queryKey = useMemo(() => ["erp", "deliveries", partnerId] as const, [partnerId])
+    const queryKey = useMemo(() => ["erp", "deliveries", partnerId, "active"] as const, [partnerId])
     const {
         items,
         isLoading,
@@ -161,8 +161,26 @@ export default function DeliveriesPage({
         queryKey,
         initialPage: { items: initialDeliveries, nextCursor: initialNextCursor, hasMore: initialHasMore },
         fetchFn: async ({ cursor }) => {
-            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25 })
+            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25, statusGroup: "active" })
             if (!res.success) throw new Error(res.error || "Erro ao carregar entregas.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
+    })
+
+    const closedQueryKey = useMemo(() => ["erp", "deliveries", partnerId, "closed"] as const, [partnerId])
+    const {
+        items: closedDeliveries,
+        isLoading: closedLoading,
+        isFetchingNextPage: closedFetchingNextPage,
+        hasNextPage: closedHasNextPage,
+        fetchNextPage: fetchClosedNextPage,
+    } = useInfiniteList<any, ERPDeliveryListCursor>({
+        queryKey: closedQueryKey,
+        enabled: mode === "failed",
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPDeliveriesPageAction(partnerId, { cursor, limit: 25, statusGroup: "closed" })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar entregas canceladas.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
@@ -177,7 +195,7 @@ export default function DeliveriesPage({
         fetchNextPage: fetchCarrierNextPage,
     } = useInfiniteList<any, ERPCarrierDeliveryListCursor>({
         queryKey: carrierQueryKey,
-        enabled: mode === "carriers",
+        enabled: carrierEnabled || mode === "carriers",
         fetchFn: async ({ cursor }) => {
             const res = await getERPCarrierDeliveriesPageAction(partnerId, { cursor, limit: 25 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar envios.")
@@ -194,9 +212,9 @@ export default function DeliveriesPage({
     const handleExportDeliveries = useCallback(() => {
         const statusFilter = filters.status.length
             ? filters.status
-            : activeTab === "active"
-                ? ["pending", "not_sent", "preparing", "sent", "pickup_available"]
-                : ["delivered", "delivery_failed", "cancelled"]
+            : mode === "failed"
+                ? ["delivery_failed", "cancelled"]
+                : ["pending", "not_sent", "preparing", "sent", "pickup_available", "delivered"]
 
         void exportData({
             partnerId,
@@ -208,14 +226,25 @@ export default function DeliveriesPage({
                 datePeriod: filters.datePeriod,
             },
         })
-    }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod, activeTab])
+    }, [exportData, partnerId, debouncedSearch, filters.status, filters.datePeriod, mode])
     const isDelivery = initialUserRole === "delivery"
 
     useInfiniteScrollObserver(observerTarget, {
-        enabled: true,
+        enabled: mode === "deliveries",
         hasNextPage: !!hasNextPage,
         isFetchingNextPage,
         fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
+    const closedObserverTarget = useRef<HTMLDivElement>(null)
+
+    useInfiniteScrollObserver(closedObserverTarget, {
+        enabled: mode === "failed",
+        hasNextPage: !!closedHasNextPage,
+        isFetchingNextPage: closedFetchingNextPage,
+        fetchNextPage: () => fetchClosedNextPage(),
         rootMargin: "320px",
         threshold: 0,
     })
@@ -247,28 +276,6 @@ export default function DeliveriesPage({
         return () => clearTimeout(timer)
     }, [search])
 
-    useEffect(() => {
-        let mounted = true
-        const run = async () => {
-            const res = await getERPDeliveryPlanAccessAction(partnerId)
-            if (!mounted) return
-            if (res.success) setPlanSlug(String(res.planSlug || "free"))
-        }
-        run()
-        return () => { mounted = false }
-    }, [partnerId])
-
-    useEffect(() => {
-        let mounted = true
-        const run = async () => {
-            const res = await getERPCarrierDeliveriesEnabledAction(partnerId)
-            if (!mounted) return
-            if (res.success) setCarrierEnabled(Boolean(res.enabled))
-        }
-        run()
-        return () => { mounted = false }
-    }, [partnerId])
-
     const canSmartSuggest = planSlug === "escalar"
 
     const loadSuggestions = async () => {
@@ -293,20 +300,6 @@ export default function DeliveriesPage({
         return () => window.removeEventListener("resize", checkScroll)
     }, [viewMode, items])
 
-    const tabCounts = useMemo(() => {
-        let active = 0
-        let closed = 0
-        for (const raw of items || []) {
-            const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
-            if (links.length === 0) continue
-            const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
-            const isClosed = ["cancelled", "delivery_failed"].includes(effectiveStatus)
-            if (isClosed) closed++
-            else active++
-        }
-        return { active, closed }
-    }, [items, statusOverrides])
-
     const filterSections: FilterSectionConfig[] = [
         {
             id: "datePeriod",
@@ -315,10 +308,9 @@ export default function DeliveriesPage({
         },
     ]
 
-    const mapped = useMemo(() => {
-        const term = debouncedSearch.toLowerCase().trim()
+    const mapDeliveryRows = useCallback((sourceItems: any[]) => {
         const nowMs = Date.now()
-        let list = (items || []).map((raw: any) => {
+        return (sourceItems || []).map((raw: any) => {
             const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
             if (links.length === 0) return null
             const firstLink = [...links].sort((a: any, b: any) => Number(a.position || 9999) - Number(b.position || 9999))[0]
@@ -369,6 +361,14 @@ export default function DeliveriesPage({
                 deliveryTimingDetail: estimatedArrivalAt && showTimingBadge && effectiveStatus === "sent" && !isLate ? remainingLabel : "",
             }
         }).filter(Boolean)
+    }, [statusOverrides])
+
+    const mapped = useMemo(() => {
+        const term = debouncedSearch.toLowerCase().trim()
+        const targetTab = mode === "failed" ? "closed" : "active"
+        const sourceItems = mode === "failed" ? closedDeliveries : items
+
+        let list = mapDeliveryRows(sourceItems || [])
 
         list = list.filter((d: any) => {
             const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
@@ -376,7 +376,7 @@ export default function DeliveriesPage({
             const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel)
 
             const isClosedTab = ["cancelled", "delivery_failed"].includes(d.status)
-            const matchTab = activeTab === "closed" ? isClosedTab : !isClosedTab
+            const matchTab = targetTab === "closed" ? isClosedTab : !isClosedTab
 
             const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
             const createdYmd = d.createdAtMs ? new Date(d.createdAtMs).toISOString().slice(0, 10) : null
@@ -402,19 +402,22 @@ export default function DeliveriesPage({
         }
 
         return list
-    }, [items, debouncedSearch, filters, sortConfig, statusOverrides, activeTab])
+    }, [mode, items, closedDeliveries, mapDeliveryRows, debouncedSearch, filters, sortConfig])
 
     const totalPages = Math.ceil(mapped.length / 100) || 1
     const [page, setPage] = useState(1)
 
     useEffect(() => {
         setPage(1)
-    }, [debouncedSearch, filters, sortConfig, activeTab])
+    }, [debouncedSearch, filters, sortConfig, mode])
 
     const paginated = useMemo(() => {
         const start = (page - 1) * 100
         return mapped.slice(start, start + 100)
     }, [mapped, page])
+
+    const isListLoading = mode === "failed" ? closedLoading : isLoading
+    const listHasNextPage = mode === "failed" ? closedHasNextPage : hasNextPage
 
     const filteredCarrierShipments = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim()
@@ -545,11 +548,13 @@ export default function DeliveriesPage({
                                     <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                                         {mode === "carriers"
                                             ? "Acompanhe os envios atendidos por transportadora."
-                                            : "Gerencie as entregas vinculadas aos pedidos."}
+                                            : mode === "failed"
+                                                ? "Acompanhe as entregas canceladas e com falha."
+                                                : "Gerencie as entregas vinculadas aos pedidos."}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {mode === "deliveries" && !isDelivery && (
+                                    {mode !== "carriers" && !isDelivery && (
                                         <Button variant="outline" onClick={handleExportDeliveries} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
                                             {isExporting ? "Exportando..." : "Exportar"}
                                         </Button>
@@ -575,17 +580,18 @@ export default function DeliveriesPage({
                             <div className="mb-4 flex-none px-4 md:px-8">
                                 <Tabs
                                     value={mode}
-                                    onValueChange={(val) => setMode(val as "deliveries" | "carriers")}
+                                    onValueChange={(val) => setMode(val as "deliveries" | "carriers" | "failed")}
                                 >
                                     <TabsList className="px-0">
-                                        <TabsTrigger value="deliveries" icon={TruckIcon}>
-                                            Entregas
+                                        <TabsTrigger value="deliveries" icon={MotorbikeIcon}>
+                                            Delivery
                                         </TabsTrigger>
-                                        {carrierEnabled && (
-                                            <TabsTrigger value="carriers" icon={PackageIcon}>
-                                                Transportadora
-                                            </TabsTrigger>
-                                        )}
+                                        <TabsTrigger value="carriers" icon={TruckIcon}>
+                                            Transportadora
+                                        </TabsTrigger>
+                                        <TabsTrigger value="failed" icon={BlockedIcon}>
+                                            Canceladas / Falhas
+                                        </TabsTrigger>
                                     </TabsList>
                                 </Tabs>
                             </div>
@@ -606,6 +612,7 @@ export default function DeliveriesPage({
                                     <CarrierDeliveryBoard
                                         shipments={filteredCarrierShipments}
                                         isLoading={carrierLoading}
+                                        integrationEnabled={carrierEnabled}
                                         onOpenOrder={(orderId) => {
                                             router.push(`/erp/pedidos?view=${orderId}&tab=delivery`)
                                         }}
@@ -617,8 +624,6 @@ export default function DeliveriesPage({
                             ) : (
                                 <>
                             <DeliveryPageControls
-                                activeTab={activeTab}
-                                onActiveTabChange={setActiveTab}
                                 search={search}
                                 onSearchChange={setSearch}
                                 onOpenFilter={() => setIsFilterOpen(true)}
@@ -626,7 +631,6 @@ export default function DeliveriesPage({
                                 onOpenSuggestions={loadSuggestions}
                                 canSmartSuggest={canSmartSuggest}
                                 addDisabled={!!planGate}
-                                tabCounts={tabCounts}
                                 userRole={initialUserRole}
                                 filters={filters}
                                 setFilters={setFilters}
@@ -645,24 +649,32 @@ export default function DeliveriesPage({
                                                         : "https://img.dudit.com.br/static/mascots/Entregas.png"
                                                 }
                                                 imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
-                                                title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                                                title={isListLoading ? "Carregando entregas..." : planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
                                                 subtitle={
-                                                    planGate
-                                                        ? planGate.message
-                                                        : isDelivery
-                                                            ? "Nenhuma entrega atribuída a você no momento."
-                                                            : activeTab === "closed"
-                                                                ? "Nenhuma entrega cancelada ou com falha encontrada."
-                                                                : "Crie uma entrega a partir de um pedido para começar."
+                                                    isListLoading
+                                                        ? "Buscando as entregas mais recentes."
+                                                        : planGate
+                                                            ? planGate.message
+                                                            : isDelivery
+                                                                ? "Nenhuma entrega atribuída a você no momento."
+                                                                : mode === "failed"
+                                                                    ? "Nenhuma entrega cancelada ou com falha encontrada."
+                                                                    : "Crie uma entrega a partir de um pedido para começar."
                                                 }
                                                 itemButton={
-                                                    planGate ? {
-                                                        text: "Ver Plano Escalar",
-                                                        action: () => openPlanUpgrade("escalar"),
-                                                    } : isDelivery ? undefined : {
-                                                        text: "Adicionar primeira entrega",
-                                                        action: () => openEntity("create"),
-                                                    }
+                                                    isListLoading
+                                                        ? undefined
+                                                        : planGate
+                                                            ? {
+                                                                text: "Ver Plano Escalar",
+                                                                action: () => openPlanUpgrade("escalar"),
+                                                            }
+                                                            : isDelivery || mode === "failed"
+                                                                ? undefined
+                                                                : {
+                                                                    text: "Adicionar primeira entrega",
+                                                                    action: () => openEntity("create"),
+                                                                }
                                                 }
                                             />
                                         </FadeIn>
@@ -670,7 +682,7 @@ export default function DeliveriesPage({
                                         <FadeIn key="kanban" className="w-full">
                                             <DeliveryKanbanBoard
                                                 deliveries={mapped}
-                                                activeTab={activeTab}
+                                                activeTab={mode === "failed" ? "closed" : "active"}
                                                 onDetails={(id) => openEntity("view", id)}
                                                 onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
                                                 onQuickStatusChange={handleQuickStatusChange}
@@ -678,7 +690,13 @@ export default function DeliveriesPage({
                                         </FadeIn>
                                     )}
                                 </AnimatePresence>
-                                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                                {listHasNextPage ? (
+                                    <div
+                                        ref={mode === "failed" ? closedObserverTarget : observerTarget}
+                                        className="h-12 w-full shrink-0"
+                                        aria-hidden
+                                    />
+                                ) : null}
                             </div>
                                 </>
                             )}

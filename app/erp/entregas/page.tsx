@@ -4,7 +4,10 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
 import DeliveriesPage from "@/components/erp/deliveries/DeliveriesPage"
-import { getERPDeliveriesPageAction } from "@/app/actions/erp/deliveries"
+import {
+  getERPCarrierDeliveriesEnabledAction,
+  getERPDeliveriesPageAction,
+} from "@/app/actions/erp/deliveries"
 
 export const dynamic = "force-dynamic"
 
@@ -13,9 +16,10 @@ export default async function DeliveriesRoutePage() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
-  const [{ allowed }, page] = await Promise.all([
+  const [{ allowed }, page, carrier] = await Promise.all([
     checkPermission(partnerId, "delivery", "view"),
-    getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 100 }),
+    getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 25, statusGroup: "active" }),
+    getERPCarrierDeliveriesEnabledAction(partnerId),
   ])
 
   if (!allowed) return <AccessDenied />
@@ -37,6 +41,8 @@ export default async function DeliveriesRoutePage() {
           initialHasMore={page.hasMore}
           planGate={planGate}
           userRole={userRole}
+          planSlug={page.planSlug}
+          carrierEnabled={carrier.success ? carrier.enabled : false}
         />
       </FadeIn>
     </>

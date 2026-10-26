@@ -7,6 +7,7 @@ import CarrierDeliveryCard from "./CarrierDeliveryCard"
 interface CarrierDeliveryBoardProps {
   shipments: any[]
   isLoading?: boolean
+  integrationEnabled?: boolean
   onOpenOrder: (orderId: string) => void
 }
 
@@ -33,7 +34,7 @@ const COLUMNS = [
   },
 ]
 
-export default function CarrierDeliveryBoard({ shipments, isLoading = false, onOpenOrder }: CarrierDeliveryBoardProps) {
+export default function CarrierDeliveryBoard({ shipments, isLoading = false, integrationEnabled = true, onOpenOrder }: CarrierDeliveryBoardProps) {
   const closed = shipments.filter((s) => ["cancelled", "failed"].includes(String(s.carrierStatus || "")))
   const active = shipments.filter((s) => !["cancelled", "failed"].includes(String(s.carrierStatus || "")))
 
@@ -43,10 +44,20 @@ export default function CarrierDeliveryBoard({ shipments, isLoading = false, onO
         placeholderType="image"
         imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
         imageAlt="Sem envios"
-        title={isLoading ? "Carregando envios..." : "Nenhum envio encontrado"}
-        subtitle={isLoading
-          ? "Buscando os pedidos atendidos por transportadora."
-          : "Os pedidos atendidos por transportadora aparecem aqui com o status do envio."}
+        title={
+          isLoading
+            ? "Carregando envios..."
+            : !integrationEnabled
+              ? "Transportadora não configurada"
+              : "Nenhum envio encontrado"
+        }
+        subtitle={
+          isLoading
+            ? "Buscando os pedidos atendidos por transportadora."
+            : !integrationEnabled
+              ? "Configure a integração com a transportadora para acompanhar os envios aqui."
+              : "Os pedidos atendidos por transportadora aparecem aqui com o status do envio."
+        }
       />
     )
   }

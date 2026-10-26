@@ -279,7 +279,6 @@ export default function PaymentStatusModal({
       setMpLoading(false);
       setMpPaymentData(null);
       setCopiedMp(false);
-      setShowMpPixModal(false);
       setManualPolicy({
         loaded: false,
         enabled: false,

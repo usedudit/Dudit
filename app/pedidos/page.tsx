@@ -15,6 +15,11 @@ export const metadata: Metadata = {
 
 const MAX_ORDERS = 200
 
+// Number of linked ERP customers resolved per query. Keeps the PostgREST
+// `in.(...)` filter short enough to stay under URL length limits.
+const LINKED_CUSTOMERS_QUERY_CHUNK = 40
+const MAX_LINKED_CUSTOMERS = 200
+
 export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string; order?: string; view?: string }> }) {
   const resolvedParams = await searchParams
   const user = await requireUser()
@@ -25,7 +30,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, delivery_breakdown, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id, recurring_subscription_id,
-    partners(id, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
+    partners(id, store_name, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
@@ -41,7 +46,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, delivery_breakdown, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id, recurring_subscription_id,
-    partners(id, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
+    partners(id, store_name, is_active, deposit_balance_manual_enabled, partner_integrations(provider_slug, status, account_id, connected_at, config, metadata), addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_shipments(id, status, tracking_number, tracking_url, kind, carrier, provider_slug, service_code, service_name, price, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
@@ -51,7 +56,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   `
 
   // Parallelize all independent data fetches
-  const [ordersResult, reviewsResult, sessionData] = await Promise.all([
+  const [ordersResult, reviewsResult, sessionData, linkedCustomersResult] = await Promise.all([
     adminClient
       .from("orders")
       .select(orderSelect)
@@ -60,6 +65,14 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       .limit(MAX_ORDERS),
     adminClient.from("reviews").select("order_id, product_id, service_id").eq("user_id", user.id),
     getUserSessionData(user.id),
+    // ERP customers linked to this marketplace account. When the seller links
+    // an ERP customer to a marketplace user, every order created for that
+    // customer in the ERP belongs in the buyer's order history as well.
+    adminClient
+      .from("customers")
+      .select("id, partner_id, user_id, marketplace_user_id")
+      .or(`user_id.eq.${user.id},marketplace_user_id.eq.${user.id}`)
+      .limit(MAX_LINKED_CUSTOMERS),
   ])
 
   let orders = ordersResult.data || []
@@ -86,6 +99,71 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     } else {
       orders = fallbackResult.data || []
     }
+  }
+
+  // ── ERP orders linked through the buyer's ERP customer records ─────────
+  // Marketplace orders are stored with buyer_id = auth user, while orders
+  // created by the seller in the ERP point customer_id/buyer_id to the
+  // customers.id of that partner. Once an ERP customer is linked to this
+  // marketplace account, those orders must show up here too.
+  if (linkedCustomersResult.error) {
+    console.error("[MY_ORDERS_PAGE] failed to load linked ERP customers", {
+      userId: user.id,
+      error: linkedCustomersResult.error.message,
+      code: linkedCustomersResult.error.code,
+    })
+  }
+
+  const linkedCustomerIds = Array.from(new Set(
+    (linkedCustomersResult.data || [])
+      .map((customer: any) => (customer?.id ? String(customer.id) : null))
+      .filter(Boolean)
+  )) as string[]
+
+  if (linkedCustomerIds.length > 0) {
+    const selectForLinkedOrders = ordersResult.error ? fallbackOrderSelect : orderSelect
+    const idChunks: string[][] = []
+    for (let i = 0; i < linkedCustomerIds.length; i += LINKED_CUSTOMERS_QUERY_CHUNK) {
+      idChunks.push(linkedCustomerIds.slice(i, i + LINKED_CUSTOMERS_QUERY_CHUNK))
+    }
+
+    const linkedOrdersResults = await Promise.all(
+      idChunks.map((ids) => {
+        const idList = ids.join(",")
+        return adminClient
+          .from("orders")
+          .select(selectForLinkedOrders)
+          .or(`customer_id.in.(${idList}),buyer_id.in.(${idList})`)
+          .order("created_at", { ascending: false })
+          .limit(MAX_ORDERS)
+      })
+    )
+
+    const mergedOrdersById = new Map<string, any>()
+    for (const order of orders) {
+      if (order?.id) mergedOrdersById.set(String(order.id), order)
+    }
+
+    for (const result of linkedOrdersResults) {
+      if (result.error) {
+        console.error("[MY_ORDERS_PAGE] failed to load linked ERP orders", {
+          userId: user.id,
+          error: result.error.message,
+          code: result.error.code,
+        })
+        continue
+      }
+      for (const order of result.data || []) {
+        if (!order?.id || mergedOrdersById.has(String(order.id))) continue
+        // Flag orders that only became visible through the ERP link so the UI
+        // can label them and skip marketplace-only actions.
+        mergedOrdersById.set(String(order.id), { ...order, is_erp_order: true })
+      }
+    }
+
+    orders = Array.from(mergedOrdersById.values())
+      .sort((a: any, b: any) => String(b?.created_at || "").localeCompare(String(a?.created_at || "")))
+      .slice(0, MAX_ORDERS)
   }
 
   // mp_* status fields are sourced from partner_integrations.

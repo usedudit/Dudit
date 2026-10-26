@@ -47,6 +47,12 @@ type CreateDeliveryPayload = {
 const DEFAULT_PAGE_SIZE = 100
 const ACTIVE_DELIVERY_STATUSES = ["preparing", "sent", "pickup_available"] as const
 
+export type ERPDeliveryListStatusGroup = "active" | "closed"
+
+// Statuses shown on the "Canceladas / Falhas" tab. Everything else (including
+// legacy statuses) stays on the "Delivery" tab.
+const ERP_DELIVERY_CLOSED_TAB_STATUSES = ["cancelled", "delivery_failed"] as const
+
 function revalidateDeliveryDashboard(partnerId: string) {
   // @ts-ignore - Next 15 accepts profile as the second argument.
   revalidateTag(DASHBOARD_TAGS.general(partnerId), "max")
@@ -1609,7 +1615,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
   export async function getERPDeliveriesPageAction(
     partnerId: string,
-    options?: { cursor?: ERPDeliveryListCursor | null; limit?: number }
+    options?: {
+      cursor?: ERPDeliveryListCursor | null
+      limit?: number
+      statusGroup?: ERPDeliveryListStatusGroup
+    }
   ): Promise<
     | {
       success: true
@@ -1617,6 +1627,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       nextCursor: ERPDeliveryListCursor | null
       hasMore: boolean
       userRole?: string
+      planSlug?: string
       planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
     }
     | { success: false; error: string }
@@ -1627,8 +1638,9 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         getDeliveryActorScope(partnerId),
         enforceDeliveryPlanAccess(partnerId, 1),
       ])
+      const planSlug = String(planCheck.planSlug || "free")
       if (!planCheck.allowed) {
-        const slug = String(planCheck.planSlug || "").toLowerCase()
+        const slug = planSlug.toLowerCase()
         // Plano Free: página deve carregar com CTA de upgrade (evita AccessDenied enganoso).
         if (slug === "free") {
           return {
@@ -1638,6 +1650,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             hasMore: false,
             planGate: { requiredPlanSlug: "crescer", message: planCheck.error },
             userRole: actor.roleId,
+            planSlug,
           }
         }
         return { success: false, error: planCheck.error }
@@ -1646,11 +1659,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
       const cursor = options?.cursor ?? null
       const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || DEFAULT_PAGE_SIZE))))
+      const statusGroup = options?.statusGroup
       const fetchLimit = limit + 1
 
       if (actor.roleId === "delivery") {
-        const result = await fetchDeliveriesUncached(partnerId, user, actor, cursor, limit, supabase)
-        return { ...result, userRole: actor.roleId }
+        const result = await fetchDeliveriesUncached(partnerId, user, actor, cursor, limit, supabase, statusGroup)
+        return { ...result, userRole: actor.roleId, planSlug }
       }
 
       const result = await getCachedErpPage(
@@ -1660,6 +1674,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           actor.roleId,
           cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
           String(limit),
+          statusGroup || "all",
         ],
         [TAGS.deliveries(partnerId)],
         async () => {
@@ -1687,6 +1702,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           `)
             .eq("partner_id", partnerId)
 
+          if (statusGroup === "closed") {
+            q = q.in("status", [...ERP_DELIVERY_CLOSED_TAB_STATUSES])
+          } else if (statusGroup === "active") {
+            q = q.not("status", "in", "(cancelled,delivery_failed)")
+          }
+
           if (cursor) q = q.or(buildKeysetFilter(cursor))
 
           const { data, error } = await q
@@ -1701,25 +1722,27 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           })
 
           const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
-          const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
-
           const deliveryIds = rows.map((r: any) => r.id).filter(Boolean)
           const platformAssignmentsByDeliveryId = new Map<string, any>()
           const platformDriverUserIds = new Set<string>()
 
-          if (deliveryIds.length > 0) {
-            const { data: assignments } = await getAdminClient()
-              .from("delivery_assignments")
-              .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
-              .in("delivery_id", deliveryIds)
-              .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
-              .order("assigned_at", { ascending: false })
+          const [deliveryPersonNameById, assignments] = await Promise.all([
+            getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds),
+            deliveryIds.length > 0
+              ? getAdminClient()
+                .from("delivery_assignments")
+                .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
+                .in("delivery_id", deliveryIds)
+                .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+                .order("assigned_at", { ascending: false })
+                .then((res: any) => res.data || [])
+              : Promise.resolve([] as any[]),
+          ])
 
-            for (const ass of assignments || []) {
-              if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
-                platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
-                if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
-              }
+          for (const ass of assignments) {
+            if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
+              platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+              if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
             }
           }
 
@@ -1831,7 +1854,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         30,
       )
 
-      return { ...result, success: true as const, userRole: actor.roleId }
+      return { ...result, success: true as const, userRole: actor.roleId, planSlug }
     } catch (e: any) {
       return { success: false, error: e?.message || "Erro ao carregar entregas." }
     }
@@ -1844,6 +1867,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     cursor: ERPDeliveryListCursor | null,
     limit: number,
     supabase: any,
+    statusGroup?: ERPDeliveryListStatusGroup,
   ) {
     const fetchLimit = limit + 1
 
@@ -1870,6 +1894,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       )
     `)
       .eq("partner_id", partnerId)
+
+    if (statusGroup === "closed") {
+      q = q.in("status", [...ERP_DELIVERY_CLOSED_TAB_STATUSES])
+    } else if (statusGroup === "active") {
+      q = q.not("status", "in", "(cancelled,delivery_failed)")
+    }
 
     const pUserId = actor.partnerUserId
     const uId = user.id
@@ -3123,14 +3153,20 @@ export async function getERPCarrierDeliveriesEnabledAction(
   try {
     await requireUser()
     await requireActivePartnerContext(partnerId)
-    const supabase = getAdminClient()
-    const { data } = await supabase
-      .from("partner_integrations")
-      .select("id, status, access_token_encrypted")
-      .eq("partner_id", partnerId)
-      .eq("provider_slug", "superfrete")
-      .maybeSingle()
-    const enabled = Boolean(data?.access_token_encrypted)
+    const enabled = await getCachedErpPage(
+      ["erp-carrier-enabled", partnerId],
+      [TAGS.partner(partnerId)],
+      async () => {
+        const { data } = await getAdminClient()
+          .from("partner_integrations")
+          .select("id, status, access_token_encrypted")
+          .eq("partner_id", partnerId)
+          .eq("provider_slug", "superfrete")
+          .maybeSingle()
+        return Boolean(data?.access_token_encrypted)
+      },
+      30,
+    )
     return { success: true, enabled }
   } catch (e: any) {
     return { success: false, error: e?.message || "Erro ao verificar integração de transportadora." }
@@ -3163,110 +3199,123 @@ export async function getERPCarrierDeliveriesPageAction(
       return { success: false, error: "Sem permissão para listar pedidos." }
     }
 
-    const supabase = getAdminClient()
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || DEFAULT_PAGE_SIZE))))
-    const fetchLimit = limit + 1
 
-    let q = supabase
-      .from("orders")
-      .select(`
-        id,
-        order_number,
-        customer_name,
-        buyer_id,
-        delivery_address,
-        delivery_fee,
-        total_amount,
-        delivery_status,
-        delivery_breakdown,
-        situation,
-        order_source,
-        created_at,
-        order_shipments(
-          id,
-          status,
-          carrier,
-          provider_slug,
-          service_code,
-          service_name,
-          tracking_number,
-          tracking_url,
-          label_url,
-          external_label_id,
-          price,
-          kind,
-          created_at,
-          updated_at,
-          paid_at,
-          delivered_at,
-          cancelled_at
-        )
-      `)
-      .eq("partner_id", partnerId)
-      .eq("delivery_type", "delivery")
-      .or("delivery_breakdown->>source.eq.superfrete")
+    return getCachedErpPage(
+      [
+        "erp-carrier-deliveries-page",
+        partnerId,
+        cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+        String(limit),
+      ],
+      [TAGS.orders(partnerId)],
+      async () => {
+        const supabase = getAdminClient()
+        const fetchLimit = limit + 1
 
-    if (cursor) q = q.or(buildKeysetFilter(cursor))
+        let q = supabase
+          .from("orders")
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            buyer_id,
+            delivery_address,
+            delivery_fee,
+            total_amount,
+            delivery_status,
+            delivery_breakdown,
+            situation,
+            order_source,
+            created_at,
+            order_shipments(
+              id,
+              status,
+              carrier,
+              provider_slug,
+              service_code,
+              service_name,
+              tracking_number,
+              tracking_url,
+              label_url,
+              external_label_id,
+              price,
+              kind,
+              created_at,
+              updated_at,
+              paid_at,
+              delivered_at,
+              cancelled_at
+            )
+          `)
+          .eq("partner_id", partnerId)
+          .eq("delivery_type", "delivery")
+          .or("delivery_breakdown->>source.eq.superfrete")
 
-    const { data, error } = await q
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(fetchLimit)
+        if (cursor) q = q.or(buildKeysetFilter(cursor))
 
-    if (error) throw error
+        const { data, error } = await q
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(fetchLimit)
 
-    // O filtro por JSONB no banco já restringe aos pedidos de transportadora;
-    // a checagem em JS cobre pedidos antigos com etiqueta e sem breakdown.
-    const rows = (data || []).filter((row: any) => {
-      const breakdown = row.delivery_breakdown as any
-      const isCarrierBreakdown = breakdown?.source === "superfrete"
-      const hasShipment = (row.order_shipments || []).some((s: any) => s?.kind !== "return")
-      return isCarrierBreakdown || hasShipment
-    })
+        if (error) throw error
 
-    const hasMore = rows.length > limit
-    const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
-      const shipments = (row.order_shipments || [])
-        .filter((s: any) => s?.kind !== "return")
-        .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      const shipment = shipments[0] || null
-      const breakdown = (row.delivery_breakdown || {}) as Record<string, any>
+        // O filtro por JSONB no banco já restringe aos pedidos de transportadora;
+        // a checagem em JS cobre pedidos antigos com etiqueta e sem breakdown.
+        const rows = (data || []).filter((row: any) => {
+          const breakdown = row.delivery_breakdown as any
+          const isCarrierBreakdown = breakdown?.source === "superfrete"
+          const hasShipment = (row.order_shipments || []).some((s: any) => s?.kind !== "return")
+          return isCarrierBreakdown || hasShipment
+        })
 
-      return {
-        id: row.id,
-        orderId: row.id,
-        orderNumber: row.order_number || `#${String(row.id).slice(0, 8).toUpperCase()}`,
-        customerName: row.customer_name || "Consumidor final",
-        customerAddress: row.delivery_address || "",
-        totalAmount: Number(row.total_amount || 0),
-        deliveryFee: Number(row.delivery_fee || 0),
-        orderSource: row.order_source || "Manual",
-        situation: row.situation || "pending",
-        orderStatus: row.delivery_status || "not_sent",
-        carrierStatus: shipment?.status || "awaiting_label",
-        carrierName: breakdown.companyName || shipment?.carrier || breakdown.carrier || "Transportadora",
-        serviceName: breakdown.serviceName || shipment?.service_name || null,
-        serviceCode: shipment?.service_code || null,
-        deliveryMinDays: breakdown.deliveryMinDays ?? null,
-        deliveryMaxDays: breakdown.deliveryMaxDays ?? null,
-        price: shipment?.price != null ? Number(shipment.price) : Number(breakdown.originalFee || 0),
-        trackingNumber: shipment?.tracking_number || null,
-        trackingUrl: shipment?.tracking_url || null,
-        labelUrl: shipment?.label_url || null,
-        externalLabelId: shipment?.external_label_id || null,
-        hasLabel: Boolean(shipment?.external_label_id),
-        createdAt: row.created_at || null,
-        createdAtMs: new Date(row.created_at || 0).getTime(),
-      }
-    })
+        const hasMore = rows.length > limit
+        const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+          const shipments = (row.order_shipments || [])
+            .filter((s: any) => s?.kind !== "return")
+            .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+          const shipment = shipments[0] || null
+          const breakdown = (row.delivery_breakdown || {}) as Record<string, any>
 
-    const last = items[items.length - 1]
-    const nextCursor = hasMore && last?.createdAt
-      ? { createdAt: String(last.createdAt), id: String(last.id) }
-      : null
+          return {
+            id: row.id,
+            orderId: row.id,
+            orderNumber: row.order_number || `#${String(row.id).slice(0, 8).toUpperCase()}`,
+            customerName: row.customer_name || "Consumidor final",
+            customerAddress: row.delivery_address || "",
+            totalAmount: Number(row.total_amount || 0),
+            deliveryFee: Number(row.delivery_fee || 0),
+            orderSource: row.order_source || "Manual",
+            situation: row.situation || "pending",
+            orderStatus: row.delivery_status || "not_sent",
+            carrierStatus: shipment?.status || "awaiting_label",
+            carrierName: breakdown.companyName || shipment?.carrier || breakdown.carrier || "Transportadora",
+            serviceName: breakdown.serviceName || shipment?.service_name || null,
+            serviceCode: shipment?.service_code || null,
+            deliveryMinDays: breakdown.deliveryMinDays ?? null,
+            deliveryMaxDays: breakdown.deliveryMaxDays ?? null,
+            price: shipment?.price != null ? Number(shipment.price) : Number(breakdown.originalFee || 0),
+            trackingNumber: shipment?.tracking_number || null,
+            trackingUrl: shipment?.tracking_url || null,
+            labelUrl: shipment?.label_url || null,
+            externalLabelId: shipment?.external_label_id || null,
+            hasLabel: Boolean(shipment?.external_label_id),
+            createdAt: row.created_at || null,
+            createdAtMs: new Date(row.created_at || 0).getTime(),
+          }
+        })
 
-    return { success: true, items, nextCursor, hasMore }
+        const last = items[items.length - 1]
+        const nextCursor = hasMore && last?.createdAt
+          ? { createdAt: String(last.createdAt), id: String(last.id) }
+          : null
+
+        return { success: true as const, items, nextCursor, hasMore }
+      },
+      30,
+    )
   } catch (e: any) {
     return { success: false, error: e?.message || "Erro ao carregar envios da transportadora." }
   }

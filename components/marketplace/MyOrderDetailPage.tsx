@@ -838,17 +838,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasMixedItems = hasAnyService && hasProducts;
     const storeDeleted = isStoreDeleted(order);
     const isCancelled = order.situation === "cancelled";
-    const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
-    const canRequestResolution = canRequestPostFulfillmentResolution(order);
+    // Orders that only appear here through the linked ERP customer are managed
+    // by the seller in the ERP. Marketplace actions (cancel, returns, receipt
+    // confirmation) require buyer_id = auth user, so they are not available.
+    const isErpOrder = Boolean(order.is_erp_order);
+    const canCancelOrder = !isErpOrder && canRequestOrderCancellation(order) && !hasActiveReturn;
+    const canRequestResolution = !isErpOrder && canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
+    const showReturnRequestButton = !isErpOrder && isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
 
     const returnButtonLabel = order.delivery_status === "delivered"
         ? (showExchangeOption ? "Solicitar troca ou devolução" : "Solicitar devolução")
         : (showStoreCreditOption ? "Solicitar reembolso ou vale-compra" : "Solicitar reembolso");
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
-    const showConfirmReceiptButton = !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
+    const showConfirmReceiptButton = !isErpOrder && !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
 
     const renderFulfillmentButtons = () => {
         if (showConfirmReceiptButton) {
@@ -1715,6 +1719,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <div className="text-left flex-1 min-w-0">
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
                             <span>Pedido #{orderNumber}</span>
+                            {isErpOrder && <Badge variant="gray" icon={null}>ERP</Badge>}
                         </h1>
                         <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{dateStrFull}</p>
                     </div>
@@ -1771,6 +1776,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         <FormSection title={
                                             <div className="flex items-center gap-2">
                                                 <span>Pedido #{orderNumber}</span>
+                                                {isErpOrder && <Badge variant="gray" icon={null}>ERP</Badge>}
                                                 {order.situation === "cancelled" && (
                                                     <Badge variant="red">Cancelado</Badge>
                                                 )}
@@ -2255,7 +2261,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 )}
 
                                                 {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
-                                                    <InfoCard message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso." color="gray" />
+                                                    <InfoCard
+                                                        message={isErpOrder
+                                                            ? "Este pedido foi registrado pela loja no ERP. Para cancelamentos, trocas ou devoluções, fale diretamente com a loja."
+                                                            : "Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."}
+                                                        color="gray"
+                                                    />
                                                 )}
 
                                                 {renderFulfillmentButtons()}
@@ -2350,7 +2361,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         )}
 
                                         {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
-                                            <InfoCard message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso." color="gray" />
+                                            <InfoCard
+                                                message={isErpOrder
+                                                    ? "Este pedido foi registrado pela loja no ERP. Para cancelamentos, trocas ou devoluções, fale diretamente com a loja."
+                                                    : "Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."}
+                                                color="gray"
+                                            />
                                         )}
 
                                         {renderFulfillmentButtons()}

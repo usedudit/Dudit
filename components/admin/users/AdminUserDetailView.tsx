@@ -586,7 +586,7 @@ export function AdminUserDetailView({
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <div className="flex-1">
-                    <ActionsDropdown trigger={
+                    <ActionsDropdown fullWidth trigger={
                         <Button variant="outline" className="w-full h-12">
                             <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
                         </Button>

@@ -418,6 +418,11 @@ export function MyOrdersListClient({
                                                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
+                                                                        {order.is_erp_order && (
+                                                                            <Tooltip text="Pedido registrado pela loja no ERP">
+                                                                                <Badge variant="gray" icon={null} className="scale-90 whitespace-nowrap">ERP</Badge>
+                                                                            </Tooltip>
+                                                                        )}
                                                                         <span className="hidden lg:inline">•</span>
                                                                         <span className="hidden lg:inline">{formatFullDate(order.created_at)}</span>
                                                                     </div>
@@ -575,7 +580,7 @@ export function MyOrdersListClient({
                                                                     </span>
                                                                 )}
 
-                                                                {order.situation === 'paid' && !isOrderFullyReviewed && reviewableItems.length > 0 && (
+                                                                {order.situation === 'paid' && !order.is_erp_order && !isOrderFullyReviewed && reviewableItems.length > 0 && (
                                                                     <ReviewButton
                                                                         orderId={order.id}
                                                                         partnerId={order.partner_id}
@@ -594,7 +599,7 @@ export function MyOrdersListClient({
                                                                     Ver detalhes
                                                                 </Button>
 
-                                                                {(order.situation === 'pending' || order.situation === 'payment_failed') && (
+                                                                {(order.situation === 'pending' || order.situation === 'payment_failed') && !order.is_erp_order && (
                                                                     <div className="w-auto">
                                                                         <OrderRetryPayment
                                                                             orderId={order.id}

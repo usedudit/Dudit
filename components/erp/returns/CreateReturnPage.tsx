@@ -24,10 +24,12 @@ import {
     InfoCard,
     SavingStatusModal,
     AlertModal,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon, PrinterIcon, TruckIcon, ThreeDotsIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatUnit } from "@/lib/utils"
 import { fetchReturnOrderBucketAction, getReturnRequestDetailsAction, retryMercadoPagoRefundAction } from "@/app/actions/erp/returns"
 import { getPartnerReturnPolicyAction } from "@/app/actions/erp/return-policies"
@@ -2350,28 +2352,46 @@ export default function CreateReturnPage({
                 </Tabs >
             </div >
 
-            {/* Mobile action bar */}
-            < div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3" >
-                <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
-                    {isViewOnly ? "Voltar" : "Cancelar"}
-                </Button>
-                {showReturnShippingButton && (
-                    <Button variant="outline" onClick={handleOpenReturnShipping} className="flex-1" leftIcon={<TruckIcon size={18} />}>
-                        Etiqueta de devolução
-                    </Button>
-                )}
-                {isViewOnly && returnRequest && (
-                    <Button variant="outline" onClick={() => setIsPrintModalOpen(true)} className="flex-1" leftIcon={<PrinterIcon size={18} />}>
-                        Imprimir
-                    </Button>
-                )}
-                {
-                    !isViewOnly && (
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3" >
+                {isViewOnly ? (
+                    <ActionsDropdown
+                        fullWidth
+                        trigger={
+                            <Button variant="outline" className="w-full h-12" leftIcon={<ThreeDotsIcon size={18} />}>
+                                Opções
+                            </Button>
+                        }
+                    >
+                        {showReturnShippingButton && (
+                            <DropdownItem onClick={handleOpenReturnShipping}>
+                                <TruckIcon size={16} /> Etiqueta de devolução
+                            </DropdownItem>
+                        )}
+                        {returnRequest && (
+                            <DropdownItem onClick={() => setIsPrintModalOpen(true)}>
+                                <PrinterIcon size={16} /> Imprimir
+                            </DropdownItem>
+                        )}
+                        <DropdownItem onClick={handleBack}>
+                            <ChevronLeftIcon size={16} /> Voltar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                ) : (
+                    <>
+                        <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
+                            Cancelar
+                        </Button>
+                        {showReturnShippingButton && (
+                            <Button variant="outline" onClick={handleOpenReturnShipping} className="flex-1" leftIcon={<TruckIcon size={18} />}>
+                                Etiqueta de devolução
+                            </Button>
+                        )}
                         <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
                             {isSaving || isUploading ? "Salvando..." : "Salvar"}
                         </Button>
-                    )
-                }
+                    </>
+                )}
             </div >
 
             {showImageCropper && selectedImageForCrop && (
