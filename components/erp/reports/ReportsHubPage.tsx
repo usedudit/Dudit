@@ -11,6 +11,8 @@ import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
 import { pushUrl } from "@/lib/navigation/history"
 import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getPeriodDateRange, type Period } from "@/lib/period-types"
+import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData, ChartPoint, DashboardListItem } from "@/lib/data/dashboard"
 import type {
   SalesReportData,
@@ -33,11 +35,10 @@ import {
   MegaphoneIcon,
   RepeatIcon,
   FileTextIcon,
-  ExportFileIcon,
   ChartIcon,
   CalendarIcon,
   ReturnIcon,
-  ArrowLeftIcon,
+  ChevronLeftIcon,
 } from "@/lib/icons"
 
 type ReportCategory = "vendas" | "produtos" | "financeiro" | "clientes" | "servicos" | "operacao" | "marketing" | "assinaturas"
@@ -92,6 +93,17 @@ const currency = (value: unknown) => new Intl.NumberFormat("pt-BR", { style: "cu
 const integer = (value: unknown) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(Number(value || 0))
 const percent = (value: unknown) => `${Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
 const dateOnly = (value: string | null | undefined) => value ? value.slice(0, 10).split("-").reverse().join("/") : "-"
+const formatDateTime = (value: string | null | undefined) => value ? `${dateOnly(value)}${value.length > 10 ? ` · ${value.slice(11, 16)}` : ""}` : "-"
+
+function statusLabel(value: string) {
+  const key = String(value || "").toLowerCase().replace(/[_-]+/g, " ").trim()
+  const labels: Record<string, string> = {
+    paid: "Pago", completed: "Concluído", cancelled: "Cancelado", canceled: "Cancelado",
+    pending: "Pendente", "awaiting payment": "Aguardando pagamento", "in progress": "Em andamento",
+    refunded: "Reembolsado", approved: "Aprovado", rejected: "Recusado", active: "Ativo", paused: "Pausado",
+  }
+  return labels[key] || (key ? key.charAt(0).toLocaleUpperCase("pt-BR") + key.slice(1) : "Não informado")
+}
 
 function pointLabel(point: ChartPoint) {
   return String(point.label ?? point.name ?? point.category ?? point.title ?? "-")
@@ -102,7 +114,7 @@ function pointValue(point: ChartPoint) {
 }
 
 function columns(...items: Array<[string, string, ReportListColumn["align"]?, string?]>): ReportListColumn[] {
-  return items.map(([id, label, align = "left", minWidth]) => ({ id, label, align, minWidth }))
+  return items.map(([id, label, align = "left", minWidth], index) => ({ id, label, align, minWidth, primary: index === 0 }))
 }
 
 function chartRows(points: ChartPoint[], valueLabel: string, format: (value: number) => string = currency) {
@@ -115,7 +127,7 @@ function chartRows(points: ChartPoint[], valueLabel: string, format: (value: num
 
 function dashboardRows(items: DashboardListItem[], valueLabel: string, formatValue?: (value: unknown) => string) {
   return {
-    columns: columns(["label", "Nome", "left", "260px"], ["detail", "Detalhes", "left", "300px"], ["value", valueLabel, "right", "150px"]),
+    columns: columns(["label", "Nome", "left", "300px"], ["value", valueLabel, "right", "150px"]),
     rows: items.map((item, index) => ({
       id: item.id || `${index}`,
       label: item.title || "-",
@@ -127,6 +139,8 @@ function dashboardRows(items: DashboardListItem[], valueLabel: string, formatVal
 
 function createReports(props: ReportsHubPageProps): ReportDefinition[] {
   const reports: ReportDefinition[] = []
+  const selectedPeriod = (["daily", "weekly", "monthly"].includes(props.period) ? props.period : "monthly") as Period
+  const periodRange = getPeriodDateRange(selectedPeriod, getTodayYmdSaoPaulo())
 
   if (props.salesData) {
     reports.push({
@@ -148,8 +162,14 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "produtos-mais-vendidos", category: "vendas", title: "Produtos mais vendidos",
       description: "Ranking dos produtos com maior quantidade vendida.", icon: PackageIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Produto", "left", "320px"], ["detail", "Ranking", "left", "220px"], ["quantity", "Quantidade", "right", "150px"]),
+      columns: columns(["label", "Produto", "left", "420px"], ["quantity", "Quantidade", "right", "150px"]),
       rows: props.salesData.topProducts.map((item) => ({ id: item.id, label: item.label, detail: item.subtitle || "-", quantity: integer(item.value) })),
+    })
+    reports.push({
+      id: "pedidos-detalhados", category: "vendas", title: "Pedidos detalhados",
+      description: "Consulte os pedidos do período por cliente, canal, pagamento, situação e valor.", icon: FileTextIcon, minimumPlan: "escalar",
+      columns: columns(["order", "Pedido", "left", "250px"], ["date", "Data", "center", "160px"], ["source", "Canal", "left", "170px"], ["payment", "Pagamento", "left", "190px"], ["status", "Situação", "center", "150px"], ["total", "Total", "right", "150px"]),
+      rows: props.salesData.detailedOrders.map((order) => ({ id: order.id, order: order.orderNumber, detail: order.customer, date: formatDateTime(order.date), source: order.source, payment: order.paymentMethod, status: statusLabel(order.status), total: currency(order.total) })),
     })
     reports.push({
       id: "margem-por-produto", category: "vendas", title: "Margem por produto",
@@ -164,14 +184,20 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "estoque-parado", category: "produtos", title: "Produtos sem movimentação",
       description: "Identifique produtos parados que podem precisar de reposição, ajuste ou promoção.", icon: PackageIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Produto", "left", "300px"], ["detail", "Categoria", "left", "260px"], ["value", "Preço cadastrado", "right", "170px"]),
+      columns: columns(["label", "Produto", "left", "420px"], ["value", "Preço cadastrado", "right", "170px"]),
       rows: idle.map((item, index) => ({ id: item.id || `${index}`, label: item.title || "-", detail: item.subtitle || item.meta || "-", value: item.value || "-" })),
     })
     reports.push({
       id: "estoque-critico", category: "produtos", title: "Estoque crítico",
       description: "Veja os itens com estoque baixo ou próximo de acabar.", icon: PackageIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Produto", "left", "300px"], ["detail", "Categoria", "left", "260px"], ["value", "Estoque", "right", "140px"]),
+      columns: columns(["label", "Produto", "left", "420px"], ["value", "Estoque", "right", "140px"]),
       rows: props.productsData.criticalStock.map((item, index) => ({ id: item.id || `${index}`, label: item.title || "-", detail: item.subtitle || item.meta || "-", value: integer(item.value) })),
+    })
+    reports.push({
+      id: "inventario-detalhado", category: "produtos", title: "Inventário detalhado",
+      description: "Consulte estoque, categoria, marca, SKU, preço e situação dos produtos.", icon: PackageIcon, minimumPlan: "escalar",
+      columns: columns(["name", "Produto", "left", "300px"], ["sku", "SKU", "left", "150px"], ["category", "Categoria", "left", "180px"], ["brand", "Marca", "left", "160px"], ["stock", "Estoque", "right", "130px"], ["price", "Preço", "right", "150px"], ["status", "Situação", "center", "130px"]),
+      rows: props.productsData.inventoryRows.map((item) => ({ id: item.id, name: item.name, sku: item.sku, category: item.category, brand: item.brand, stock: `${integer(item.stock)} ${item.unit}`, price: currency(item.price), status: item.active ? "Ativo" : "Inativo" })),
     })
     reports.push({
       id: "curva-abc", category: "produtos", title: "Curva ABC de produtos",
@@ -201,8 +227,19 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "contas-vencidas", category: "financeiro", title: "Contas vencidas",
       description: "Acompanhe os lançamentos que precisam de atenção.", icon: FileTextIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Descrição", "left", "280px"], ["detail", "Situação", "left", "240px"], ["date", "Vencimento", "center", "150px"], ["value", "Valor", "right", "150px"]),
+      columns: columns(["label", "Descrição", "left", "360px"], ["date", "Vencimento", "center", "150px"], ["value", "Valor", "right", "150px"]),
       rows: props.financialData.overdueAccounts.map((item, index) => ({ id: item.id || `${index}`, label: item.title || "-", detail: item.subtitle || "-", date: item.meta || "-", value: item.value || "-" })),
+    })
+    reports.push({
+      id: "lancamentos-financeiros", category: "financeiro", title: "Lançamentos financeiros",
+      description: "Veja os lançamentos carregados no período com vencimento, pagamento, categoria e situação.", icon: FileTextIcon, minimumPlan: "escalar",
+      columns: columns(["description", "Lançamento", "left", "300px"], ["category", "Categoria", "left", "180px"], ["type", "Tipo", "center", "130px"], ["status", "Situação", "center", "150px"], ["due", "Vencimento", "center", "140px"], ["paid", "Pagamento", "center", "140px"], ["amount", "Valor", "right", "150px"]),
+      rows: props.financialData.transactionRows
+        .filter((item) => {
+          const date = (item.paymentDate || item.createdAt || item.dueDate).slice(0, 10)
+          return date >= periodRange.from && date <= periodRange.to
+        })
+        .map((item) => ({ id: item.id, description: item.description, category: item.category, type: item.type === "income" ? "Receita" : item.type === "expense" ? "Despesa" : item.type, status: statusLabel(item.status), due: dateOnly(item.dueDate), paid: dateOnly(item.paymentDate), amount: currency(item.amount) })),
     })
   }
 
@@ -214,9 +251,15 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
       rows: props.customerData.topCustomers.map((item) => ({ id: item.id, label: item.label, orders: integer(item.orders), value: item.value })),
     })
     reports.push({
+      id: "clientes-detalhados", category: "clientes", title: "Clientes no período",
+      description: "Consulte clientes com compras no período, frequência, faturamento e último pedido.", icon: Users, minimumPlan: "escalar",
+      columns: columns(["label", "Cliente", "left", "330px"], ["orders", "Pedidos", "right", "120px"], ["lastOrder", "Último pedido", "center", "170px"], ["revenue", "Faturamento", "right", "170px"]),
+      rows: props.customerData.customerRanking.map((item) => ({ id: item.id, label: item.label, orders: integer(item.orders), lastOrder: dateOnly(item.lastOrderDate), revenue: currency(item.revenue) })),
+    })
+    reports.push({
       id: "clientes-inativos", category: "clientes", title: "Clientes sem compras recentes",
       description: "Encontre clientes que podem receber uma nova ação comercial.", icon: Users, minimumPlan: "crescer",
-      columns: columns(["label", "Cliente", "left", "260px"], ["lastOrder", "Último pedido", "center", "170px"], ["orders", "Pedidos", "right", "110px"], ["value", "Faturamento histórico", "right", "190px"]),
+      columns: columns(["label", "Cliente", "left", "320px"], ["lastOrder", "Último pedido", "center", "170px"], ["orders", "Pedidos", "right", "110px"], ["value", "Faturamento histórico", "right", "190px"]),
       rows: props.customerData.inactiveCustomerList.map((item) => ({ id: item.id, label: item.label, lastOrder: item.subtitle.replace("Último pedido: ", ""), orders: integer(item.orders), value: item.value })),
     })
     reports.push({
@@ -234,28 +277,32 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "servicos-por-desempenho", category: "servicos", title: "Serviços por desempenho",
       description: "Consulte os serviços mais procurados e a receita gerada.", icon: WrenchIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Serviço", "left", "300px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.serviceRows),
+      columns: columns(["label", "Serviço", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.serviceRows),
     })
     reports.push({
       id: "desempenho-por-profissional", category: "servicos", title: "Desempenho por profissional",
       description: "Compare a produção da equipe de atendimento.", icon: Users, minimumPlan: "escalar",
-      columns: columns(["label", "Profissional", "left", "300px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.staffRows),
+      columns: columns(["label", "Profissional", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.staffRows),
     })
   }
 
   if (props.appointmentsData) {
     reports.push({ id: "agendamentos-por-status", category: "servicos", title: "Agendamentos por status", description: "Veja a situação dos atendimentos do período.", icon: CalendarIcon, minimumPlan: "crescer", columns: columns(["label", "Status", "left", "280px"], ["value", "Agendamentos", "right", "170px"]), rows: chartRows(props.appointmentsData.statusBreakdown, "Agendamentos", integer) })
     reports.push({ id: "servicos-mais-agendados", category: "servicos", title: "Serviços mais agendados", description: "Identifique os serviços com maior procura.", icon: CalendarIcon, minimumPlan: "escalar", columns: columns(["label", "Serviço", "left", "280px"], ["value", "Agendamentos", "right", "170px"]), rows: chartRows(props.appointmentsData.servicePopularity, "Agendamentos", integer) })
+    reports.push({ id: "agenda-detalhada", category: "servicos", title: "Agendamentos detalhados", description: "Consulte os atendimentos do período por cliente, serviço, profissional, horário e situação.", icon: CalendarIcon, minimumPlan: "escalar", columns: columns(["customer", "Cliente", "left", "250px"], ["service", "Serviço", "left", "220px"], ["staff", "Profissional", "left", "200px"], ["date", "Data", "center", "130px"], ["time", "Horário", "center", "100px"], ["status", "Situação", "center", "150px"], ["price", "Valor", "right", "140px"]), rows: props.appointmentsData.appointmentDetails.map((item) => ({ id: item.id, customer: item.customer, service: item.service, staff: item.staff, date: dateOnly(item.date), time: item.time || "-", status: item.status, price: currency(item.price) })) })
   }
 
   if (props.serviceOrdersData) {
     reports.push({ id: "ordens-de-servico-por-status", category: "servicos", title: "Ordens de serviço por status", description: "Acompanhe o volume de OS abertas, em andamento e concluídas.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["label", "Status", "left", "280px"], ["value", "Ordens", "right", "170px"]), rows: chartRows(props.serviceOrdersData.byStatus, "Ordens", integer) })
+    reports.push({ id: "ordens-de-servico-detalhadas", category: "servicos", title: "Ordens de serviço detalhadas", description: "Consulte as OS do período por número, cliente, situação, data e valor.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["order", "Ordem de serviço", "left", "280px"], ["status", "Situação", "center", "180px"], ["date", "Data", "center", "150px"], ["total", "Valor", "right", "150px"]), rows: props.serviceOrdersData.recentOrders.map((item) => ({ id: item.id, order: item.orderNumber, detail: item.title, status: item.status, date: item.date, total: item.total })) })
   }
 
   if (props.deliveryData) reports.push({ id: "entregas-por-status", category: "operacao", title: "Entregas por status", description: "Acompanhe pendências, entregas concluídas e atrasos.", icon: TruckIcon, minimumPlan: "crescer", columns: columns(["label", "Status", "left", "280px"], ["value", "Entregas", "right", "170px"]), rows: chartRows(props.deliveryData.byStatus, "Entregas", integer) })
+  if (props.deliveryData) reports.push({ id: "entregas-detalhadas", category: "operacao", title: "Entregas detalhadas", description: "Consulte as entregas do período, com status, data, responsável e duração prevista.", icon: TruckIcon, minimumPlan: "escalar", columns: columns(["delivery", "Entrega", "left", "260px"], ["status", "Situação", "center", "170px"], ["date", "Data", "center", "160px"], ["person", "Entregador", "left", "220px"], ["duration", "Previsão", "right", "130px"]), rows: props.deliveryData.recentDeliveries.map((item) => ({ id: item.id, delivery: `Entrega ${item.id.slice(0, 8)}`, status: item.status, date: item.date, person: item.deliveryPerson || "Não atribuído", duration: item.duration || "-" })) })
   if (props.returnsData) {
     reports.push({ id: "devolucoes-por-motivo", category: "operacao", title: "Devoluções por motivo", description: "Entenda por que os clientes estão devolvendo pedidos.", icon: ReturnIcon, minimumPlan: "crescer", columns: columns(["label", "Motivo", "left", "280px"], ["value", "Devoluções", "right", "170px"]), rows: chartRows(props.returnsData.byReason, "Devoluções", integer) })
     reports.push({ id: "produtos-mais-devolvidos", category: "operacao", title: "Produtos mais devolvidos", description: "Identifique itens que merecem uma investigação comercial ou operacional.", icon: ReturnIcon, minimumPlan: "escalar", columns: columns(["label", "Produto", "left", "300px"], ["count", "Devoluções", "right", "140px"], ["quantity", "Quantidade", "right", "140px"]), rows: props.returnsData.topReturnedProducts.map((item, index) => ({ id: `${index}`, label: item.productName, count: integer(item.count), quantity: integer(item.totalQuantity) })) })
+    reports.push({ id: "devolucoes-detalhadas", category: "operacao", title: "Devoluções detalhadas", description: "Consulte solicitações, clientes, motivos, situação e valores reembolsados.", icon: ReturnIcon, minimumPlan: "escalar", columns: columns(["customer", "Cliente", "left", "240px"], ["reason", "Motivo", "left", "250px"], ["status", "Situação", "center", "170px"], ["date", "Data", "center", "140px"], ["amount", "Reembolso", "right", "150px"]), rows: props.returnsData.recentReturns.map((item) => ({ id: item.id, customer: item.customer, reason: item.reason, status: item.status, date: item.date, amount: item.amount })) })
   }
 
   if (props.marketingData) {
@@ -267,6 +314,8 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
   if (props.subscriptionData) {
     reports.push({ id: "resumo-de-assinaturas", category: "assinaturas", title: "Resumo das assinaturas", description: "Acompanhe receita recorrente, renovação e cancelamentos.", icon: RepeatIcon, minimumPlan: "escalar", columns: columns(["metric", "Indicador", "left", "280px"], ["value", "Valor", "right", "180px"]), rows: [{ id: "mrr", metric: "MRR ativo", value: currency(props.subscriptionData.mrr) }, { id: "arr", metric: "ARR anualizado", value: currency(props.subscriptionData.arr) }, { id: "ltv", metric: "LTV médio", value: currency(props.subscriptionData.ltv) }, { id: "renewal", metric: "Taxa de renovação", value: percent(props.subscriptionData.renewalRate) }, { id: "churn", metric: "Churn em 30 dias", value: percent(props.subscriptionData.churnRate) }] })
     reports.push({ id: "assinaturas-por-status", category: "assinaturas", title: "Assinaturas por status", description: "Veja a composição da base recorrente.", icon: RepeatIcon, minimumPlan: "escalar", columns: columns(["status", "Status", "left", "280px"], ["count", "Quantidade", "right", "170px"]), rows: [{ id: "active", status: "Ativas", count: integer(props.subscriptionData.activeCount) }, { id: "paused", status: "Pausadas", count: integer(props.subscriptionData.pausedCount) }, { id: "delinquent", status: "Pendentes", count: integer(props.subscriptionData.delinquentCount) }, { id: "cancelled", status: "Canceladas", count: integer(props.subscriptionData.cancelledCount) }] })
+    reports.push({ id: "execucoes-de-assinaturas", category: "assinaturas", title: "Execuções de assinaturas", description: "Consulte ciclos recorrentes, data programada, situação e pedido associado.", icon: RepeatIcon, minimumPlan: "escalar", columns: columns(["execution", "Execução", "left", "280px"], ["scheduled", "Data programada", "center", "180px"], ["status", "Situação", "center", "170px"], ["order", "Pedido", "left", "180px"]), rows: props.subscriptionData.recentExecutions.map((item: any, index) => ({ id: String(item.id || index), execution: `Ciclo ${String(item.id || "").slice(0, 8) || index + 1}`, scheduled: dateOnly(item.scheduled_for), status: statusLabel(item.status), order: item.order_id ? String(item.order_id).slice(0, 12) : "Ainda sem pedido" })) })
+    reports.push({ id: "projecao-de-reposicao-recorrente", category: "assinaturas", title: "Demanda de produtos recorrentes", description: "Veja os produtos previstos para os próximos ciclos de assinaturas ativas.", icon: PackageIcon, minimumPlan: "escalar", columns: columns(["product", "Produto", "left", "320px"], ["quantity", "Quantidade projetada", "right", "200px"]), rows: props.subscriptionData.projectedProducts.map((item) => ({ id: item.id, product: item.name, quantity: integer(item.quantity) })) })
   }
 
   if (props.productivityData) {
@@ -281,10 +330,6 @@ function withReportUrl(tab?: string) {
   if (tab) url.searchParams.set("tab", tab)
   else url.searchParams.delete("tab")
   return `${url.pathname}${url.search}${url.hash}`
-}
-
-function planName(plan: PlanTierSlug) {
-  return plan === "escalar" ? "Escalar" : "Crescer"
 }
 
 export function ReportsHubPage(props: ReportsHubPageProps) {
@@ -335,13 +380,16 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
     return (
       <div className="w-full space-y-6 pt-4 px-4 md:px-8">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading">{selectedReport.title}</h1>
-            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">{selectedReport.description}</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <Button variant="filled" size="icon" onClick={closeReport} className="mt-1 h-10 w-10 shrink-0" aria-label="Voltar">
+              <ChevronLeftIcon size={18} />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading">{selectedReport.title}</h1>
+              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">{selectedReport.description}</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={closeReport} leftIcon={<ArrowLeftIcon size={17} />}>Voltar</Button>
-            <Button variant="outline" onClick={() => void exportSelected("xlsx")} leftIcon={<ExportFileIcon size={17} />}>Exportar Excel</Button>
             <GlobalPeriodFilter />
           </div>
         </header>
@@ -351,13 +399,13 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
             <table className="w-full min-w-[900px] text-left border-separate border-spacing-0">
               <thead>
                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                  {selectedReport.columns.map((column) => (
-                    <th key={column.id} className={`px-2 py-3 text-xs font-bold text-brand-inactive-text dark:text-dark-body ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"}`} style={{ width: column.width, minWidth: column.minWidth }}>{column.label}</th>
+                  {selectedReport.columns.map((column, index) => (
+                    <th key={column.id} className={`px-2 py-3 text-xs font-bold text-brand-inactive-text dark:text-dark-body ${index === 0 ? "pl-6 rounded-l-lg" : ""} ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"}`} style={{ width: column.width, minWidth: column.minWidth }}>{column.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paginatedRows.map((row) => <ReportListRow key={row.id} row={row} columns={selectedReport.columns} />)}
+                {paginatedRows.map((row) => <ReportListRow key={row.id} row={row} columns={selectedReport.columns} icon={selectedReport.icon} />)}
               </tbody>
             </table>
           </div>

@@ -188,7 +188,7 @@ const fetchReturnsDataStatic = unstable_cache(
       byStatus: Array.from(byStatus.entries())
         .sort((a, b) => b[1] - a[1])
         .map(([key, value]) => ({ label: statusLabels[String(key).trim().toLowerCase()] || humanizeStatus(key), value })),
-      recentReturns: periodReturns.slice(0, 8).map((r: any) => ({
+      recentReturns: periodReturns.map((r: any) => ({
         id: r.id,
         customer: r.customer_name_snapshot || "Cliente",
         reason: reasonLabels[String(r.reason || "").trim().toLowerCase()] || r.reason || r.customer_reason || "Outro",

@@ -125,9 +125,6 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
               onCancel={canCancel ? () => onRunAction("cancel", sub.id) : undefined}
               cancelLabel="Cancelar assinatura"
             >
-              <DropdownItem onClick={() => onOpen(sub.id, "history")}>
-                <ClockIcon size={18} /> Histórico
-              </DropdownItem>
               {canManage && sub.mpPreapprovalId && (
                 <DropdownItem onClick={() => onRunAction("sync", sub.id)}>
                   <RepeatIcon size={18} /> Sincronizar com MP

@@ -17,6 +17,7 @@ export interface AppointmentsReportData {
   sourceBreakdown: { label: string; value: number }[]
   recentAppointments: DashboardListItem[]
   staffPerformance: { id: string; label: string; value: string; appointments: number; cancelled: number }[]
+  appointmentDetails: { id: string; customer: string; service: string; staff: string; date: string; time: string; status: string; price: number; duration: number }[]
   repeatCustomerRate: number
   avgDuration: number
   attendanceRate: number
@@ -209,6 +210,17 @@ const getCachedAppointmentsData = cache(async (partnerId: string, period: Period
             appointments: data.count,
             cancelled: data.cancelled,
           })),
+        appointmentDetails: rows.map((a: any) => ({
+          id: a.id,
+          customer: a.customer_name || "Cliente não identificado",
+          service: a.service_name || "Serviço não informado",
+          staff: a.staff_name || "Sem profissional",
+          date: String(a.start_date || ""),
+          time: String(a.start_time || "").slice(0, 5),
+          status: normalizeStatus(String(a.status || "")),
+          price: money(a.price),
+          duration: Number(a.duration_minutes || 0),
+        })),
         repeatCustomerRate,
         avgDuration: durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
         attendanceRate,

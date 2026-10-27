@@ -94,7 +94,6 @@ const fetchMarketingDataStatic = unstable_cache(
         discountType: c.discount_type || "fixed",
       }))
       .sort((a: any, b: any) => b.usageCount - a.usageCount)
-      .slice(0, 5)
 
     const totalCoupons = coupons.length
     const usedCoupons = Array.from(usageCountMap.keys()).length

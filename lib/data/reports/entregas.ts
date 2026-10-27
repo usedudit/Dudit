@@ -189,7 +189,7 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
           .sort((a, b) => b[1] - a[1])
           .map(([label, value]) => ({ label, value })),
         evolution,
-        recentDeliveries: periodDeliveries.slice(0, 4).map((d: any) => ({
+        recentDeliveries: periodDeliveries.map((d: any) => ({
           id: d.id,
           status: statusLabels[String(d.status || "").toLowerCase()] || d.status || "-",
           statusKey: String(d.status || "").toLowerCase(),

@@ -23,6 +23,7 @@ export interface CustomerReportData {
   vipCustomers: { id: string; label: string; value: string; orders: number }[]
   inactiveCustomerList: { id: string; label: string; value: string; subtitle: string; orders: number }[]
   customerEvolution: { label: string; ativos: number; novos: number }[]
+  customerRanking: { id: string; label: string; orders: number; revenue: number; lastOrderDate: string }[]
 }
 
 const getCachedCustomerData = cache(async (partnerId: string, period: Period = "monthly") => {
@@ -75,13 +76,15 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
       }).length
 
       const periodCustomerSet = new Set<string>()
-      const periodCustomerMap = new Map<string, { name: string; total: number; count: number }>()
+      const periodCustomerMap = new Map<string, { name: string; total: number; count: number; lastOrderDate: string }>()
       for (const o of periodOrders) {
         const key = o.customer_id || o.customer_name || "anon"
         periodCustomerSet.add(key)
-        const current = periodCustomerMap.get(key) || { name: o.customer_name || "Cliente", total: 0, count: 0 }
+        const current = periodCustomerMap.get(key) || { name: o.customer_name || "Cliente", total: 0, count: 0, lastOrderDate: "" }
         current.total += money(o.total_amount)
         current.count += 1
+        const orderDate = String(o.created_at || "").slice(0, 10)
+        if (orderDate > current.lastOrderDate) current.lastOrderDate = orderDate
         periodCustomerMap.set(key, current)
       }
 
@@ -229,6 +232,9 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
         vipCustomers,
         inactiveCustomerList,
         customerEvolution,
+        customerRanking: Array.from(periodCustomerMap.entries())
+          .map(([id, data]) => ({ id, label: data.name, orders: data.count, revenue: data.total, lastOrderDate: data.lastOrderDate }))
+          .sort((a, b) => b.revenue - a.revenue),
       }
     },
     [`report-customers-${partnerId}-${period}`],

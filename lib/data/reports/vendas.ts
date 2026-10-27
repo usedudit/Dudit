@@ -46,6 +46,7 @@ export interface SalesReportData {
   productTurnover: number
   topServices: { id: string; label: string; value: number; count: number }[]
   topMarginProducts: { id: string; label: string; value: number; margin: number }[]
+  detailedOrders: { id: string; orderNumber: string; customer: string; source: string; paymentMethod: string; status: string; date: string; total: number }[]
 }
 
 const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly"): Promise<SalesReportData> => {
@@ -57,7 +58,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       const [currentOrdersResult, prevOrdersResult, itemsResult, cancelResult, allItemsResult, serviceItemsResult] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, total_amount, order_source, payment_method, created_at, discount_total, delivery_fee, amount_paid")
+          .select("id, order_number, customer_name, total_amount, order_source, payment_method, situation, created_at, discount_total, delivery_fee, amount_paid")
           .eq("partner_id", partnerId)
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
@@ -358,6 +359,16 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         productTurnover,
         topServices,
         topMarginProducts,
+        detailedOrders: periodOrders.map((order: any) => ({
+          id: order.id,
+          orderNumber: String(order.order_number || order.id).slice(0, 12),
+          customer: order.customer_name || "Cliente não identificado",
+          source: normalizeOrderSource(order.order_source),
+          paymentMethod: normalizePaymentMethod(String(order.payment_method || "")),
+          status: String(order.situation || "Não informado"),
+          date: String(order.created_at || "").slice(0, 16),
+          total: money(order.total_amount),
+        })),
       }
     },
     [`report-sales-${partnerId}-${period}`],

@@ -258,6 +258,7 @@ export type ProductsDashboardData = {
   categorySales: ChartPoint[]
   salesEvolution: ChartPoint[]
   busyHours: ChartPoint[]
+  inventoryRows: Array<{ id: string; name: string; category: string; sku: string; brand: string; stock: number; unit: string; price: number; active: boolean }>
 }
 
 export type ServicesDashboardData = {
@@ -290,6 +291,7 @@ export type FinancialDashboardData = {
   alertsAndPendings?: FinancialAlertItem[]
   largestExpenses: DashboardListItem[]
   dailyMovements?: Record<string, { income: number; expense: number; net: number }>
+  transactionRows: Array<{ id: string; description: string; category: string; type: string; status: string; dueDate: string; paymentDate: string; createdAt: string; amount: number }>
 }
 
 export type OperationsDashboardData = {
@@ -490,7 +492,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
     async () => {
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
-          scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).limit(300),
+          scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).order("name", { ascending: true }).limit(300),
           supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).order("created_at", { ascending: false }).limit(400),
           supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).limit(600),
         ])
@@ -538,6 +540,17 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
           categorySales: topFromMap(catRevenue),
           salesEvolution: bucketByDate(orderRows, "created_at", "total_amount"),
           busyHours: topFromMap(hours, 8),
+          inventoryRows: productRows.map((p: any) => ({
+            id: p.id,
+            name: p.name || "Produto",
+            category: p.category?.name || "Sem categoria",
+            sku: p.sku || "-",
+            brand: p.brand || "-",
+            stock: Number(p.stock_quantity || 0),
+            unit: p.unit || "UN",
+            price: Number(p.price || 0),
+            active: Boolean(p.is_active),
+          })),
         }
     },
     120,
@@ -791,6 +804,17 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
             meta: dateLabel(tx.due_date || tx.created_at),
             value: brl(Math.abs(money(tx.amount))),
             tone: "red",
+          })),
+          transactionRows: rows.map((tx: any) => ({
+            id: tx.id,
+            description: tx.description || "Movimentação",
+            category: tx.category || "Sem categoria",
+            type: tx.transaction_type || "Não informado",
+            status: tx.status || "Não informado",
+            dueDate: tx.due_date || "",
+            paymentDate: tx.payment_date || "",
+            createdAt: tx.created_at || "",
+            amount: Math.abs(money(tx.amount)),
           })),
         }
     },

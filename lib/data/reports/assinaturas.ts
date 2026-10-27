@@ -133,6 +133,7 @@ export async function getSubscriptionReportData(
     .select("id, status, scheduled_for, order_id, orders(situation)")
     .eq("partner_id", partnerId)
     .order("scheduled_for", { ascending: false })
+    .limit(500)
 
   const recentExecs = executions || []
   const pastExecs = recentExecs.filter((e: any) => new Date(e.scheduled_for) <= new Date())
@@ -197,6 +198,6 @@ export async function getSubscriptionReportData(
     projectedProducts,
     creditsUsedCount,
     creditsExpiredCount,
-    recentExecutions: recentExecs.slice(0, 10)
+    recentExecutions: recentExecs
   }
 }
