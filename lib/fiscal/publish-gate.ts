@@ -52,5 +52,5 @@ export async function getFiscalPublishBlockReason(
 
   if (!turningOn) return null
 
-  return "Informe o CNPJ no perfil fiscal antes de publicar a loja. Sem CNPJ o MEI não consegue emitir nota fiscal para clientes PJ."
+  return "Informe o CNPJ nos dados do negócio antes de publicar a loja. Sem CNPJ o MEI não consegue emitir nota fiscal para clientes PJ."
 }

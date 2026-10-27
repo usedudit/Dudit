@@ -53,7 +53,7 @@ export function getNotificationHref(params: {
   }
 
   if (type === "revenue_limit_alert") {
-    return "/erp/configuracoes?tab=dados-do-negocio"
+    return "/erp/configuracoes?tab=dados-do-negocio&fiscal=1"
   }
 
   if (entityType === "quote") {

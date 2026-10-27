@@ -30,11 +30,15 @@ import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { updateStoreAction } from "@/app/actions/erp/stores"
 import {
     getFiscalProfileAction,
+    getRevenueLimitStatusAction,
     saveFiscalProfileAction,
+    type FiscalEntityDto,
+    type RevenueLimitStatus,
 } from "@/app/actions/erp/fiscal-entity"
 import { ChevronLeftIcon, SaveIcon, Store, ChevronRightIcon, UserIcon, StoreIcon, TagIcon, BriefcaseIcon, ClockIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
-import { FiscalProfileSection } from "./FiscalProfileSection"
+import { FiscalProfileSection, type FiscalProfileFormValue } from "./FiscalProfileSection"
+import { getDefaultAnnualLimit, TAX_PROFILE_META, type TaxProfile } from "@/lib/fiscal-entity"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
@@ -85,18 +89,26 @@ export const BusinessDataSubPage = ({
     partner,
     store,
     paymentMethods,
+    initialTab,
     onBack,
 }: {
     partner: any
     store?: any
     paymentMethods: any[]
+    /** Aba inicial (deep link ?fiscal=1). */
+    initialTab?: string
     onBack: () => void
 }) => {
     const { refreshStores } = useStore()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isPending, startTransition] = useTransition()
     const [isLoading, setIsLoading] = useState(false)
-    const [activeTab, setActiveTab] = useState("general")
+    const [activeTab, setActiveTab] = useState(initialTab || "general")
+
+    // Deep link vindo do card/notificação de limite de faturamento.
+    useEffect(() => {
+        if (initialTab) setActiveTab(initialTab)
+    }, [initialTab])
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
@@ -169,6 +181,67 @@ export const BusinessDataSubPage = ({
         fetchAddress()
     }, [store?.id])
 
+    // Carrega o perfil fiscal da loja (CNPJ/limite/CNAE) e o status do limite
+    // anual. O perfil é a fonte da verdade, então também alinha o CRT exibido.
+    useEffect(() => {
+        if (!store?.id) {
+            setFiscalLoading(false)
+            return
+        }
+        let active = true
+        setFiscalLoading(true)
+
+        Promise.all([
+            getFiscalProfileAction({ storeId: store.id }),
+            getRevenueLimitStatusAction({ storeId: store.id }),
+        ])
+            .then(([profileRes, statusRes]) => {
+                if (!active) return
+
+                if (profileRes.success && profileRes.data) {
+                    const dto = profileRes.data
+                    // Sem limite salvo, mostra o padrão do enquadramento para o
+                    // campo não aparecer zerado (o back-end aplica o mesmo padrão).
+                    const defaultLimit =
+                        getDefaultAnnualLimit(dto.taxProfile, new Date().getFullYear()) ?? 0
+                    const nextProfile: FiscalProfileFormValue = {
+                        taxProfile: dto.taxProfile,
+                        cnaePrimary: dto.cnaePrimary || "",
+                        cnaeSecondary: (dto.cnaeSecondary || []).join(", "),
+                        annualRevenueLimit: Number(dto.annualRevenueLimit || defaultLimit),
+                        openingDate: dto.openingDate ? dto.openingDate.slice(0, 10) : "",
+                    }
+                    const loadedCrt =
+                        dto.taxProfile === "mei"
+                            ? "4"
+                            : dto.taxProfile === "pf_contribuinte"
+                                ? "3"
+                                : store.crt || ""
+
+                    setFiscalEntity(dto)
+                    setFiscalProfile(nextProfile)
+                    setFiscalInfo(prev => ({ ...prev, crt: loadedCrt }))
+                    // Dados vieram do banco: não podem marcar o form como sujo.
+                    setInitialState(prev => ({
+                        ...prev,
+                        fiscalProfile: { ...nextProfile },
+                        fiscalInfo: { ...prev.fiscalInfo, crt: loadedCrt },
+                    }))
+                }
+
+                if (statusRes.success && statusRes.data) setRevenueStatus(statusRes.data)
+            })
+            .catch(() => { })
+            .finally(() => {
+                if (active) setFiscalLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [store?.id])
+
     const partnerAddress = partner.addresses?.[0] || partner.address || {};
     const storeAddress = store?.addresses?.[0] || store?.address || {};
     const effectiveZip = store?.zip_code || storeAddress.zip_code || partnerAddress.zip_code || partner.zip_code || "";
@@ -200,6 +273,19 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: store?.inscricao_municipal || "",
     })
 
+    // Perfil fiscal é controlado por este formulário: a aba "Dados fiscais"
+    // apenas edita, e o botão Salvar principal persiste tudo.
+    const [fiscalProfile, setFiscalProfile] = useState<FiscalProfileFormValue>({
+        taxProfile: "nao_informado",
+        cnaePrimary: "",
+        cnaeSecondary: "",
+        annualRevenueLimit: 0,
+        openingDate: "",
+    })
+    const [fiscalEntity, setFiscalEntity] = useState<FiscalEntityDto | null>(null)
+    const [revenueStatus, setRevenueStatus] = useState<RevenueLimitStatus | null>(null)
+    const [fiscalLoading, setFiscalLoading] = useState(Boolean(store?.id))
+
     // Regime tributário simplificado usado no DRE gerencial.
     const [taxInfo, setTaxInfo] = useState({
         simplesTaxRateProducts: Number(store?.simples_tax_rate_products || 0),
@@ -219,6 +305,7 @@ export const BusinessDataSubPage = ({
         generalInfo: { ...generalInfo },
         addresses: { ...addresses },
         fiscalInfo: { ...fiscalInfo },
+        fiscalProfile: { ...fiscalProfile },
         taxInfo: { ...taxInfo },
         hours: { ...hours },
         timezone: store?.timezone || partner?.timezone || "America/Sao_Paulo",
@@ -229,11 +316,12 @@ export const BusinessDataSubPage = ({
         return JSON.stringify(initialState.generalInfo) !== JSON.stringify(generalInfo) ||
             JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
             JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
+            JSON.stringify(initialState.fiscalProfile) !== JSON.stringify(fiscalProfile) ||
             JSON.stringify(initialState.taxInfo) !== JSON.stringify(taxInfo) ||
             JSON.stringify(initialState.hours) !== JSON.stringify(hours) ||
             initialState.timezone !== timezone ||
             initialState.acceptOrdersWhenClosed !== acceptOrdersWhenClosed
-    }, [initialState, generalInfo, addresses, fiscalInfo, taxInfo, hours, timezone, acceptOrdersWhenClosed])
+    }, [initialState, generalInfo, addresses, fiscalInfo, fiscalProfile, taxInfo, hours, timezone, acceptOrdersWhenClosed])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -266,10 +354,53 @@ export const BusinessDataSubPage = ({
                         }
                         return prev
                     })
-                    setFiscalInfo(prev => {
-                        if (data.simei_optante) return { ...prev, crt: "4" }
-                        return prev
-                    })
+
+                    // A mesma consulta preenche o perfil fiscal (CNAE principal e
+                    // secundários, data de abertura) e os dados tributários (CRT,
+                    // contribuinte e IE quando a base retorna).
+                    const secondaryCnaes = Array.isArray(data.cnae_fiscal_secundaria)
+                        ? data.cnae_fiscal_secundaria.map((c: any) => String(c)).filter(Boolean)
+                        : []
+                    const isMei = Boolean(data.simei_optante)
+                    const openingDate =
+                        typeof data.data_abertura === "string" ? data.data_abertura.slice(0, 10) : ""
+                    const rawStateRegistration =
+                        data.inscricao_estadual != null && data.inscricao_estadual !== ""
+                            ? String(data.inscricao_estadual).trim()
+                            : ""
+                    // Algumas bases devolvem "ISENTO" no campo da IE e outras não
+                    // devolvem nada; nesse segundo caso preservamos o que o usuário
+                    // já tinha informado.
+                    const stateRegistrationIsExempt = /^isento$/i.test(rawStateRegistration)
+
+                    setFiscalProfile(prev => ({
+                        ...prev,
+                        taxProfile: isMei ? "mei" : prev.taxProfile,
+                        cnaePrimary: data.cnae_fiscal ? String(data.cnae_fiscal) : prev.cnaePrimary,
+                        // A resposta é a fonte da verdade para o CNPJ consultado:
+                        // limpa secundários antigos quando não houver nenhum.
+                        cnaeSecondary: secondaryCnaes.join(", "),
+                        // Não sobrescreve um limite personalizado já salvo: só
+                        // aplica o padrão quando o perfil acabou de virar MEI.
+                        annualRevenueLimit:
+                            isMei && prev.taxProfile !== "mei"
+                                ? (getDefaultAnnualLimit("mei", new Date().getFullYear()) ?? prev.annualRevenueLimit)
+                                : prev.annualRevenueLimit,
+                        openingDate: openingDate || prev.openingDate,
+                    }))
+
+                    setFiscalInfo(prev => ({
+                        ...prev,
+                        crt: isMei ? "4" : prev.crt,
+                        // MEI é não contribuinte de ICMS por padrão.
+                        contribuinte: isMei ? "9" : prev.contribuinte,
+                        ...(stateRegistrationIsExempt
+                            ? { inscricaoEstadual: "", ieIsento: true }
+                            : rawStateRegistration
+                                ? { inscricaoEstadual: rawStateRegistration, ieIsento: false }
+                                : {}),
+                    }))
+
                     notifySuccess("Dados da empresa importados com sucesso!")
                 } else if (data?.error) {
                     notifyError("CNPJ não encontrado ou erro na consulta.")
@@ -285,8 +416,8 @@ export const BusinessDataSubPage = ({
     const setMode = (mode: BusinessMode) =>
         setGeneralInfo((prev: any) => ({ ...prev, mode }))
 
-    // Troca o tipo de pessoa alinhando o documento e o CRT, para o formulário
-    // legado não enviar CPF como CNPJ (ou um CRT de MEI em loja PF).
+    // Troca o tipo de pessoa alinhando o documento e o perfil fiscal, para o
+    // formulário legado não enviar CPF como CNPJ (ou um perfil de MEI em loja PF).
     const handlePersonTypeChange = (next: "pf" | "pj") => {
         const digits = generalInfo.cnpj.replace(/\D/g, "")
         setGeneralInfo(prev => ({
@@ -299,10 +430,54 @@ export const BusinessDataSubPage = ({
                         ? ""
                         : prev.cnpj,
         }))
+
+        const year = new Date().getFullYear()
         if (next === "pf") {
             setFiscalInfo(prev => ({ ...prev, crt: "" }))
+            setFiscalProfile(prev => {
+                if (prev.taxProfile !== "mei" && prev.taxProfile !== "pf_contribuinte") return prev
+                return {
+                    ...prev,
+                    taxProfile: "nano",
+                    annualRevenueLimit: getDefaultAnnualLimit("nano", year) ?? 0,
+                    openingDate: "",
+                }
+            })
+        } else {
+            // O público PJ suportado é o MEI (SIMEI).
+            setFiscalInfo(prev => ({ ...prev, crt: prev.crt || "4" }))
+            setFiscalProfile(prev => {
+                if (prev.taxProfile === "mei" || prev.taxProfile === "pf_contribuinte") return prev
+                return {
+                    ...prev,
+                    taxProfile: "mei",
+                    annualRevenueLimit: getDefaultAnnualLimit("mei", year) ?? 0,
+                }
+            })
         }
     }
+
+    // Troca explícita do perfil na aba Dados fiscais: define o limite padrão do
+    // novo enquadramento e mantém o CRT legado coerente (MEI = 4, PF = 3).
+    const handleTaxProfileChange = useCallback((next: TaxProfile) => {
+        const year = new Date().getFullYear()
+        const meta = TAX_PROFILE_META[next]
+        setFiscalProfile(prev => ({
+            ...prev,
+            taxProfile: next,
+            annualRevenueLimit: meta.hasRevenueLimit ? (getDefaultAnnualLimit(next, year) ?? 0) : 0,
+            openingDate: next === "mei" ? prev.openingDate : "",
+        }))
+        setFiscalInfo(prev => ({ ...prev, crt: meta.crt ?? "" }))
+
+        // Nano é pessoa física: CNPJ não se aplica.
+        if (next === "nano") {
+            setGeneralInfo(prev => {
+                const digits = prev.cnpj.replace(/\D/g, "")
+                return digits.length === 14 ? { ...prev, personType: "pf", cnpj: "" } : prev
+            })
+        }
+    }, [])
 
     const validate = useCallback(() => {
         const errors = new Set<string>()
@@ -377,69 +552,74 @@ export const BusinessDataSubPage = ({
 
                 // O formulário legado ainda permite editar CNPJ/CPF. Antes de
                 // salvar a loja, alinha a identidade fiscal (fonte da verdade
-                // do limite) para os dois cadastros não divergirem.
+                // do limite) para os dois cadastros não divergirem. O perfil
+                // vem da aba Dados fiscais e é persistido aqui, pelo Salvar.
                 let persistedCrt: string | undefined
+                let persistedProfile: FiscalProfileFormValue | undefined
                 const documentDigits = generalInfo.cnpj.replace(/\D/g, "")
                 const initialDocumentDigits = initialState.generalInfo.cnpj.replace(/\D/g, "")
                 const documentChanged =
                     documentDigits !== initialDocumentDigits ||
                     generalInfo.personType !== initialState.generalInfo.personType
                 const crtChanged = fiscalInfo.crt !== initialState.fiscalInfo.crt
+                const fiscalProfileChanged =
+                    JSON.stringify(fiscalProfile) !== JSON.stringify(initialState.fiscalProfile)
 
-                if ((documentChanged || crtChanged) && store?.id) {
-                    const profileRes = await getFiscalProfileAction({ storeId: store.id })
-                    if (!profileRes.success || !profileRes.data) {
-                        notifyError(profileRes.error || "Erro ao carregar o perfil fiscal.")
+                if ((documentChanged || crtChanged || fiscalProfileChanged) && store?.id) {
+                    const meta = TAX_PROFILE_META[fiscalProfile.taxProfile]
+                    const syncRes = await saveFiscalProfileAction({
+                        storeId: store.id,
+                        taxProfile: fiscalProfile.taxProfile,
+                        document: documentDigits || null,
+                        cnaePrimary: fiscalProfile.cnaePrimary.trim() || null,
+                        cnaeSecondary: fiscalProfile.cnaeSecondary
+                            .split(",")
+                            .map((value) => value.trim())
+                            .filter(Boolean),
+                        annualRevenueLimit:
+                            meta.hasRevenueLimit && fiscalProfile.annualRevenueLimit > 0
+                                ? fiscalProfile.annualRevenueLimit
+                                : null,
+                        openingDate:
+                            fiscalProfile.taxProfile === "mei" ? fiscalProfile.openingDate || null : null,
+                    })
+                    if (!syncRes.success) {
+                        notifyError(syncRes.error || "Erro ao salvar o perfil fiscal.")
                         setIsLoading(false)
                         return
                     }
 
-                    const current = profileRes.data
-
-                    // O formulário legado (tipo de pessoa + CRT) é traduzido para
-                    // o perfil fiscal: PJ com CRT 4 é MEI; PJ sem CRT 4 é PF
-                    // contribuinte; PF deixa de ser MEI ao remover o CNPJ.
-                    const targetProfile =
-                        generalInfo.personType === "pj"
-                            ? fiscalInfo.crt === "4"
-                                ? "mei"
-                                : "pf_contribuinte"
-                            : current.taxProfile === "mei" || current.taxProfile === "pf_contribuinte"
-                                ? "nano"
-                                : current.taxProfile
-                    const profileChanged = targetProfile !== current.taxProfile
-
-                    if (current.document !== documentDigits || profileChanged) {
-                        const syncRes = await saveFiscalProfileAction({
-                            storeId: store.id,
-                            taxProfile: targetProfile,
-                            document: documentDigits || null,
-                            cnaePrimary: current.cnaePrimary,
-                            cnaeSecondary: current.cnaeSecondary,
-                            // Ao trocar de perfil, deixa o limite padrão do novo
-                            // enquadramento valer (ex.: nano -> MEI).
-                            annualRevenueLimit: profileChanged ? null : current.annualRevenueLimit,
-                            openingDate: current.openingDate,
-                        })
-                        if (!syncRes.success) {
-                            notifyError(syncRes.error || "Erro ao sincronizar o perfil fiscal.")
-                            setIsLoading(false)
-                            return
+                    const synced = syncRes.data
+                    if (synced) {
+                        const nextCrt =
+                            synced.taxProfile === "mei"
+                                ? "4"
+                                : synced.taxProfile === "pf_contribuinte"
+                                    ? "3"
+                                    : ""
+                        persistedCrt = nextCrt
+                        const normalized: FiscalProfileFormValue = {
+                            taxProfile: synced.taxProfile,
+                            cnaePrimary: synced.cnaePrimary || "",
+                            cnaeSecondary: (synced.cnaeSecondary || []).join(", "),
+                            annualRevenueLimit: Number(synced.annualRevenueLimit || 0),
+                            openingDate: synced.openingDate ? synced.openingDate.slice(0, 10) : "",
                         }
-
-                        const synced = syncRes.data
-                        if (synced) {
-                            const nextCrt =
-                                synced.taxProfile === "mei"
-                                    ? "4"
-                                    : synced.taxProfile === "pf_contribuinte"
-                                        ? "3"
-                                        : ""
-                            persistedCrt = nextCrt
-                            setFiscalInfo(prev => ({ ...prev, crt: nextCrt }))
-                        }
+                        persistedProfile = normalized
+                        setFiscalEntity(synced)
+                        setFiscalProfile(normalized)
+                        setFiscalInfo(prev => ({ ...prev, crt: nextCrt }))
                     }
                 }
+
+                // O perfil fiscal é a fonte da verdade do CRT; quando ele não
+                // define regime (nano), limpa; em "não informado", preserva o
+                // CRT legado da loja.
+                const profileCrt = TAX_PROFILE_META[fiscalProfile.taxProfile].crt
+                const storeCrt =
+                    fiscalProfile.taxProfile === "nano"
+                        ? ""
+                        : profileCrt ?? fiscalInfo.crt
 
                 // Store-level fields → updateStoreAction
                 if (store?.id) {
@@ -473,7 +653,7 @@ export const BusinessDataSubPage = ({
                         nomeFantasia: generalInfo.personType === "pj" ? (generalInfo.nomeFantasia || null) : null,
                         // persistedCrt reflete o CRT que a sincronização fiscal
                         // acabou de gravar; o state ainda pode estar atrasado.
-                        crt: (persistedCrt ?? fiscalInfo.crt) || undefined,
+                        crt: (persistedCrt ?? storeCrt) || undefined,
                         contribuinte: fiscalInfo.contribuinte,
                         inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
                         ieIsento: fiscalInfo.ieIsento,
@@ -503,6 +683,14 @@ export const BusinessDataSubPage = ({
                 } else {
                     notifySuccess("Configurações atualizadas com sucesso!")
                     await refreshStores()
+                    // O limite exibido depende do faturamento/perfil recém-salvos.
+                    if (store?.id) {
+                        getRevenueLimitStatusAction({ storeId: store.id })
+                            .then((res) => {
+                                if (res.success && res.data) setRevenueStatus(res.data)
+                            })
+                            .catch(() => { })
+                    }
                     setInitialState({
                         generalInfo: { ...generalInfo },
                         addresses: { ...addresses },
@@ -512,6 +700,7 @@ export const BusinessDataSubPage = ({
                             ...fiscalInfo,
                             crt: persistedCrt ?? fiscalInfo.crt,
                         },
+                        fiscalProfile: persistedProfile ?? { ...fiscalProfile },
                         taxInfo: { ...taxInfo },
                         hours: { ...hours },
                         timezone: timezone || "America/Sao_Paulo",
@@ -600,6 +789,7 @@ export const BusinessDataSubPage = ({
                                             Endereço
                                             {getTabErrorCount("address") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
+                                        <TabsTrigger value="fiscal">Dados fiscais</TabsTrigger>
                                         <TabsTrigger value="hours">Horários</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -710,7 +900,18 @@ export const BusinessDataSubPage = ({
                                                                 errorMessage={fieldErrors.has("cnpj") ? (generalInfo.personType === "pj" ? "CNPJ inválido" : "CPF inválido") : undefined}
                                                                 dataField="cnpj"
                                                             />
-                                                            {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
+                                                            {isSearchingCnpj ? (
+                                                                <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>
+                                                            ) : generalInfo.personType === "pj" ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleCnpjBlur}
+                                                                    disabled={generalInfo.cnpj.replace(/\D/g, "").length !== 14}
+                                                                    className="self-start text-[11px] font-bold text-brand-primary hover:underline disabled:text-brand-inactive-text disabled:no-underline dark:disabled:text-dark-body"
+                                                                >
+                                                                    Buscar dados do CNPJ
+                                                                </button>
+                                                            ) : null}
                                                         </div>
                                                     </motion.div>
 
@@ -736,7 +937,15 @@ export const BusinessDataSubPage = ({
                                                                 <FormDropdown
                                                                     label="CRT - Código de Regime Tributário"
                                                                     value={fiscalInfo.crt}
-                                                                    setValue={(v) => setFiscalInfo({ ...fiscalInfo, crt: v })}
+                                                                    setValue={(v) => {
+                                                                        setFiscalInfo(prev => ({ ...prev, crt: v }))
+                                                                        // Mantém o perfil da aba Dados fiscais coerente.
+                                                                        if (v === "4" && fiscalProfile.taxProfile !== "mei") {
+                                                                            handleTaxProfileChange("mei")
+                                                                        } else if (v === "3" && fiscalProfile.taxProfile !== "pf_contribuinte") {
+                                                                            handleTaxProfileChange("pf_contribuinte")
+                                                                        }
+                                                                    }}
                                                                     options={[
                                                                         { value: "4", label: "4 - MEI (SIMEI)" },
                                                                         ...(fiscalInfo.crt && fiscalInfo.crt !== "4"
@@ -783,80 +992,10 @@ export const BusinessDataSubPage = ({
                                                                     Inscrição Estadual isenta (IE Isento)
                                                                 </label>
                                                             </div>
-
-                                                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-4">
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Impostos sobre faturamento (DRE)</p>
-                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                                                        Usado para estimar a dedução de impostos no DRE. Informe apenas o regime da sua empresa: as alíquotas do Simples têm prioridade; se informar somente o DAS-MEI (valor fixo mensal), ele será rateado por dia no período selecionado.
-                                                                    </p>
-                                                                </div>
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <PercentageInput
-                                                                        label="Simples Nacional - Produtos (%)"
-                                                                        value={taxInfo.simplesTaxRateProducts}
-                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateProducts: v }))}
-                                                                    />
-                                                                    <PercentageInput
-                                                                        label="Simples Nacional - Serviços (%)"
-                                                                        value={taxInfo.simplesTaxRateServices}
-                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateServices: v }))}
-                                                                    />
-                                                                </div>
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <MoneyInput
-                                                                        label="DAS-MEI (valor fixo mensal)"
-                                                                        value={taxInfo.meiFixedTaxAmount}
-                                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, meiFixedTaxAmount: v }))}
-                                                                    />
-                                                                </div>
-                                                            </div>
                                                         </motion.div>
                                                     )}
                                                 </div>
                                             </FormSection>
-
-                                            {store?.id && (
-                                                <FiscalProfileSection
-                                                    storeId={store.id}
-                                                    onSaved={(data) => {
-                                                        const nextPersonType = data.documentType === "cnpj" ? "pj" : "pf"
-                                                        const nextDocument = data.document || ""
-                                                        // Mesmo mapeamento do CRT gravado pela action:
-                                                        // MEI = 4, PF contribuinte = 3.
-                                                        const nextCrt =
-                                                            data.taxProfile === "mei"
-                                                                ? "4"
-                                                                : data.taxProfile === "pf_contribuinte"
-                                                                    ? "3"
-                                                                    : ""
-
-                                                        setGeneralInfo(prev => ({
-                                                            ...prev,
-                                                            personType: nextPersonType,
-                                                            cnpj: nextDocument,
-                                                        }))
-                                                        setFiscalInfo(prev => ({
-                                                            ...prev,
-                                                            crt: nextCrt,
-                                                        }))
-                                                        // O perfil salvo já está persistido: não deve
-                                                        // marcar o formulário como "não salvo".
-                                                        setInitialState(prev => ({
-                                                            ...prev,
-                                                            generalInfo: {
-                                                                ...prev.generalInfo,
-                                                                personType: nextPersonType,
-                                                                cnpj: nextDocument,
-                                                            },
-                                                            fiscalInfo: {
-                                                                ...prev.fiscalInfo,
-                                                                crt: nextCrt,
-                                                            },
-                                                        }))
-                                                    }}
-                                                />
-                                            )}
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
@@ -889,6 +1028,55 @@ export const BusinessDataSubPage = ({
                                                             Remover categoria
                                                         </button>
                                                     )}
+                                                </div>
+                                            </SidebarCard>
+                                        </div>
+                                    </motion.div>
+                                </TabsContent>
+
+                                <TabsContent value="fiscal" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                            {store?.id ? (
+                                                <FiscalProfileSection
+                                                    value={fiscalProfile}
+                                                    status={revenueStatus}
+                                                    loading={fiscalLoading}
+                                                    sharedStoreCount={fiscalEntity?.sharedStoreIds.length ?? 0}
+                                                    hasDocument={generalInfo.cnpj.replace(/\D/g, "").length === 14}
+                                                    onChange={(patch) => setFiscalProfile(prev => ({ ...prev, ...patch }))}
+                                                    onTaxProfileChange={handleTaxProfileChange}
+                                                />
+                                            ) : (
+                                                <FormSection hasSeparator title="Perfil fiscal e limite de faturamento">
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                        Salve os dados do negócio para configurar o perfil fiscal.
+                                                    </p>
+                                                </FormSection>
+                                            )}
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                            <SidebarCard hasTopStrip hasSeparator title="Impostos sobre faturamento (DRE)">
+                                                <div className="space-y-5">
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                        Usado para estimar a dedução de impostos no DRE. As alíquotas do Simples têm prioridade; se informar somente o DAS-MEI (valor fixo mensal), ele será rateado por dia no período selecionado.
+                                                    </p>
+                                                    <PercentageInput
+                                                        label="Simples Nacional - Produtos (%)"
+                                                        value={taxInfo.simplesTaxRateProducts}
+                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateProducts: v }))}
+                                                    />
+                                                    <PercentageInput
+                                                        label="Simples Nacional - Serviços (%)"
+                                                        value={taxInfo.simplesTaxRateServices}
+                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, simplesTaxRateServices: v }))}
+                                                    />
+                                                    <MoneyInput
+                                                        label="DAS-MEI (valor fixo mensal)"
+                                                        value={taxInfo.meiFixedTaxAmount}
+                                                        onChange={(v) => setTaxInfo(prev => ({ ...prev, meiFixedTaxAmount: v }))}
+                                                    />
                                                 </div>
                                             </SidebarCard>
                                         </div>
@@ -1031,24 +1219,28 @@ export const BusinessDataSubPage = ({
                                 </TabsContent>
 
                                 <TabsContent value="hours" className="mt-0 focus-visible:outline-none">
-                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden space-y-8">
-                                        <FormSection title="Fuso horário">
-                                            <div className="max-w-md space-y-2">
-                                                <FormDropdown
-                                                    label="Fuso horário do negócio"
-                                                    value={timezone}
-                                                    setValue={setTimezone}
-                                                    options={TIMEZONE_OPTIONS}
-                                                />
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    Define como datas e horários de pedidos, agendamentos e relatórios são interpretados no sistema.
-                                                </p>
-                                            </div>
-                                        </FormSection>
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                            <FormSection title="Horários de Funcionamento">
+                                                <BusinessHoursSelector value={hours as any} onChange={setHours} />
+                                            </FormSection>
+                                        </div>
 
-                                        <FormSection title="Horários de Funcionamento" hasSeparator>
-                                            <BusinessHoursSelector value={hours as any} onChange={setHours} />
-                                        </FormSection>
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                            <SidebarCard hasTopStrip hasSeparator title="Fuso horário">
+                                                <div className="space-y-2">
+                                                    <FormDropdown
+                                                        label="Fuso horário do negócio"
+                                                        value={timezone}
+                                                        setValue={setTimezone}
+                                                        options={TIMEZONE_OPTIONS}
+                                                    />
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                        Define como datas e horários de pedidos, agendamentos e relatórios são interpretados no sistema.
+                                                    </p>
+                                                </div>
+                                            </SidebarCard>
+                                        </div>
                                     </motion.div>
                                 </TabsContent>
                             </AnimatePresence>

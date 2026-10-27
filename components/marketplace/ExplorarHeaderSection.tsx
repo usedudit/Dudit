@@ -1,7 +1,7 @@
 "use client"
 
-import { Button, Badge } from "@/components/reusable"
-import { ChevronLeft, MapPin } from "lucide-react"
+import { Button } from "@/components/reusable"
+import { ChevronLeft } from "lucide-react"
 
 interface ExplorarHeaderSectionProps {
     title: string
@@ -9,8 +9,6 @@ interface ExplorarHeaderSectionProps {
     showBackButton?: boolean
     onBack?: () => void
     isLoading?: boolean
-    citySlug?: string | null
-    formatCitySlug?: (slug: string | null) => string
 }
 
 export function ExplorarHeaderSection({
@@ -19,11 +17,7 @@ export function ExplorarHeaderSection({
     showBackButton = false,
     onBack,
     isLoading = false,
-    citySlug,
-    formatCitySlug,
 }: ExplorarHeaderSectionProps) {
-    const cityLabel = citySlug && formatCitySlug ? formatCitySlug(citySlug) : null
-
     return (
         <div className="mb-6">
             <div className="flex items-start gap-3">
@@ -39,24 +33,19 @@ export function ExplorarHeaderSection({
                     </div>
                 )}
 
-                {/* Badge de localização - aparece quando tem cidade definida */}
-                {cityLabel && (
-                    <Badge variant="gray" className="shrink-0">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>{cityLabel}</span>
-                    </Badge>
-                )}
-
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1 truncate">
+                    {/* Título e contador: desktop apenas.
+                        Em tablet/mobile a cidade é exibida como badge de filtro
+                        fixa na barra de filtros, então repita informação é redundante. */}
+                    <h1 className="hidden lg:block text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-1 truncate">
                         {title}
                     </h1>
                     {isLoading ? (
-                        <div className="h-5 flex items-center mt-1">
+                        <div className="hidden lg:flex items-center mt-1">
                             <span className="inline-block w-28 h-3.5 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
                         </div>
                     ) : (
-                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
+                        <p className="hidden lg:block text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
                             {resultsCount} resultado{resultsCount !== 1 ? "s" : ""} encontrado{resultsCount !== 1 ? "s" : ""}
                         </p>
                     )}

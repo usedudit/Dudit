@@ -230,7 +230,7 @@ export default function PaymentStatusModal({
   }>({
     title: "Receber saldo",
     canGoBack: false,
-    onGoBack: () => {},
+    onGoBack: () => { },
   });
   const [successSnapshot, setSuccessSnapshot] = useState<{
     displayOrderTotal: number;
@@ -369,9 +369,9 @@ export default function PaymentStatusModal({
     // sinal pendente (QR já gerado) ou pedido sem sinal.
     const shouldFetchMpPayment = Boolean(
       !fullyPaid &&
-        targetOrderId &&
-        (canPaySinal(depositSummary) ||
-          (isMpOrder && !depositSummary?.usesDeposit)),
+      targetOrderId &&
+      (canPaySinal(depositSummary) ||
+        (isMpOrder && !depositSummary?.usesDeposit)),
     );
 
     if (shouldFetchMpPayment) {
@@ -429,11 +429,11 @@ export default function PaymentStatusModal({
 
   const cashEntry = Array.isArray(breakdown)
     ? breakdown.find((entry: any) => {
-        const m = String(entry?.method || "")
-          .toLowerCase()
-          .trim();
-        return m === "cash" || m === "dinheiro";
-      })
+      const m = String(entry?.method || "")
+        .toLowerCase()
+        .trim();
+      return m === "cash" || m === "dinheiro";
+    })
     : null;
   const wantsChange =
     (cashEntry as any)?.wantsChange ??
@@ -530,10 +530,10 @@ export default function PaymentStatusModal({
       quantity: Number(item.quantity || 1),
       unitPrice: Number(
         item.product_price ||
-          item.unit_price ||
-          item.unitPrice ||
-          item.price ||
-          0,
+        item.unit_price ||
+        item.unitPrice ||
+        item.price ||
+        0,
       ),
     }));
   }, [targetOrder, mpPaymentData]);
@@ -654,9 +654,9 @@ export default function PaymentStatusModal({
       (manualPolicy.enabled || overrideEnabled));
   const isManualBalanceOverride = Boolean(
     depositSummary?.usesDeposit &&
-      depositSummary.sinalPaid &&
-      !manualPolicy.enabled &&
-      overrideEnabled,
+    depositSummary.sinalPaid &&
+    !manualPolicy.enabled &&
+    overrideEnabled,
   );
 
   // MP Pix/Boleto QR code está sendo exibido inline (sem sinal/deposit) —
@@ -664,9 +664,9 @@ export default function PaymentStatusModal({
   // recebimento manual, pois o QR Code já contém o valor definido.
   const isMpPaymentPendingInline = Boolean(
     isMpOrder &&
-      !isFullyPaid &&
-      !depositSummary?.usesDeposit &&
-      (mpPaymentData?.pixData || mpPaymentData?.boletoData),
+    !isFullyPaid &&
+    !depositSummary?.usesDeposit &&
+    (mpPaymentData?.pixData || mpPaymentData?.boletoData),
   );
 
   // Handler for the "Salvar recebimento" button.
@@ -794,13 +794,13 @@ export default function PaymentStatusModal({
 
       const finalBreakdown = hasRealLeg
         ? updatedBreakdown.filter((leg: any) => {
-            const norm = String(leg.method || "").toLowerCase();
-            return (
-              !norm.includes("não definido") &&
-              !norm.includes("metodo nao definido") &&
-              !norm.includes("pendente")
-            );
-          })
+          const norm = String(leg.method || "").toLowerCase();
+          return (
+            !norm.includes("não definido") &&
+            !norm.includes("metodo nao definido") &&
+            !norm.includes("pendente")
+          );
+        })
         : updatedBreakdown;
 
       const isFullPaymentOfBalance =
@@ -999,8 +999,8 @@ export default function PaymentStatusModal({
                           bottomElement={
                             manualPolicy.canOverride && !overrideEnabled ? (
                               <Button
-                                variant="outline"
-                                size="sm"
+                                variant="link"
+                                className={overrideEnabled ? "text-brand-blue hover:text-brand-blue/70" : "text-brand-orange hover:text-brand-orange/70"}
                                 onClick={() => setShowOverrideConfirm(true)}
                               >
                                 Autorizar
@@ -1065,9 +1065,9 @@ export default function PaymentStatusModal({
                             <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                               {formatCurrency(
                                 depositSummary?.initialChargeAmount ||
-                                  depositSummary?.depositAmount ||
-                                  mpPaymentData.chargeAmount ||
-                                  0,
+                                depositSummary?.depositAmount ||
+                                mpPaymentData.chargeAmount ||
+                                0,
                               )}
                             </span>
                           </div>
@@ -1371,7 +1371,7 @@ export default function PaymentStatusModal({
                     orderNumber={targetOrder?.order_number}
                     onSyncMp={
                       targetOrder.mp_payment_id ||
-                      targetOrder.payment_provider === "Mercado Pago"
+                        targetOrder.payment_provider === "Mercado Pago"
                         ? handleSyncMpPayment
                         : undefined
                     }
@@ -1379,9 +1379,9 @@ export default function PaymentStatusModal({
                   />
 
                   {!isFullyPaid &&
-                  totalRemaining > 0.009 &&
-                  manualBalanceAllowed &&
-                  !isMpPaymentPendingInline ? (
+                    totalRemaining > 0.009 &&
+                    manualBalanceAllowed &&
+                    !isMpPaymentPendingInline ? (
                     <BalancePaymentCollector
                       partnerId={partnerId}
                       remainingBalance={totalRemaining}

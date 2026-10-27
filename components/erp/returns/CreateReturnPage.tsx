@@ -2246,7 +2246,7 @@ export default function CreateReturnPage({
                                                                         bottomElement={
                                                                             <Button
                                                                                 variant="link"
-                                                                                className="text-orange-700 dark:text-orange-300/80"
+                                                                                className="text-brand-orange hover:text-brand-orange/70"
                                                                                 onClick={() => setIsCustomerSheetOpen(true)}
                                                                                 type="button"
                                                                             >

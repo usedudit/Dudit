@@ -1,25 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Badge,
-  Button,
-  CpfCnpjInput,
   FormDropdown,
   FormSection,
   InfoCard,
   Input,
   MoneyInput,
 } from "@/components/reusable"
-import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
-import {
-  getFiscalProfileAction,
-  getRevenueLimitStatusAction,
-  saveFiscalProfileAction,
-  type FiscalEntityDto,
-  type RevenueLimitStatus,
-} from "@/app/actions/erp/fiscal-entity"
+import type { RevenueLimitStatus } from "@/app/actions/erp/fiscal-entity"
 import {
   REVENUE_LIMIT_STATUS_META,
   TAX_PROFILE_META,
@@ -28,9 +18,25 @@ import {
   type TaxProfile,
 } from "@/lib/fiscal-entity"
 
+export interface FiscalProfileFormValue {
+  taxProfile: TaxProfile
+  cnaePrimary: string
+  /** CNAEs secundários separados por vírgula (formato de input). */
+  cnaeSecondary: string
+  annualRevenueLimit: number
+  openingDate: string
+}
+
 interface FiscalProfileSectionProps {
-  storeId: string
-  onSaved?: (data: FiscalEntityDto) => void
+  value: FiscalProfileFormValue
+  status: RevenueLimitStatus | null
+  onChange: (patch: Partial<FiscalProfileFormValue>) => void
+  onTaxProfileChange: (profile: TaxProfile) => void
+  loading?: boolean
+  /** Quantidade de lojas que compartilham a mesma identidade fiscal. */
+  sharedStoreCount?: number
+  /** Documento (CNPJ) já informado na aba Geral. */
+  hasDocument?: boolean
 }
 
 const PROFILE_OPTIONS = TAX_PROFILES.map((profile) => ({
@@ -42,138 +48,39 @@ function formatPercent(value: number) {
   return `${Math.min(999, Math.round(value))}%`
 }
 
-export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionProps) {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [entity, setEntity] = useState<FiscalEntityDto | null>(null)
-  const [status, setStatus] = useState<RevenueLimitStatus | null>(null)
-
-  const [profile, setProfile] = useState<TaxProfile>("nao_informado")
-  const [document, setDocument] = useState("")
-  const [cnae, setCnae] = useState("")
-  const [cnaeSecondary, setCnaeSecondary] = useState("")
-  const [limit, setLimit] = useState(0)
-  const [openingDate, setOpeningDate] = useState("")
-
-  const applyEntity = useCallback((data: FiscalEntityDto) => {
-    setEntity(data)
-    setProfile(data.taxProfile)
-    setDocument(data.document || "")
-    setCnae(data.cnaePrimary || "")
-    setCnaeSecondary((data.cnaeSecondary || []).join(", "))
-    setLimit(Number(data.annualRevenueLimit || 0))
-    setOpeningDate(data.openingDate ? data.openingDate.slice(0, 10) : "")
-  }, [])
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [profileRes, statusRes] = await Promise.all([
-        getFiscalProfileAction({ storeId }),
-        getRevenueLimitStatusAction({ storeId }),
-      ])
-      if (profileRes.success && profileRes.data) applyEntity(profileRes.data)
-      if (statusRes.success && statusRes.data) setStatus(statusRes.data)
-    } catch {
-      toast.error("Erro ao carregar os dados fiscais.")
-    } finally {
-      setLoading(false)
-    }
-  }, [storeId, applyEntity])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const meta = TAX_PROFILE_META[profile]
+/**
+ * Perfil fiscal + limite de faturamento.
+ *
+ * Componente controlado: todo o estado vem do formulário de Dados do Negócio e
+ * é persistido pelo botão Salvar principal (nada de salvar por conta própria).
+ * O CNPJ/CPF não aparece aqui — ele é informado na aba Geral e o lookup do
+ * CNPJ preenche CNAE, CRT, IE e data de abertura.
+ */
+export function FiscalProfileSection({
+  value,
+  status,
+  onChange,
+  onTaxProfileChange,
+  loading,
+  sharedStoreCount,
+  hasDocument = true,
+}: FiscalProfileSectionProps) {
+  const meta = TAX_PROFILE_META[value.taxProfile]
   const snapshot = status?.snapshot
-
-  const customLimit = useMemo(() => {
-    if (!meta.hasRevenueLimit) return false
-    const defaultLimit = getDefaultAnnualLimit(profile, new Date().getFullYear())
-    return defaultLimit != null && limit > 0 && limit !== defaultLimit
-  }, [meta.hasRevenueLimit, profile, limit])
-
-  const handleProfileChange = (next: TaxProfile) => {
-    setProfile(next)
-    // Ao trocar de enquadramento, parte do limite padrão do novo perfil para
-    // não salvar um teto incompatível (ex.: nano com limite de MEI).
-    setLimit(getDefaultAnnualLimit(next, new Date().getFullYear()) ?? 0)
-
-    // MEI/PF contribuinte exigem CNPJ; nano/não informado não podem ter CNPJ.
-    // Limpa o documento quando o tipo atual deixa de ser aceito, para o
-    // usuário não ficar preso em um erro de validação ao trocar de perfil.
-    const digits = document.replace(/\D/g, "")
-    if (TAX_PROFILE_META[next].requiresCnpj && digits.length === 11) setDocument("")
-    if (!TAX_PROFILE_META[next].requiresCnpj && digits.length === 14) setDocument("")
-  }
-
-  const handleLookupCnae = async () => {
-    const digits = document.replace(/\D/g, "")
-    if (digits.length !== 14) {
-      toast.error("Informe o CNPJ para buscar o CNAE.")
-      return
-    }
-    try {
-      const res = await fetch(`/api/cnpj?cnpj=${digits}`)
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data?.error || "Não foi possível consultar o CNPJ.")
-        return
-      }
-      if (data.cnae_fiscal) {
-        setCnae(String(data.cnae_fiscal))
-        toast.success("CNAE preenchido a partir do CNPJ.")
-      } else {
-        toast.warning("O CNPJ não retornou CNAE. Informe manualmente.")
-      }
-    } catch {
-      toast.error("Erro ao consultar o CNPJ.")
-    }
-  }
-
-  const handleSave = async () => {
-    if (meta.requiresCnpj && document.replace(/\D/g, "").length !== 14) {
-      toast.error("Informe um CNPJ válido para este perfil.")
-      return
-    }
-
-    setSaving(true)
-    try {
-      const res = await saveFiscalProfileAction({
-        storeId,
-        taxProfile: profile,
-        document: document || null,
-        cnaePrimary: cnae || null,
-        cnaeSecondary: cnaeSecondary
-          .split(",")
-          .map((v) => v.trim())
-          .filter(Boolean),
-        annualRevenueLimit: meta.hasRevenueLimit && limit > 0 ? limit : null,
-        openingDate: profile === "mei" ? openingDate || null : null,
-      })
-
-      if (!res.success || !res.data) {
-        toast.error(res.error || "Erro ao salvar o perfil fiscal.")
-        return
-      }
-
-      applyEntity(res.data)
-      const statusRes = await getRevenueLimitStatusAction({ storeId })
-      if (statusRes.success && statusRes.data) setStatus(statusRes.data)
-      toast.success("Perfil fiscal atualizado.")
-      onSaved?.(res.data)
-    } catch {
-      toast.error("Erro ao salvar o perfil fiscal.")
-    } finally {
-      setSaving(false)
-    }
-  }
+  const currentYear = new Date().getFullYear()
+  const defaultLimit = getDefaultAnnualLimit(value.taxProfile, currentYear)
+  const customLimit =
+    meta.hasRevenueLimit &&
+    defaultLimit != null &&
+    value.annualRevenueLimit > 0 &&
+    value.annualRevenueLimit !== defaultLimit
 
   if (loading) {
     return (
-      <FormSection hasSeparator title="Perfil fiscal e limite de faturamento">
-        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Carregando dados fiscais...</p>
+      <FormSection title="Perfil fiscal e limite de faturamento">
+        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+          Carregando dados fiscais...
+        </p>
       </FormSection>
     )
   }
@@ -189,7 +96,7 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
           : "bg-gray-400"
 
   return (
-    <FormSection hasSeparator title="Perfil fiscal e limite de faturamento">
+    <FormSection title="Perfil fiscal e limite de faturamento">
       <div className="space-y-5">
         <InfoCard
           color="blue"
@@ -197,53 +104,44 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
           message="O Dudit não emite nota fiscal. Aqui você informa como o negócio está enquadrado para calcular o limite de faturamento e avisar antes de estourar."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <FormDropdown
-            label="Perfil tributário"
-            value={profile}
-            setValue={(v) => handleProfileChange(v as TaxProfile)}
-            options={PROFILE_OPTIONS}
-            dataField="taxProfile"
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <CpfCnpjInput
-              label={meta.requiresCnpj ? "CNPJ" : "CNPJ ou CPF (opcional)"}
-              placeholder={meta.requiresCnpj ? "00.000.000/0000-00" : "Documento do negócio"}
-              value={document}
-              onChange={(e) => setDocument((e.target as HTMLInputElement).value)}
-              dataField="taxDocument"
-            />
-          </div>
-        </div>
+        <FormDropdown
+          label="Perfil tributário"
+          value={value.taxProfile}
+          setValue={(v) => onTaxProfileChange(v as TaxProfile)}
+          options={PROFILE_OPTIONS}
+          dataField="taxProfile"
+        />
 
         <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
           {meta.description}
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input
-                label="CNAE principal"
-                placeholder="0000-0/00"
-                value={cnae}
-                onChange={(e) => setCnae(e.target.value)}
-                maxLength={12}
-              />
-            </div>
-            <Button type="button" variant="outline" onClick={handleLookupCnae}>
-              Buscar
-            </Button>
-          </div>
+        {meta.requiresCnpj && !hasDocument && (
+          <InfoCard
+            color="red"
+            title="Informe o CNPJ"
+            message="Preencha o CNPJ na aba Geral. Sem ele a loja não pode ser publicada e não é possível emitir nota fiscal para clientes PJ."
+          />
+        )}
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Input
+            label="CNAE principal"
+            placeholder="0000-0/00"
+            value={value.cnaePrimary}
+            onChange={(e) => onChange({ cnaePrimary: e.target.value })}
+            maxLength={12}
+          />
           <Input
             label="CNAEs secundários"
             placeholder="Separados por vírgula"
-            value={cnaeSecondary}
-            onChange={(e) => setCnaeSecondary(e.target.value)}
+            value={value.cnaeSecondary}
+            onChange={(e) => onChange({ cnaeSecondary: e.target.value })}
           />
         </div>
+        <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
+          Preenchidos automaticamente ao consultar o CNPJ na aba Geral.
+        </p>
 
         {meta.hasRevenueLimit && (
           <>
@@ -251,28 +149,22 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
               <div>
                 <MoneyInput
                   label="Limite anual de faturamento"
-                  value={limit}
-                  onChange={setLimit}
+                  value={value.annualRevenueLimit}
+                  onChange={(v) => onChange({ annualRevenueLimit: v })}
                 />
                 <p className="mt-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
-                  {(() => {
-                    const currentYear = new Date().getFullYear()
-                    const defaultLimit = getDefaultAnnualLimit(profile, currentYear)
-                    if (profile === "mei") {
-                      return `Padrão ${currentYear}: ${formatCurrency(defaultLimit ?? 0)}.`
-                    }
-                    const meiLimit = getDefaultAnnualLimit("mei", currentYear) ?? 0
-                    return `Padrão ${currentYear}: ${formatCurrency(defaultLimit ?? 0)} (50% do limite do MEI de ${formatCurrency(meiLimit)}).`
-                  })()}
+                  {value.taxProfile === "mei"
+                    ? `Padrão ${currentYear}: ${formatCurrency(defaultLimit ?? 0)}.`
+                    : `Padrão ${currentYear}: ${formatCurrency(defaultLimit ?? 0)} (50% do limite do MEI de ${formatCurrency(getDefaultAnnualLimit("mei", currentYear) ?? 0)}).`}
                 </p>
               </div>
-              {profile === "mei" && (
+              {value.taxProfile === "mei" && (
                 <div>
                   <Input
                     type="date"
                     label="Data de abertura do CNPJ"
-                    value={openingDate}
-                    onChange={(e) => setOpeningDate(e.target.value)}
+                    value={value.openingDate}
+                    onChange={(e) => onChange({ openingDate: e.target.value })}
                   />
                   <p className="mt-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
                     Usada para calcular o limite proporcional no primeiro ano.
@@ -290,8 +182,8 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
                     </p>
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">
                       Faturamento bruto de {status?.year} · {formatPercent(snapshot.percentage)} do limite
-                      {entity && entity.sharedStoreIds.length > 1
-                        ? ` · somando ${entity.sharedStoreIds.length} lojas`
+                      {(sharedStoreCount ?? 0) > 1
+                        ? ` · somando ${sharedStoreCount} lojas`
                         : ""}
                     </p>
                   </div>
@@ -309,7 +201,7 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
 
                 <div
                   className={`grid grid-cols-1 gap-3 text-xs ${
-                    profile === "mei" ? "sm:grid-cols-3" : "sm:grid-cols-2"
+                    value.taxProfile === "mei" ? "sm:grid-cols-3" : "sm:grid-cols-2"
                   }`}
                 >
                   <div>
@@ -318,7 +210,7 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
                       {formatCurrency(snapshot.remaining ?? 0)}
                     </p>
                   </div>
-                  {profile === "mei" && (
+                  {value.taxProfile === "mei" && (
                     <div>
                       <p className="text-brand-inactive-text dark:text-dark-body">Margem de tolerância (20%)</p>
                       <p className="font-bold text-brand-dark dark:text-dark-heading">
@@ -352,7 +244,7 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
 
                 {snapshot.status === "excedido" && (
                   <p className="text-xs text-brand-red">
-                    {profile === "mei"
+                    {value.taxProfile === "mei"
                       ? "Limite e tolerância ultrapassados. Procure um contador: o desenquadramento pode ser retroativo ao início do ano."
                       : "Limite do nanoempreendedor ultrapassado. A partir daí o negócio deixa de ser nano e passa a exigir CNPJ técnico e documento fiscal. Procure um contador para fazer a transição."}
                   </p>
@@ -362,7 +254,7 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
           </>
         )}
 
-        {!meta.hasRevenueLimit && profile !== "nao_informado" && (
+        {!meta.hasRevenueLimit && value.taxProfile !== "nao_informado" && (
           <InfoCard
             color="gray"
             title="Sem limite anual monitorado"
@@ -370,14 +262,11 @@ export function FiscalProfileSection({ storeId, onSaved }: FiscalProfileSectionP
           />
         )}
 
-        <div className="flex items-center justify-between gap-3">
+        {meta.hasRevenueLimit && (
           <p className="text-xs text-brand-inactive-text dark:text-dark-body">
             {customLimit ? "Limite personalizado em uso." : "Usando o limite padrão do ano."}
           </p>
-          <Button type="button" onClick={handleSave} isLoading={saving}>
-            Salvar perfil fiscal
-          </Button>
-        </div>
+        )}
       </div>
     </FormSection>
   )

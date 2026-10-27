@@ -1418,6 +1418,22 @@ export function ExplorarPageClient({
 
     const activeFilterChips = useMemo(() => {
         const chips: { key: string; label: string; value: string; onRemove: () => void }[] = []
+
+        // Cidade como chip de filtro: substitui a badge solta que ficava no header,
+        // aparecendo exatamente como os demais chips de filtro ativo na barra de filtros.
+        // O X abre o seletor de cidade para trocar/remover a localização.
+        if (selectedCitySlug) {
+            const cityValue = formatCitySlug(selectedCitySlug)
+            if (cityValue) {
+                chips.push({
+                    key: "cidade",
+                    label: "Localidade",
+                    value: cityValue,
+                    onRemove: () => setIsCityModalOpen(true),
+                })
+            }
+        }
+
         if (selectedCategories.length > 0) {
             chips.push({
                 key: "category",
@@ -1522,7 +1538,7 @@ export function ExplorarPageClient({
         }
         return chips
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType, selectedCitySlug, selectedSection, query, resolveCategoryName, triggerFilterLoading, contextualSortOptions])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, onlyShipping, minRating, deliveryFilter, maxDistanceKm, showcaseOnly, sortBy, currentType, selectedCitySlug, selectedSection, query, resolveCategoryName, triggerFilterLoading, contextualSortOptions, formatCitySlug])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1792,8 +1808,6 @@ export function ExplorarPageClient({
                                 resultsCount={filteredResults.length}
                                 isLoading={isContentLoading}
                                 showBackButton={!!query || !!selectedSection || isCategoryMode}
-                                citySlug={selectedCitySlug}
-                                formatCitySlug={formatCitySlug}
                                 onBack={() => {
                                     if (selectedSection) {
                                         triggerFilterLoading()

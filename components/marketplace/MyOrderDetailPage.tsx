@@ -995,7 +995,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     message={`Sinal confirmado. Falta pagar ${formatCurrency(depositSummary.remainingBalance)} do saldo para concluir o pedido.`}
                     color="orange"
                     bottomElement={
-                        <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                        <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar saldo
                         </Button>
@@ -1023,7 +1023,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
                     color="red"
                     bottomElement={
-                        <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                        <Button variant="link" className="text-brand-red hover:text-brand-red/70" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar agora
                         </Button>
@@ -1037,7 +1037,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`}
                 color="orange"
                 bottomElement={
-                    <Button variant="link" className="!p-0" onClick={handlePixClick} disabled={loadingPayment}>
+                    <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={handlePixClick} disabled={loadingPayment}>
                         {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                         Pagar agora
                     </Button>
@@ -1690,8 +1690,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     canReport ? (
                         <Button
                             variant="link"
-                            size="sm"
-                            className="p-0 h-auto whitespace-nowrap"
+                            className={returnStatusCfg.color === "gray" ? "text-brand-dark dark:text-dark-heading" : `text-brand-${returnStatusCfg.color} hover:text-brand-${returnStatusCfg.color}/70`}
                             onClick={() => setReportReturnOpen(true)}
                         >
                             Reportar à Dudit
@@ -1765,7 +1764,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             onClick={() =>
                                                                 window.open(`/assinaturas?tab=assinaturas&view=${order.recurring_subscription_id}`)
                                                             }
-                                                            type="button"
                                                         >
                                                             Ver assinatura
                                                         </Button>
@@ -2087,10 +2085,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         className="mt-4"
                                                         bottomElement={
                                                             <Button
-                                                                size="sm"
                                                                 onClick={handlePixClick}
                                                                 disabled={loadingPayment}
-                                                                className="whitespace-nowrap"
+                                                                className="text-brand-orange hover:text-brand-orange/70"
                                                             >
                                                                 {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                                                                 Pagar via Pix
@@ -2105,12 +2102,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         className="mt-4"
                                                         bottomElement={
                                                             <Button
-                                                                variant="outline"
-                                                                size="sm"
+                                                                variant="link"
                                                                 onClick={handleWhatsAppExchangeDifference}
-                                                                className="whitespace-nowrap flex items-center gap-1.5"
+                                                                leftIcon={<WhatsappIcon />}
+                                                                className="text-brand-blue hover:text-brand-blue/70"
                                                             >
-                                                                <WhatsappIcon size={14} className="text-[#25D366]" />
                                                                 Combinar no WhatsApp
                                                             </Button>
                                                         }

@@ -55,7 +55,24 @@ export async function consultarCNPJ(cnpj: string) {
 	if (FUNCTIONS_URL) {
 		const result = await _fetchEdgeFunction("cnpj-lookup", `?cnpj=${cnpjClean}`)
 		if (!result.shouldFallback) {
-			return result.data
+			const data = result.data
+			// Versões antigas da Edge Function mapeavam só o CNAE principal.
+			// Quando o campo novo não vem na resposta, completa pela rota local
+			// (que já devolve CNAEs secundários, abertura e IE).
+			if (
+				isBrowser &&
+				data &&
+				typeof data === "object" &&
+				!data.error &&
+				data.cnae_fiscal &&
+				!("cnae_fiscal_secundaria" in data)
+			) {
+				const routeResult = await _fetchFromApiRoute(`/api/cnpj?cnpj=${cnpjClean}`)
+				if (!routeResult.shouldFallback && routeResult.data && !routeResult.data.error) {
+					return routeResult.data
+				}
+			}
+			return data
 		}
 		console.warn("[consultarCNPJ] Edge Function failed, trying fallback...", result.reason)
 	}

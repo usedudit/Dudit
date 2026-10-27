@@ -36,6 +36,14 @@ function categorizePhones(rawPhones: string[]) {
 	}
 }
 
+/** Formata o CNAE no padrão 0000-0/00. */
+function formatCnae(value: unknown): string | undefined {
+	const digits = String(value ?? "").replace(/\D/g, "")
+	if (!digits) return undefined
+	const padded = digits.padStart(7, "0").slice(0, 7)
+	return `${padded.slice(0, 4)}-${padded.slice(4, 5)}/${padded.slice(5, 7)}`
+}
+
 function mapCnpjaData(data: any, cnpj: string) {
 	const rawPhones: string[] = []
 	if (Array.isArray(data.phones)) {
@@ -55,6 +63,18 @@ function mapCnpjaData(data: any, cnpj: string) {
 		email = data.emails[0]?.address || ""
 	}
 
+	// CNAEs secundários, data de abertura e inscrição estadual vêm da mesma
+	// consulta; antes só o CNAE principal era mapeado.
+	const secondaryActivities = Array.isArray(data.sideActivities)
+		? data.sideActivities
+			.map((activity: any) => formatCnae(activity?.id))
+			.filter((value): value is string => Boolean(value))
+		: []
+
+	const stateRegistration = Array.isArray(data.registrations)
+		? data.registrations.find((r: any) => r?.enabled !== false) || data.registrations[0]
+		: null
+
 	return {
 		cnpj: data.taxId || cnpj,
 		razao_social: data.company?.name || "",
@@ -72,7 +92,10 @@ function mapCnpjaData(data: any, cnpj: string) {
 		telefone_fixo: phoneObj.telefone_fixo,
 		celular: phoneObj.celular,
 		email: email,
-		cnae_fiscal: data.mainActivity?.id ? String(data.mainActivity.id) : undefined,
+		cnae_fiscal: formatCnae(data.mainActivity?.id),
+		cnae_fiscal_secundaria: secondaryActivities,
+		data_abertura: typeof data.founded === "string" ? data.founded.slice(0, 10) : undefined,
+		inscricao_estadual: stateRegistration?.number != null ? String(stateRegistration.number) : undefined,
 		simples_optante: data.simples?.optant ?? false,
 		simei_optante: data.simei?.optant ?? false,
 	}
@@ -84,6 +107,16 @@ function mapBrasilApiData(bData: any, cnpj: string) {
 	if (bData.ddd_telefone_2) rawPhones.push(String(bData.ddd_telefone_2))
 
 	const phoneObj = categorizePhones(rawPhones)
+
+	const secondaryActivities = Array.isArray(bData.cnaes_secundarios)
+		? bData.cnaes_secundarios
+			.map((cnae: any) => formatCnae(cnae?.codigo))
+			.filter((value): value is string => Boolean(value))
+		: []
+
+	const stateRegistration = Array.isArray(bData.inscricoes_estaduais)
+		? bData.inscricoes_estaduais.find((r: any) => r?.ativo) || bData.inscricoes_estaduais[0]
+		: null
 
 	return {
 		cnpj: bData.cnpj || cnpj,
@@ -102,7 +135,15 @@ function mapBrasilApiData(bData: any, cnpj: string) {
 		telefone_fixo: phoneObj.telefone_fixo,
 		celular: phoneObj.celular,
 		email: bData.email || "",
-		cnae_fiscal: bData.cnae_fiscal ? String(bData.cnae_fiscal) : undefined,
+		cnae_fiscal: formatCnae(bData.cnae_fiscal),
+		cnae_fiscal_secundaria: secondaryActivities,
+		data_abertura: bData.data_inicio_atividade
+			? String(bData.data_inicio_atividade).slice(0, 10)
+			: undefined,
+		inscricao_estadual:
+			stateRegistration?.inscricao_estadual != null
+				? String(stateRegistration.inscricao_estadual)
+				: undefined,
 		simples_optante: bData.opcao_pelo_simples ?? false,
 		simei_optante: bData.opcao_pelo_mei ?? false,
 	}

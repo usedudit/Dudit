@@ -458,6 +458,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               partner={partner}
               store={selectedStore}
               paymentMethods={paymentMethods}
+              initialTab={searchParams.get("fiscal") === "1" ? "fiscal" : undefined}
               onBack={() => navigateToSubpage("home")}
             />
           )}

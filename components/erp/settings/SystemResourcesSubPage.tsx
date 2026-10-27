@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback } from "react"
-import { Button, FormSection, AlertModal, SavingStatusModal, DefaultModal } from "@/components/reusable"
+import { Button, FormSection, AlertModal, SavingStatusModal, DefaultModal, InfoCard, ThreeDotsLoader } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AlertTriangleIcon, ChevronLeftIcon, SaveIcon } from "@/lib/icons"
@@ -363,7 +363,7 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                             return (
                                 <div
                                     key={resourceId}
-                                    className="rounded-xl border border-brand-border dark:border-dark-border p-3"
+                                    className="border-b border-brand-border dark:border-dark-border pb-2"
                                 >
                                     <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">
                                         {resource?.label || resourceId}
@@ -377,50 +377,29 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                     </div>
 
                     {impactLoading ? (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Verificando assinaturas ativas...
-                        </p>
+                        <ThreeDotsLoader />
                     ) : impact ? (
-                        <div className="rounded-xl border border-brand-yellow/40 bg-brand-yellow/10 p-4 space-y-3">
-                            <div className="flex items-start gap-3">
-                                <AlertTriangleIcon className="w-5 h-5 text-brand-yellow shrink-0 mt-0.5" />
-                                <div className="min-w-0 space-y-1">
-                                    {activeSubscriptions > 0 ? (
-                                        <>
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {activeSubscriptions} assinatura(s) ativa(s)
-                                            </p>
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                {saveBlockedBySubscriptions
-                                                    ? "Pedidos e Assinaturas recorrentes sustentam as assinaturas ativas. Pause todas as assinaturas para continuar."
-                                                    : "Assinaturas existentes continuam cobrando normalmente (são contratos). Novas vendas seguem as regras acima."}
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                Nenhuma assinatura ativa
-                                            </p>
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Não há assinaturas em andamento que dependam destes recursos.
-                                            </p>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {activeSubscriptions > 0 && (
-                                <Button
-                                    variant="outline"
-                                    onClick={handlePauseAllSubscriptions}
-                                    isLoading={pausingAll}
-                                    disabled={pausingAll || saving}
-                                    className="w-full sm:w-auto"
-                                >
-                                    Pausar todas as assinaturas ativas
-                                </Button>
-                            )}
-                        </div>
+                        <InfoCard
+                            title={activeSubscriptions > 0 ? `${activeSubscriptions} assinatura(s) ativa(s)` : ""}
+                            message={activeSubscriptions > 0 ? saveBlockedBySubscriptions
+                                ? "Pedidos e Assinaturas recorrentes sustentam as assinaturas ativas. Pause todas as assinaturas para continuar."
+                                : "Assinaturas existentes continuam cobrando normalmente (são contratos). Novas vendas seguem as regras acima."
+                                : "Nenhuma assinatura ativa"}
+                            color="orange"
+                            bottomElement={
+                                activeSubscriptions > 0 && (
+                                    <Button
+                                        variant="link"
+                                        onClick={handlePauseAllSubscriptions}
+                                        isLoading={pausingAll}
+                                        disabled={pausingAll || saving}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        Pausar todas as assinaturas ativas
+                                    </Button>
+                                )
+                            }
+                        />
                     ) : null}
                 </div>
             </DefaultModal>
