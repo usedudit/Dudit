@@ -12,6 +12,7 @@ import {
     MapPin,
     Check,
     ChevronDown,
+    Globe,
 } from "lucide-react"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
 import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
@@ -248,7 +249,10 @@ export function ExplorarPageClient({
     // Modal states
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
     const [showStateList, setShowStateList] = useState(false)
+    const [showStateDropdown, setShowStateDropdown] = useState(false)
+    const [selectedStateFilter, setSelectedStateFilter] = useState<string>("brasil")
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+    const stateDropdownRef = useRef<HTMLDivElement>(null)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
     const [isMobileScrolled, setIsMobileScrolled] = useState(false)
@@ -274,6 +278,26 @@ export function ExplorarPageClient({
                 setCityAccentCache((prev) => ({ ...prev, ...resolved }))
             }
         }).catch(() => { })
+    }, [isCityModalOpen])
+
+    // Close state dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (stateDropdownRef.current && !stateDropdownRef.current.contains(e.target as Node)) {
+                setShowStateDropdown(false)
+            }
+        }
+        if (showStateDropdown) {
+            document.addEventListener("mousedown", handleClickOutside)
+            return () => document.removeEventListener("mousedown", handleClickOutside)
+        }
+    }, [showStateDropdown])
+
+    // Reset dropdown when modal closes
+    useEffect(() => {
+        if (!isCityModalOpen) {
+            setShowStateDropdown(false)
+        }
     }, [isCityModalOpen])
 
     // Filters state
@@ -1081,6 +1105,11 @@ export function ExplorarPageClient({
             .trim()
         return citiesData
             .filter((slug: string) => {
+                // Filter by selected state if not "brasil"
+                if (selectedStateFilter !== "brasil") {
+                    const cityState = slug.split("-").pop()?.toLowerCase()
+                    if (cityState !== selectedStateFilter) return false
+                }
                 const norm = slug
                     .toLowerCase()
                     .normalize("NFD")
@@ -1089,7 +1118,7 @@ export function ExplorarPageClient({
                 return norm.includes(q)
             })
             .slice(0, 5)
-    }, [citySearchText])
+    }, [citySearchText, citiesData, selectedStateFilter])
 
     // Group remaining products by category for feed view
     const categoriesWithProducts = useMemo(() => {
@@ -2111,38 +2140,68 @@ export function ExplorarPageClient({
                     </p>
 
                     <div className="space-y-4">
-                        {/* Quick location scope options */}
-                        <div className="flex flex-col gap-2 border-t pt-2">
+                        {/* Location scope selector: Brasil / Estado */}
+                        <div className="relative" ref={stateDropdownRef}>
                             <button
-                                onClick={() => {
-                                    handleSelectCity("brasil")
-                                    setIsCityModalOpen(false)
-                                }}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
+                                onClick={() => setShowStateDropdown(!showStateDropdown)}
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg border border-brand-border dark:border-dark-border"
                             >
-                                <span className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-brand-green" />
-                                    Brasil
+                                <span className="flex items-center gap-3">
+                                    {selectedStateFilter === "brasil" ? (
+                                        <Globe className="w-4 h-4 text-brand-green" />
+                                    ) : (
+                                        <MapPin className="w-4 h-4 text-brand-green" />
+                                    )}
+                                    <span>
+                                        {selectedStateFilter === "brasil" ? "Brasil" : ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}
+                                    </span>
                                 </span>
+                                <ChevronDown className={`w-4 h-4 text-brand-inactive-text transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
                             </button>
-                            {Object.entries(ESTADO_MAP).map(([uf, name]) => (
-                                <button
-                                    key={uf}
-                                    onClick={() => {
-                                        handleSelectCity(`estado-${uf}`)
-                                        setIsCityModalOpen(false)
-                                    }}
-                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20 rounded-lg"
-                                >
-                                    <span>{name}</span>
-                                </button>
-                            ))}
+
+                            {showStateDropdown && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedStateFilter("brasil")
+                                            setShowStateDropdown(false)
+                                            setCitySearchText("")
+                                            handleSelectCity("brasil")
+                                            setIsCityModalOpen(false)
+                                        }}
+                                        className="w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
+                                    >
+                                        <Globe className="w-4 h-4 text-brand-green" />
+                                        <span>Brasil (todos os estados)</span>
+                                        {selectedStateFilter === "brasil" && <Check className="w-4 h-4 text-brand-green ml-auto" />}
+                                    </button>
+                                    {Object.entries(ESTADO_MAP).map(([uf, name]) => (
+                                        <button
+                                            key={uf}
+                                            onClick={() => {
+                                                setSelectedStateFilter(uf)
+                                                setShowStateDropdown(false)
+                                                setCitySearchText("")
+                                                handleSelectCity(`estado-${uf}`)
+                                                setIsCityModalOpen(false)
+                                            }}
+                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading hover:bg-brand-gray/10 dark:hover:bg-dark-border/20"
+                                        >
+                                            <span className="flex items-center gap-3">
+                                                <MapPin className="w-4 h-4 text-brand-green" />
+                                                {name}
+                                            </span>
+                                            {selectedStateFilter === uf && <Check className="w-4 h-4 text-brand-green" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
-                        {/* City search (show when user starts typing) */}
+                        {/* City search - filters by selected state */}
                         <div className="relative">
                             <Input
-                                placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
+                                placeholder={selectedStateFilter === "brasil" ? "Buscar por cidade... (ex: São Paulo, Bauru)" : `Buscar cidade em ${ESTADO_MAP[selectedStateFilter] || selectedStateFilter.toUpperCase()}...`}
                                 value={citySearchText}
                                 onChange={(e) => setCitySearchText(e.target.value)}
                                 className="h-[42px] w-full"
@@ -2165,6 +2224,11 @@ export function ExplorarPageClient({
                                         </button>
                                     ))}
                                 </div>
+                            )}
+                            {citySearchText.trim().length >= 2 && filteredCitiesSuggestions.length === 0 && citiesData.length > 0 && (
+                                <p className="text-center text-xs text-brand-inactive-text py-3">
+                                    Nenhuma cidade encontrada{selectedStateFilter !== "brasil" ? ` em ${ESTADO_MAP[selectedStateFilter]}` : ""}
+                                </p>
                             )}
                         </div>
 

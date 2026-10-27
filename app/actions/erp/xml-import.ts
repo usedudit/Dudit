@@ -9,7 +9,8 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { decryptCPF } from "@/lib/crypto"
+import { decryptCPF, encryptCPF, generateCpfLookupHash } from "@/lib/crypto"
+import { encrypt as encryptSensitiveValue, decrypt as decryptSensitiveValue } from "@/lib/cryptoService"
 import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
@@ -96,12 +97,10 @@ async function findOrCreateSupplier(
   if (docType === "cnpj" && !validateCNPJ(doc)) return { id: null, isNew: false, document: doc, documentType: docType }
   if (docType === "cpf" && !validateCPF(doc)) return { id: null, isNew: false, document: doc, documentType: docType }
 
-  const { data: existing } = await supabase
-    .from("suppliers")
-    .select("id, name, cnpj, cpf")
-    .eq("partner_id", partnerId)
-    .or(`cnpj.eq.${doc},cpf.eq.${doc}`)
-    .maybeSingle()
+  const lookup = docType === "cnpj"
+    ? supabase.from("suppliers").select("id, name").eq("partner_id", partnerId).eq("cnpj", doc)
+    : supabase.from("suppliers").select("id, name").eq("partner_id", partnerId).eq("cpf_lookup_hash", await generateCpfLookupHash(doc))
+  const { data: existing } = await lookup.maybeSingle()
 
   if (existing) {
     return { id: existing.id, isNew: false, document: doc, documentType: docType }
@@ -708,7 +707,8 @@ export async function uploadXMLAction(
           name: sanitizeInput(metadata.emitente.nome, 150),
           nome_fantasia: sanitizeInput(metadata.emitente.nome_fantasia || metadata.emitente.nome, 150),
           cnpj: supplier.documentType === "cnpj" ? supplier.document : null,
-          cpf: supplier.documentType === "cpf" ? supplier.document : null,
+          cpf: supplier.documentType === "cpf" ? await encryptCPF(supplier.document) : null,
+          cpf_lookup_hash: supplier.documentType === "cpf" ? await generateCpfLookupHash(supplier.document) : null,
           person_type: supplier.documentType === "cnpj" ? "pj" : "pf",
           inscricao_estadual: metadata.emitente.ie || null,
           crt: metadata.emitente.crt || null,
@@ -855,11 +855,11 @@ export async function uploadXMLAction(
           tipo_operacao: metadata.invoice.tipo_operacao || null,
           total_value: metadata.invoice.valor_total,
           supplier_name: metadata.emitente.nome,
-          supplier_document: supplier.document,
+          supplier_document: supplier.documentType === "cpf" ? await encryptSensitiveValue(supplier.document, "cpf") : supplier.document,
           supplier_document_type: supplier.documentType,
           supplier_ie: metadata.emitente.ie || null,
           status: "preview",
-          raw_xml: xmlContent,
+          raw_xml: await encryptSensitiveValue(xmlContent, "nfe_xml"),
           file_key: fileKey,
           file_name: fileName,
           xml_hash: xmlHash,
@@ -906,11 +906,11 @@ export async function uploadXMLAction(
           tipo_operacao: metadata.invoice.tipo_operacao || null,
           total_value: metadata.invoice.valor_total,
           supplier_name: metadata.emitente.nome,
-          supplier_document: supplier.document,
+          supplier_document: supplier.documentType === "cpf" ? await encryptSensitiveValue(supplier.document, "cpf") : supplier.document,
           supplier_document_type: supplier.documentType,
           supplier_ie: metadata.emitente.ie || null,
           status: "preview",
-          raw_xml: xmlContent,
+          raw_xml: await encryptSensitiveValue(xmlContent, "nfe_xml"),
           file_key: fileKey,
           file_name: fileName,
           xml_hash: xmlHash,
@@ -1139,14 +1139,17 @@ export async function confirmImportAction(
     // Garante que o arquivo XML esteja no R2
     let finalFileKey = xmlImport.file_key
     const finalFileName = xmlImport.file_name || `NFe-${xmlImport.invoice_number || xmlImport.access_key}.xml`
-    const finalFileSize = xmlImport.xml_size || (xmlImport.raw_xml ? Buffer.byteLength(xmlImport.raw_xml, "utf-8") : 0)
-    const finalFileHash = xmlImport.xml_hash || (xmlImport.raw_xml ? crypto.createHash("sha256").update(xmlImport.raw_xml).digest("hex") : "")
+    const rawXml = xmlImport.raw_xml
+      ? (/^v\d+:/.test(xmlImport.raw_xml) ? await decryptSensitiveValue(xmlImport.raw_xml, "nfe_xml") : xmlImport.raw_xml)
+      : null
+    const finalFileSize = xmlImport.xml_size || (rawXml ? Buffer.byteLength(rawXml, "utf-8") : 0)
+    const finalFileHash = xmlImport.xml_hash || (rawXml ? crypto.createHash("sha256").update(rawXml).digest("hex") : "")
 
-    if (!finalFileKey && xmlImport.raw_xml) {
+    if (!finalFileKey && rawXml) {
       try {
         finalFileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${xmlImport.access_key}.xml`
         await uploadBufferToR2({
-          buffer: xmlImport.raw_xml,
+          buffer: rawXml,
           key: finalFileKey,
           contentType: "application/xml",
         })
@@ -1418,7 +1421,11 @@ export async function getImportPreviewAction(
       supplier: {
         id: xmlImport.supplier_id,
         name: xmlImport.supplier_name || "",
-        document: xmlImport.supplier_document || "",
+        document: xmlImport.supplier_document
+          ? (xmlImport.supplier_document_type === "cpf" && /^v\d+:/.test(xmlImport.supplier_document)
+            ? await decryptSensitiveValue(xmlImport.supplier_document, "cpf")
+            : xmlImport.supplier_document)
+          : "",
         documentType: xmlImport.supplier_document_type || "cnpj",
         isNew: false,
       },
@@ -1506,7 +1513,7 @@ export async function listImportsAction(
       .from("xml_imports")
       .select(`
         id, access_key, invoice_number, invoice_series, total_value,
-        supplier_name, supplier_document, status,
+        supplier_name, supplier_document, supplier_document_type, status,
         items_count, imported_items, skipped_items,
         xml_hash, created_by_ip,
         created_at, updated_at, reversed_at, reversal_reason
@@ -1545,7 +1552,13 @@ export async function listImportsAction(
       return { success: false, error: error.message }
     }
 
-    return { success: true, imports: data, total: count || undefined }
+    const imports = await Promise.all((data || []).map(async (row: any) => ({
+      ...row,
+      supplier_document: row.supplier_document && row.supplier_document_type === "cpf" && /^v\d+:/.test(row.supplier_document)
+        ? await decryptSensitiveValue(row.supplier_document, "cpf")
+        : row.supplier_document,
+    })))
+    return { success: true, imports, total: count || undefined }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
   }
@@ -1773,11 +1786,14 @@ export async function getXmlImportDownloadUrlAction(
     const fileName = xmlImport.file_name || `NFe-${xmlImport.invoice_number || xmlImport.access_key}.xml`
 
     let fileKey = xmlImport.file_key
-    if (!fileKey && xmlImport.raw_xml) {
+    const rawXml = xmlImport.raw_xml
+      ? (/^v\d+:/.test(xmlImport.raw_xml) ? await decryptSensitiveValue(xmlImport.raw_xml, "nfe_xml") : xmlImport.raw_xml)
+      : null
+    if (!fileKey && rawXml) {
       fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${xmlImport.access_key}.xml`
       try {
         await uploadBufferToR2({
-          buffer: xmlImport.raw_xml,
+          buffer: rawXml,
           key: fileKey,
           contentType: "application/xml",
         })

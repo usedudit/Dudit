@@ -136,7 +136,7 @@ export async function sendBillingNotification(
     try {
         const title = notificationLabels[type] || "Notificação de Assinatura"
         const message = metadata.message || ""
-        const href = metadata.token ? `/reembolso/${metadata.token}` : "/ddt-admin/billing/reembolsos"
+        const href = type.startsWith("billing.refund") ? "/erp/configuracoes" : "/ddt-admin/billing/reembolsos"
         const notifType = mapBillingTypeToNotificationType(type)
         const idempotencyKey = `billing:${type}:${metadata.refundRequestId || metadata.purchaseId || partnerId}:${userId}:${Date.now()}`
 
@@ -218,7 +218,7 @@ export async function notifyPartnerTeam(
 
         const title = notificationLabels[type] || "Notificação de Reembolso"
         const message = metadata.message || ""
-        const href = metadata.token ? `/reembolso/${metadata.token}` : "/ddt-admin/billing/reembolsos"
+        const href = type.startsWith("billing.refund") ? "/erp/configuracoes" : "/ddt-admin/billing/reembolsos"
         const notifType = mapBillingTypeToNotificationType(type)
 
         await Promise.all(

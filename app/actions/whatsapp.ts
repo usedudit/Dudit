@@ -4,6 +4,7 @@ import { randomBytes } from "crypto"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireUser, requirePartnerRouteAccess, requireMinimumPlan } from "@/lib/auth/authorization"
 import { decrypt } from "@/lib/cryptoService"
+import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import {
@@ -179,7 +180,7 @@ export async function getWhatsappIntegrationAction(): Promise<
                 apiUrl: active.api_url,
                 hasApiKey: !!active.api_key_encrypted,
                 webhookUrl: active.provider === "evolution"
-                    ? getWebhookUrl("evolution", active.id, active.evolution_webhook_secret || undefined)
+                    ? getWebhookUrl("evolution", active.id, decryptWhatsappSecret(active.evolution_webhook_secret) || undefined)
                     : getWebhookUrl("meta"),
             }
             : null
@@ -203,7 +204,7 @@ export async function getWhatsappIntegrationAction(): Promise<
             apiUrl: c.api_url,
             hasApiKey: !!c.api_key_encrypted,
             webhookUrl: c.provider === "evolution"
-                ? getWebhookUrl("evolution", c.id, c.evolution_webhook_secret || undefined)
+                ? getWebhookUrl("evolution", c.id, decryptWhatsappSecret(c.evolution_webhook_secret) || undefined)
                 : getWebhookUrl("meta"),
         }))
 
@@ -269,7 +270,7 @@ export async function connectWhatsappAction(input: {
             success: true,
             data: {
                 connectionId: connection.id,
-                webhookVerifyToken: connection.webhook_verify_token || "",
+                webhookVerifyToken: decryptWhatsappSecret(connection.webhook_verify_token) || "",
             },
         }
     } catch (error: unknown) {
@@ -679,10 +680,11 @@ export async function connectEvolutionAction(storeId?: string | null): Promise<
         // O secret é passado via query param (?secret=) porque a Evolution API
         // pode não repassar headers customizados (x-evolution-signature) ao
         // disparar o webhook. O ?secret= é preservado por ser parte da URL.
-        const webhookUrl = getWebhookUrl("evolution", connection.id, connection.evolution_webhook_secret)
+        const webhookSecret = decryptWhatsappSecret(connection.evolution_webhook_secret)
+        const webhookUrl = getWebhookUrl("evolution", connection.id, webhookSecret)
         const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
-        const webhookHeaders = connection.evolution_webhook_secret
-            ? { "x-evolution-signature": connection.evolution_webhook_secret }
+        const webhookHeaders = webhookSecret
+            ? { "x-evolution-signature": webhookSecret }
             : undefined
 
         const client = new EvolutionWhatsappClient({

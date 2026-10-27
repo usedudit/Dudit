@@ -213,6 +213,7 @@ export async function checkAndExpireDeposit(
 export async function checkAndExpireOrder(
   client: SupabaseClient,
   orderId: string,
+  options: { deadline?: number } = {},
 ): Promise<{ expired: boolean; reason?: string; depositExpired?: boolean }> {
   const { data: order, error } = await client
     .from("orders")
@@ -291,12 +292,18 @@ export async function checkAndExpireOrder(
     for (const shipment of shipments || []) {
       if (!shipment?.external_label_id) continue
       const { cancelCarrierLabelForOrder } = await import("@/lib/services/shipping/superfrete-label-cancel")
+      // Nunca deixar a chamada externa passar do orçamento do cron (cron-job.org
+      // corta em 30s); o cancelamento da etiqueta é best-effort.
+      const timeoutMs = options.deadline
+        ? Math.max(1_000, Math.min(20_000, options.deadline - Date.now()))
+        : undefined
       await cancelCarrierLabelForOrder({
         partnerId: order.partner_id,
         orderId,
         labelId: String(shipment.external_label_id),
         reason: "Pedido cancelado por expiração do prazo de pagamento",
         currentStatus: shipment.status,
+        timeoutMs,
       })
     }
   } catch (labelErr) {
@@ -382,7 +389,8 @@ export async function checkAndExpireOrder(
 
 export async function expireAllExpiredOrders(
   client: SupabaseClient,
-): Promise<{ expiredCount: number }> {
+  options: { deadline?: number } = {},
+): Promise<{ expiredCount: number; deferred: number }> {
   const now = new Date().toISOString()
 
   const { data: expiredOrders } = await client
@@ -393,11 +401,19 @@ export async function expireAllExpiredOrders(
     .lt("payment_expires_at", now)
 
   if (!expiredOrders || expiredOrders.length === 0) {
-    return { expiredCount: 0 }
+    return { expiredCount: 0, deferred: 0 }
   }
 
   let expiredCount = 0
-  for (const order of expiredOrders) {
+  let deferred = 0
+
+  for (let i = 0; i < expiredOrders.length; i++) {
+    if (options.deadline && Date.now() >= options.deadline) {
+      deferred = expiredOrders.length - i
+      break
+    }
+
+    const order = expiredOrders[i]
     // Only auto-cancel expired orders that are paid via Mercado Pago.
     // Manual payment orders should NOT be auto-cancelled by the cron job;
     // they are handled separately by `autoCancelManualOrdersHours` setting
@@ -405,9 +421,9 @@ export async function expireAllExpiredOrders(
     if (order.payment_provider !== "Mercado Pago") {
       continue
     }
-    const result = await checkAndExpireOrder(client, order.id)
+    const result = await checkAndExpireOrder(client, order.id, { deadline: options.deadline })
     if (result.expired) expiredCount++
   }
 
-  return { expiredCount }
+  return { expiredCount, deferred }
 }

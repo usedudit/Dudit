@@ -26,7 +26,6 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
-    ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -168,9 +167,9 @@ export function AdminRefundsPage() {
                 const storeName = String(stores[0]?.name || "").toLowerCase()
                 const planName = String(r.purchase?.plan?.name || r.purchase?.description || "").toLowerCase()
                 const partnerId = String(r.partner_id || "").toLowerCase()
-                const token = String(r.token || "").toLowerCase()
+                const requestId = String(r.id || "").toLowerCase()
 
-                if (!storeName.includes(q) && !planName.includes(q) && !partnerId.includes(q) && !token.includes(q)) {
+                if (!storeName.includes(q) && !planName.includes(q) && !partnerId.includes(q) && !requestId.includes(q)) {
                     return false
                 }
             }
@@ -335,7 +334,7 @@ export function AdminRefundsPage() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 px-4 md:px-8">
                     <div className="w-full sm:w-80">
                         <Input
-                            placeholder="Buscar por loja, plano ou token..."
+                            placeholder="Buscar por loja, plano ou protocolo..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             prefix={<SearchIcon size={16} className="text-brand-inactive-text" />}
@@ -496,11 +495,6 @@ export function AdminRefundsPage() {
 
                                                             <td className="py-4 px-2 pr-6 text-center">
                                                                 <div className="flex items-center justify-center gap-2">
-                                                                    <Link href={`/reembolso/${r.token}`} target="_blank">
-                                                                        <Button variant="ghost" size="sm" title="Ver Portal do Reembolso">
-                                                                            <ExternalLink size={14} />
-                                                                        </Button>
-                                                                    </Link>
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"

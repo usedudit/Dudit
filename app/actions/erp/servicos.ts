@@ -31,6 +31,7 @@ import {
     sortPricingAlerts,
     roundMoney,
 } from "@/lib/erp/pricing-alerts"
+import { moderateProductContent } from "@/lib/moderation/product-moderation"
 
 import { headers } from "next/headers"
 
@@ -234,6 +235,18 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             }
         }
 
+        // Moderação de texto (nome + descrição) antes de gravar
+        if (!data.isDuplicate) {
+            const moderation = await moderateProductContent({
+                name: data.name,
+                description: data.description,
+                userId: finalPartnerId,
+            })
+            if (!moderation.valid) {
+                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
+            }
+        }
+
         const serviceData: any = {
             ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
@@ -335,6 +348,18 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
+
+        // Moderação apenas dos campos de texto alterados
+        if (data.name !== undefined || data.description !== undefined) {
+            const moderation = await moderateProductContent({
+                name: data.name,
+                description: data.description,
+                userId: existing.partner_id,
+            })
+            if (!moderation.valid) {
+                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
+            }
+        }
 
         if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
         if (data.description !== undefined) payload.description = data.description

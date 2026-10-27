@@ -119,11 +119,15 @@ export async function getUsers(
 
     let query = supabase
         .from("user_profiles")
-        .select("user_id, full_name, avatar_url, phone, cpf, banned_at, banned_until, banned_reason, banned_case_id, created_at")
+        .select("user_id, full_name, avatar_url, phone, cpf, cpf_lookup_hash, banned_at, banned_until, banned_reason, banned_case_id, created_at")
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
-        query = query.or(`full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%`)
+        const digits = search.trim().replace(/\D/g, "")
+        const cpfHash = digits.length === 11
+            ? (await import("@/lib/crypto")).generateCpfLookupHash(digits)
+            : null
+        query = query.or(`full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%${cpfHash ? `,cpf_lookup_hash.eq.${cpfHash}` : ""}`)
     }
 
     if (status === "active" || status === "Ativos") {

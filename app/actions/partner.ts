@@ -11,6 +11,7 @@ import { syncToExploreRedis, syncPartnerItemsToExploreRedis } from "@/lib/redis-
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { moderateStoreContent } from "@/lib/moderation/product-moderation"
 
 // --- Interfaces Atualizadas ---
 
@@ -377,6 +378,18 @@ export async function updatePartnerAction(
 
   // Handle store updates (headquarters store) - all fiscal fields moved per-store
   const storeUpdateData: Record<string, any> = {}
+
+  if (data.storeName !== undefined || data.storeDescription !== undefined) {
+    const storeModeration = await moderateStoreContent({
+      name: data.storeName,
+      description: data.storeDescription,
+      userId: partnerId,
+    })
+    if (!storeModeration.valid) {
+      return { error: storeModeration.error || "Conteúdo não aprovado pela moderação" }
+    }
+  }
+
   if (isSeoSensitiveChange) {
     storeUpdateData.last_seo_update_at = new Date().toISOString()
   }

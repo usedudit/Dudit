@@ -31,8 +31,8 @@ export interface LegalDocumentReference {
 }
 
 export const CURRENT_LEGAL_DOCUMENTS: LegalDocumentReference[] = [
-  { tipo: "terms", versao: "1.0", url: "/institucional/termos" },
-  { tipo: "privacy", versao: "1.0", url: "/institucional/privacidade" },
+  { tipo: "terms", versao: "1.1", url: "/institucional/termos" },
+  { tipo: "privacy", versao: "1.2", url: "/institucional/privacidade" },
 ]
 
 export const CURRENT_LEGAL_DOCUMENTS_BY_TYPE = Object.fromEntries(

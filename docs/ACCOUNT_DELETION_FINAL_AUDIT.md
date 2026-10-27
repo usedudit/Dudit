@@ -26,9 +26,9 @@ Investigamos todas as relações estrangeiras apontando para `partners` e `store
   * A tabela `stores` possui FK para `partners(id) ON DELETE CASCADE`.
   * As tabelas dependentes exclusivas de loja (`store_members`, `store_products`, `store_services`, `store_suppliers`, `store_product_kits`, `promotion_stores`) possuem `ON DELETE CASCADE` vinculados à tabela `stores(id)`.
   * Toda a volumetria multi-loja é excluída fisicamente do banco de dados de maneira automatizada pela constraint do PostgreSQL no momento em que o registro pai do parceiro é purgado.
-* **Anonimização e Sobrevivência (PII Zero)**:
-  * Entidades de histórico fiscal e financeiro (`orders`, `sales`, `transactions`, `service_orders`, `appointments`) mudam seu relacionamento para `NULL` (`ON DELETE SET NULL`) mantendo o faturamento legal para cumprimento de obrigações fiscais e forenses (Art. 27 CDC) de forma totalmente dissociada de dados pessoais (anônimo).
-  * O certificado SHA-256 e o log de compliance gerado registram a execução da limpeza sem reter nomes, e-mails, telefones ou documentos dos usuários originais.
+* **Anonimização e evidências minimizadas**:
+  * Entidades de histórico fiscal e financeiro (`orders`, `sales`, `transactions`, `service_orders`, `appointments`) mudam seu relacionamento para `NULL` (`ON DELETE SET NULL`) mantendo apenas os registros estritamente necessários e minimizados para obrigações legais ou exercício regular de direitos, conforme o prazo aplicável a cada registro. O art. 27 do CDC prevê prazo prescricional para pretensão de reparação por fato do produto ou serviço; não determina retenção genérica de todo registro por cinco anos.
+  * O certificado SHA-256 e o log de compliance registram a execução da limpeza; o vínculo direto ao user_id é removido após a conclusão e permanece somente um identificador pseudonimizado com prazo de retenção limitado. Hash não equivale a anonimização irreversível.
 
 ---
 

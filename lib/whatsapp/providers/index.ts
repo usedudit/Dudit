@@ -1,6 +1,7 @@
 import "server-only"
 
 import { decrypt } from "@/lib/cryptoService"
+import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
 import type { PartnerWhatsappConnection, WhatsappProviderId } from "../types"
 import { createMetaWhatsappProvider } from "./meta"
 import { createEvolutionWhatsappProvider } from "./evolution"
@@ -21,8 +22,8 @@ export function createWhatsappProviderFromConnection(
       return createMetaWhatsappProvider({
         accessToken,
         phoneNumberId: connection.phone_number_id,
-        webhookVerifyToken: connection.webhook_verify_token,
-        webhookSecret: connection.webhook_secret,
+        webhookVerifyToken: decryptWhatsappSecret(connection.webhook_verify_token),
+        webhookSecret: decryptWhatsappSecret(connection.webhook_secret),
       })
     }
 
@@ -53,7 +54,7 @@ export function createWhatsappProviderFromConnection(
         apiUrl,
         apiKey,
         instanceName: connection.instance_name,
-        webhookSecret: connection.evolution_webhook_secret,
+        webhookSecret: decryptWhatsappSecret(connection.evolution_webhook_secret),
       })
     }
 

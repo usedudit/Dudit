@@ -30,3 +30,11 @@ export function getTrustedClientIP(
   // and X-Real-IP are intentionally not accepted because clients can supply them.
   return normalizeCandidate(headers.get("cf-connecting-ip")) || "unknown"
 }
+
+/** Resolve country only from an explicitly trusted reverse proxy. */
+export function getTrustedClientCountry(headers: HeaderReader): string | null {
+  if (process.env.TRUSTED_PROXY_HEADERS !== "true") return null
+  const country = headers.get("cf-ipcountry")?.trim().toUpperCase()
+  if (!country || country === "XX" || !/^[A-Z]{2}$/.test(country)) return null
+  return country
+}

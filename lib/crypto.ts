@@ -18,6 +18,12 @@ export async function decryptCPF(encryptedCpf: string): Promise<string> {
   return decrypt(encryptedCpf, "cpf")
 }
 
+/** Returns a legacy plaintext CPF unchanged and decrypts versioned values. */
+export async function decryptCpfIfEncrypted(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null
+  return /^v\d+:/.test(value) ? decryptCPF(value) : value
+}
+
 export async function generateCpfLookupHash(cpf: string | null | undefined): Promise<string | null> {
   const { generateCpfLookupHash: genHash } = await import("@/lib/services/cpf-hash")
   return genHash(cpf)

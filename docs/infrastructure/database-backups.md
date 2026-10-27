@@ -81,18 +81,21 @@ Crie um job diário, em um horário de baixo uso:
 - método: `POST`
 - frequência: uma vez por dia, por exemplo `03:00 UTC`
 - header: `Authorization: Bearer <BACKUP_CRON_SECRET>`
-- header: `Content-Type: application/json`
 - corpo: vazio
-- timeout do cliente: maior que a duração máxima esperada do backup
 
 Respostas esperadas:
 
-- `200`: backup enviado e retenção aplicada;
+- `202` com `accepted: true`: execução aceita; o dump continua em background
+  (`after()`) e o cron-job.org não espera os 30s do agendador;
 - `200` com `skipped: true`: outra execução já está ativa;
 - `401`: segredo ausente/incorreto;
 - `429`: limite de chamadas excedido;
-- `503`: Redis/rate limiter indisponível;
-- `500`: falha no dump, compressão, criptografia, upload ou retenção.
+- `503`: Redis/rate limiter indisponível.
+
+Em execução manual, use `POST .../backup-database?sync=1` para aguardar o dump e
+receber o resultado completo (`200` ou `500`). O cron-job.org usa a chamada sem
+`sync`, porque ele corta a conexão em 30 segundos — bem antes do fim de um dump.
+Falhas em background são registradas em log estruturado e no Sentry.
 
 O endpoint aceita somente POST, valida o segredo com comparação constant-time, aplica rate limit, impede execuções concorrentes com lock Redis e não registra URL, senha, payload ou stderr do PostgreSQL.
 

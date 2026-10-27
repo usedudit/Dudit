@@ -6,7 +6,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { cookies, headers } from "next/headers"
 import { AccountDeletionService } from "@/lib/services/account-deletion.service"
-import { getTrustedClientIP } from "@/lib/security/client-ip"
+import { getTrustedClientCountry, getTrustedClientIP } from "@/lib/security/client-ip"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SMTP2GOService } from "@/lib/services/smtp2go.service"
 import { SMTP2GO_TEMPLATE_IDS } from "@/lib/services/smtp2go-templates"
@@ -144,7 +144,7 @@ export async function requestAccountDeletionCodeAction(
     const reqHeaders = await headers()
     const userAgent = reqHeaders.get("user-agent")
     const ip = getTrustedClientIP(reqHeaders)
-    const country = reqHeaders.get("cf-ipcountry") || "BR"
+    const country = getTrustedClientCountry(reqHeaders) || "unknown"
 
     // 7. Store in account_deletion_requests
     const { data: requestRow, error: insertError } = await admin
@@ -343,7 +343,7 @@ export async function confirmAccountDeletionAction(input: {
     const reqHeaders = await headers()
     const userAgent = reqHeaders.get("user-agent")
     const ip = getTrustedClientIP(reqHeaders)
-    const country = reqHeaders.get("cf-ipcountry") || "BR"
+    const country = getTrustedClientCountry(reqHeaders) || "unknown"
     const finalReason = input.reason || requestRow.metadata?.reason || null
 
     // 7. Delegate execution to AccountDeletionService (creates account_deletions record & starts pipeline)

@@ -2,6 +2,7 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { unstable_cache } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { decryptCpfIfEncrypted } from "@/lib/crypto"
 
 /**
  * Fetches all suppliers for a partner.
@@ -30,5 +31,9 @@ export const getPartnerSuppliersCached = cache(async (partnerId: string, storeId
         )
         suppliersCacheMap.set(`${partnerId}:${storeId}`, cachedFn)
     }
-    return cachedFn(partnerId, storeId)
+    const rows = await cachedFn(partnerId, storeId)
+    return Promise.all((rows || []).map(async (supplier: any) => ({
+        ...supplier,
+        cpf: await decryptCpfIfEncrypted(supplier.cpf),
+    })))
 })

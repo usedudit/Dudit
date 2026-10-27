@@ -101,6 +101,7 @@ export const accountDeletionTask = task({
       // Step 2: Evolution WhatsApp & MP Customer Cancel (deleting_external_services)
       // ───────────────────────────────────────────────────────────────────────
       let whatsappDisconnected = deletion.checkpoints?.step_status?.deleting_external_services?.whatsappDisconnected || 0
+      let customerSubscriptionsCancelled = deletion.checkpoints?.step_status?.deleting_external_services?.customerSubscriptionsCancelled || 0
       let deletingExtCompleted = deletion.checkpoints?.step_status?.deleting_external_services?.completed || false
 
       if (!deletingExtCompleted) {
@@ -111,9 +112,10 @@ export const accountDeletionTask = task({
 
         if (payload.partnerId) {
           whatsappDisconnected = await AccountDeletionService.disconnectWhatsApp(payload.partnerId)
-          await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
+          customerSubscriptionsCancelled = await AccountDeletionService.cancelCustomerSubscriptions(payload.partnerId)
         } else {
           whatsappDisconnected = 0
+          customerSubscriptionsCancelled = 0
         }
 
         const { data: cur } = await admin
@@ -123,7 +125,11 @@ export const accountDeletionTask = task({
           .maybeSingle()
 
         const stepStatus = cur?.checkpoints?.step_status || {}
-        stepStatus.deleting_external_services = { completed: true, whatsappDisconnected }
+        stepStatus.deleting_external_services = {
+          completed: true,
+          whatsappDisconnected,
+          customerSubscriptionsCancelled
+        }
 
         await admin
           .from("account_deletions")
@@ -268,19 +274,20 @@ export const accountDeletionTask = task({
         .eq("id", payload.deletionId)
 
       // Generate and save Deletion Certificate in compliance_logs
+      const userIdHash = crypto.createHash("sha256").update(payload.userId).digest("hex")
       const certificateMetrics = {
         deletionId: payload.deletionId,
         partnerId: payload.partnerId,
-        userId: payload.userId,
+        userIdHash,
         startedAt: deletion.requested_at,
         finishedAt: new Date().toISOString(),
         durationMs: executionTime,
         dbRowsRemoved: dbRowsDeleted,
         filesRemoved: filesDeleted,
         redisKeysRemoved: plannedReport.redisKeysCount,
-        subscriptionsCancelled: plannedReport.whatsappCount,
+        subscriptionsCancelled: customerSubscriptionsCancelled,
         whatsappInstancesRemoved: whatsappDisconnected,
-        complianceRetained: "Orders (Orders & Order Items) anonymized and retained for 5 years per Art. 27 CDC; audit logs anonymized and retained for 5 years for security forensics."
+        complianceRetained: "Minimized evidence may be retained for up to five years where necessary for legal obligations or the exercise of rights; this is a case-specific retention policy and not a blanket five-year retention rule under the CDC."
       }
 
       const sha256Report = crypto
@@ -294,13 +301,18 @@ export const accountDeletionTask = task({
       }
 
       // Update the compliance logs record with execution time and certificate
-      await admin
+      const { error: certificateError } = await admin
         .from("compliance_logs")
         .update({
           execution_time_ms: executionTime,
-          certificate: fullCertificate
+          certificate: fullCertificate,
+          user_id: null
         })
-        .eq("user_id", payload.userId)
+        .eq("user_id_hash", userIdHash)
+
+      if (certificateError) {
+        throw new Error(`Failed to save account deletion certificate: ${certificateError.message}`)
+      }
 
     } catch (err: any) {
       SecureLogger.error("Failed executing account deletion workflow", { deletionId: payload.deletionId, error: err.message })

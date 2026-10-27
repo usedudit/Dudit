@@ -1,14 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from "react"
-import { useSearchParams } from "next/navigation"
-import { Button, ListItem, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Button, IconPlaceholder, ListItem, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
 import ReportListRow, { type ReportListColumn, type ReportListRowData } from "@/components/erp/reports/ReportListRow"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
-import { pushUrl } from "@/lib/navigation/history"
 import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getPeriodDateRange, type Period } from "@/lib/period-types"
@@ -113,8 +112,8 @@ function pointValue(point: ChartPoint) {
   return Number(point.value ?? point.total ?? point.amount ?? point.revenue ?? 0)
 }
 
-function columns(...items: Array<[string, string, ReportListColumn["align"]?, string?]>): ReportListColumn[] {
-  return items.map(([id, label, align = "left", minWidth], index) => ({ id, label, align, minWidth, primary: index === 0 }))
+function columns(...items: Array<[string, string, ReportListColumn["align"]?, string?, ReportListColumn["format"]?]>): ReportListColumn[] {
+  return items.map(([id, label, align = "left", minWidth, format], index) => ({ id, label, align, minWidth, format, primary: index === 0 }))
 }
 
 function chartRows(points: ChartPoint[], valueLabel: string, format: (value: number) => string = currency) {
@@ -146,7 +145,7 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "vendas-por-periodo", category: "vendas", title: "Vendas por período",
       description: "Acompanhe a evolução da receita no período selecionado.", icon: AnalyticsIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Período", "left", "180px"], ["value", "Receita", "right", "160px"], ["previous", "Período anterior", "right", "180px"]),
+      columns: columns(["label", "Período", "left", "180px"], ["value", "Receita", "right", "160px", "currency"], ["previous", "Período anterior", "right", "180px", "currency"]),
       rows: props.salesData.evolution.map((point, index) => ({ id: `${index}`, label: point.label, value: currency(point.value), previous: currency(point.secondary) })),
     })
     reports.push({
@@ -168,8 +167,8 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "pedidos-detalhados", category: "vendas", title: "Pedidos detalhados",
       description: "Consulte os pedidos do período por cliente, canal, pagamento, situação e valor.", icon: FileTextIcon, minimumPlan: "escalar",
-      columns: columns(["order", "Pedido", "left", "250px"], ["date", "Data", "center", "160px"], ["source", "Canal", "left", "170px"], ["payment", "Pagamento", "left", "190px"], ["status", "Situação", "center", "150px"], ["total", "Total", "right", "150px"]),
-      rows: props.salesData.detailedOrders.map((order) => ({ id: order.id, order: order.orderNumber, detail: order.customer, date: formatDateTime(order.date), source: order.source, payment: order.paymentMethod, status: statusLabel(order.status), total: currency(order.total) })),
+      columns: columns(["order", "Pedido", "left", "200px"], ["customer", "Cliente", "left", "250px"], ["source", "Origem", "left", "150px"], ["date", "Data", "left", "150px"], ["total", "Total", "right", "150px", "currency"], ["status", "Status", "center", "110px", "badge"]),
+      rows: props.salesData.detailedOrders.map((order) => ({ id: order.id, order: order.orderNumber, detail: order.paymentMethod, customer: order.customer, source: order.source, date: formatDateTime(order.date), status: statusLabel(order.status), total: currency(order.total) })),
     })
     reports.push({
       id: "margem-por-produto", category: "vendas", title: "Margem por produto",
@@ -196,8 +195,8 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "inventario-detalhado", category: "produtos", title: "Inventário detalhado",
       description: "Consulte estoque, categoria, marca, SKU, preço e situação dos produtos.", icon: PackageIcon, minimumPlan: "escalar",
-      columns: columns(["name", "Produto", "left", "300px"], ["sku", "SKU", "left", "150px"], ["category", "Categoria", "left", "180px"], ["brand", "Marca", "left", "160px"], ["stock", "Estoque", "right", "130px"], ["price", "Preço", "right", "150px"], ["status", "Situação", "center", "130px"]),
-      rows: props.productsData.inventoryRows.map((item) => ({ id: item.id, name: item.name, sku: item.sku, category: item.category, brand: item.brand, stock: `${integer(item.stock)} ${item.unit}`, price: currency(item.price), status: item.active ? "Ativo" : "Inativo" })),
+      columns: columns(["name", "Produto", "left", "300px"], ["category", "Categoria", "left", "130px"], ["brand", "Marca", "left", "110px"], ["stock", "Estoque", "left", "160px"], ["price", "Preço", "right", "110px", "currency"], ["visibility", "Visibilidade", "center", "100px", "badge"], ["status", "Status", "center", "100px", "badge"]),
+      rows: props.productsData.inventoryRows.map((item) => ({ id: item.id, name: item.name, detail: item.sku, category: item.category, brand: item.brand, stock: `${integer(item.stock)} ${item.unit} · ${item.stock <= 0 ? "Esgotado" : "Normal"}`, price: currency(item.price), visibility: item.visible ? "Visível" : "Oculto", status: item.active ? "Ativo" : "Inativo" })),
     })
     reports.push({
       id: "curva-abc", category: "produtos", title: "Curva ABC de produtos",
@@ -211,18 +210,18 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "fluxo-de-caixa", category: "financeiro", title: "Fluxo de caixa",
       description: "Consulte a evolução das entradas e saídas do período.", icon: MoneyIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Período", "left", "220px"], ["income", "Entradas", "right", "160px"], ["expense", "Saídas", "right", "160px"]),
+      columns: columns(["label", "Período", "left", "220px"], ["income", "Entradas", "right", "160px", "inflow"], ["expense", "Saídas", "right", "160px", "outflow"]),
       rows: props.financialData.cashflow.map((point, index) => ({ id: `${index}`, label: pointLabel(point), income: currency(pointValue(point)), expense: currency(point.secondary) })),
     })
     reports.push({
       id: "receitas-e-despesas", category: "financeiro", title: "Receitas e despesas",
       description: "Compare a movimentação financeira no período selecionado.", icon: MoneyIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Período", "left", "220px"], ["value", "Receita recebida", "right", "180px"]), rows: chartRows(props.financialData.revenue, "Receita recebida"),
+      columns: columns(["label", "Período", "left", "220px"], ["value", "Receita recebida", "right", "180px", "inflow"]), rows: chartRows(props.financialData.revenue, "Receita recebida"),
     })
     reports.push({
       id: "despesas-por-categoria", category: "financeiro", title: "Despesas por categoria",
       description: "Entenda onde o negócio está concentrando seus gastos.", icon: ChartIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Categoria", "left", "280px"], ["value", "Despesas", "right", "170px"]), rows: chartRows(props.financialData.expensesByCategory, "Despesas"),
+      columns: columns(["label", "Categoria", "left", "280px"], ["value", "Despesas", "right", "170px", "outflow"]), rows: chartRows(props.financialData.expensesByCategory, "Despesas"),
     })
     reports.push({
       id: "contas-vencidas", category: "financeiro", title: "Contas vencidas",
@@ -233,13 +232,13 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "lancamentos-financeiros", category: "financeiro", title: "Lançamentos financeiros",
       description: "Veja os lançamentos carregados no período com vencimento, pagamento, categoria e situação.", icon: FileTextIcon, minimumPlan: "escalar",
-      columns: columns(["description", "Lançamento", "left", "300px"], ["category", "Categoria", "left", "180px"], ["type", "Tipo", "center", "130px"], ["status", "Situação", "center", "150px"], ["due", "Vencimento", "center", "140px"], ["paid", "Pagamento", "center", "140px"], ["amount", "Valor", "right", "150px"]),
+      columns: columns(["description", "Descrição", "left", "300px"], ["category", "Categoria", "left", "170px"], ["type", "Tipo", "left", "130px"], ["due", "Vencimento", "left", "130px"], ["paid", "Pagamento", "left", "130px"], ["amount", "Valor", "right", "130px", "moneyByDirection"], ["status", "Status", "center", "130px", "badge"]),
       rows: props.financialData.transactionRows
         .filter((item) => {
           const date = (item.paymentDate || item.createdAt || item.dueDate).slice(0, 10)
           return date >= periodRange.from && date <= periodRange.to
         })
-        .map((item) => ({ id: item.id, description: item.description, category: item.category, type: item.type === "income" ? "Receita" : item.type === "expense" ? "Despesa" : item.type, status: statusLabel(item.status), due: dateOnly(item.dueDate), paid: dateOnly(item.paymentDate), amount: currency(item.amount) })),
+        .map((item) => ({ id: item.id, description: item.description, category: item.category, type: item.type === "income" ? "Receita" : item.type === "expense" ? "Despesa" : item.type, direction: item.type === "income" ? "in" : item.type === "expense" ? "out" : "", status: statusLabel(item.status), due: dateOnly(item.dueDate), paid: dateOnly(item.paymentDate), amount: currency(item.amount) })),
     })
   }
 
@@ -277,32 +276,32 @@ function createReports(props: ReportsHubPageProps): ReportDefinition[] {
     reports.push({
       id: "servicos-por-desempenho", category: "servicos", title: "Serviços por desempenho",
       description: "Consulte os serviços mais procurados e a receita gerada.", icon: WrenchIcon, minimumPlan: "crescer",
-      columns: columns(["label", "Serviço", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.serviceRows),
+      columns: columns(["label", "Serviço", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px", "currency"]), rows: serviceRows(props.servicesData.serviceRows),
     })
     reports.push({
       id: "desempenho-por-profissional", category: "servicos", title: "Desempenho por profissional",
       description: "Compare a produção da equipe de atendimento.", icon: Users, minimumPlan: "escalar",
-      columns: columns(["label", "Profissional", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px"]), rows: serviceRows(props.servicesData.staffRows),
+      columns: columns(["label", "Profissional", "left", "420px"], ["appointments", "Atendimentos", "right", "150px"], ["revenue", "Receita", "right", "170px", "currency"]), rows: serviceRows(props.servicesData.staffRows),
     })
   }
 
   if (props.appointmentsData) {
-    reports.push({ id: "agendamentos-por-status", category: "servicos", title: "Agendamentos por status", description: "Veja a situação dos atendimentos do período.", icon: CalendarIcon, minimumPlan: "crescer", columns: columns(["label", "Status", "left", "280px"], ["value", "Agendamentos", "right", "170px"]), rows: chartRows(props.appointmentsData.statusBreakdown, "Agendamentos", integer) })
+    reports.push({ id: "agendamentos-por-status", category: "servicos", title: "Agendamentos por status", description: "Veja a situação dos atendimentos do período.", icon: CalendarIcon, minimumPlan: "crescer", columns: columns(["label", "Status", "left", "280px", "badge"], ["value", "Agendamentos", "right", "170px"]), rows: chartRows(props.appointmentsData.statusBreakdown, "Agendamentos", integer) })
     reports.push({ id: "servicos-mais-agendados", category: "servicos", title: "Serviços mais agendados", description: "Identifique os serviços com maior procura.", icon: CalendarIcon, minimumPlan: "escalar", columns: columns(["label", "Serviço", "left", "280px"], ["value", "Agendamentos", "right", "170px"]), rows: chartRows(props.appointmentsData.servicePopularity, "Agendamentos", integer) })
-    reports.push({ id: "agenda-detalhada", category: "servicos", title: "Agendamentos detalhados", description: "Consulte os atendimentos do período por cliente, serviço, profissional, horário e situação.", icon: CalendarIcon, minimumPlan: "escalar", columns: columns(["customer", "Cliente", "left", "250px"], ["service", "Serviço", "left", "220px"], ["staff", "Profissional", "left", "200px"], ["date", "Data", "center", "130px"], ["time", "Horário", "center", "100px"], ["status", "Situação", "center", "150px"], ["price", "Valor", "right", "140px"]), rows: props.appointmentsData.appointmentDetails.map((item) => ({ id: item.id, customer: item.customer, service: item.service, staff: item.staff, date: dateOnly(item.date), time: item.time || "-", status: item.status, price: currency(item.price) })) })
+    reports.push({ id: "agenda-detalhada", category: "servicos", title: "Agendamentos detalhados", description: "Consulte os atendimentos do período por cliente, serviço, profissional, horário e situação.", icon: CalendarIcon, minimumPlan: "escalar", columns: columns(["customer", "Cliente", "left", "300px"], ["datetime", "Data e horário", "left", "180px"], ["staff", "Profissional", "left", "220px"], ["price", "Valor", "left", "130px", "currency"], ["status", "Status", "center", "150px", "badge"]), rows: props.appointmentsData.appointmentDetails.map((item) => ({ id: item.id, customer: item.customer, detail: item.service, datetime: `${dateOnly(item.date)} · ${item.time || "-"}`, staff: item.staff, price: currency(item.price), status: item.status })) })
   }
 
   if (props.serviceOrdersData) {
-    reports.push({ id: "ordens-de-servico-por-status", category: "servicos", title: "Ordens de serviço por status", description: "Acompanhe o volume de OS abertas, em andamento e concluídas.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["label", "Status", "left", "280px"], ["value", "Ordens", "right", "170px"]), rows: chartRows(props.serviceOrdersData.byStatus, "Ordens", integer) })
-    reports.push({ id: "ordens-de-servico-detalhadas", category: "servicos", title: "Ordens de serviço detalhadas", description: "Consulte as OS do período por número, cliente, situação, data e valor.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["order", "Ordem de serviço", "left", "280px"], ["status", "Situação", "center", "180px"], ["date", "Data", "center", "150px"], ["total", "Valor", "right", "150px"]), rows: props.serviceOrdersData.recentOrders.map((item) => ({ id: item.id, order: item.orderNumber, detail: item.title, status: item.status, date: item.date, total: item.total })) })
+    reports.push({ id: "ordens-de-servico-por-status", category: "servicos", title: "Ordens de serviço por status", description: "Acompanhe o volume de OS abertas, em andamento e concluídas.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["label", "Status", "left", "280px", "badge"], ["value", "Ordens", "right", "170px"]), rows: chartRows(props.serviceOrdersData.byStatus, "Ordens", integer) })
+    reports.push({ id: "ordens-de-servico-detalhadas", category: "servicos", title: "Ordens de serviço detalhadas", description: "Consulte as OS do período por número, título, situação, data e valor.", icon: FileTextIcon, minimumPlan: "escalar", columns: columns(["order", "Nº OS", "left", "160px"], ["title", "Título", "left", "280px"], ["date", "Data", "left", "150px"], ["total", "Total", "left", "130px", "currency"], ["status", "Status", "center", "150px", "badge"]), rows: props.serviceOrdersData.recentOrders.map((item) => ({ id: item.id, order: item.orderNumber, detail: item.date, title: item.title, status: item.status, date: item.date, total: item.total })) })
   }
 
   if (props.deliveryData) reports.push({ id: "entregas-por-status", category: "operacao", title: "Entregas por status", description: "Acompanhe pendências, entregas concluídas e atrasos.", icon: TruckIcon, minimumPlan: "crescer", columns: columns(["label", "Status", "left", "280px"], ["value", "Entregas", "right", "170px"]), rows: chartRows(props.deliveryData.byStatus, "Entregas", integer) })
-  if (props.deliveryData) reports.push({ id: "entregas-detalhadas", category: "operacao", title: "Entregas detalhadas", description: "Consulte as entregas do período, com status, data, responsável e duração prevista.", icon: TruckIcon, minimumPlan: "escalar", columns: columns(["delivery", "Entrega", "left", "260px"], ["status", "Situação", "center", "170px"], ["date", "Data", "center", "160px"], ["person", "Entregador", "left", "220px"], ["duration", "Previsão", "right", "130px"]), rows: props.deliveryData.recentDeliveries.map((item) => ({ id: item.id, delivery: `Entrega ${item.id.slice(0, 8)}`, status: item.status, date: item.date, person: item.deliveryPerson || "Não atribuído", duration: item.duration || "-" })) })
+  if (props.deliveryData) reports.push({ id: "entregas-detalhadas", category: "operacao", title: "Entregas detalhadas", description: "Consulte as entregas do período, com status, data, responsável e duração prevista.", icon: TruckIcon, minimumPlan: "escalar", columns: columns(["delivery", "Entrega", "left", "280px"], ["status", "Status", "left", "160px", "badge"], ["person", "Entregador", "left", "220px"], ["duration", "Previsão", "left", "130px"]), rows: props.deliveryData.recentDeliveries.map((item) => ({ id: item.id, delivery: `Entrega ${item.id.slice(0, 8)}`, detail: item.date, status: item.status, date: item.date, person: item.deliveryPerson || "Não atribuído", duration: item.duration || "-" })) })
   if (props.returnsData) {
     reports.push({ id: "devolucoes-por-motivo", category: "operacao", title: "Devoluções por motivo", description: "Entenda por que os clientes estão devolvendo pedidos.", icon: ReturnIcon, minimumPlan: "crescer", columns: columns(["label", "Motivo", "left", "280px"], ["value", "Devoluções", "right", "170px"]), rows: chartRows(props.returnsData.byReason, "Devoluções", integer) })
     reports.push({ id: "produtos-mais-devolvidos", category: "operacao", title: "Produtos mais devolvidos", description: "Identifique itens que merecem uma investigação comercial ou operacional.", icon: ReturnIcon, minimumPlan: "escalar", columns: columns(["label", "Produto", "left", "300px"], ["count", "Devoluções", "right", "140px"], ["quantity", "Quantidade", "right", "140px"]), rows: props.returnsData.topReturnedProducts.map((item, index) => ({ id: `${index}`, label: item.productName, count: integer(item.count), quantity: integer(item.totalQuantity) })) })
-    reports.push({ id: "devolucoes-detalhadas", category: "operacao", title: "Devoluções detalhadas", description: "Consulte solicitações, clientes, motivos, situação e valores reembolsados.", icon: ReturnIcon, minimumPlan: "escalar", columns: columns(["customer", "Cliente", "left", "240px"], ["reason", "Motivo", "left", "250px"], ["status", "Situação", "center", "170px"], ["date", "Data", "center", "140px"], ["amount", "Reembolso", "right", "150px"]), rows: props.returnsData.recentReturns.map((item) => ({ id: item.id, customer: item.customer, reason: item.reason, status: item.status, date: item.date, amount: item.amount })) })
+    reports.push({ id: "devolucoes-detalhadas", category: "operacao", title: "Devoluções detalhadas", description: "Consulte solicitações, clientes, motivos, situação e valores reembolsados.", icon: ReturnIcon, minimumPlan: "escalar", columns: columns(["return", "Código", "left", "160px"], ["customer", "Cliente", "left", "220px"], ["reason", "Motivo", "left", "240px"], ["date", "Data", "left", "150px"], ["amount", "Reembolso", "left", "140px", "currency"], ["status", "Status", "left", "170px", "badge"]), rows: props.returnsData.recentReturns.map((item) => ({ id: item.id, return: `DVL-${item.id.slice(0, 6).toUpperCase()}`, customer: item.customer, reason: item.reason, status: item.status, date: item.date, amount: item.amount })) })
   }
 
   if (props.marketingData) {
@@ -333,6 +332,7 @@ function withReportUrl(tab?: string) {
 }
 
 export function ReportsHubPage(props: ReportsHubPageProps) {
+  const router = useRouter()
   const { setExportHandler } = useDashboard()
   const searchParams = useSearchParams()
   const { openPlanUpgrade } = usePlanUpgrade()
@@ -340,6 +340,8 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   const availableCategories = useMemo(() => CATEGORIES.filter((category) => reports.some((report) => report.category === category.id)), [reports])
   const tab = searchParams.get("tab")
   const selectedReport = reports.find((report) => report.id === tab) || null
+  const compare = searchParams.get("compare") || "none"
+  const visibleColumns = selectedReport?.columns.filter((column) => !(column.id === "previous" && compare === "none")) || []
   const [activeCategory, setActiveCategory] = useState<ReportCategory>(availableCategories[0]?.id || "vendas")
   const [page, setPage] = useState(1)
 
@@ -351,12 +353,18 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
 
   const exportSelected = useCallback(async (format: "csv" | "xlsx") => {
     if (!selectedReport || !hasMinimumPlan(props.planSlug, selectedReport.minimumPlan)) return
-    const headers = selectedReport.columns.map((column) => column.label)
-    const rows = selectedReport.rows.map((row) => selectedReport.columns.map((column) => String(row[column.id] ?? "-")))
+    const headers = visibleColumns.map((column) => column.label)
+    const rows = selectedReport.rows.map((row) => visibleColumns.map((column) => {
+      const value = String(row[column.id] ?? "-")
+      if (column.format === "inflow") return "+ " + value
+      if (column.format === "outflow") return "- " + value
+      if (column.format === "moneyByDirection" && (row.direction === "in" || row.direction === "out")) return (row.direction === "in" ? "+ " : "- ") + value
+      return value
+    }))
     const filename = `relatorio-${selectedReport.id}`
     if (format === "csv") exportCSV(filename, headers, rows)
     else await exportXLSX(filename, [{ name: selectedReport.title.slice(0, 31), headers, rows }])
-  }, [props.planSlug, selectedReport])
+  }, [props.planSlug, selectedReport, visibleColumns])
 
   useEffect(() => {
     setExportHandler(selectedReport && hasMinimumPlan(props.planSlug, selectedReport.minimumPlan) ? exportSelected : null)
@@ -368,10 +376,10 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
       openPlanUpgrade(report.minimumPlan)
       return
     }
-    pushUrl(withReportUrl(report.id))
+    router.push(withReportUrl(report.id))
   }
 
-  const closeReport = () => pushUrl(withReportUrl())
+  const closeReport = () => router.push(withReportUrl())
   const currentRows = selectedReport?.rows || []
   const totalPages = Math.max(1, Math.ceil(currentRows.length / 8))
   const paginatedRows = currentRows.slice((page - 1) * 8, page * 8)
@@ -394,24 +402,26 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
           </div>
         </header>
 
+        {currentRows.length > 0 ? <>
         <div className="w-full overflow-hidden rounded-xl">
           <div className="overflow-x-auto pb-4 custom-scrollbar">
             <table className="w-full min-w-[900px] text-left border-separate border-spacing-0">
               <thead>
                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                  {selectedReport.columns.map((column, index) => (
-                    <th key={column.id} className={`px-2 py-3 text-xs font-bold text-brand-inactive-text dark:text-dark-body ${index === 0 ? "pl-6 rounded-l-lg" : ""} ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"}`} style={{ width: column.width, minWidth: column.minWidth }}>{column.label}</th>
+                  {visibleColumns.map((column, index) => (
+                    <th key={column.id} className={`px-2 py-3 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body ${index === 0 ? "pl-6 rounded-l-lg" : ""} ${index === visibleColumns.length - 1 ? "rounded-r-lg" : ""} ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"}`} style={{ width: column.width, minWidth: column.minWidth }}>{column.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paginatedRows.map((row) => <ReportListRow key={row.id} row={row} columns={selectedReport.columns} icon={selectedReport.icon} />)}
+                {paginatedRows.map((row) => <ReportListRow key={row.id} row={row} columns={visibleColumns} icon={selectedReport.icon} />)}
               </tbody>
             </table>
           </div>
         </div>
 
-        {currentRows.length > 0 ? <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} /> : <div className="py-12 text-center text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum dado encontrado para este período.</div>}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </> : <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="" title="Nenhum dado encontrado" subtitle="Não há resultados para este período. Ajuste os filtros para consultar outros dados." className="min-h-[500px]" />}
       </div>
     )
   }

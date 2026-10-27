@@ -6,6 +6,10 @@ import { checkPermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerSuppliersCached } from "@/lib/data/suppliers"
 import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
+import { getERPProductsPageData } from "@/app/actions/erp/products"
+import { fetchCustomersWithStorePriority } from "@/lib/store-queries"
+import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { decryptCpfIfEncrypted } from "@/lib/crypto"
 
 export async function fetchERPOrdersClient() {
   const user = await getCurrentUser()
@@ -20,9 +24,24 @@ export async function fetchERPOrdersClient() {
   return getPartnerOrdersCached(partnerId, storeId)
 }
 
-import { getERPProductsPageData } from "@/app/actions/erp/products"
-import { fetchCustomersWithStorePriority } from "@/lib/store-queries"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+export async function fetchStoreSuppliersClient(partnerId: string, storeId: string | null) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const context = await getCurrentPartnerContext()
+  if (!context || context.partnerId !== partnerId) throw new Error("Forbidden")
+  const { allowed } = await checkPartnerPermission(partnerId, "suppliers", "view")
+  if (!allowed) throw new Error("Forbidden")
+
+  const supabase = await getSupabaseServerClient()
+  let query = supabase.from("suppliers").select("*").eq("partner_id", partnerId)
+  if (storeId) query = query.eq("store_id", storeId)
+  const { data, error } = await query.order("name", { ascending: true })
+  if (error) throw error
+  return Promise.all((data || []).map(async (supplier: any) => ({
+    ...supplier,
+    cpf: await decryptCpfIfEncrypted(supplier.cpf),
+  })))
+}
 
 export async function fetchERPProductsClient() {
   const data = await getERPProductsPageData()

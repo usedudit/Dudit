@@ -1,6 +1,7 @@
 "use server"
 
 import { headers } from "next/headers"
+import { createHash } from "node:crypto"
 import { z } from "zod"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
@@ -80,10 +81,9 @@ export async function recordLegalConsent(input: {
     error: unknown
   }
 
-  if (!doc) {
-    console.warn(
-      `[LEGAL-CONSENT] Documento não cadastrado (tipo=${tipo}, versao=${versao}). Registrando sem hash. Execute: npm run seed:legal`
-    )
+  if (!doc?.conteudo_hash) {
+    console.error(`[LEGAL-CONSENT] Documento sem hash publicado (tipo=${tipo}, versao=${versao}).`)
+    return { success: false, error: "O documento legal está sendo atualizado. Tente novamente em instantes." }
   }
 
   const headerList = await headers()
@@ -92,10 +92,11 @@ export async function recordLegalConsent(input: {
 
   const { error } = await admin.from("user_legal_consents").insert({
     user_id: userId,
+    user_id_hash: createHash("sha256").update(userId).digest("hex"),
     documento_id: doc?.id ?? null,
     tipo,
     versao,
-    conteudo_hash: doc?.conteudo_hash ?? null,
+    conteudo_hash: doc.conteudo_hash,
     origem,
     ip_address: ip,
     user_agent: userAgent ? userAgent.slice(0, 500) : null,
@@ -168,6 +169,11 @@ export async function ensureLegalConsents(
 
   if (!documents || documents.length === 0) return { success: true }
 
+  if (documents.some((document) => !document.conteudo_hash)) {
+    console.error("[LEGAL-CONSENT] Documento vigente sem hash publicado.")
+    return { success: false }
+  }
+
   const { data: consents } = (await admin
     .from("user_legal_consents")
     .select("tipo, documento_id, versao, aceito_em")
@@ -190,6 +196,7 @@ export async function ensureLegalConsents(
     const doc = docByKey.get(`${p.tipo}:${p.versao}`)
     return {
       user_id: userId,
+      user_id_hash: createHash("sha256").update(userId).digest("hex"),
       documento_id: doc?.id ?? null,
       tipo: p.tipo,
       versao: p.versao,

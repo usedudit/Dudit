@@ -413,8 +413,8 @@ export class SuperFreteClient {
     }, 30_000) as Promise<SuperFreteCheckoutResult>
   }
 
-  async getOrderInfo(orderId: string): Promise<SuperFreteOrderInfo> {
-    return this.request("GET", `api/v0/order/info/${orderId}`) as Promise<SuperFreteOrderInfo>
+  async getOrderInfo(orderId: string, timeoutMs = 20_000): Promise<SuperFreteOrderInfo> {
+    return this.request("GET", `api/v0/order/info/${orderId}`, undefined, timeoutMs) as Promise<SuperFreteOrderInfo>
   }
 
   async getLabelPrintUrl(orderIds: string[]): Promise<{ url: string }> {
@@ -423,10 +423,10 @@ export class SuperFreteClient {
     }, 12_000) as Promise<{ url: string }>
   }
 
-  async cancelOrder(orderId: string, description: string): Promise<Record<string, unknown>> {
+  async cancelOrder(orderId: string, description: string, timeoutMs = 20_000): Promise<Record<string, unknown>> {
     return this.request("POST", "api/v0/order/cancel", {
       order: { id: orderId, description },
-    }) as Promise<Record<string, unknown>>
+    }, timeoutMs) as Promise<Record<string, unknown>>
   }
 
   async listWebhooks(): Promise<any[]> {

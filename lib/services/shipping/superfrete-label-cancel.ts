@@ -20,6 +20,8 @@ export async function cancelCarrierLabelForOrder(params: {
   labelId: string
   reason: string
   currentStatus?: string | null
+  /** Limite por chamada à SuperFrete. Usado pelo cron para caber no orçamento. */
+  timeoutMs?: number
 }): Promise<CarrierLabelCancelResult> {
   const { partnerId, orderId, labelId, reason } = params
   if (!labelId) {
@@ -47,7 +49,7 @@ export async function cancelCarrierLabelForOrder(params: {
   }
 
   try {
-    await client.cancelOrder(labelId, reason)
+    await client.cancelOrder(labelId, reason, params.timeoutMs)
   } catch (err: any) {
     const message = err?.message || "Erro ao cancelar etiqueta."
     return { success: false, cancelled: false, error: message }

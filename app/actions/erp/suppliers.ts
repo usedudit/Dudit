@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes, sanitizeInput, validateBrazilMobile, validateCPF, validateCNPJ } from "@/lib/input-validator"
+import { encryptCPF, decryptCpfIfEncrypted, generateCpfLookupHash } from "@/lib/crypto"
 
 import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { canUseFeature } from "@/lib/services/subscription.service"
@@ -93,7 +94,8 @@ export async function createComprehensiveSupplierAction(data: {
     email: data.email || null,
     phone: data.phone || null,
     person_type: data.personType || null,
-    cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
+    cpf: data.cpf ? await encryptCPF(data.cpf.replace(/\D/g, "")) : null,
+    cpf_lookup_hash: await generateCpfLookupHash(data.cpf),
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
@@ -326,7 +328,8 @@ export async function updateComprehensiveSupplierAction(data: {
       email: data.email || null,
       phone: data.phone || null,
       person_type: data.personType || null,
-      cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
+      cpf: data.cpf ? await encryptCPF(data.cpf.replace(/\D/g, "")) : null,
+      cpf_lookup_hash: await generateCpfLookupHash(data.cpf),
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
@@ -418,6 +421,7 @@ export async function duplicateSupplierAction(supplierId: string) {
       phone: originalSupplier.phone,
       person_type: originalSupplier.person_type,
       cpf: originalSupplier.cpf,
+      cpf_lookup_hash: originalSupplier.cpf_lookup_hash,
       contribuinte: originalSupplier.contribuinte,
       cnpj: originalSupplier.cnpj,
       nome_fantasia: originalSupplier.nome_fantasia,
@@ -562,10 +566,9 @@ export async function getERPSuppliersPageAction(
       hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
 
     // Decrypt CPFs
-    const { decryptCPF } = await import("@/lib/crypto")
     await Promise.all(items.map(async (item: any) => {
       if (item.cpf) {
-        try { item.cpf = await decryptCPF(item.cpf) } catch { /* keep encrypted */ }
+        try { item.cpf = await decryptCpfIfEncrypted(item.cpf) } catch { /* keep encrypted */ }
       }
     }))
 
@@ -591,8 +594,7 @@ export async function getSupplierByIdAction(supplierId: string) {
 
   if (supplier.cpf) {
     try {
-      const { decryptCPF } = await import("@/lib/crypto")
-      supplier.cpf = await decryptCPF(supplier.cpf)
+    supplier.cpf = await decryptCpfIfEncrypted(supplier.cpf)
     } catch { /* keep encrypted */ }
   }
 

@@ -1,37 +1,70 @@
 import type { ModerationResult } from "@/lib/types/moderation"
-import { checkTextSafety } from "@/lib/moderation/moderation-service" // <--- Importe do arquivo novo
+import { checkTextSafety } from "@/lib/moderation/moderation-service"
 
-export async function moderateProductContent(data: {
-  name?: string
-  description?: string
-  imageKeysForModeration?: string[]
-}): Promise<ModerationResult> {
+/**
+ * Modera uma lista de campos de texto livres (nome, descrição, comentário...).
+ * Campos vazios/undefined são ignorados.
+ */
+export async function moderateFields(
+  fields: Array<string | null | undefined>,
+  options?: { userId?: string }
+): Promise<ModerationResult> {
   try {
-    const texts: string[] = []
-    if (data.name?.trim()) texts.push(data.name.trim())
-    if (data.description?.trim()) texts.push(data.description.trim())
+    const texts = fields
+      .map((f) => (typeof f === "string" ? f.trim() : ""))
+      .filter((f) => f.length > 0)
 
-    // Se não tiver texto, retorna válido direto
     if (texts.length === 0) return { valid: true }
 
-    console.log("[moderateProductContent] Running internal check:", { textsCount: texts.length })
-
-    // CHAMADA DIRETA (Sem HTTP fetch para localhost)
-    const result = await checkTextSafety(texts, "system-internal")
+    const result = await checkTextSafety(texts, options?.userId)
 
     if (!result.passed) {
       return {
         valid: false,
         error: result.reason || "Conteúdo não aprovado pela moderação",
         flaggedTexts: result.flaggedTexts as any,
+        infraFailure: result.degraded || undefined,
       }
     }
 
-    return { valid: true }
+    return { valid: true, infraFailure: result.degraded || undefined }
   } catch (err) {
-    console.error("[moderateProductContent] Error:", err)
-    // Fail-open: não bloqueia produto, mas sinaliza falha de infra
-    // para o worker agendar retry
+    console.error("[moderateFields] Error:", err)
+    // Fail-open: não bloqueia o usuário se a moderação quebrar.
+    // `infraFailure` permite que o chamador registre/alerta.
     return { valid: true, infraFailure: true }
   }
+}
+
+/**
+ * Compatibilidade: moderação de produto/serviço (nome + descrição).
+ */
+export async function moderateProductContent(data: {
+  name?: string
+  description?: string
+  imageKeysForModeration?: string[]
+  userId?: string
+}): Promise<ModerationResult> {
+  return moderateFields([data.name, data.description], { userId: data.userId })
+}
+
+/**
+ * Moderação de conteúdo público de loja/perfil (nome, descrição/bio).
+ */
+export async function moderateStoreContent(data: {
+  name?: string | null
+  description?: string | null
+  userId?: string
+}): Promise<ModerationResult> {
+  return moderateFields([data.name, data.description], { userId: data.userId })
+}
+
+/**
+ * Moderação de comentário de avaliação (review).
+ */
+export async function moderateReviewContent(data: {
+  comment?: string | null
+  userId?: string
+}): Promise<ModerationResult> {
+  return moderateFields([data.comment], { userId: data.userId })
 }

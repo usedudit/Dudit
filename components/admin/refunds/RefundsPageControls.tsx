@@ -159,7 +159,7 @@ export default function RefundsPageControls({
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
                         <Input
-                            placeholder="Buscar por loja, plano ou token..."
+                            placeholder="Buscar por loja, plano ou protocolo..."
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
                             className="h-[42px] w-full"
@@ -177,7 +177,7 @@ export default function RefundsPageControls({
                     <div className="flex items-center gap-3 shrink-0">
                         <div className="w-80">
                             <Input
-                                placeholder="Buscar por loja, plano ou token..."
+                            placeholder="Buscar por loja, plano ou protocolo..."
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 className="h-[42px]"

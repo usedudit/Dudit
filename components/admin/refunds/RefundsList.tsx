@@ -168,9 +168,9 @@ export default function RefundsList({ initialData, initialStats, initialTotalCou
                 const storeName = String(stores[0]?.name || "").toLowerCase()
                 const planName = String(r.purchase?.plan?.name || r.purchase?.description || "").toLowerCase()
                 const partnerId = String(r.partner_id || "").toLowerCase()
-                const token = String(r.token || "").toLowerCase()
+                const protocol = String(r.id || "").slice(0, 8).toLowerCase()
 
-                if (!storeName.includes(term) && !planName.includes(term) && !partnerId.includes(term) && !token.includes(term)) {
+                if (!storeName.includes(term) && !planName.includes(term) && !partnerId.includes(term) && !protocol.includes(term)) {
                     return false
                 }
             }

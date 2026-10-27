@@ -19,6 +19,7 @@ import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { decryptCpfIfEncrypted, generateCpfLookupHash } from "@/lib/crypto"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
@@ -37,6 +38,7 @@ import {
     roundMoney,
     sortPricingAlerts,
 } from "@/lib/erp/pricing-alerts"
+import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
@@ -558,6 +560,18 @@ export async function createProductComprehensiveAction(data: {
             data.featured = false
         }
 
+        // 5. MODERAÇÃO DE TEXTO (nome + descrição) antes de tocar no banco
+        if (!data.isDuplicate) {
+            const moderation = await moderateProductContent({
+                name: data.name,
+                description: data.description,
+                userId: finalPartnerId,
+            })
+            if (!moderation.valid) {
+                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
+            }
+        }
+
         // SKU: sanitização e geração automática caso venha vazio ou 'Gerar automaticamente'
         const rawSku = data.sku?.trim()
         const isAutoSku = !rawSku || rawSku.toLowerCase() === "gerar automaticamente" || rawSku.toLowerCase() === "gerar" || rawSku.toLowerCase() === "sem sku"
@@ -947,6 +961,18 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail"),
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
+
+        // Moderação apenas dos campos de texto que estão sendo alterados.
+        if (data.name !== undefined || data.description !== undefined) {
+            const moderation = await moderateProductContent({
+                name: data.name,
+                description: data.description,
+                userId: product.partner_id,
+            })
+            if (!moderation.valid) {
+                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
+            }
+        }
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
@@ -1685,7 +1711,7 @@ export async function updateProductSupplierAction(productId: string, supplierId:
 }
 
 export const getCachedSuppliers = async (partnerId: string) => {
-    return unstable_cache(
+    const rows = await unstable_cache(
         async () => {
             const supabase = getAdminClient()
             const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf, status").eq("partner_id", partnerId).order("name")
@@ -1694,6 +1720,10 @@ export const getCachedSuppliers = async (partnerId: string) => {
         [`suppliers-list-${partnerId}`],
         { tags: [TAGS.suppliers(partnerId)], revalidate: 60 }
     )()
+    return Promise.all((rows || []).map(async (supplier: any) => ({
+        ...supplier,
+        cpf: await decryptCpfIfEncrypted(supplier.cpf),
+    })))
 }
 
 export async function getProductSuppliersAction(productId: string) {
@@ -1709,7 +1739,7 @@ export async function getProductSuppliersAction(productId: string) {
             `)
             .eq("product_id", productId)
         if (error) return { error: error.message }
-        const suppliers = (data || []).map((ps: any) => ({
+        const suppliers = await Promise.all((data || []).map(async (ps: any) => ({
             id: ps.id,
             product_id: ps.product_id,
             supplier_id: ps.supplier_id,
@@ -1722,9 +1752,9 @@ export async function getProductSuppliersAction(productId: string) {
             supplier_name: ps.supplier?.name || "",
             supplier_email: ps.supplier?.email || null,
             supplier_phone: ps.supplier?.phone || null,
-            supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
+            supplier_document: ps.supplier?.cnpj || await decryptCpfIfEncrypted(ps.supplier?.cpf) || null,
             supplier_image_url: ps.supplier?.image_url || null,
-        }))
+        })))
 
         // Cidade/UF vêm da tabela de endereços (mesma abordagem da listagem de fornecedores)
         const supplierIds = suppliers.map((s: any) => s.supplier_id).filter(Boolean)
@@ -1797,7 +1827,7 @@ export async function getProductSuppliersOverviewAction(
 
         if (suppliersRes.error) return { error: suppliersRes.error.message }
 
-        const suppliers = (suppliersRes.data || []).map((ps: any) => ({
+        const suppliers = await Promise.all((suppliersRes.data || []).map(async (ps: any) => ({
             id: ps.id,
             product_id: ps.product_id,
             supplier_id: ps.supplier_id,
@@ -1810,9 +1840,9 @@ export async function getProductSuppliersOverviewAction(
             supplier_name: ps.supplier?.name || "",
             supplier_email: ps.supplier?.email || null,
             supplier_phone: ps.supplier?.phone || null,
-            supplier_document: ps.supplier?.cnpj || ps.supplier?.cpf || null,
+            supplier_document: ps.supplier?.cnpj || await decryptCpfIfEncrypted(ps.supplier?.cpf) || null,
             supplier_image_url: ps.supplier?.image_url || null,
-        }))
+        })))
 
         const supplierNameMap: Record<string, string> = {}
         suppliers.forEach((s: any) => {
@@ -1968,18 +1998,34 @@ export async function searchSuppliersAction(partnerId: string, search: string) {
         const sanitized = search.replace(/[%_]/g, "")
         if (!sanitized.trim()) {
             const { data } = await supabase.from("suppliers").select("id, name, email, phone, cnpj, cpf, image_url").eq("partner_id", partnerId).order("name").limit(20)
-            return { suppliers: data || [] }
+            return { suppliers: await Promise.all((data || []).map(async (supplier: any) => ({ ...supplier, cpf: await decryptCpfIfEncrypted(supplier.cpf) }))) }
         }
         const term = `%${sanitized}%`
         const { data, error } = await supabase
             .from("suppliers")
             .select("id, name, email, phone, cnpj, cpf, image_url")
             .eq("partner_id", partnerId)
-            .or(`name.ilike.${term},email.ilike.${term},cnpj.ilike.${term},cpf.ilike.${term},phone.ilike.${term}`)
+            .or(`name.ilike.${term},email.ilike.${term},cnpj.ilike.${term},phone.ilike.${term}`)
             .order("name")
             .limit(20)
         if (error) return { error: error.message }
-        return { suppliers: data || [] }
+        const digits = sanitized.replace(/\D/g, "")
+        const cpfHash = digits.length === 11 ? await generateCpfLookupHash(digits) : null
+        let cpfMatches: any[] = []
+        if (cpfHash) {
+            const { data: matches, error: cpfError } = await supabase.from("suppliers")
+                .select("id, name, email, phone, cnpj, cpf, image_url")
+                .eq("partner_id", partnerId).eq("cpf_lookup_hash", cpfHash).limit(20)
+            if (cpfError) return { error: cpfError.message }
+            cpfMatches = matches || []
+        }
+        const unique = new Map<string, any>()
+        for (const supplier of [...(data || []), ...cpfMatches]) unique.set(supplier.id, supplier)
+        const suppliers = await Promise.all([...unique.values()].map(async (supplier: any) => ({
+            ...supplier,
+            cpf: await decryptCpfIfEncrypted(supplier.cpf),
+        })))
+        return { suppliers }
     } catch (error: any) {
         return { error: error.message }
     }

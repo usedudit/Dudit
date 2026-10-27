@@ -452,9 +452,12 @@ export async function getRecurringSubscriptionDetailAction(partnerId: string, su
   }
 }
 
-export async function runDueRecurringSubscriptionsAction(limit = 100) {
+export async function runDueRecurringSubscriptionsAction(
+  limit = 100,
+  options: { deadline?: number } = {},
+) {
   try {
-    const result = await processDueRecurringExecutions(limit)
+    const result = await processDueRecurringExecutions(limit, options)
     return { success: true, data: result }
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro no processamento" }

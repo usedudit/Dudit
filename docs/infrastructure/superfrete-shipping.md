@@ -12,7 +12,7 @@ conecta a integração (ou clica em **Ativar agora** na tela de integrações).
 
 ## Eventos suportados pela SuperFrete
 
-| Evento | Efeito no Dudit |
+| Evento | Efeito na Dudit |
 |---|---|
 | `order.created` | etiqueta `pending` → pedido `not_sent` |
 | `order.released` | pedido pago → etiqueta `released` → pedido `preparing` |

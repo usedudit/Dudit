@@ -339,9 +339,16 @@ export async function getAdminCatalogProductDetail(productId: string) {
                 .limit(100),
         ])
 
+        const decryptCpfIfEncrypted = (await import("@/lib/crypto")).decryptCpfIfEncrypted
+        const suppliers = await Promise.all((suppliersRes.data || []).map(async (supplier: any) => {
+            let cpf = null
+            try { cpf = await decryptCpfIfEncrypted(supplier.cpf) } catch { /* omit unreadable fiscal value */ }
+            return { ...supplier, cpf }
+        }))
+
         return successResponse({
             product,
-            suppliers: suppliersRes.data || [],
+            suppliers,
             store,
             partner: partnerRes.data || null,
             auditEvents: (auditRes.data as any[]) || [],

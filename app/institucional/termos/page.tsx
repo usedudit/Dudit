@@ -38,7 +38,7 @@ export default function TermsPage() {
                                 Termos de Uso
                             </h1>
                             <p className="text-brand-inactive-text text-lg">
-                                Versão 1.0 - Última atualização: Agosto de 2026
+                                Versão 1.1 - Última atualização: Outubro de 2026
                             </p>
                         </motion.div>
                     </div>
@@ -47,7 +47,7 @@ export default function TermsPage() {
                 <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="prose prose-lg max-w-none text-brand-dark leading-relaxed space-y-12">
                         <p className="font-medium text-xl border-l-4 border-brand-green pl-6 py-2 bg-brand-gray rounded-r-xl">
-                            Estes Termos de Uso ("Termos") regem o acesso e uso da plataforma DUDIT, operada por [SEU NOME COMPLETO], CPF nº [XXX.XXX.XXX-XX] (futuramente constituída como Pessoa Jurídica), com sede na cidade de Lucélia/SP, doravante denominada "DUDIT".
+                            Estes Termos de Uso ("Termos") regem o acesso e uso da plataforma DUDIT, operada por [NOME CIVIL COMPLETO DA OPERADORA], pessoa física, CPF nº [INFORMAR CPF OU VALIDAR COM ADVOGADO A FORMA DE DIVULGAÇÃO], com endereço para contato em [ENDEREÇO COMPLETO] e e-mail [E-MAIL VÁLIDO DE CONTATO], doravante denominada "DUDIT".
                         </p>
 
                         <p>
@@ -73,7 +73,7 @@ export default function TermsPage() {
                                 <div className="space-y-6 md:pl-12 pl-6">
                                     <p>Para fins destes Termos, os seguintes termos têm o significado indicado abaixo:</p>
                                     <ul className="space-y-4 list-none p-0">
-                                        <li><strong>• DUDIT:</strong> Plataforma tecnológica operada por [SEU NOME COMPLETO], que oferece ferramentas de gestão empresarial (ERP), vitrine digital e canal de descoberta de produtos e serviços para conexão entre Parceiros e Usuários.</li>
+                                        <li><strong>• DUDIT:</strong> Plataforma tecnológica operada por [NOME CIVIL COMPLETO DA OPERADORA], que oferece ferramentas de gestão empresarial (ERP), vitrine digital e canal de descoberta de produtos e serviços para conexão entre Parceiros e Usuários.</li>
                                         <li><strong>• Parceiro:</strong> Pessoa física ou jurídica que utiliza a plataforma para anunciar, vender produtos ou prestar serviços. Também denominado Vendedor.</li>
                                         <li><strong>• Usuário:</strong> Pessoa física que acessa a plataforma para buscar, visualizar ou adquirir produtos e serviços. Também denominado Comprador ou Consumidor Final.</li>
                                         <li><strong>• Plataforma:</strong> Conjunto de funcionalidades disponibilizadas pela DUDIT, incluindo ERP, vitrine digital, marketplace, ferramentas de gestão e demais recursos tecnológicos.</li>
@@ -109,9 +109,9 @@ export default function TermsPage() {
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
                                     <p><strong>3.1. Natureza do Serviço:</strong> A DUDIT é uma plataforma tecnológica (modelo SaaS - Software as a Service) que fornece ferramentas de gestão empresarial (ERP), vitrine digital e canal de descoberta e divulgação de produtos e serviços para conectar Parceiros e Usuários.</p>
-                                    <p><strong>3.2. Papel da DUDIT:</strong> A DUDIT disponibiliza a infraestrutura tecnológica para facilitar a negociação entre as partes, cabendo ao Parceiro a execução da venda ou do serviço. A DUDIT não é proprietária, fornecedora, transportadora ou garantidora dos produtos ou serviços anunciados, e não executa os serviços contratados pelos Usuários.</p>
-                                    <p><strong>3.3. Contratação Direta entre as Partes:</strong> A compra de produtos e a contratação de serviços ocorrem diretamente entre o Parceiro e o Usuário. A DUDIT não é parte na relação de compra e venda ou de prestação de serviços, atuando exclusivamente como canal tecnológico de conexão entre as partes.</p>
-                                    <p><strong>3.4. Responsabilidade Integral do Parceiro:</strong> O Parceiro é o único e exclusivo responsável por:</p>
+                                    <p><strong>3.2. Papel da DUDIT:</strong> A DUDIT fornece ferramentas de ERP e um marketplace que organiza vitrines, anúncios, carrinho, checkout, pedidos e recursos de atendimento. O Parceiro define e responde pela oferta, disponibilidade, qualidade, entrega do produto e execução do serviço. A DUDIT não fabrica nem executa os produtos ou serviços dos Parceiros, mas continua responsável pelas obrigações legais relacionadas aos próprios serviços e às atividades que efetivamente realiza na plataforma.</p>
+                                    <p><strong>3.3. Relação de compra e venda:</strong> A contratação do produto ou serviço anunciado é feita entre o Usuário e o Parceiro. A DUDIT facilita a descoberta, a comunicação e, quando disponível, a criação do pedido e o início do pagamento por integração com terceiros. A delimitação de papéis nesta cláusula não exclui responsabilidades que a legislação atribua à DUDIT conforme sua atuação concreta.</p>
+                                    <p><strong>3.4. Responsabilidades do Parceiro:</strong> Sem afastar os deveres próprios da DUDIT, o Parceiro é responsável por:</p>
                                     <ul className="list-disc pl-6 space-y-2">
                                         <li>Veracidade das informações do anúncio;</li>
                                         <li>Entrega do produto ou prestação do serviço;</li>
@@ -202,15 +202,12 @@ export default function TermsPage() {
                                     PAGAMENTOS E INTEGRAÇÕES
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
-                                    <p><strong>6.1. Gateway de Pagamento:</strong> A DUDIT utiliza gateways de pagamento parceiros (atualmente: Mercado Pago) para processar transações online.</p>
-                                    <p><strong>6.2. A DUDIT Não Processa Pagamentos:</strong> A DUDIT não é instituição financeira, não realiza cobrança direta, não intermedeia valores e não possui controle sobre pagamentos efetuados entre Usuários e Parceiros. Todo pagamento ocorre exclusivamente por meio de gateways de terceiros ou diretamente entre as partes.</p>
-                                    <p><strong>6.3. Recebimento Direto (Split), Sem Comissão:</strong> Ao realizar uma compra via gateway na plataforma, o valor é processado e enviado diretamente para a conta do Parceiro, descontadas exclusivamente as taxas próprias do Gateway de Pagamento. A DUDIT não recebe, não custodia, não retém e não gerencia o fluxo financeiro da venda, tampouco cobra comissão, percentual ou qualquer taxa sobre o valor transacionado entre Parceiro e Usuário. A receita da DUDIT decorre exclusivamente da assinatura de Planos, nos termos da Seção 7.</p>
-                                    <p><strong>6.3.1. Não Enquadramento como Instituição de Pagamento:</strong> Por não deter, custodiar ou intermediar recursos financeiros de terceiros, a DUDIT não atua como instituição de pagamento ou instituição financeira, não estando sujeita, quanto a esta atividade, à regulamentação do Banco Central do Brasil aplicável a essas instituições. O processamento e a custódia dos valores são realizados integralmente pelo Gateway de Pagamento, que possui suas próprias autorizações regulatórias.</p>
-                                    <p><strong>6.4. Chargebacks e Estornos:</strong> O Parceiro é o único responsável por eventuais estornos (chargebacks), reembolsos ou disputas financeiras com o Usuário.</p>
-                                    <p><strong>6.5. Independência do Gateway:</strong> O Usuário reconhece que a transação financeira é processada integralmente pelo Gateway de Pagamento, e não pela DUDIT. Em casos de fraude ou disputa, a responsabilidade pela custódia do valor é da Instituição Financeira/Gateway, conforme suas próprias regras. A DUDIT fornecerá os dados técnicos disponíveis para auxiliar na disputa, mas não tem poder para estornar valores que não estão em sua posse.</p>
-                                    <p><strong>6.6. Transações Fora da Plataforma:</strong> Nas modalidades "Pagamento na Entrega" ou "Retirada no Local", a DUDIT atua estritamente como vitrine digital. A DUDIT não participa, não intervém e não garante a conclusão da transação, que ocorre exclusivamente no mundo físico. Qualquer divergência é de responsabilidade exclusiva das partes, isentando a DUDIT de qualquer solidariedade.</p>
+                                    <p><strong>6.1. Integração com pagamento:</strong> A plataforma integra-se atualmente ao Mercado Pago. A DUDIT pode enviar ao gateway os dados necessários para iniciar e acompanhar o pagamento de um pedido; o gateway processa a transação e, conforme a integração e as regras do próprio gateway, liquida os valores na conta conectada do Parceiro.</p>
+                                    <p><strong>6.2. Valores de venda:</strong> A DUDIT não recebe nem mantém em custódia os valores das vendas entre Usuários e Parceiros e não cobra comissão ou percentual sobre essas vendas. A ausência de custódia não altera o papel tecnológico da DUDIT no checkout, no registro do pedido e na comunicação de status. A DUDIT cobra separadamente a assinatura dos próprios planos.</p>
+                                    <p><strong>6.3. Disputas e reembolsos:</strong> O Parceiro deve atender o Usuário e cumprir as obrigações legais relativas à venda ou serviço que oferece. O gateway decide e executa as operações financeiras sob suas próprias regras. A DUDIT pode fornecer os registros disponíveis e cooperar na apuração; isso não exclui deveres legais próprios da DUDIT nem impede reembolso de valores que ela própria tenha cobrado.</p>
+                                    <p><strong>6.4. Pagamentos fora da plataforma:</strong> Em modalidades como pagamento na entrega ou retirada no local, o Parceiro e o Usuário combinam diretamente a forma de pagamento. A DUDIT não recebe esses valores. Ela continua responsável pelo funcionamento e pelas informações que disponibiliza em seus próprios serviços, nos limites da legislação aplicável.</p>
                                     <p><strong>6.7. Logística Integrada:</strong> Ao utilizar o serviço de logística integrada (Superfrete), o Parceiro reconhece que o contrato de transporte é firmado diretamente com a transportadora, sendo esta a responsável pelo serviço de entrega. A DUDIT atua apenas como facilitadora da contratação.</p>
-                                    <p><strong>6.8. Integrações de Terceiros:</strong> A DUDIT não se responsabiliza por falhas, indisponibilidades, alterações de API, limitações técnicas ou interrupções causadas por serviços de terceiros integrados à plataforma.</p>
+                                    <p><strong>6.8. Integrações de Terceiros:</strong> Serviços externos têm termos, controles e disponibilidade próprios. A DUDIT informará as dependências relevantes e adotará medidas razoáveis para tratar falhas que afetem a plataforma, sem excluir responsabilidades que a lei lhe atribua.</p>
                                 </div>
                             </div>
 
@@ -267,8 +264,8 @@ export default function TermsPage() {
                                     LIMITAÇÃO DE RESPONSABILIDADE
                                 </h2>
                                 <div className="space-y-6 md:pl-12 pl-6">
-                                    <p><strong>10.1. Danos Indiretos:</strong> Em nenhuma hipótese a DUDIT será responsável por lucros cessantes, danos indiretos, perda de dados ou perda de oportunidades de negócio decorrentes de instabilidades da plataforma.</p>
-                                    <p><strong>10.2. Limitação Financeira:</strong> A responsabilidade total da DUDIT, independentemente da natureza da reclamação, fica limitada ao valor efetivamente pago pelo Parceiro à plataforma nos últimos 12 (doze) meses anteriores ao evento que originou a reclamação.</p>
+                                    <p><strong>10.1. Limites legais:</strong> Eventuais limites de responsabilidade previstos nestes Termos aplicam-se somente na medida permitida pela legislação e não afastam direitos indisponíveis, deveres de proteção de dados ou responsabilidade por falha própria da DUDIT quando aplicável.</p>
+                                    <p><strong>10.2. Limitação financeira:</strong> Nenhum limite contratual reduz direitos do consumidor ou de titulares de dados garantidos por lei. Fora dessas hipóteses, eventual limitação será interpretada conforme a legislação aplicável e as circunstâncias do caso.</p>
                                     <p><strong>10.3. Sem Garantia de Resultados:</strong> A DUDIT não garante volume de vendas, geração de clientes, posicionamento em buscas, crescimento financeiro ou qualquer resultado comercial específico decorrente do uso da plataforma.</p>
                                 </div>
                             </div>

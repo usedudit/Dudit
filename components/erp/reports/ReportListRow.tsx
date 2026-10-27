@@ -3,6 +3,7 @@
 import React from "react"
 import type { ElementType } from "react"
 import { motion } from "framer-motion"
+import { Badge, type BadgeVariant } from "@/components/reusable"
 
 export interface ReportListColumn {
   id: string
@@ -11,6 +12,7 @@ export interface ReportListColumn {
   width?: string
   minWidth?: string
   primary?: boolean
+  format?: "badge" | "currency" | "inflow" | "outflow" | "moneyByDirection"
 }
 
 export interface ReportListRowData {
@@ -27,6 +29,16 @@ export default function ReportListRow({
   columns: ReportListColumn[]
   icon: ElementType
 }) {
+  const getStatusVariant = (value: unknown): BadgeVariant => {
+    const status = String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_-]+/g, " ")
+    if (/inativ|arquivad|encerrad|pausad/.test(status)) return "gray"
+    if (/cancel|rejeit|recus|falh|bloque|vencid|inadimpl|devolvid/.test(status)) return "red"
+    if (/pend|aguard|analise|atras|parcial|estoque|prepar/.test(status)) return "orange"
+    if (/andamento|transito|iniciado/.test(status)) return "cyan"
+    if (/pago|recebid|conclu|entregue|aprovad|ativo|confirmad|resolvid|visivel|normal/.test(status)) return "green"
+    return "gray"
+  }
+
   return (
     <motion.tr
       initial={{ opacity: 0 }}
@@ -48,12 +60,26 @@ export default function ReportListRow({
                   <Icon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </div>
                 <div className="flex min-w-0 flex-col text-left">
-                  <span className="mb-0.5 truncate font-bold text-[13px] text-brand-dark dark:text-dark-heading">{row[column.id] ?? "-"}</span>
+                  {column.format === "badge" ? <Badge variant={getStatusVariant(row[column.id])} className="w-fit whitespace-nowrap">{row[column.id] ?? "-"}</Badge> : <span className="mb-0.5 truncate font-bold text-[13px] text-brand-dark dark:text-dark-heading">{row[column.id] ?? "-"}</span>}
                   {row.detail != null && <span className="truncate text-xs font-medium text-brand-inactive-text dark:text-dark-body">{row.detail}</span>}
                 </div>
               </div>
+            ) : column.format === "badge" ? (
+              <Badge variant={getStatusVariant(row[column.id])} className="w-fit whitespace-nowrap">
+                {row[column.id] ?? "-"}
+              </Badge>
+            ) : column.format === "currency" ? (
+              <span className="whitespace-nowrap text-[13px] font-bold text-brand-dark dark:text-dark-heading">{row[column.id] ?? "-"}</span>
+            ) : column.format === "inflow" ? (
+              <span className="whitespace-nowrap text-[13px] font-bold text-brand-green">+ {row[column.id] ?? "-"}</span>
+            ) : column.format === "outflow" ? (
+              <span className="whitespace-nowrap text-[13px] font-bold text-brand-red">- {row[column.id] ?? "-"}</span>
+            ) : column.format === "moneyByDirection" ? (
+              <span className={`whitespace-nowrap text-[13px] font-bold ${row.direction === "in" ? "text-brand-green" : row.direction === "out" ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
+                {row.direction === "in" ? "+ " : row.direction === "out" ? "- " : ""}{row[column.id] ?? "-"}
+              </span>
             ) : (
-              <span className="text-[13px] text-brand-dark dark:text-dark-heading">{row[column.id] ?? "-"}</span>
+              <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{row[column.id] ?? "-"}</span>
             )}
           </div>
         </td>

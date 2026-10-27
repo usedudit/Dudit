@@ -18,37 +18,21 @@ const HKDF_SALT = createHash("sha256")
 //
 // HOW KEY ROTATION WORKS:
 //
-// 1. Initially, only MASTER_KEY_V1 is set. ACTIVE_KEY_VERSION = "v1".
-//    All encrypt() calls produce payloads prefixed with "v1:".
-//
-// 2. To rotate to a new key:
-//    a. Generate a new strong MASTER_KEY_V2 (≥32 chars, high entropy).
-//    b. Set MASTER_KEY_V2 in your environment / secrets manager.
-//    c. Change ACTIVE_KEY_VERSION below to "v2".
-//    d. Deploy. New encrypt() calls will use v2. Old v1 payloads still decrypt
-//       because MASTER_KEY_V1 remains set.
-//
-// 3. To fully migrate existing data (optional, recommended):
-//    Run a migration script that calls reEncryptWithActiveVersion() on each
-//    stored encrypted value. This re-encrypts v1 payloads under v2.
-//
-// 4. Once all data is migrated to v2, you can remove MASTER_KEY_V1
-//    from the environment. Any leftover v1 payloads will fail to decrypt
-//    with an explicit error (no silent fallback).
-//
-// To add v3, v4, etc: add entries to SUPPORTED_VERSIONS and corresponding
-// MASTER_KEY_V3 / MASTER_KEY_V4 env vars. Follow the same process.
+// Keep old versions supported during and after a rotation. Only remove an old
+// version after the rotation script verifies there are no payloads using it
+// and backups/rollback no longer need that key.
 
-type KeyVersion = "v1" | "v2"
+type KeyVersion = "v1" | "v2" | "v3"
 
 /**
  * The version used by encrypt() for all NEW encryptions.
- * Change this to "v2" after deploying MASTER_KEY_V2.
+ * V3 is active for new writes. Keep V1/V2 available for existing records until
+ * their migration and the required backup-retention window are complete.
  */
-const ACTIVE_KEY_VERSION: KeyVersion = "v2"
+const ACTIVE_KEY_VERSION: KeyVersion = "v3"
 
 /** All supported versions for decryption. */
-const SUPPORTED_VERSIONS: readonly KeyVersion[] = ["v1", "v2"] as const
+const SUPPORTED_VERSIONS: readonly KeyVersion[] = ["v1", "v2", "v3"] as const
 
 // Context-to-info mapping for HKDF derivation.
 // Each context produces a completely independent derived key.
@@ -57,6 +41,7 @@ const CONTEXT_INFO = {
   mercadopago: "mercadopago-token-encryption",
   whatsapp: "whatsapp-token-encryption",
   superfrete: "superfrete-token-encryption",
+  nfe_xml: "nfe-xml-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO

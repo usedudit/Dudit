@@ -15,6 +15,13 @@ const MAX_SHIPMENTS_PER_RUN = 60
 const MAX_SHIPMENT_AGE_DAYS = 45
 const CONCURRENCY = 5
 
+// O cron-job.org corta a conexão em 30s. Mantemos uma margem para devolver a
+// resposta (e o log) em vez de a execução ser marcada como timeout. Etiquetas
+// não processadas ficam para a próxima rodada: a fila gira por updated_at.
+const RUN_BUDGET_MS = 22_000
+const MAX_REQUEST_MS = 20_000
+const MIN_BATCH_WINDOW_MS = 3_000
+
 interface ShipmentRow {
   id: string
   order_id: string
@@ -29,6 +36,7 @@ interface ShipmentRow {
 }
 
 export async function GET(req: Request) {
+  const startedAt = Date.now()
   try {
     const authHeader = req.headers.get("Authorization")
     const secret = process.env.CRON_SECRET
@@ -97,7 +105,10 @@ export async function GET(req: Request) {
           throw new Error("Integração SuperFrete indisponível para o parceiro")
         }
 
-        const info = await client.getOrderInfo(shipment.external_label_id)
+        // Recalcula o fôlego restante aqui: a busca da integração acima também
+        // consome tempo, e o corte precisa acontecer antes do cron-job.org.
+        const timeoutMs = Math.min(MAX_REQUEST_MS, Math.max(1_000, deadline - Date.now()))
+        const info = await client.getOrderInfo(shipment.external_label_id, timeoutMs)
         const status = typeof info?.status === "string" ? info.status : null
         if (!status) {
           throw new Error("SuperFrete não retornou status da etiqueta")
@@ -153,7 +164,16 @@ export async function GET(req: Request) {
     }
 
     const rows = (shipments || []) as ShipmentRow[]
+    const deadline = startedAt + RUN_BUDGET_MS
+    let deferred = 0
+
     for (let i = 0; i < rows.length; i += CONCURRENCY) {
+      const remaining = deadline - Date.now()
+      if (remaining < MIN_BATCH_WINDOW_MS) {
+        deferred = rows.length - i
+        break
+      }
+
       await Promise.all(rows.slice(i, i + CONCURRENCY).map(reconcile))
     }
 
@@ -163,6 +183,8 @@ export async function GET(req: Request) {
       processed,
       failed,
       total: rows.length,
+      deferred,
+      elapsedMs: Date.now() - startedAt,
     })
   } catch (error: any) {
     captureError(error, {

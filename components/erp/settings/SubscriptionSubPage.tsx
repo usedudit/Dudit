@@ -44,7 +44,7 @@ import {
     getLatestPurchaseForSubscriptionAction,
     getLatestCompletedPurchaseForPartnerAction,
 } from "@/app/actions/billing/purchases"
-import { getActiveRefundForPartnerAction } from "@/app/actions/billing/refunds"
+import { createRefundPublicLinkAction, getActiveRefundForPartnerAction } from "@/app/actions/billing/refunds"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
@@ -368,6 +368,28 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const [refundPurchase, setRefundPurchase] = useState<any>(null)
     const [loadingRefund, setLoadingRefund] = useState(false)
     const [activeRefund, setActiveRefund] = useState<any | null>(null)
+    const [openingRefundLink, setOpeningRefundLink] = useState(false)
+
+    const handleOpenRefundPortal = async () => {
+        if (!activeRefund?.id || openingRefundLink) return
+        const portalWindow = window.open("about:blank", "_blank")
+        setOpeningRefundLink(true)
+        try {
+            const result = await createRefundPublicLinkAction(activeRefund.id)
+            if (!result.success || !result.token) {
+                portalWindow?.close()
+                toast.error(result.error || "Não foi possível criar o link de acompanhamento.")
+                return
+            }
+            if (portalWindow) portalWindow.location.href = `/reembolso/${result.token}`
+            else window.location.href = `/reembolso/${result.token}`
+        } catch {
+            portalWindow?.close()
+            toast.error("Não foi possível criar o link de acompanhamento.")
+        } finally {
+            setOpeningRefundLink(false)
+        }
+    }
 
     const handleOpenRefundModal = async () => {
         const subId = subData?.subscription?.id
@@ -870,8 +892,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 </DropdownItem>
                                             )}
                                             {activeRefund && (
-                                                <DropdownItem onClick={() => window.open(`/reembolso/${activeRefund.token}`, "_blank")}>
-                                                    <EyeIcon size={18} /> Acompanhar Reembolso
+                                                <DropdownItem onClick={handleOpenRefundPortal}>
+                                                    <EyeIcon size={18} /> {openingRefundLink ? "Gerando link..." : "Acompanhar Reembolso"}
                                                 </DropdownItem>
                                             )}
                                             {displayPlanSlug !== "free" && (

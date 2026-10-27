@@ -14,15 +14,6 @@ function normalizeCest(cest: string): string {
   return cest.replace(/\D/g, "")
 }
 
-const selectionSchema = {
-  type: "object",
-  properties: {
-    selected_id: { type: "integer", description: "ID da opção correta" },
-    reasoning: { type: "string" },
-  },
-  required: ["selected_id", "reasoning"],
-}
-
 async function handleSuggestCEST(req: NextRequest) {
   try {
     // --- Auth/Rate Limit ---
@@ -108,8 +99,8 @@ async function handleSuggestCEST(req: NextRequest) {
       })
     }
 
-    // 4. Múltiplos resultados: usa IA para desempatar
-    console.log("[CEST] Desempatando com IA...")
+    // 4. Múltiplos resultados: usa IA (Groq) para desempatar
+    console.log("[CEST] Desempatando com IA (Groq)...")
     const optionsList = candidates
       .map((row: any, idx: number) => {
         const c = row["CEST"] || row["CEST."]
@@ -118,9 +109,9 @@ async function handleSuggestCEST(req: NextRequest) {
       })
       .join("\n")
 
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY
+    const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) {
-      console.error("[CEST] API Key do Gemini não configurada")
+      console.error("[CEST] API Key do Groq não configurada")
       // Fallback: retorna primeiro resultado
       const fallbackRow = candidates[0]
       return NextResponse.json({
@@ -140,36 +131,39 @@ async function handleSuggestCEST(req: NextRequest) {
       
       Lista:
       ${optionsList}
+      
+      Retorne JSON no formato: { "selected_id": 0, "reasoning": "..." }
     `
 
     try {
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      const groqResponse = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.0,
-              responseMimeType: "application/json",
-              responseSchema: selectionSchema,
-            },
+            model: "qwen/qwen3.8-27b",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.0,
+            response_format: { type: "json_object" },
           }),
-        },
+        }
       )
 
-      if (!geminiResponse.ok) {
-        throw new Error(`Gemini API retornou status ${geminiResponse.status}`)
+      if (!groqResponse.ok) {
+        throw new Error(`Groq API retornou status ${groqResponse.status}`)
       }
 
-      const result = await geminiResponse.json()
+      const result = await groqResponse.json()
 
-      if (!result.candidates || !result.candidates[0]?.content?.parts?.[0]?.text) {
+      if (!result.choices || !result.choices[0]?.message?.content) {
         throw new Error("Resposta da IA em formato inesperado")
       }
 
-      const aiContent = JSON.parse(result.candidates[0].content.parts[0].text)
+      const aiContent = JSON.parse(result.choices[0].message.content)
 
       const selectedIndex = aiContent.selected_id || 0
       const selectedRow = candidates[selectedIndex] || candidates[0]
@@ -177,7 +171,7 @@ async function handleSuggestCEST(req: NextRequest) {
       const finalCest = selectedRow["CEST"] || selectedRow["CEST."]
       const finalDesc = selectedRow["Descricao"] || selectedRow["Descrição"] || selectedRow["Descrição CEST"]
 
-      console.log("[CEST] IA selecionou:", finalCest)
+      console.log("[CEST] IA (Groq) selecionou:", finalCest)
 
       return NextResponse.json({
         found: true,
@@ -188,7 +182,7 @@ async function handleSuggestCEST(req: NextRequest) {
         reasoning: aiContent.reasoning,
       })
     } catch (aiError: any) {
-      console.error("[CEST] Erro na IA:", aiError.message)
+      console.error("[CEST] Erro na IA (Groq):", aiError.message)
 
       // Fallback: retorna primeiro resultado se IA falhar
       const fallbackRow = candidates[0]

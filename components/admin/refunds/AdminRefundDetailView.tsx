@@ -367,26 +367,14 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                         </div>
                                                     </div>
 
-                                                    {/* Portal Publico */}
-                                                    {refund.token && (
-                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                                Portal Publico
-                                                            </h3>
-                                                            <p className="text-xs text-brand-inactive-text mb-3">
-                                                                Link de acompanhamento publico para o lojista.
-                                                            </p>
-                                                            <a
-                                                                href={`/reembolso/${refund.token}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-green hover:underline"
-                                                            >
-                                                                Abrir Portal
-                                                                <ShareIcon size={13} />
-                                                            </a>
-                                                        </div>
-                                                    )}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
+                                                            Protocolo
+                                                        </h3>
+                                                        <p className="text-xs text-brand-inactive-text">
+                                                            {refund.id?.slice(0, 8)?.toUpperCase() || "—"}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </FadeIn>

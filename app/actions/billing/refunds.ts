@@ -4,9 +4,13 @@ import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getMpPlatformAccessToken, cancelMpSubscription } from "@/lib/services/mercadopago/subscriptions"
 import { logBillingAudit, logBillingAdminAudit } from "@/lib/billing/audit"
 import { notifyPartnerTeam } from "@/lib/billing/notifications"
+import { createRefundPublicToken, hashRefundPublicToken, isRefundPublicTokenFormat } from "@/lib/security/refund-public-token"
+import { decryptCpfIfEncrypted } from "@/lib/crypto"
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +118,7 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
         // 3. Verificar se já existe solicitação aberta para esta compra ou parceiro
         const { data: existingRequest } = await supabase
             .from("billing_refund_requests")
-            .select("id, status, token")
+            .select("id, status")
             .eq("purchase_id", data.purchaseId)
             .in("status", ["pending", "under_review", "approved"])
             .maybeSingle()
@@ -122,7 +126,6 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
         if (existingRequest) {
             return {
                 error: "Já existe uma solicitação de reembolso em andamento ou aprovada para esta fatura.",
-                token: existingRequest.token,
             }
         }
 
@@ -137,6 +140,7 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
         const approvedPayment = paymentsList.find((p) => p.status === "approved") || paymentsList[0]
 
         // 6. Inserir a solicitação
+        const publicToken = createRefundPublicToken()
         const { data: newRefund, error: insertErr } = await supabase
             .from("billing_refund_requests")
             .insert({
@@ -152,13 +156,24 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
                 documents: data.documents,
                 is_within_7_days: isWithin7Days,
                 status: "pending",
+                token: null,
             })
-            .select("id, token, requested_at")
+            .select("id, requested_at")
             .single()
 
         if (insertErr || !newRefund) {
             console.error("[requestSubscriptionRefundAction] Insert error:", insertErr)
             return { error: "Erro ao registrar solicitação de reembolso." }
+        }
+
+        const { error: tokenError } = await supabase.from("billing_refund_public_tokens").insert({
+            refund_request_id: newRefund.id,
+            token_hash: hashRefundPublicToken(publicToken),
+        })
+        if (tokenError) {
+            await supabase.from("billing_refund_requests").delete().eq("id", newRefund.id)
+            console.error("[requestSubscriptionRefundAction] Public token hash insert failed:", tokenError.code)
+            return { error: "Erro ao registrar acesso ao acompanhamento do reembolso." }
         }
 
         // 7. Auditoria e Notificação
@@ -167,7 +182,6 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
             purchase_id: data.purchaseId,
             reason_category: data.reasonCategory,
             is_within_7_days: isWithin7Days,
-            token: newRefund.token,
         }, user.id)
 
         await notifyPartnerTeam(
@@ -177,13 +191,12 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
                 message: `Solicitação de reembolso enviada para a fatura de R$ ${purchase.total_amount}. Acompanhe pelo portal.`,
                 purchaseId: data.purchaseId,
                 refundRequestId: newRefund.id,
-                token: newRefund.token,
             }
         )
 
         return {
             success: true,
-            token: newRefund.token,
+            token: publicToken,
             refundRequestId: newRefund.id,
             isWithin7Days,
         }
@@ -205,7 +218,7 @@ export async function getActiveRefundForPartnerAction(partnerId: string, subscri
         let query = supabase
             .from("billing_refund_requests")
             .select(`
-                id, token, status, amount, refunded_amount, reason_category,
+                id, status, amount, refunded_amount, reason_category,
                 reason_description, requested_at, created_at, grace_period_ends_at,
                 is_within_7_days, purchase_id, subscription_id
             `)
@@ -231,6 +244,43 @@ export async function getActiveRefundForPartnerAction(partnerId: string, subscri
     }
 }
 
+/** Issues an additional hashed public portal token after verifying partner access. */
+export async function createRefundPublicLinkAction(refundRequestId: string) {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const parsedId = z.string().uuid().safeParse(refundRequestId)
+        if (!parsedId.success) return { success: false, error: "Solicitação inválida." }
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autenticado." }
+        const supabase = createAdminClient()
+        const { data: refund, error } = await supabase
+            .from("billing_refund_requests")
+            .select("id, partner_id")
+            .eq("id", parsedId.data)
+            .maybeSingle()
+        if (error || !refund) return { success: false, error: "Solicitação não encontrada." }
+
+        const [partnerUser, partnerOwner] = await Promise.all([
+            supabase.from("partner_users").select("partner_id")
+                .eq("partner_id", refund.partner_id).eq("user_id", user.id).maybeSingle(),
+            supabase.from("partners").select("id")
+                .eq("id", refund.partner_id).eq("user_id", user.id).maybeSingle(),
+        ])
+        if (!partnerUser.data && !partnerOwner.data) return { success: false, error: "Acesso não autorizado." }
+
+        const token = createRefundPublicToken()
+        const { error: tokenError } = await supabase.from("billing_refund_public_tokens").insert({
+            refund_request_id: refund.id,
+            token_hash: hashRefundPublicToken(token),
+        })
+        if (tokenError) return { success: false, error: "Não foi possível criar o link agora." }
+        return { success: true, token }
+    } catch (error: any) {
+        console.error("[createRefundPublicLinkAction] Error:", error)
+        return { success: false, error: "Não foi possível criar o link agora." }
+    }
+}
+
 // ─── 2. DETALHES PÚBLICOS DO REEMBOLSO (PORTAL COM PREVIEW) ───────────────────
 
 export async function getPublicRefundDetailsAction(token: string) {
@@ -240,11 +290,26 @@ export async function getPublicRefundDetailsAction(token: string) {
         }
 
         const supabase = createAdminClient()
+        const publicToken = token.trim()
+        if (!isRefundPublicTokenFormat(publicToken)) {
+            return { error: "Solicitação de reembolso não encontrada." }
+        }
+
+        const { data: tokenRow, error: tokenErr } = await supabase
+            .from("billing_refund_public_tokens")
+            .select("refund_request_id")
+            .eq("token_hash", hashRefundPublicToken(publicToken))
+            .is("revoked_at", null)
+            .maybeSingle()
+
+        if (tokenErr || !tokenRow) {
+            return { error: "Solicitação de reembolso não encontrada." }
+        }
 
         const { data: refund, error: refundErr } = await supabase
             .from("billing_refund_requests")
             .select(`
-                id, token, status, amount, refunded_amount, reason_category, reason_description,
+                id, status, amount, refunded_amount, reason_category, reason_description,
                 images, documents, admin_response, admin_evidence, is_within_7_days,
                 grace_period_ends_at, requested_at, processed_at, created_at, updated_at,
                 partner:partner_id (
@@ -263,7 +328,7 @@ export async function getPublicRefundDetailsAction(token: string) {
                     id, gateway, status, paid_at, amount, payment_method_type, payment_method_details, gateway_response, gateway_payment_id
                 )
             `)
-            .eq("token", token)
+            .eq("id", tokenRow.refund_request_id)
             .single()
 
         if (refundErr || !refund) {
@@ -309,7 +374,7 @@ export async function getPublicRefundDetailsAction(token: string) {
                 } : null,
                 partnerName: hqStore.name || "Minha Empresa",
                 partnerLogo: hqStore.logo_url || null,
-                partnerDocument: hqStore.cnpj || hqStore.cpf || "",
+                partnerDocument: hqStore.cnpj || await decryptCpfIfEncrypted(hqStore.cpf) || "",
                 partnerPhone: hqStore.phone || "",
             },
         }
@@ -339,7 +404,7 @@ export async function adminListRefundRequestsAction(params?: {
         let query = supabase
             .from("billing_refund_requests")
             .select(`
-                id, token, status, amount, refunded_amount, reason_category, reason_description,
+                id, status, amount, refunded_amount, reason_category, reason_description,
                 images, documents, admin_response, is_within_7_days, requested_at, processed_at,
                 grace_period_ends_at, created_at,
                 partner:partner_id (
@@ -453,7 +518,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
             .from("billing_refund_requests")
             .select(`
                 id, partner_id, user_id, subscription_id, purchase_id, payment_id,
-                amount, status, token,
+                amount, status,
                 purchase:purchase_id (
                     id, partner_id, user_id, amount, total_amount, gateway, gateway_payment_id,
                     subscription_id
@@ -652,7 +717,6 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
                 message: `Reembolso de R$ ${targetAmount.toFixed(2)} aprovado e estornado. Carência de 24h ativada antes da migração para o plano Gratuito.`,
                 purchaseId: refundReq.purchase_id,
                 refundRequestId: refundReq.id,
-                token: refundReq.token,
             }
         )
 
@@ -682,7 +746,7 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
 
         const { data: refundReq, error: reqErr } = await supabase
             .from("billing_refund_requests")
-            .select("id, partner_id, token, purchase_id")
+            .select("id, partner_id, purchase_id")
             .eq("id", data.refundRequestId)
             .single()
 
@@ -731,7 +795,6 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
                 message: `Solicitação de reembolso recusada. Motivo: ${data.adminResponse}`,
                 purchaseId: refundReq.purchase_id,
                 refundRequestId: refundReq.id,
-                token: refundReq.token,
             }
         )
 

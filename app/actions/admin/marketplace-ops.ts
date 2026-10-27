@@ -173,6 +173,14 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
             .eq("user_id", order.buyer_id)
             .maybeSingle()
 
+        if (profile?.cpf) {
+            try {
+                profile.cpf = await (await import("@/lib/crypto")).decryptCpfIfEncrypted(profile.cpf)
+            } catch {
+                profile.cpf = null
+            }
+        }
+
         // Get buyer email from auth
         try {
             const { data: authUser } = await admin.auth.admin.getUserById(order.buyer_id)

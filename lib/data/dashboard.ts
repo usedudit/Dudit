@@ -258,7 +258,7 @@ export type ProductsDashboardData = {
   categorySales: ChartPoint[]
   salesEvolution: ChartPoint[]
   busyHours: ChartPoint[]
-  inventoryRows: Array<{ id: string; name: string; category: string; sku: string; brand: string; stock: number; unit: string; price: number; active: boolean }>
+  inventoryRows: Array<{ id: string; name: string; category: string; sku: string; brand: string; stock: number; unit: string; price: number; active: boolean; visible: boolean }>
 }
 
 export type ServicesDashboardData = {
@@ -492,7 +492,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
     async () => {
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
-          scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).order("name", { ascending: true }).limit(300),
+          scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active, show_in_marketplace").eq("partner_id", partnerId)).order("name", { ascending: true }).limit(300),
           supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).order("created_at", { ascending: false }).limit(400),
           supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).limit(600),
         ])
@@ -550,6 +550,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
             unit: p.unit || "UN",
             price: Number(p.price || 0),
             active: Boolean(p.is_active),
+            visible: Boolean(p.show_in_marketplace),
           })),
         }
     },

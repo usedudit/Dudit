@@ -14,7 +14,7 @@ export async function getAdminRefundRequestDetail(refundRequestId: string) {
     const { data: refund, error } = await admin
         .from("billing_refund_requests")
         .select(`
-            id, token, status, amount, refunded_amount, reason_category, reason_description,
+            id, status, amount, refunded_amount, reason_category, reason_description,
             images, documents, admin_response, admin_evidence, is_within_7_days,
             grace_period_ends_at, requested_at, processed_at, created_at, updated_at, admin_id,
             partner:partner_id (
@@ -40,6 +40,18 @@ export async function getAdminRefundRequestDetail(refundRequestId: string) {
 
     if (error) throw error
     if (!refund) return null
+
+    const stores = refund.partner?.stores
+    if (Array.isArray(stores)) {
+        for (const store of stores) {
+            if (!store.cpf) continue
+            try {
+                store.cpf = await (await import("@/lib/crypto")).decryptCpfIfEncrypted(store.cpf)
+            } catch {
+                store.cpf = null
+            }
+        }
+    }
 
     // Se payment for nulo na solicitação, buscar o pagamento mais recente da compra
     if (!refund.payment && refund.purchase?.id) {

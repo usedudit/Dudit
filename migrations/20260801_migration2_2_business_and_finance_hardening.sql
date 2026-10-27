@@ -3,7 +3,7 @@
 -- Data: 2026-08-01 | Projeto: Dudit
 -- Descrição: 
 --   1. Trava o search_path em public, extensions, pg_temp nas 36 funções SECURITY INVOKER
---      do módulo de Negócio, Vendas, Estoque e Finanças do Dudit.
+--      do módulo de Negócio, Vendas, Estoque e Finanças da Dudit.
 --   2. Exclui estritamente todas as 35 funções internas de extensão (pg_trgm, unaccent).
 --   3. Usa blocos PL/pgSQL resilientes com EXCEPTION para garantir compatibilidade total.
 -- ==============================================================================

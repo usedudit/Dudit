@@ -7,6 +7,7 @@ import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
 import { FilterIcon, SparklesIcon, DownloadIcon, XIcon, ChevronDownIcon } from "@/lib/icons"
 import { useDashboard } from "./dashboard/DashboardContext"
+import { pushUrl } from "@/lib/navigation/history"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -33,7 +34,10 @@ export function GlobalPeriodFilter() {
       if (value) params.set(key, value)
       else params.delete(key)
     }
-    router.push(`${pathname}?${params.toString()}`)
+    const target = `${pathname}?${params.toString()}`
+    const onlyComparison = Object.keys(updates).every((key) => key === "compare" || key === "compareFrom" || key === "compareTo")
+    if (onlyComparison || (pathname === "/erp/relatorios" && !searchParams.get("tab") && Object.keys(updates).every((key) => key === "period" || key === "compare" || key === "compareFrom" || key === "compareTo"))) pushUrl(target)
+    else router.push(target)
   }, [router, pathname, searchParams])
 
   const handleCompareSelect = (mode: CompareMode) => {
@@ -48,9 +52,7 @@ export function GlobalPeriodFilter() {
   }
 
   const handleCustomDateChange = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set(key, value)
-    router.push(`${pathname}?${params.toString()}`)
+    updateParams({ [key]: value })
   }
 
   const maxDate = getCustomMaxDate(period, new Date().toISOString().slice(0, 10))

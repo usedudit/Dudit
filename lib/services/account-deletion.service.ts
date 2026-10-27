@@ -125,6 +125,7 @@ export class AccountDeletionService {
       .from("account_deletions")
       .insert({
         user_id: userId,
+        user_id_hash: crypto.createHash("sha256").update(userId).digest("hex"),
         partner_id: partnerId,
         status: "deleting_storage",
         requested_at: requestedAt.toISOString(),
@@ -189,10 +190,20 @@ export class AccountDeletionService {
           .update({ trigger_run_id: run.id })
           .eq("id", deletion.id)
       } else {
-        SecureLogger.warn("TRIGGER_SECRET_KEY not set. Account deletion scheduled locally, but Trigger.dev task was not enqueued.", { deletionId: deletion.id })
+        SecureLogger.warn("TRIGGER_SECRET_KEY not set. Account deletion task was not queued.", { deletionId: deletion.id })
+        await admin
+          .from("account_deletions")
+          .update({ status: "failed", error_log: "TRIGGER_SECRET_KEY is not configured; deletion task was not queued." })
+          .eq("id", deletion.id)
+        return { success: false, error: "Não foi possível iniciar a exclusão. Tente novamente mais tarde ou contate o suporte." }
       }
     } catch (triggerErr) {
       SecureLogger.error("Failed to enqueue Trigger.dev deletion task", { deletionId: deletion.id, error: triggerErr })
+      await admin
+        .from("account_deletions")
+        .update({ status: "failed", error_log: "Trigger.dev task could not be queued." })
+        .eq("id", deletion.id)
+      return { success: false, error: "Não foi possível iniciar a exclusão. Tente novamente mais tarde ou contate o suporte." }
     }
 
     await auditLog({
@@ -327,69 +338,72 @@ export class AccountDeletionService {
    * Cancel customer preapprovals (subscriptions) linked to the partner.
    */
   static async cancelCustomerSubscriptions(partnerId: string): Promise<number> {
-    try {
-      const admin = getAdminClient()
-      let cancelledCount = 0
+    const admin = getAdminClient()
+    let cancelledCount = 0
+    let failures = 0
 
-      // Fetch active customer subscriptions of this partner
-      const { data: subs, error: subsError } = await admin
-        .from("recurring_subscriptions")
-        .select("id, mp_preapproval_id")
-        .eq("partner_id", partnerId)
-        .not("mp_preapproval_id", "is", null)
+    const { data: subs, error: subsError } = await admin
+      .from("recurring_subscriptions")
+      .select("id, mp_preapproval_id")
+      .eq("partner_id", partnerId)
+      .not("mp_preapproval_id", "is", null)
 
-      if (subsError || !subs || subs.length === 0) {
-        return 0
-      }
-
-      // Find decrypted token of the partner
-      const { data: integration } = await admin
-        .from("partner_integrations")
-        .select("access_token_encrypted")
-        .eq("partner_id", partnerId)
-        .eq("provider_slug", MERCADOPAGO_PROVIDER)
-        .maybeSingle()
-
-      if (integration?.access_token_encrypted) {
-        const storeAccessToken = decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
-
-        for (const sub of subs) {
-          if (sub.mp_preapproval_id) {
-            try {
-              const response = await fetch(
-                `https://api.mercadopago.com/preapproval/${sub.mp_preapproval_id}`,
-                {
-                  method: "PUT",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${storeAccessToken}`
-                  },
-                  body: JSON.stringify({ status: "cancelled" })
-                }
-              )
-              if (response.ok) {
-                cancelledCount++
-              } else {
-                SecureLogger.warn("Failed to cancel customer subscription on MP", {
-                  mpPreapprovalId: sub.mp_preapproval_id,
-                  status: response.status
-                })
-              }
-            } catch (err) {
-              SecureLogger.error("Network error cancelling customer subscription on MP", {
-                mpPreapprovalId: sub.mp_preapproval_id,
-                error: err
-              })
-            }
-          }
-        }
-      }
-
-      return cancelledCount
-    } catch (err) {
-      SecureLogger.warn("cancelCustomerSubscriptions bypassed due to error or missing columns", { error: err })
-      return 0
+    if (subsError) {
+      throw new Error(`Failed to load customer subscriptions for deletion: ${subsError.message}`)
     }
+    if (!subs || subs.length === 0) return 0
+
+    const { data: integration, error: integrationError } = await admin
+      .from("partner_integrations")
+      .select("access_token_encrypted")
+      .eq("partner_id", partnerId)
+      .eq("provider_slug", MERCADOPAGO_PROVIDER)
+      .maybeSingle()
+
+    if (integrationError) {
+      throw new Error(`Failed to load Mercado Pago integration for deletion: ${integrationError.message}`)
+    }
+    if (!integration?.access_token_encrypted) {
+      throw new Error("Cannot verify cancellation of customer subscriptions: Mercado Pago credentials are unavailable.")
+    }
+
+    const storeAccessToken = decrypt(integration.access_token_encrypted, MERCADOPAGO_PROVIDER)
+    for (const sub of subs) {
+      if (!sub.mp_preapproval_id) continue
+      try {
+        const response = await fetch(
+          `https://api.mercadopago.com/preapproval/${sub.mp_preapproval_id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${storeAccessToken}`
+            },
+            body: JSON.stringify({ status: "cancelled" })
+          }
+        )
+        if (response.ok || response.status === 404) {
+          cancelledCount++
+        } else {
+          failures++
+          SecureLogger.warn("Failed to cancel customer subscription on MP", {
+            mpPreapprovalId: sub.mp_preapproval_id,
+            status: response.status
+          })
+        }
+      } catch (err) {
+        failures++
+        SecureLogger.error("Network error cancelling customer subscription on MP", {
+          mpPreapprovalId: sub.mp_preapproval_id,
+          error: err
+        })
+      }
+    }
+
+    if (failures > 0) {
+      throw new Error(`Could not verify cancellation of ${failures} Mercado Pago customer subscription(s).`)
+    }
+    return cancelledCount
   }
 
   /**
@@ -398,44 +412,53 @@ export class AccountDeletionService {
   static async disconnectWhatsApp(partnerId: string): Promise<number> {
     const admin = getAdminClient()
     let disconnectedCount = 0
+    let failures = 0
 
-    const { data: conns } = await admin
+    const { data: conns, error: connectionError } = await admin
       .from("partner_whatsapp_connections")
       .select("id, instance_name, api_key_encrypted")
       .eq("partner_id", partnerId)
 
-    if (conns && conns.length > 0) {
-      for (const conn of conns) {
-        if (conn.instance_name && conn.api_key_encrypted) {
-          try {
-            const apiKey = decrypt(conn.api_key_encrypted, "whatsapp")
-            // Call WhatsApp Evolution client or API directly to delete instance
-            const evoUrl = process.env.WHATSAPP_EVOLUTION_API_URL || "https://api.dudit.com.br/whatsapp"
-            const response = await fetch(`${evoUrl}/instance/delete/${conn.instance_name}`, {
-              method: "DELETE",
-              headers: {
-                "apikey": apiKey
-              }
-            })
+    if (connectionError) {
+      throw new Error(`Failed to load WhatsApp connections for deletion: ${connectionError.message}`)
+    }
 
-            if (response.ok) {
-              disconnectedCount++
-            } else {
-              SecureLogger.warn("Failed to delete WhatsApp instance on Evolution API server", {
-                instanceName: conn.instance_name,
-                status: response.status
-              })
-            }
-          } catch (err) {
-            SecureLogger.error("Error connecting to Evolution API server during deletion", {
-              instanceName: conn.instance_name,
-              error: err
-            })
-          }
+    for (const conn of conns || []) {
+      if (!conn.instance_name || !conn.api_key_encrypted) {
+        failures++
+        SecureLogger.warn("WhatsApp connection is missing deletion credentials", { connectionId: conn.id })
+        continue
+      }
+
+      try {
+        const apiKey = decrypt(conn.api_key_encrypted, "whatsapp")
+        const evoUrl = process.env.WHATSAPP_EVOLUTION_API_URL || "https://api.dudit.com.br/whatsapp"
+        const response = await fetch(`${evoUrl}/instance/delete/${conn.instance_name}`, {
+          method: "DELETE",
+          headers: { apikey: apiKey }
+        })
+
+        if (response.ok || response.status === 404) {
+          disconnectedCount++
+        } else {
+          failures++
+          SecureLogger.warn("Failed to delete WhatsApp instance on Evolution API server", {
+            connectionId: conn.id,
+            status: response.status
+          })
         }
+      } catch (err) {
+        failures++
+        SecureLogger.error("Error connecting to WhatsApp provider during deletion", {
+          connectionId: conn.id,
+          error: err
+        })
       }
     }
 
+    if (failures > 0) {
+      throw new Error(`Could not verify deletion of ${failures} WhatsApp instance(s).`)
+    }
     return disconnectedCount
   }
 
@@ -676,10 +699,11 @@ export class AccountDeletionService {
     const deletionVersion = "1.0.0"
     const requestedTimestamp = new Date(requestedAt)
 
-    await admin
+    const { error: complianceLogError } = await admin
       .from("compliance_logs")
       .insert({
         user_id: userId,
+        user_id_hash: crypto.createHash("sha256").update(userId).digest("hex"),
         partner_id: partnerId,
         email_hash: emailHash,
         mp_subscription_id: mpSubscriptionId,
@@ -693,6 +717,10 @@ export class AccountDeletionService {
         workflow_version: workflowVersion,
         deletion_reason: reason
       })
+
+    if (complianceLogError) {
+      throw new Error(`Failed to retain account deletion evidence: ${complianceLogError.message}`)
+    }
 
     return anonymizedCount
   }

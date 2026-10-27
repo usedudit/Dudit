@@ -15,7 +15,7 @@ const XML_IMPORT_SELECT = `
 `
 
 const XML_IMPORT_SELECT_ALL = `
-  id, invoice_number, invoice_series, supplier_name, supplier_document,
+  id, invoice_number, invoice_series, supplier_name, supplier_document, supplier_document_type,
   invoice_date, total_value, items_count, imported_items, skipped_items,
   status, created_at, updated_at, processed_at, access_key, modelo,
   protocolo, ambiente, finalidade, tipo_operacao, inf_cpl, inf_ad_fisco, xml_hash
@@ -85,6 +85,12 @@ export async function fetchXmlImportExport(
     },
   })
 
+  const { decrypt } = await import("@/lib/cryptoService")
+  for (const row of rawRows) {
+    if (row.supplier_document_type === "cpf" && row.supplier_document && String(row.supplier_document).startsWith("v")) {
+      try { row.supplier_document = await decrypt(row.supplier_document, "cpf") } catch { /* keep encrypted */ }
+    }
+  }
   const rows = rawRows.map((r) => mapXmlImportRow(r, includeAllColumns))
   const columns = includeAllColumns ? XML_IMPORT_EXPORT_ALL_COLUMNS : XML_IMPORT_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }

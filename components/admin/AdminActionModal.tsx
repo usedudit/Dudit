@@ -144,7 +144,7 @@ export default function AdminActionModal({
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         rows={3}
-                        placeholder="Explique por que esta ação está sendo feita. O vendedor recebe isso como notificação no Dudit."
+                        placeholder="Explique por que esta ação está sendo feita. O vendedor recebe isso como notificação na Dudit."
                         className="w-full px-3 py-2 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/50 resize-none"
                     />
                     {requireReason && (

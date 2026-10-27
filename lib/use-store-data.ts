@@ -8,10 +8,10 @@ import {
   fetchCustomersWithStorePriority,
   fetchStoreOrders,
   fetchStoreServices,
-  fetchStoreSuppliers,
   fetchStoreStockMovements,
   fetchStorePaymentMethods,
 } from "@/lib/store-queries"
+import { fetchStoreSuppliersClient } from "@/app/actions/erp/client-loaders"
 
 interface UseStoreDataOptions {
   includeProducts?: boolean
@@ -85,7 +85,7 @@ export function useStoreData(partnerId: string, options: UseStoreDataOptions = {
 
   const { data: suppliers, isLoading: suppliersLoading } = useSWR(
     options.includeSuppliers ? [baseKey, "suppliers"] : null,
-    () => fetchStoreSuppliers(partnerId, storeId || null),
+    () => fetchStoreSuppliersClient(partnerId, storeId || null),
     SWR_CONFIG
   )
 

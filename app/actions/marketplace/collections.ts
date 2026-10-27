@@ -31,7 +31,7 @@ export async function createCollection(name: string, description?: string): Prom
       return { success: false, error: "Descrição deve ter no máximo 500 caracteres" }
     }
 
-    const moderation = await moderateProductContent({ name, description })
+    const moderation = await moderateProductContent({ name, description, userId: user.id })
     if (!moderation.valid) {
       return { success: false, error: moderation.error || "Conteúdo não aprovado" }
     }
@@ -71,7 +71,7 @@ export async function updateCollection(id: string, name: string, description?: s
       return { success: false, error: "Descrição deve ter no máximo 500 caracteres" }
     }
 
-    const moderation = await moderateProductContent({ name, description })
+    const moderation = await moderateProductContent({ name, description, userId: user.id })
     if (!moderation.valid) {
       return { success: false, error: moderation.error || "Conteúdo não aprovado" }
     }

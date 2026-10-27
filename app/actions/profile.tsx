@@ -134,7 +134,7 @@ export async function updateProfileAction(data: {
 
       const cleanCpf = sanitizedData.cpf.replace(/\D/g, "")
 
-      const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
+      const { encryptCPF, decryptCPF, generateCpfLookupHash } = await import("@/lib/crypto")
 
       // Verificar unicidade do CPF entre os perfis
       const { data: existingCpfs, error: fetchError } = await supabaseAdmin
@@ -161,6 +161,7 @@ export async function updateProfileAction(data: {
 
       try {
         updateData.cpf = await encryptCPF(cleanCpf)
+        updateData.cpf_lookup_hash = await generateCpfLookupHash(cleanCpf)
       } catch (err) {
         console.error("Error encrypting CPF:", err)
         return { error: "Erro ao criptografar o CPF" }
@@ -168,6 +169,7 @@ export async function updateProfileAction(data: {
     } else {
       // Allow clearing CPF
       updateData.cpf = null
+      updateData.cpf_lookup_hash = null
     }
   }
 

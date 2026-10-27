@@ -130,8 +130,8 @@ function resolveGroupPayment(params: {
   const paidAmount = params.orderFullyPaid
     ? params.group.totalPrice
     : params.group.services.reduce((sum, s) => {
-        return sum + (s.payDepositOnly ? (s.depositAmount ?? s.unitPrice * s.quantity) : s.unitPrice * s.quantity)
-      }, 0)
+      return sum + (s.payDepositOnly ? (s.depositAmount ?? s.unitPrice * s.quantity) : s.unitPrice * s.quantity)
+    }, 0)
 
   const paymentStatus: "unpaid" | "partially_paid" | "paid" = params.orderFullyPaid
     ? "paid"
@@ -834,7 +834,7 @@ async function createSubscriptionFromPlan(
     }
   }
 
-  // Ciclo 1 ja foi pago no checkout do Dudit: o preapproval do MP cobrara a
+  // Ciclo 1 ja foi pago no checkout da Dudit: o preapproval do MP cobrara a
   // partir do proximo ciclo (nextExecutionAt).
   if (plan.billing_mode === "auto_mercado_pago" && Number(plan.price || 0) + shipping.amount > 0) {
     await linkMpPreapproval(supabase, {
@@ -1014,7 +1014,7 @@ export async function fulfillMarketplaceOrder(
               remaining,
               paidAmount: groupPaidAmount,
               paymentMethod: order.payment_method,
-          })
+            })
             if (receivableId) {
               await supabase
                 .from("appointments")

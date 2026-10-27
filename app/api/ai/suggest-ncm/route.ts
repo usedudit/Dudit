@@ -69,24 +69,6 @@ const GENERIC_CONTAINERS = [
 
 const STOP_WORDS = ["de", "da", "do", "com", "para", "e", "sem", "ao"];
 
-const ncmSchema = {
-    type: "object",
-    properties: {
-        suggestions: {
-            type: "array",
-            items: {
-                type: "object",
-                properties: {
-                    ncm: { type: "string" },
-                    description: { type: "string" },
-                    confidence: { type: "string" },
-                    reasoning: { type: "string" }
-                }
-            }
-        }
-    }
-}
-
 async function handleSuggestNCM(req: NextRequest) {
     try {
         // --- Rate Limit & Auth ---
@@ -146,37 +128,39 @@ async function handleSuggestNCM(req: NextRequest) {
             })
         }
 
-        // 2. IA (Fonte Primária)
-        const apiKey = process.env.GOOGLE_GEMINI_API_KEY
+        // 2. IA (Fonte Primária) - Usando Groq
+        const apiKey = process.env.GROQ_API_KEY
         if (apiKey) {
             try {
-                console.log(`[NCM] Consultando IA para: "${cleanName}"`)
+                console.log(`[NCM] Consultando IA (Groq) para: "${cleanName}"`)
                 const prompt = `
               Atue como banco de dados fiscal. Liste 3 NCMs (8 dígitos) para: "${cleanName}".
               - Ignore embalagens (Caixa, Pote). Foque no produto.
               - "Caixa de Bombom" = 18069000 (Chocolate).
               - Ordene por probabilidade.
+              - Retorne JSON no formato: { "suggestions": [{ "ncm": "12345678", "description": "...", "confidence": "alta", "reasoning": "..." }] }
             `
 
-                const geminiResponse = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                const groqResponse = await fetch(
+                    "https://api.groq.com/openai/v1/chat/completions",
                     {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${apiKey}`,
+                        },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: {
-                                temperature: 0.1,
-                                responseMimeType: "application/json",
-                                responseSchema: ncmSchema
-                            },
+                            model: "qwen/qwen3.8-27b",
+                            messages: [{ role: "user", content: prompt }],
+                            temperature: 0.1,
+                            response_format: { type: "json_object" },
                         }),
                     }
                 )
 
-                if (geminiResponse.ok) {
-                    const data = await geminiResponse.json()
-                    const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "{}")
+                if (groqResponse.ok) {
+                    const data = await groqResponse.json()
+                    const result = JSON.parse(data.choices?.[0]?.message?.content || "{}")
                     const aiSuggestions = result.suggestions || []
 
                     for (const item of aiSuggestions) {
@@ -203,7 +187,7 @@ async function handleSuggestNCM(req: NextRequest) {
                     }
                 }
             } catch (e) {
-                console.warn("[NCM] Erro na IA, indo para fallback:", e)
+                console.warn("[NCM] Erro na IA (Groq), indo para fallback:", e)
             }
         }
 

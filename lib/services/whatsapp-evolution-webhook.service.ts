@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SecureLogger } from "@/lib/secure-logger"
 import { decrypt } from "@/lib/cryptoService"
+import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
 import { EvolutionWhatsappClient } from "@/lib/whatsapp/providers/evolution-client"
 import { updateConnectionStatus, getWebhookUrl, EVOLUTION_WEBHOOK_EVENTS } from "./whatsapp-connection.service"
 import type { WhatsappConnectionStatus } from "@/lib/whatsapp/types"
@@ -16,9 +17,11 @@ export function verifyEvolutionWebhookSecret(
 ): boolean {
   if (!receivedSecret || !expectedSecret) return false
   try {
+    const plaintextExpected = decryptWhatsappSecret(expectedSecret)
+    if (!plaintextExpected) return false
     return timingSafeEqual(
       Buffer.from(receivedSecret),
-      Buffer.from(expectedSecret),
+      Buffer.from(plaintextExpected),
     )
   } catch {
     return false
@@ -370,6 +373,8 @@ export async function refreshEvolutionWebhookUrl(
 ): Promise<void> {
   try {
     if (!connection.instance_name || !connection.api_url || !connection.evolution_webhook_secret) return
+    const webhookSecret = decryptWhatsappSecret(connection.evolution_webhook_secret)
+    if (!webhookSecret) return
 
     const apiKey = connection.api_key_encrypted
       ? decrypt(connection.api_key_encrypted, "whatsapp")
@@ -377,9 +382,9 @@ export async function refreshEvolutionWebhookUrl(
 
     if (!apiKey) return
 
-    const webhookUrl = getWebhookUrl("evolution", connection.id, connection.evolution_webhook_secret)
+    const webhookUrl = getWebhookUrl("evolution", connection.id, webhookSecret)
     const webhookEvents = [...EVOLUTION_WEBHOOK_EVENTS]
-    const webhookHeaders = { "x-evolution-signature": connection.evolution_webhook_secret }
+    const webhookHeaders = { "x-evolution-signature": webhookSecret }
 
     const client = new EvolutionWhatsappClient({
       apiUrl: connection.api_url,

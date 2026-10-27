@@ -658,10 +658,14 @@ export async function claimDueRecurringExecutions(limit = 100): Promise<ClaimedR
   }))
 }
 
-export async function processDueRecurringExecutions(limit = 100): Promise<{
+export async function processDueRecurringExecutions(
+  limit = 100,
+  options: { deadline?: number } = {},
+): Promise<{
   claimed: number
   completed: number
   failed: number
+  deferred: number
 }> {
   const supabase = getAdminClient()
   try {
@@ -674,8 +678,17 @@ export async function processDueRecurringExecutions(limit = 100): Promise<{
   const claims = await claimDueRecurringExecutions(limit)
   let completed = 0
   let failed = 0
+  let deferred = 0
 
-  for (const claim of claims) {
+  for (let i = 0; i < claims.length; i++) {
+    // Claims não processados continuam como 'pending' em recurring_executions,
+    // então a próxima execução do cron os pega de novo.
+    if (options.deadline && Date.now() >= options.deadline) {
+      deferred = claims.length - i
+      break
+    }
+
+    const claim = claims[i]
     try {
       await executeRecurringClaim(claim)
       completed++
@@ -687,7 +700,7 @@ export async function processDueRecurringExecutions(limit = 100): Promise<{
     }
   }
 
-  return { claimed: claims.length, completed, failed }
+  return { claimed: claims.length, completed, failed, deferred }
 }
 
 /**

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { acquireExecutionLock, cronLogger, releaseExecutionLock } from "@/lib/internal-cron"
 import { getLimiter, RateLimitCategory } from "@/lib/rate-limiter"
 import { captureError, flushMonitoring } from "@/lib/monitoring/sentry"
@@ -28,7 +28,6 @@ export async function POST(req: Request) {
   const startedAt = Date.now()
   const authError = validateBackupCronRequest(req)
   if (authError) return authError
-
   // The bearer secret authenticates the caller; do not key this limit by a
   // client-controlled forwarding header.
   const ip = `job:${JOB_NAME}`
@@ -52,38 +51,63 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, skipped: true, reason: "lock_active" })
   }
 
-  try {
-    cronLogger.start(JOB_NAME)
-    const result = await runDatabaseBackup()
-    cronLogger.success(JOB_NAME, {
-      fileName: result.fileName,
-      sizeBytes: result.sizeBytes,
-      retentionDeleted: result.retentionDeleted,
-      retentionRetained: result.retentionRetained,
-    }, result.durationMs)
+  const executeBackup = async () => {
+    try {
+      cronLogger.start(JOB_NAME)
+      const result = await runDatabaseBackup()
+      cronLogger.success(JOB_NAME, {
+        fileName: result.fileName,
+        sizeBytes: result.sizeBytes,
+        retentionDeleted: result.retentionDeleted,
+        retentionRetained: result.retentionRetained,
+      }, result.durationMs)
 
-    return NextResponse.json({
-      success: true,
-      fileName: result.fileName,
-      sizeBytes: result.sizeBytes,
-      durationMs: result.durationMs,
-      retentionDeleted: result.retentionDeleted,
-      retentionRetained: result.retentionRetained,
-    })
-  } catch (error) {
-    const durationMs = Date.now() - startedAt
-    const errorType = error instanceof Error ? error.name : "UnknownError"
-    const errorMessage = sanitizeBackupError(error)
-    cronLogger.error(JOB_NAME, "Database backup failed", { durationMs, errorType, errorMessage })
-    captureError(new Error(errorMessage), {
-      module: "database-backup",
-      action: "run",
-      route: "/api/internal/jobs/backup-database",
-      metadata: { duration_ms: durationMs, error_type: errorType, error_message: errorMessage },
-    })
-    await flushMonitoring(3000)
-    return NextResponse.json({ success: false, error: "Database backup failed" }, { status: 500 })
-  } finally {
-    await releaseExecutionLock(lock.lockKey)
+      return { ok: true as const, result }
+    } catch (error) {
+      const durationMs = Date.now() - startedAt
+      const errorType = error instanceof Error ? error.name : "UnknownError"
+      const errorMessage = sanitizeBackupError(error)
+      cronLogger.error(JOB_NAME, "Database backup failed", { durationMs, errorType, errorMessage })
+      captureError(new Error(errorMessage), {
+        module: "database-backup",
+        action: "run",
+        route: "/api/internal/jobs/backup-database",
+        metadata: { duration_ms: durationMs, error_type: errorType, error_message: errorMessage },
+      })
+      await flushMonitoring(3000)
+      return { ok: false as const, error: "Database backup failed" }
+    }
   }
+
+  // Execução manual: ?sync=1 espera o dump terminar e devolve o resultado.
+  const runSynchronously = new URL(req.url).searchParams.get("sync") === "1"
+
+  if (runSynchronously) {
+    try {
+      const outcome = await executeBackup()
+      if (!outcome.ok) {
+        return NextResponse.json({ success: false, error: outcome.error }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, ...outcome.result })
+    } finally {
+      await releaseExecutionLock(lock.lockKey)
+    }
+  }
+
+  // O cron-job.org encerra a conexão em 30s, bem antes de um dump terminar.
+  // Devolver 202 imediatamente evita que a execução diária seja marcada como
+  // timeout (25 falhas seguidas desativam o job). O dump continua em background
+  // via after(), que é suportado no next start; erros vão para Sentry e logs.
+  after(async () => {
+    try {
+      await executeBackup()
+    } finally {
+      await releaseExecutionLock(lock.lockKey)
+    }
+  })
+
+  return NextResponse.json(
+    { success: true, accepted: true, status: "started" },
+    { status: 202 },
+  )
 }

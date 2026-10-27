@@ -1,499 +1,246 @@
 /**
- * Script de migração de chave mestra de criptografia (v1 → v2, v2 → v3, etc.)
- *
- * COMO USAR:
- *   1. Gere a nova chave:     node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
- *   2. Adicione MASTER_KEY_V2 (ou V3, V4...) no .env (mantendo a MASTER_KEY_V1)
- *   3. No arquivo lib/cryptoService.ts, mude:
- *         ACTIVE_KEY_VERSION: KeyVersion = "v1"  →  "v2"
- *         SUPPORTED_VERSIONS: ["v1", "v2"]  →  adicione a nova versão se necessário
- *         type KeyVersion = "v1" | "v2"     →  adicione a nova versão se necessário
- *   4. Rode o script:
- *         npx jiti scripts/rotate-encryption-keys.ts
- *   5. Verifique os logs - nenhum erro = migração concluída
- *   6. Após confirmar que tudo está em v2, pode remover MASTER_KEY_V1 do .env
- *
- * SEGURANÇA:
- *   - O script NUNCA apaga dados, apenas lê e atualiza
- *   - Se algo falhar no meio, é seguro rodar de novo (idempotente)
- *   - As chaves antigas permanecem no .env até vc removê-las manualmente
+ * Rotação de payloads que já estão criptografados pelo cryptoService.
+ * Simula por padrão; use --apply para gravar. A conversão de texto puro é feita
+ * separadamente por scripts/migrate-plaintext-sensitive-data.ts.
  */
-
-// ────────────────────────────────────────────────────────────
-// 1. Load .env (sem dependência externa)
-// ────────────────────────────────────────────────────────────
-import { hkdfSync, createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto"
 import { createClient } from "@supabase/supabase-js"
-import * as fs from "fs"
-import * as path from "path"
+import {
+  decryptWithSupportedVersion,
+  encryptWithFreshIv,
+  getMasterKey,
+  getPayloadVersion,
+  loadEnv,
+  readCryptoConfig,
+  type CryptoContext,
+  type KeyVersion,
+} from "./crypto-rotation-utils"
 
-function loadEnv() {
-  const envPath = path.resolve(process.cwd(), ".env")
-  if (!fs.existsSync(envPath)) {
-    console.error("Arquivo .env não encontrado em", envPath)
-    process.exit(1)
-  }
-  const content = fs.readFileSync(envPath, "utf-8")
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith("#")) continue
-    const eqIdx = trimmed.indexOf("=")
-    if (eqIdx === -1) continue
-    const key = trimmed.slice(0, eqIdx).trim()
-    let value = trimmed.slice(eqIdx + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1)
-    }
-    if (!process.env[key]) {
-      process.env[key] = value
-    }
-  }
-}
-
-loadEnv()
-
-// ────────────────────────────────────────────────────────────
-// 2. Crypto helpers (inline para evitar import "server-only")
-// ────────────────────────────────────────────────────────────
-
-const ALGORITHM = "aes-256-gcm" as const
-const IV_LENGTH = 12
-const AUTH_TAG_LENGTH = 16
-const KEY_LENGTH = 32
-const MIN_MASTER_KEY_LENGTH = 32
-
-const HKDF_SALT = createHash("sha256")
-  .update("dudit-crypto-service-hkdf-salt-v1")
-  .digest()
-
-const CONTEXT_INFO: Record<string, string> = {
-  cpf: "cpf-encryption",
-  mercadopago: "mercadopago-token-encryption",
-  whatsapp: "whatsapp-token-encryption",
-  superfrete: "superfrete-token-encryption",
-}
-
-type KeyVersion = "v1" | "v2"
-
-function getMasterKey(version: KeyVersion): Buffer {
-  const envVarName = `MASTER_KEY_${version.toUpperCase()}`
-  const masterKeyBase64 = process.env[envVarName]
-  if (!masterKeyBase64) {
-    throw new Error(`[MIGRAÇÃO] ${envVarName} não está definida no .env`)
-  }
-  const masterKey = Buffer.from(masterKeyBase64, "base64")
-  if (masterKey.length < MIN_MASTER_KEY_LENGTH) {
-    throw new Error(`[MIGRAÇÃO] ${envVarName} precisa ter no mínimo 32 bytes após decode base64`)
-  }
-  return masterKey
-}
-
-const derivedKeyCache = new Map<string, Buffer>()
-
-function deriveKey(version: KeyVersion, context: string): Buffer {
-  const cacheKey = `${version}:${context}`
-  const cached = derivedKeyCache.get(cacheKey)
-  if (cached) return cached
-
-  const masterKey = getMasterKey(version)
-  const info = CONTEXT_INFO[context]
-  if (!info) throw new Error(`Contexto desconhecido: ${context}`)
-
-  const derived = Buffer.from(hkdfSync("sha256", masterKey, HKDF_SALT, info, KEY_LENGTH))
-  derivedKeyCache.set(cacheKey, derived)
-  return derived
-}
-
-function parseVersionedPayload(data: string): { version: string; body: string } {
-  const colonIdx = data.indexOf(":")
-  if (colonIdx === -1) {
-    throw new Error("Payload inválido: sem prefixo de versão")
-  }
-  const version = data.slice(0, colonIdx)
-  const body = data.slice(colonIdx + 1)
-  if (!body) throw new Error("Payload inválido: corpo vazio após prefixo")
-  return { version, body }
-}
-
-function decrypt(data: string, context: string): string {
-  if (!data) throw new Error("Cannot decrypt empty data")
-  const { version, body } = parseVersionedPayload(data)
-  const key = deriveKey(version as KeyVersion, context)
-  const packed = Buffer.from(body, "base64")
-
-  if (packed.length < IV_LENGTH + AUTH_TAG_LENGTH + 1) {
-    throw new Error("Dados criptografados inválidos: payload muito curto")
-  }
-
-  const iv = packed.subarray(0, IV_LENGTH)
-  const authTag = packed.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
-  const ciphertext = packed.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
-
-  const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
-  decipher.setAuthTag(authTag)
-
-  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
-  return decrypted.toString("utf8")
-}
-
-function reEncryptWithActiveVersion(data: string, context: string, activeVersion: KeyVersion): string {
-  const plaintext = decrypt(data, context)
-  return encrypt(plaintext, context, activeVersion)
-}
-
-function encrypt(data: string, context: string, activeVersion: KeyVersion): string {
-  if (!data) throw new Error("Cannot encrypt empty data")
-  const key = deriveKey(activeVersion, context)
-  const iv = randomBytes(IV_LENGTH)
-
-  const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH })
-  const ciphertext = Buffer.concat([cipher.update(data, "utf8"), cipher.final()])
-  const authTag = cipher.getAuthTag()
-
-  const packed = Buffer.concat([iv, authTag, ciphertext])
-  return `${activeVersion}:${packed.toString("base64")}`
-}
-
-// ────────────────────────────────────────────────────────────
-// 3. Detecta qual versão está ativa agora
-// ────────────────────────────────────────────────────────────
-
-function detectActiveVersion(): KeyVersion {
-  const cryptoServicePath = path.resolve(process.cwd(), "lib", "cryptoService.ts")
-  const content = fs.readFileSync(cryptoServicePath, "utf-8")
-
-  // Procura o ACTIVE_KEY_VERSION no código
-  const match = content.match(/ACTIVE_KEY_VERSION:\s*KeyVersion\s*=\s*"(v\d+)"/)
-  if (!match) {
-    console.warn("⚠  Não foi possível detectar ACTIVE_KEY_VERSION. Usando 'v2' como fallback.")
-    return "v2"
-  }
-
-  const version = match[1] as KeyVersion
-  console.log(`ℹ  ACTIVE_KEY_VERSION detectado: ${version}`)
-  return version
-}
-
-// ────────────────────────────────────────────────────────────
-// 4. Configuração do Supabase
-// ────────────────────────────────────────────────────────────
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error("❌ Variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórias no .env")
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey)
-
-// ────────────────────────────────────────────────────────────
-// 5. Definição das migrações
-// ────────────────────────────────────────────────────────────
-
-interface ColumnMigration {
+type ColumnMigration = {
   table: string
   column: string
-  /** Contexto de criptografia fixo (cryptoService) */
-  context?: string
-  /**
-   * Coluna cujo valor define o contexto de criptografia de cada linha.
-   * Usado em tabelas multi-provedor (partner_integrations.provider_slug guarda
-   * tokens de mercadopago, superfrete, etc).
-   */
+  context?: CryptoContext
   contextColumn?: string
-  /** Chave dentro de uma coluna JSONB (ex: credentials.refresh_token_encrypted) */
   jsonbKey?: string
-  /** Filtros extras (ex: { pix_key_type: "cpf" }) */
   filters?: Record<string, string>
-  /** Nome amigável para exibição */
   label: string
 }
 
 const MIGRATIONS: ColumnMigration[] = [
-  // CPF
   { table: "stores", column: "cpf", context: "cpf", label: "CPF de lojas" },
   { table: "customers", column: "cpf", context: "cpf", label: "CPF de clientes" },
   { table: "suppliers", column: "cpf", context: "cpf", label: "CPF de fornecedores" },
-  { table: "user_profiles", column: "cpf", context: "cpf", label: "CPF de usuarios" },
-
-  // TOTP secrets (pode não existir em todas as instâncias)
-  { table: "user_2fa_secrets", column: "secret", context: "cpf", label: "Segredos 2FA" },
-
-  // PIX key (só quando for CPF)
+  { table: "user_profiles", column: "cpf", context: "cpf", label: "CPF de perfis" },
+  { table: "xml_imports", column: "raw_xml", context: "nfe_xml", label: "XMLs fiscais" },
+  { table: "xml_imports", column: "supplier_document", context: "cpf", filters: { supplier_document_type: "cpf" }, label: "CPF fiscal do fornecedor na NF-e" },
   {
     table: "payment_methods",
     column: "pix_key",
     context: "cpf",
     filters: { pix_key_type: "cpf" },
-    label: "Chaves PIX (tipo CPF)",
+    label: "Chaves PIX do tipo CPF",
   },
-
-  // Integrações por parceiro (segredos do Mercado Pago, SuperFrete, etc)
-  // Desde a migração 20260928 os tokens do Mercado Pago vivem aqui, não mais
-  // em partners.mp_*.
   {
     table: "partner_integrations",
     column: "access_token_encrypted",
     contextColumn: "provider_slug",
-    label: "Access token das integrações",
+    label: "Tokens de acesso das integrações",
   },
   {
     table: "partner_integrations",
     column: "webhook_secret_encrypted",
     contextColumn: "provider_slug",
-    label: "Webhook secret das integrações",
+    label: "Segredos de webhook das integrações",
   },
   {
     table: "partner_integrations",
     column: "credentials",
     jsonbKey: "refresh_token_encrypted",
     contextColumn: "provider_slug",
-    label: "Refresh token MP (JSONB)",
+    label: "Refresh token do Mercado Pago",
   },
-
-  // WhatsApp
-  { table: "partner_whatsapp_connections", column: "access_token_encrypted", context: "whatsapp", label: "Access Token WhatsApp" },
-  { table: "partner_whatsapp_connections", column: "api_key_encrypted", context: "whatsapp", label: "API Key WhatsApp" },
+  { table: "partner_whatsapp_connections", column: "access_token_encrypted", context: "whatsapp", label: "Token WhatsApp" },
+  { table: "partner_whatsapp_connections", column: "api_key_encrypted", context: "whatsapp", label: "API key WhatsApp" },
+  { table: "partner_whatsapp_connections", column: "webhook_verify_token", context: "whatsapp", label: "Token de verificação WhatsApp" },
+  { table: "partner_whatsapp_connections", column: "webhook_secret", context: "whatsapp", label: "Segredo de webhook WhatsApp" },
+  { table: "partner_whatsapp_connections", column: "evolution_webhook_secret", context: "whatsapp", label: "Segredo de webhook Evolution" },
 ]
 
-// ────────────────────────────────────────────────────────────
-// 6. Estatísticas
-// ────────────────────────────────────────────────────────────
+const PAGE_SIZE = 250
+type Row = Record<string, any> & { id: string }
+type ScanResult = { byVersion: Map<KeyVersion, number>; malformed: number; rows: number }
 
-interface Stats {
-  total: number
-  migrated: number
-  skipped: number
-  errors: number
+function getFilterColumn(migration: ColumnMigration): string {
+  return migration.jsonbKey ? `${migration.column}->>${migration.jsonbKey}` : migration.column
 }
 
-// ────────────────────────────────────────────────────────────
-// 7. Lógica principal
-// ────────────────────────────────────────────────────────────
+function getValue(row: Row, migration: ColumnMigration): string | null {
+  const value = migration.jsonbKey ? row[migration.column]?.[migration.jsonbKey] : row[migration.column]
+  return typeof value === "string" && value.length ? value : null
+}
 
-async function migrateColumn(migration: ColumnMigration, activeVersion: KeyVersion): Promise<Stats> {
-  const { table, column, context, contextColumn, jsonbKey, filters, label } = migration
-  const stats: Stats = { total: 0, migrated: 0, skipped: 0, errors: 0 }
+function getQuery(supabase: any, migration: ColumnMigration, afterId?: string) {
+  const selected = `id, ${migration.column}${migration.contextColumn ? `, ${migration.contextColumn}` : ""}`
+  let query = supabase.from(migration.table).select(selected).like(getFilterColumn(migration), "v%")
+  for (const [key, value] of Object.entries(migration.filters || {})) query = query.eq(key, value)
+  if (afterId) query = query.gt("id", afterId)
+  return query.order("id", { ascending: true }).limit(PAGE_SIZE)
+}
 
-  // Descobre qual prefixo é "antigo" (dados que PRECISAM ser migrados)
-  const versionNum = parseInt(activeVersion[1])
-  const oldPrefix = versionNum > 1 ? `v${versionNum - 1}:` : null
-
-  // Valor filtrado: dentro de JSONB o filtro usa a sintaxe `coluna->>chave`
-  const filterColumn = jsonbKey ? `${column}->>${jsonbKey}` : column
-
-  process.stdout.write(`\n📦 ${label} (${table}.${column})... `)
-
-  try {
-    // Se a versão ativa é v1, não há o que migrar
-    if (!oldPrefix) {
-      console.log(`já está na versão ativa ✔`)
-      return stats
+async function scanMigration(supabase: any, migration: ColumnMigration): Promise<ScanResult> {
+  const result: ScanResult = { byVersion: new Map(), malformed: 0, rows: 0 }
+  let afterId: string | undefined
+  while (true) {
+    const { data, error } = await getQuery(supabase, migration, afterId)
+    if (error) throw new Error(`${migration.table}.${migration.column}: ${error.message}`)
+    const rows = (data || []) as Row[]
+    if (!rows.length) break
+    for (const row of rows) {
+      result.rows++
+      const value = getValue(row, migration)
+      if (!value) continue
+      const version = getPayloadVersion(value)
+      if (!version) result.malformed++
+      else result.byVersion.set(version, (result.byVersion.get(version) || 0) + 1)
     }
-
-    // Busca registros com dados na versão antiga
-    let query = supabase
-      .from(table)
-      .select(`id, ${column}${contextColumn ? `, ${contextColumn}` : ""}`)
-
-    // Filtros adicionais (ex: pix_key_type = 'cpf')
-    if (filters) {
-      for (const [key, value] of Object.entries(filters)) {
-        query = query.eq(key, value)
-      }
-    }
-
-    // Filtra apenas registros com prefixo da versão ANTERIOR
-    query = query.like(filterColumn, `${oldPrefix}%`)
-
-    const { data: records, error } = await query
-
-    if (error) {
-      // Tabela pode não existir - não é erro fatal
-      if (error.code === "PGRST116" || error.message?.includes("Could not find the table")) {
-        console.log(`tabela não encontrada, pulando ✔`)
-        return stats
-      }
-      console.error(`\n❌ Erro na consulta: ${error.message}`)
-      stats.errors++
-      return stats
-    }
-
-    if (!records || records.length === 0) {
-      console.log(`0 pendentes ✔`)
-      return stats
-    }
-
-    stats.total = records.length
-    console.log(`${stats.total} encontrados`)
-
-    // Processa em lotes de 50
-    const BATCH_SIZE = 50
-    for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE)
-      const updates: { id: string;[key: string]: any }[] = []
-
-      for (const record of batch) {
-        const rowContext = contextColumn ? (record as any)[contextColumn] : context
-        const oldValue = jsonbKey
-          ? (record as any)?.[column]?.[jsonbKey]
-          : (record as any)[column]
-
-        if (!oldValue) {
-          stats.skipped++
-          continue
-        }
-
-        // Verifica se já está na versão ativa
-        if (oldValue.startsWith(`${activeVersion}:`)) {
-          stats.skipped++
-          continue
-        }
-
-        if (!rowContext) {
-          stats.errors++
-          console.error(`\n⚠  Contexto de criptografia ausente em ${table} id=${record.id}`)
-          continue
-        }
-
-        try {
-          const newValue = reEncryptWithActiveVersion(oldValue, rowContext, activeVersion)
-          updates.push(
-            jsonbKey
-              ? { id: record.id, [column]: { ...((record as any)[column] || {}), [jsonbKey]: newValue } }
-              : { id: record.id, [column]: newValue },
-          )
-        } catch (err) {
-          stats.errors++
-          console.error(`\n⚠  Erro ao re-criptografar ${table}.${column} id=${record.id}: ${err}`)
-        }
-      }
-
-      // Executa as atualizações
-      for (const update of updates) {
-        const { error: updateError } = await supabase
-          .from(table)
-          .update({ [column]: update[column] })
-          .eq("id", update.id)
-
-        if (updateError) {
-          stats.errors++
-          console.error(`\n⚠  Erro ao atualizar ${table} id=${update.id}: ${updateError.message}`)
-        } else {
-          stats.migrated++
-        }
-      }
-
-      // Progresso
-      const progress = Math.min(i + BATCH_SIZE, stats.total)
-      process.stdout.write(`\r  ↳ ${progress}/${stats.total} processados (${stats.errors} erros)`)
-    }
-
-    console.log(`\r  ↳ ${stats.total}/${stats.total} - ✅ ${stats.migrated} migrados, ${stats.skipped} ignorados, ${stats.errors} erros`)
-  } catch (err) {
-    console.error(`\n❌ Erro fatal em ${label}: ${err}`)
-    stats.errors++
+    afterId = rows[rows.length - 1].id
+    if (rows.length < PAGE_SIZE) break
   }
+  return result
+}
 
-  return stats
+function printScan(migration: ColumnMigration, scan: ScanResult, activeVersion: KeyVersion) {
+  const pending = Array.from(scan.byVersion.entries())
+    .filter(([version]) => version !== activeVersion)
+    .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
+  const description = pending.length ? pending.map(([version, count]) => `${version}: ${count}`).join(", ") : "nenhum"
+  console.log(`  ${migration.label}: ${description}${scan.malformed ? `; prefixos inválidos: ${scan.malformed}` : ""}`)
+}
+
+async function migrateOne(supabase: any, migration: ColumnMigration, supported: KeyVersion[], activeVersion: KeyVersion) {
+  let afterId: string | undefined
+  let migrated = 0
+  let conflicts = 0
+  let errors = 0
+
+  while (true) {
+    const { data, error } = await getQuery(supabase, migration, afterId)
+    if (error) throw new Error(`${migration.table}.${migration.column}: ${error.message}`)
+    const rows = (data || []) as Row[]
+    if (!rows.length) break
+
+    for (const row of rows) {
+      const oldValue = getValue(row, migration)
+      const sourceVersion = getPayloadVersion(oldValue)
+      if (!oldValue || !sourceVersion || sourceVersion === activeVersion) continue
+      const rowContext = migration.contextColumn ? row[migration.contextColumn] : migration.context
+      if (!rowContext) {
+        errors++
+        console.error(`  Contexto ausente em ${migration.table} (registro omitido)`)
+        continue
+      }
+
+      try {
+        const plaintext = decryptWithSupportedVersion(oldValue, rowContext as CryptoContext, supported)
+        const nextValue = encryptWithFreshIv(plaintext, rowContext as CryptoContext, activeVersion)
+        const update: Record<string, unknown> = migration.jsonbKey
+          ? { [migration.column]: { ...(row[migration.column] || {}), [migration.jsonbKey]: nextValue } }
+          : { [migration.column]: nextValue }
+        let updateQuery = supabase.from(migration.table).update(update).eq("id", row.id)
+        for (const [key, value] of Object.entries(migration.filters || {})) updateQuery = updateQuery.eq(key, value)
+        // Compare-and-swap: never overwrite a value changed after the read.
+        updateQuery = updateQuery.eq(migration.column, row[migration.column])
+        const { data: changed, error: updateError } = await updateQuery.select("id")
+        if (updateError) {
+          errors++
+          console.error(`  Falha ao atualizar ${migration.table}.${migration.column}: ${updateError.message}`)
+        } else if (!changed?.length) {
+          conflicts++
+        } else {
+          migrated++
+        }
+      } catch (err) {
+        errors++
+        console.error(`  Falha de descriptografia em ${migration.table}.${migration.column}: ${err instanceof Error ? err.message : "erro desconhecido"}`)
+      }
+    }
+    afterId = rows[rows.length - 1].id
+    if (rows.length < PAGE_SIZE) break
+  }
+  return { migrated, conflicts, errors }
 }
 
 async function main() {
-  console.log("══════════════════════════════════════════════")
-  console.log("  Migração de Chave Mestra de Criptografia")
-  console.log("══════════════════════════════════════════════")
-  console.log()
+  loadEnv()
+  const apply = process.argv.includes("--apply")
+  const invalidArgs = process.argv.slice(2).filter((arg) => !["--apply", "--dry-run"].includes(arg))
+  if (invalidArgs.length) throw new Error(`Argumento desconhecido: ${invalidArgs[0]}`)
 
-  const activeVersion = detectActiveVersion()
-  console.log(`🔑 Versão ativa: ${activeVersion}`)
+  const { activeVersion, supportedVersions } = readCryptoConfig()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórias")
+  const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
 
-  // Verifica se a chave da versão ativa existe
-  try {
-    getMasterKey(activeVersion)
-    console.log(`✅ MASTER_KEY_${activeVersion.toUpperCase()} encontrada no .env`)
-  } catch (e) {
-    console.error(`❌ ${e}`)
-    console.error(`   Adicione MASTER_KEY_${activeVersion.toUpperCase()} no .env antes de rodar o script.`)
-    process.exit(1)
-  }
+  console.log(`Versão ativa: ${activeVersion}; versões suportadas: ${supportedVersions.join(", ")}`)
+  console.log(apply ? "MODO APPLY: alterações serão gravadas." : "SIMULAÇÃO: nenhuma alteração será gravada. Use --apply para executar.")
+  console.log("\nPré-verificação das colunas registradas:")
 
-  // Verifica se a chave anterior existe (necessária pra descriptografar dados existentes)
-  let oldVersion: string | null = null
-  if (activeVersion !== "v1") {
-    const oldVersionNum = parseInt(activeVersion[1]) - 1
-    oldVersion = `v${oldVersionNum}`
-    try {
-      getMasterKey(oldVersion as KeyVersion)
-      console.log(`✅ MASTER_KEY_${oldVersion.toUpperCase()} encontrada no .env (usada pra descriptografar dados antigos)`)
-    } catch (e) {
-      console.error(`❌ ${e}`)
-      console.error(`   MASTER_KEY_${oldVersion.toUpperCase()} é necessária para descriptografar dados existentes.`)
-      process.exit(1)
-    }
-  }
-
-  console.log()
-  console.log("📋 Colunas que serão migradas:")
-  console.log("─".repeat(60))
-  for (const m of MIGRATIONS) {
-    const contextLabel = m.contextColumn ? `coluna "${m.contextColumn}"` : `contexto "${m.context}"`
-    console.log(`   ${m.table}.${m.column} → ${contextLabel}`)
-  }
-  console.log("─".repeat(60))
-  console.log()
-
-  // Confirmação
-  console.log("⚠  Tem certeza que deseja prosseguir com a migração?")
-  console.log("   Os dados serão re-criptografados com a chave", activeVersion)
-  console.log("   Pressione Ctrl+C para cancelar ou aguarde 5 segundos para continuar...")
-  await new Promise((resolve) => setTimeout(resolve, 5000))
-
-  console.log()
-  console.log("🚀 Iniciando migração...")
-  console.log()
-
-  const startTime = Date.now()
-  const totals: Stats = { total: 0, migrated: 0, skipped: 0, errors: 0 }
-
+  const scans = new Map<ColumnMigration, ScanResult>()
   for (const migration of MIGRATIONS) {
-    const stats = await migrateColumn(migration, activeVersion)
-    totals.total += stats.total
-    totals.migrated += stats.migrated
-    totals.skipped += stats.skipped
-    totals.errors += stats.errors
+    const scan = await scanMigration(supabase, migration)
+    scans.set(migration, scan)
+    printScan(migration, scan, activeVersion)
   }
 
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-
-  console.log()
-  console.log("══════════════════════════════════════════════")
-  console.log("  RESUMO DA MIGRAÇÃO")
-  console.log("══════════════════════════════════════════════")
-  console.log(`  Duração:     ${elapsed}s`)
-  console.log(`  Total lidos: ${totals.total}`)
-  console.log(`  Migrados:    ${totals.migrated}`)
-  console.log(`  Ignorados:   ${totals.skipped}`)
-  console.log(`  Erros:       ${totals.errors}`)
-  console.log()
-  if (totals.errors === 0) {
-    console.log("✅ Migração concluída com sucesso!")
-    console.log()
-    console.log("Próximos passos:")
-    console.log(`  1. Verifique se todos os dados foram migrados rodando o script novamente`)
-    console.log("     (deve mostrar 0 pendentes)")
-    if (oldVersion) {
-      console.log(`  2. Remova a MASTER_KEY_${oldVersion.toUpperCase()} do .env com segurança`)
+  const unsupported = new Set<string>()
+  const requiredKeys = new Set<KeyVersion>([activeVersion])
+  for (const scan of scans.values()) {
+    if (scan.malformed) throw new Error("Há valores com prefixo inválido. Corrija-os antes de iniciar qualquer gravação.")
+    for (const [version, count] of scan.byVersion) {
+      if (!supportedVersions.includes(version)) unsupported.add(version)
+      else if (count > 0 && version !== activeVersion) requiredKeys.add(version)
     }
-  } else {
-    console.log(`⚠  Migração finalizada com ${totals.errors} erro(s).`)
-    console.log("   Revise os logs acima e rode o script novamente (é idempotente).")
   }
-  console.log()
+  if (unsupported.size) throw new Error(`Há payloads em versões não declaradas em SUPPORTED_VERSIONS: ${Array.from(unsupported).join(", ")}`)
+  for (const version of requiredKeys) getMasterKey(version)
+
+  const pending = Array.from(scans.values()).some((scan) =>
+    Array.from(scan.byVersion.entries()).some(([version, count]) => version !== activeVersion && count > 0),
+  )
+  if (!pending) {
+    console.log("\nTudo já está na versão ativa; nenhuma rotação necessária.")
+    return
+  }
+  if (!apply) {
+    console.log("\nSimulação concluída. Revise as contagens; para executar, rode novamente com --apply.")
+    return
+  }
+
+  console.log("\nExecutando rotação com comparação condicional por registro...")
+  let totalMigrated = 0
+  let totalConflicts = 0
+  let totalErrors = 0
+  for (const migration of MIGRATIONS) {
+    const result = await migrateOne(supabase, migration, supportedVersions, activeVersion)
+    totalMigrated += result.migrated
+    totalConflicts += result.conflicts
+    totalErrors += result.errors
+    console.log(`  ${migration.label}: ${result.migrated} migrados, ${result.conflicts} alterados concorrentemente, ${result.errors} erros`)
+  }
+
+  console.log("\nVerificação após a rotação:")
+  let remaining = 0
+  for (const migration of MIGRATIONS) {
+    const scan = await scanMigration(supabase, migration)
+    const oldCount = Array.from(scan.byVersion.entries()).reduce((sum, [version, count]) => sum + (version === activeVersion ? 0 : count), 0)
+    remaining += oldCount + scan.malformed
+    console.log(`  ${migration.label}: ${oldCount} payloads antigos; ${scan.malformed} prefixos inválidos`)
+  }
+  console.log(`\nResumo: ${totalMigrated} migrados; ${totalConflicts} conflitos concorrentes; ${totalErrors} erros; ${remaining} pendentes.`)
+  if (totalErrors || remaining) process.exitCode = 1
 }
 
-main().catch((err) => {
-  console.error("Erro fatal:", err)
-  process.exit(1)
+main().catch((error) => {
+  console.error(`Rotação interrompida sem confirmar sucesso: ${error instanceof Error ? error.message : error}`)
+  process.exitCode = 1
 })

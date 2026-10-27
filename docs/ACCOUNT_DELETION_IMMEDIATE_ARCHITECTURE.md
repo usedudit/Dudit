@@ -53,7 +53,7 @@ A task assíncrona foi projetada como uma Saga com checkpoints lineares de estad
    * **Idempotência**: Operações do Redis são estruturalmente idempotentes (`DEL` / `ZREM`).
 
 4. **`deleting_database`**:
-   * **Ação**: Executa a Procedure SQL `execute_account_deletion_db` por RPC e higieniza/anonimiza registros históricos de faturamento (pedidos e itens) para conformidade com o Art. 27 do Código de Defesa do Consumidor (retenção de 5 anos para forensics).
+   * **Ação**: Executa a Procedure SQL `execute_account_deletion_db` por RPC e higieniza/anonimiza registros históricos de pedidos e itens. Registros minimizados poderão ser retidos por até cinco anos quando necessários a obrigação legal ou ao exercício regular de direitos, conforme a Política de Privacidade; o Art. 27 do CDC não impõe uma retenção genérica de todos os pedidos por cinco anos.
    * **Idempotência**: Chaves primárias excluídas por cascade não produzem efeitos colaterais em execuções repetidas.
 
 5. **`deleting_auth`**:

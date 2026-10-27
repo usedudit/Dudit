@@ -15,6 +15,7 @@ import { validateBrazilMobile, sanitizeInput } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { getFiscalPublishBlockReason } from "@/lib/fiscal/publish-gate"
+import { moderateStoreContent } from "@/lib/moderation/product-moderation"
 
 export async function listStoresAction(partnerId: string) {
     const user = await requireUser()
@@ -172,6 +173,15 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
         }
         const normalizedPhone = normalizePhoneToE164(sanitizedPhone)
 
+        const storeModeration = await moderateStoreContent({
+            name: input.name,
+            description: input.description,
+            userId: input.partnerId,
+        })
+        if (!storeModeration.valid) {
+            return { success: false, error: storeModeration.error || "Conteúdo não aprovado pela moderação" }
+        }
+
         const { data, error } = await supabase
             .from("stores")
             .insert({
@@ -327,6 +337,17 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         }
 
         const updateData: Record<string, unknown> = {}
+
+        if (input.name !== undefined || input.description !== undefined) {
+            const storeModeration = await moderateStoreContent({
+                name: input.name,
+                description: input.description,
+                userId: input.partnerId,
+            })
+            if (!storeModeration.valid) {
+                return { success: false, error: storeModeration.error || "Conteúdo não aprovado pela moderação" }
+            }
+        }
 
         if (input.name !== undefined) updateData.name = sanitizeInput(input.name, 150)
 

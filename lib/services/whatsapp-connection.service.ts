@@ -2,6 +2,7 @@ import "server-only"
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { encrypt } from "@/lib/cryptoService"
+import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
 import { MetaWhatsappManagementClient } from "@/lib/whatsapp/providers/meta-management-client"
 import type { PartnerWhatsappConnection, WhatsappConnectionSource, WhatsappConnectionStatus, WhatsappProviderId } from "@/lib/whatsapp/types"
 import { randomBytes } from "crypto"
@@ -112,8 +113,8 @@ export async function upsertWhatsappConnection(params: {
     phone_number_id: params.phoneNumberId,
     business_account_id: params.businessAccountId || null,
     access_token_encrypted: encrypt(params.accessToken, "whatsapp"),
-    webhook_verify_token: verifyToken,
-    webhook_secret: webhookSecret,
+    webhook_verify_token: encrypt(verifyToken, "whatsapp"),
+    webhook_secret: encrypt(webhookSecret, "whatsapp"),
     connection_source: params.connectionSource || "manual",
     waba_name: params.wabaName || null,
     last_synced_at: params.lastSyncedAt || now,
@@ -337,7 +338,7 @@ export async function upsertEvolutionConnection(params: {
 
   const { data: existing } = await existingQuery.maybeSingle()
 
-  const webhookSecret = existing?.evolution_webhook_secret || randomBytes(24).toString("hex")
+  const webhookSecret = decryptWhatsappSecret(existing?.evolution_webhook_secret) || randomBytes(24).toString("hex")
 
   const row = {
     partner_id: params.partnerId,
@@ -347,7 +348,7 @@ export async function upsertEvolutionConnection(params: {
     api_url: params.apiUrl,
     api_key_encrypted: encrypt(params.apiKey, "whatsapp"),
     instance_name: params.instanceName,
-    evolution_webhook_secret: webhookSecret,
+    evolution_webhook_secret: encrypt(webhookSecret, "whatsapp"),
     connection_source: "evolution_manual" as const,
     status: "pending" as WhatsappConnectionStatus,
     is_active: params.activate !== false,

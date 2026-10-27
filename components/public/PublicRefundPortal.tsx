@@ -178,7 +178,7 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
     }, [payment, purchase])
 
     const statusConfig = getStatusConfig(refund.status)
-    const refundNumber = refund.token ? (refund.token.length > 8 ? refund.token.slice(0, 8) : refund.token) : "N/A"
+    const refundNumber = refund.id ? String(refund.id).slice(0, 8) : "N/A"
     const dateStrFull = formatFullDate(refund.requested_at || refund.created_at)
 
     const historyEntries = useMemo(() => {
@@ -195,7 +195,7 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                 id: "requested",
                 actor_name: refund.partnerName || "Lojista",
                 change_lines: [
-                    `Solicitação de reembolso registrada sob protocolo #${refund.token}.`,
+                    `Solicitação de reembolso registrada sob protocolo #${refundNumber}.`,
                     `Motivo declarado: ${getReasonLabel(refund.reason_category)}.`,
                 ],
                 created_at: refund.requested_at || refund.created_at,
@@ -328,7 +328,7 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                                         />
                                         <DetailRow
                                             label="Protocolo"
-                                            value={<span className="font-mono text-xs">{refund.token}</span>}
+                                            value={<span className="font-mono text-xs">{refundNumber}</span>}
                                         />
                                     </FormSection>
                                 </div>

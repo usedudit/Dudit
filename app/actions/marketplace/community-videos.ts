@@ -255,6 +255,7 @@ export async function createCommunityVideo(data: {
       const moderation = await moderateProductContent({
         name: data.title,
         description: data.description,
+        userId: partner.id,
       })
       if (!moderation.valid) {
         return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
@@ -307,6 +308,17 @@ export async function updateCommunityVideo(
       .single()
 
     if (!partner) return { success: false, error: "Partner não encontrado" }
+
+    if (data.title !== undefined || data.description !== undefined) {
+      const moderation = await moderateProductContent({
+        name: data.title,
+        description: data.description,
+        userId: partner.id,
+      })
+      if (!moderation.valid) {
+        return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
+      }
+    }
 
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
     if (data.title !== undefined) updateData.title = data.title.trim().substring(0, 150) || null

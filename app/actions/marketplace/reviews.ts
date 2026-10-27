@@ -8,6 +8,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sendSuspiciousReview } from "@/lib/services/discord-marketplace-webhook.service"
 import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
+import { moderateReviewContent } from "@/lib/moderation/product-moderation"
 
 async function checkFraudulentReview(
   adminSupabase: any,
@@ -329,6 +330,14 @@ export async function createReviewAction(data: {
     }).catch(err => console.warn("[REVIEWS] Discord webhook failed (non-blocking):", err))
 
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
+  }
+
+  // Moderação do comentário antes de gravar
+  if (data.comment && data.comment.trim()) {
+    const moderation = await moderateReviewContent({ comment: data.comment, userId })
+    if (!moderation.valid) {
+      return { error: moderation.error || "Comentário não aprovado pela moderação" }
+    }
   }
 
   const { error } = await adminSupabase.from("reviews").insert({

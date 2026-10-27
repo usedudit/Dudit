@@ -38,7 +38,7 @@ export interface SuperFreteStatusSyncResult {
   updated: boolean
 }
 
-// Ordem dos status de entrega do Dudit - usada para impedir regressão
+// Ordem dos status de entrega da Dudit - usada para impedir regressão
 // (ex.: retry atrasado de order.released depois de order.delivered).
 const DELIVERY_STATUS_RANK: Record<string, number> = {
   not_sent: 0,
@@ -159,7 +159,7 @@ export async function applySuperFreteShipmentStatus(params: {
 
   // Reverse shipments (buyer -> store) never change the order's own
   // delivery status - only outbound labels (store -> buyer) do.
-  // Preenche os mesmos campos do fluxo de delivery padrão do Dudit
+  // Preenche os mesmos campos do fluxo de delivery padrão da Dudit
   // (delivery_departure_at / delivery_arrived_at / delivery_completed_at).
   if (deliveryStatus && shipment.kind !== "return") {
     const { data: orderRow } = await supabase
@@ -267,4 +267,5 @@ export async function applySuperFreteShipmentStatus(params: {
     await revalidateOrders(shipment.partner_id)
   }
 
-  return { shipmentStatus, deliveryStatus, updated }}
+  return { shipmentStatus, deliveryStatus, updated }
+}
