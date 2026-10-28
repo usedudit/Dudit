@@ -7,6 +7,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface CustomerReportData {
   totalCustomers: number
@@ -26,40 +27,34 @@ export interface CustomerReportData {
   customerRanking: { id: string; label: string; orders: number; revenue: number; lastOrderDate: string }[]
 }
 
-const getCachedCustomerData = cache(async (partnerId: string, period: Period = "monthly") => {
+const getCachedCustomerData = cache(async (partnerId: string, period: Period = "monthly", storeId = "") => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
+      const customersQuery = supabase.from("customers").select("id, name, created_at").eq("partner_id", partnerId)
+      const periodOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
+      const prevOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
+      const allOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
+      if (storeId) {
+        scopeQueryToStores(customersQuery, storeId)
+        scopeQueryToStores(periodOrdersQuery, storeId)
+        scopeQueryToStores(prevOrdersQuery, storeId)
+        scopeQueryToStores(allOrdersQuery, storeId)
+      }
       const [customersResult, periodOrdersResult, prevOrdersResult, allCustomersResult] = await Promise.all([
-        supabase
-          .from("customers")
-          .select("id, name, created_at")
-          .eq("partner_id", partnerId)
-          .order("created_at", { ascending: false })
-          .limit(500),
-        supabase
-          .from("orders")
-          .select("id, customer_name, customer_id, total_amount, created_at")
-          .eq("partner_id", partnerId)
+        customersQuery,
+        periodOrdersQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("orders")
-          .select("id, customer_name, customer_id, total_amount, created_at")
-          .eq("partner_id", partnerId)
+        prevOrdersQuery
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("orders")
-          .select("id, customer_name, customer_id, total_amount, created_at")
-          .eq("partner_id", partnerId)
-          .order("created_at", { ascending: false })
-          .limit(1000),
+        allOrdersQuery.order("created_at", { ascending: false }).limit(1000),
       ])
 
       if (customersResult.error) throw customersResult.error
@@ -237,11 +232,11 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
           .sort((a, b) => b.revenue - a.revenue),
       }
     },
-    [`report-customers-${partnerId}-${period}`],
+    [`report-customers-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.clientes(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getCustomerReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedCustomerData(partnerId, period)
+export async function getCustomerReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedCustomerData(partnerId, period, storeId)
 }

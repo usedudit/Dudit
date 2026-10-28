@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button, IconPlaceholder, ListItem, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Dropdown, DropdownItem, IconPlaceholder, ListItem, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
 import ReportListRow, { type ReportListColumn, type ReportListRowData } from "@/components/erp/reports/ReportListRow"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
+import { pushUrl } from "@/lib/navigation/history"
 import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getPeriodDateRange, type Period } from "@/lib/period-types"
@@ -57,6 +58,8 @@ interface ReportsHubPageProps {
   period: string
   planSlug: string
   activeResources: string[]
+  storeId: string
+  stores: Array<{ id: string; name: string }>
   productsData: ProductsDashboardData | null
   servicesData: ServicesDashboardData | null
   financialData: FinancialDashboardData | null
@@ -376,10 +379,29 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
       openPlanUpgrade(report.minimumPlan)
       return
     }
-    router.push(withReportUrl(report.id))
+    pushUrl(withReportUrl(report.id))
   }
 
-  const closeReport = () => router.push(withReportUrl())
+  const closeReport = () => pushUrl(withReportUrl())
+  const selectStore = (storeId: string) => {
+    const url = new URL(window.location.href)
+    if (storeId) url.searchParams.set("store", storeId)
+    else url.searchParams.delete("store")
+    router.push(`${url.pathname}${url.search}`)
+  }
+  const storeFilter = (
+    <Dropdown
+      showChevron
+      fullWidth={false}
+      width="w-64"
+      trigger={<Button variant="outline" size="sm">{props.stores.find((store) => store.id === props.storeId)?.name || "Todas as lojas"}</Button>}
+    >
+      <DropdownItem onClick={() => selectStore("all")}>Todas as lojas</DropdownItem>
+      {props.stores.map((store) => (
+        <DropdownItem key={store.id} onClick={() => selectStore(store.id)}>{store.name}</DropdownItem>
+      ))}
+    </Dropdown>
+  )
   const currentRows = selectedReport?.rows || []
   const totalPages = Math.max(1, Math.ceil(currentRows.length / 8))
   const paginatedRows = currentRows.slice((page - 1) * 8, page * 8)
@@ -398,6 +420,7 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {props.stores.length > 1 && storeFilter}
             <GlobalPeriodFilter />
           </div>
         </header>
@@ -433,7 +456,10 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
           <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading">Relatórios</h1>
           <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">Consulte os dados do seu negócio, filtre os resultados e escolha uma análise.</p>
         </div>
-        <GlobalPeriodFilter />
+        <div className="flex items-center gap-2">
+          {props.stores.length > 1 && storeFilter}
+          <GlobalPeriodFilter />
+        </div>
       </header>
 
       {availableCategories.length > 0 ? (

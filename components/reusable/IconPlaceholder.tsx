@@ -5,7 +5,7 @@ import Link from "next/link"
 
 interface IconPlaceholderProps {
   placeholderType?: "default" | "image"
-  icon?: React.ElementType
+  icon?: React.ElementType | string
   imageSrc?: string
   imageAlt?: string
   title?: React.ReactNode
@@ -54,7 +54,7 @@ export default function IconPlaceholder({
   buttons,
   className,
 }: IconPlaceholderProps) {
-  const isImage = placeholderType === "image" || !!imageSrc
+  const isImage = placeholderType === "image" || !!imageSrc || (typeof icon === "string")
 
   // Default classes based on type
   const defaultImageClass = isImage
@@ -69,7 +69,9 @@ export default function IconPlaceholder({
     ? `text-brand-inactive-text dark:text-dark-body max-w-sm text-md ${(itemButton || (buttons && buttons.length > 0)) ? "mb-8" : ""}`
     : "text-xs"
 
-  const Icon = icon || (!imageSrc && placeholderType === "default" ? AlertCircleIcon : null)
+  // Determine what to render: imageSrc takes priority, then icon string, then icon component
+  const iconImageSrc = imageSrc || (typeof icon === "string" ? icon : null)
+  const IconComponent = typeof icon === "function" ? icon : (!iconImageSrc && placeholderType === "default" ? AlertCircleIcon : null)
 
   const renderSingleButton = (btn: any, idx?: number) => {
     const { text, action, type, accept, onChange, disabled, variant = "default", className = "" } = btn
@@ -138,14 +140,14 @@ export default function IconPlaceholder({
   return (
     <div className={`flex flex-col items-center justify-center text-center ${className || ""}`}>
       {/* Renderiza imagem OU ícone com fundo */}
-      {imageSrc ? (
+      {iconImageSrc ? (
         <img
-          src={imageSrc}
+          src={iconImageSrc}
           alt={imageAlt}
           loading="lazy"
           className={imageClass || defaultImageClass}
         />
-      ) : Icon ? (
+      ) : IconComponent ? (
         <div
           className={`
             ${containerSize} 
@@ -155,7 +157,7 @@ export default function IconPlaceholder({
             transition-colors
           `}
         >
-          <Icon className={`${iconSize} text-brand-dark dark:text-dark-heading`} />
+          <IconComponent className={`${iconSize} text-brand-dark dark:text-dark-heading`} />
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface DeliveryReportData {
   metrics: {
@@ -25,24 +26,24 @@ export interface DeliveryReportData {
   deliveryPersonRanking: { id: string; name: string; deliveries: number; status: string }[]
 }
 
-const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "monthly") => {
+const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "monthly", storeId = "") => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
+      const periodQuery = supabase.from("deliveries").select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at, delivery_person_id, orders!inner(store_id)").eq("partner_id", partnerId)
+      const previousQuery = supabase.from("deliveries").select("id, status, started_at, delivered_at, created_at, orders!inner(store_id)").eq("partner_id", partnerId)
+      if (storeId) {
+        scopeQueryToStores(periodQuery, storeId, "orders.store_id")
+        scopeQueryToStores(previousQuery, storeId, "orders.store_id")
+      }
       const [periodDeliveriesResult, prevDeliveriesResult] = await Promise.all([
-        supabase
-          .from("deliveries")
-          .select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at, delivery_person_id")
-          .eq("partner_id", partnerId)
+        periodQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("deliveries")
-          .select("id, status, started_at, delivered_at, created_at")
-          .eq("partner_id", partnerId)
+        previousQuery
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
@@ -200,11 +201,11 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
         deliveryPersonRanking,
       }
     },
-    [`report-deliveries-${partnerId}-${period}`],
+    [`report-deliveries-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.entregas(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getDeliveryReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedDeliveryData(partnerId, period)
+export async function getDeliveryReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedDeliveryData(partnerId, period, storeId)
 }

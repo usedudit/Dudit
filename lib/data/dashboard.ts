@@ -12,6 +12,7 @@ import type { Period } from "@/lib/period-types"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { normalizeOrderSource } from "@/lib/orders/order-utils"
 import { cache } from "react"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 const addDays = (ymd: string, days: number) => {
   const [y, m, d] = ymd.split("-").map(Number)
@@ -491,10 +492,18 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
     [DASHBOARD_TAGS.products(partnerId)],
     async () => {
         const supabase = createAdminClient()
+        const productsQuery = scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active, show_in_marketplace").eq("partner_id", partnerId))
+        const ordersQuery = supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29)))
+        const itemsQuery = supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29)))
+        if (storeId) {
+          scopeQueryToStores(productsQuery, storeId)
+          scopeQueryToStores(ordersQuery, storeId)
+          scopeQueryToStores(itemsQuery, storeId, "orders.store_id")
+        }
         const [products, orders, items] = await Promise.all([
-          scopeActiveOnly(supabase.from("products").select("id, name, sku, brand, stock_quantity, unit, category:product_categories!category_id(name), price, is_active, show_in_marketplace").eq("partner_id", partnerId)).order("name", { ascending: true }).limit(300),
-          supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).order("created_at", { ascending: false }).limit(400),
-          supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).limit(600),
+          productsQuery.order("name", { ascending: true }).limit(300),
+          ordersQuery.order("created_at", { ascending: false }).limit(400),
+          itemsQuery.limit(600),
         ])
         if (products.error) throw products.error
         if (orders.error) throw orders.error
@@ -566,9 +575,15 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const from = addDays(today, -29)
+        const appointmentsQuery = supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from)
+        const servicesQuery = scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, status, service_categories(name)").eq("partner_id", partnerId).eq("status", "ativo"))
+        if (storeId) {
+          scopeQueryToStores(appointmentsQuery, storeId)
+          scopeQueryToStores(servicesQuery, storeId)
+        }
         const [appointments, services] = await Promise.all([
-          supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from).order("start_date", { ascending: false }).order("start_time").limit(400),
-          scopeActiveOnly(supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, status, service_categories(name)").eq("partner_id", partnerId).eq("status", "ativo")).limit(300),
+          appointmentsQuery.order("start_date", { ascending: false }).order("start_time").limit(400),
+          servicesQuery.limit(300),
         ])
         if (appointments.error) throw appointments.error
         if (services.error) throw services.error
@@ -642,9 +657,15 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
         const supabase = createAdminClient()
         const today = getTodayYmdInTz()
         const from = addDays(today, -120)
+        const accountsQuery = supabase.from("finance_accounts").select("id, current_balance, initial_balance, is_active").eq("partner_id", partnerId).eq("is_active", true)
+        const transactionsQuery = supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${toStartOfDayIso(from)},due_date.gte.${from},payment_date.gte.${from}`)
+        if (storeId) {
+          scopeQueryToStores(accountsQuery, storeId)
+          scopeQueryToStores(transactionsQuery, storeId)
+        }
         const [accounts, transactions] = await Promise.all([
-          supabase.from("finance_accounts").select("id, current_balance, initial_balance, is_active").eq("partner_id", partnerId).eq("is_active", true),
-          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${toStartOfDayIso(from)},due_date.gte.${from},payment_date.gte.${from}`).order("created_at", { ascending: false }).limit(1000),
+          accountsQuery,
+          transactionsQuery.order("created_at", { ascending: false }).limit(1000),
         ])
         if (accounts.error) throw accounts.error
         if (transactions.error) throw transactions.error

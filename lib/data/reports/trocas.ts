@@ -7,6 +7,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface ReturnsReportData {
   returnCount: number
@@ -22,35 +23,33 @@ export interface ReturnsReportData {
 }
 
 const fetchReturnsDataStatic = unstable_cache(
-  async (partnerId: string, period: Period) => {
+  async (partnerId: string, period: Period, storeId = "") => {
     const supabase = createAdminClient()
     const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
+    const currentReturnsQuery = supabase.from("return_requests").select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at").eq("partner_id", partnerId)
+    const previousReturnsQuery = supabase.from("return_requests").select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at").eq("partner_id", partnerId)
+    const ordersQuery = supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
+    const previousOrdersQuery = supabase.from("orders").select("id", { count: "exact", head: true }).eq("partner_id", partnerId)
+    if (storeId) {
+      scopeQueryToStores(currentReturnsQuery, storeId)
+      scopeQueryToStores(previousReturnsQuery, storeId)
+      scopeQueryToStores(ordersQuery, storeId)
+      scopeQueryToStores(previousOrdersQuery, storeId)
+    }
     const [periodReturnsResult, prevReturnsResult, ordersResult, prevOrdersResult] = await Promise.all([
-      supabase
-        .from("return_requests")
-        .select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at")
-        .eq("partner_id", partnerId)
+      currentReturnsQuery
         .gte("created_at", `${from}T00:00:00`)
         .order("created_at", { ascending: false })
         .limit(300),
-      supabase
-        .from("return_requests")
-        .select("id, customer_name_snapshot, reason, customer_reason, status, refund_amount, order_total_snapshot, created_at")
-        .eq("partner_id", partnerId)
+      previousReturnsQuery
         .gte("created_at", `${previousFrom}T00:00:00`)
         .lt("created_at", `${from}T00:00:00`)
         .order("created_at", { ascending: false })
         .limit(300),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
+      ordersQuery
         .gte("created_at", `${from}T00:00:00`),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
+      previousOrdersQuery
         .gte("created_at", `${previousFrom}T00:00:00`)
         .lt("created_at", `${from}T00:00:00`),
     ])
@@ -204,10 +203,10 @@ const fetchReturnsDataStatic = unstable_cache(
   { tags: ["reports"], revalidate: 120 }
 )
 
-const getCachedReturnsData = cache(async (partnerId: string, period: Period = "monthly") => {
-  return fetchReturnsDataStatic(partnerId, period)
+const getCachedReturnsData = cache(async (partnerId: string, period: Period = "monthly", storeId = "") => {
+  return fetchReturnsDataStatic(partnerId, period, storeId)
 })
 
-export async function getReturnsReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedReturnsData(partnerId, period)
+export async function getReturnsReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedReturnsData(partnerId, period, storeId)
 }

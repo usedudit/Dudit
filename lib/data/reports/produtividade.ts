@@ -7,6 +7,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface ProductivityReportData {
   staffRanking: { id: string; label: string; value: string; appointments: number; revenue: number; cancelled: number; ticketMedio?: number }[]
@@ -36,7 +37,7 @@ const getCachedProductivityData = cache(async (partnerId: string, period: Period
         .neq("source", "unavailable")
 
       if (storeId) {
-        query = query.eq("store_id", storeId)
+        query = scopeQueryToStores(query, storeId)
       }
 
       const appointmentsResult = await query

@@ -9,6 +9,7 @@ import { money, brl } from "@/lib/data/dashboard"
 import { normalizeOrderSource } from "@/lib/orders/order-utils"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface SalesReportData {
   metrics: {
@@ -49,52 +50,51 @@ export interface SalesReportData {
   detailedOrders: { id: string; orderNumber: string; customer: string; source: string; paymentMethod: string; status: string; date: string; total: number }[]
 }
 
-const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly"): Promise<SalesReportData> => {
+const getCachedSalesData = cache(async (partnerId: string, period: Period = "monthly", storeId = ""): Promise<SalesReportData> => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
-      const [currentOrdersResult, prevOrdersResult, itemsResult, cancelResult, allItemsResult, serviceItemsResult] = await Promise.all([
-        supabase
+      const currentOrdersQuery = supabase
           .from("orders")
           .select("id, order_number, customer_name, total_amount, order_source, payment_method, situation, created_at, discount_total, delivery_fee, amount_paid")
           .eq("partner_id", partnerId)
+      const prevOrdersQuery = supabase.from("orders").select("id, total_amount, created_at").eq("partner_id", partnerId)
+      const cancelOrdersQuery = supabase.from("orders").select("id, situation, created_at").eq("partner_id", partnerId)
+      const itemsQuery = supabase.from("order_items").select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
+      const allItemsQuery = supabase.from("order_items").select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
+      const serviceItemsQuery = supabase.from("order_items").select("product_name, quantity, net_item_value, line_type, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId)
+      if (storeId) {
+        scopeQueryToStores(currentOrdersQuery, storeId)
+        scopeQueryToStores(prevOrdersQuery, storeId)
+        scopeQueryToStores(cancelOrdersQuery, storeId)
+        scopeQueryToStores(itemsQuery, storeId, "orders.store_id")
+        scopeQueryToStores(allItemsQuery, storeId, "orders.store_id")
+        scopeQueryToStores(serviceItemsQuery, storeId, "orders.store_id")
+      }
+      const [currentOrdersResult, prevOrdersResult, itemsResult, cancelResult, allItemsResult, serviceItemsResult] = await Promise.all([
+        currentOrdersQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("orders")
-          .select("id, total_amount, created_at")
-          .eq("partner_id", partnerId)
+        prevOrdersQuery
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("order_items")
-          .select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)")
-          .eq("orders.partner_id", partnerId)
+        itemsQuery
           .gte("created_at", `${from}T00:00:00`)
           .limit(500),
-        supabase
-          .from("orders")
-          .select("id, situation, created_at")
-          .eq("partner_id", partnerId)
+        cancelOrdersQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("order_items")
-          .select("product_id, product_name, quantity, net_item_value, created_at, orders!inner(partner_id)")
-          .eq("orders.partner_id", partnerId)
+        allItemsQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(300),
-        supabase
-          .from("order_items")
-          .select("product_name, quantity, net_item_value, line_type, created_at, orders!inner(partner_id)")
-          .eq("orders.partner_id", partnerId)
+        serviceItemsQuery
           .in("line_type", ["service_booking"])
           .gte("created_at", `${from}T00:00:00`)
           .limit(200),
@@ -371,11 +371,11 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         })),
       }
     },
-    [`report-sales-${partnerId}-${period}`],
+    [`report-sales-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.vendas(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getSalesReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedSalesData(partnerId, period)
+export async function getSalesReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedSalesData(partnerId, period, storeId)
 }

@@ -6,6 +6,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface ServiceOrderReportData {
   metrics: {
@@ -40,24 +41,24 @@ const STATUS_LABELS: Record<string, string> = {
   aguardando_retirada: "Aguardando Retirada",
 }
 
-const getCachedServiceOrdersData = cache(async (partnerId: string, period: Period = "monthly") => {
+const getCachedServiceOrdersData = cache(async (partnerId: string, period: Period = "monthly", storeId = "") => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
+      const periodQuery = supabase.from("service_orders").select("id, order_number, title, status, total_amount, assigned_user_id, created_at, completed_at").eq("partner_id", partnerId)
+      const previousQuery = supabase.from("service_orders").select("id, total_amount, created_at").eq("partner_id", partnerId)
+      if (storeId) {
+        scopeQueryToStores(periodQuery, storeId)
+        scopeQueryToStores(previousQuery, storeId)
+      }
       const [periodResult, prevResult] = await Promise.all([
-        supabase
-          .from("service_orders")
-          .select("id, order_number, title, status, total_amount, assigned_user_id, created_at, completed_at")
-          .eq("partner_id", partnerId)
+        periodQuery
           .gte("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
           .limit(500),
-        supabase
-          .from("service_orders")
-          .select("id, total_amount, created_at")
-          .eq("partner_id", partnerId)
+        previousQuery
           .gte("created_at", `${previousFrom}T00:00:00`)
           .lt("created_at", `${from}T00:00:00`)
           .order("created_at", { ascending: false })
@@ -159,11 +160,11 @@ const getCachedServiceOrdersData = cache(async (partnerId: string, period: Perio
         })),
       }
     },
-    [`report-service-orders-${partnerId}-${period}`],
+    [`report-service-orders-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.ordensServico(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getServiceOrderReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedServiceOrdersData(partnerId, period)
+export async function getServiceOrderReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedServiceOrdersData(partnerId, period, storeId)
 }

@@ -18,7 +18,7 @@ import {
   getSubscriptionReportData,
 } from "@/lib/data/reports"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
-import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
+import { getAllUserStoreAccess } from "@/lib/auth/partner-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { can } from "@/lib/permissions/can"
@@ -30,7 +30,7 @@ import type { Period } from "@/lib/period-types"
 export const dynamic = "force-dynamic"
 
 export default async function ERPReportsPage(props: {
-  searchParams?: Promise<{ period?: string; tab?: string }>
+  searchParams?: Promise<{ period?: string; tab?: string; store?: string }>
 }) {
   const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
@@ -42,19 +42,33 @@ export default async function ERPReportsPage(props: {
     return <AccessDenied />
   }
 
-  const [plan, allAccess] = await Promise.all([
+  const [plan, storeAccess] = await Promise.all([
     getPartnerPlan(partnerId),
-    getAllUserPartnerAccess(),
+    getAllUserStoreAccess(),
   ])
-  const activeStore = allAccess.find((store: (typeof allAccess)[number]) => store.partnerId === partnerId)
+  const stores = storeAccess
+    .filter((store) => store.partnerId === partnerId)
+    .map((store) => ({ id: store.storeId, name: store.storeName }))
   const businessInfo = normalizeBusinessInfo(context.businessInfo)
   const activeResources = resolveActiveResources(businessInfo)
   const searchParams = await props.searchParams
   const period = (searchParams?.period as Period) || "monthly"
+  const requestedStoreId = searchParams?.store
+  const selectedStoreIds = requestedStoreId === "all"
+    ? (stores.length ? stores.map((store) => store.id) : context.activeStoreId ? [context.activeStoreId] : [])
+    : stores.some((store) => store.id === requestedStoreId)
+      ? [requestedStoreId!]
+      : context.activeStoreId
+        ? [context.activeStoreId]
+        : []
+  const storeId = selectedStoreIds.join(",")
+  const storeName = selectedStoreIds.length === 1
+    ? stores.find((store) => store.id === selectedStoreIds[0])?.name
+    : null
 
   return (
     <>
-      <ERPPageHeader title={activeStore?.storeName ?? "Relatórios"} />
+      <ERPPageHeader title={storeName ?? "Relatórios"} />
       <FadeIn className="p-4">
         <DashboardProvider>
           <Suspense fallback={<ReportsSkeleton />}>
@@ -62,7 +76,8 @@ export default async function ERPReportsPage(props: {
               partnerId={partnerId}
               activeResources={activeResources}
               period={period}
-              tab={searchParams?.tab}
+              storeId={storeId}
+              stores={stores}
               planSlug={plan.slug}
               permissionContext={context as RbacUserLike}
             />
@@ -77,14 +92,16 @@ async function ReportsContent({
   partnerId,
   activeResources,
   period,
-  tab,
+  storeId,
+  stores,
   planSlug,
   permissionContext,
 }: {
   partnerId: string
   activeResources: string[]
   period: Period
-  tab?: string
+  storeId: string
+  stores: Array<{ id: string; name: string }>
   planSlug: string
   permissionContext: RbacUserLike
 }) {
@@ -101,27 +118,27 @@ async function ReportsContent({
   const hasSubscriptions = activeResources.includes("recurringSubscriptions") || activeResources.includes("recurring_subscriptions") || activeResources.includes("recorrentes")
   const hasAppointments = activeResources.includes("appointments")
   const hasPermission = (permission: string) => can(permissionContext, permission)
-  const needs = (...ids: string[]) => !tab || ids.includes(tab)
-
   const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, subscriptionData, appointmentsData] = await Promise.all([
-    hasProducts && hasPermission("products.view") && needs("estoque-parado", "estoque-critico", "inventario-detalhado", "curva-abc") ? getDashboardProductsData(partnerId).catch(() => null) : Promise.resolve(null),
-    hasServices && hasPermission("appointments.view") && needs("servicos-por-desempenho", "desempenho-por-profissional") ? getDashboardServicesData(partnerId).catch(() => null) : Promise.resolve(null),
-    hasFinancial && hasPermission("financial.view") && needs("fluxo-de-caixa", "receitas-e-despesas", "despesas-por-categoria", "contas-vencidas", "lancamentos-financeiros") ? getDashboardFinancialData(partnerId).catch(() => null) : Promise.resolve(null),
-    hasOrders && hasPermission("products.view") && needs("vendas-por-periodo", "vendas-por-canal", "vendas-por-pagamento", "produtos-mais-vendidos", "pedidos-detalhados", "margem-por-produto", "curva-abc") ? getSalesReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasCustomers && hasPermission("customers.view") && needs("clientes-maior-faturamento", "clientes-detalhados", "clientes-inativos", "evolucao-da-carteira") ? getCustomerReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasReturns && hasPermission("orders.view") && needs("devolucoes-por-motivo", "produtos-mais-devolvidos", "devolucoes-detalhadas") ? getReturnsReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasDeliveries && hasPermission("delivery.view") && needs("entregas-por-status", "entregas-detalhadas") ? getDeliveryReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasMarketing && hasPermission("products.view") && needs("marketing-por-canal", "desempenho-de-cupons", "campanhas-promocionais") ? getMarketingReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasProductivity && hasPermission("appointments.view") && needs("produtividade-da-equipe") ? getProductivityReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasServiceOrders && hasPermission("service_orders.view") && needs("ordens-de-servico-por-status", "ordens-de-servico-detalhadas") ? getServiceOrderReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasSubscriptions && hasPermission("recurring_subscriptions.view") && needs("resumo-de-assinaturas", "assinaturas-por-status", "execucoes-de-assinaturas", "projecao-de-reposicao-recorrente") ? getSubscriptionReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
-    hasAppointments && hasPermission("appointments.view") && needs("agendamentos-por-status", "servicos-mais-agendados", "agenda-detalhada") ? getAppointmentsReportData(partnerId, period).catch(() => null) : Promise.resolve(null),
+    hasProducts && hasPermission("products.view") ? getDashboardProductsData(partnerId, storeId).catch(() => null) : Promise.resolve(null),
+    hasServices && hasPermission("appointments.view") ? getDashboardServicesData(partnerId, storeId).catch(() => null) : Promise.resolve(null),
+    hasFinancial && hasPermission("financial.view") ? getDashboardFinancialData(partnerId, storeId).catch(() => null) : Promise.resolve(null),
+    hasOrders && hasPermission("products.view") ? getSalesReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasCustomers && hasPermission("customers.view") ? getCustomerReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasReturns && hasPermission("orders.view") ? getReturnsReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasDeliveries && hasPermission("delivery.view") ? getDeliveryReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasMarketing && hasPermission("products.view") ? getMarketingReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasProductivity && hasPermission("appointments.view") ? getProductivityReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasServiceOrders && hasPermission("service_orders.view") ? getServiceOrderReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasSubscriptions && hasPermission("recurring_subscriptions.view") ? getSubscriptionReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
+    hasAppointments && hasPermission("appointments.view") ? getAppointmentsReportData(partnerId, period, storeId).catch(() => null) : Promise.resolve(null),
   ])
 
   return (
     <ReportsHubPage
       activeResources={activeResources}
       period={period}
+      storeId={storeId}
+      stores={stores}
       planSlug={planSlug}
       productsData={productsData}
       servicesData={servicesData}

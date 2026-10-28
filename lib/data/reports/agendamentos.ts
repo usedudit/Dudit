@@ -7,6 +7,7 @@ import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
 import type { Metric, DashboardListItem } from "../dashboard"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface AppointmentsReportData {
   metrics: Metric[]
@@ -23,26 +24,26 @@ export interface AppointmentsReportData {
   attendanceRate: number
 }
 
-const getCachedAppointmentsData = cache(async (partnerId: string, period: Period = "monthly"): Promise<AppointmentsReportData> => {
+const getCachedAppointmentsData = cache(async (partnerId: string, period: Period = "monthly", storeId = ""): Promise<AppointmentsReportData> => {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const { today, from, previousFrom } = getDateRangeWithPrevious(period)
 
+      const currentQuery = supabase.from("appointments").select("id, customer_name, service_name, staff_name, price, duration_minutes, status, start_date, start_time, source").eq("partner_id", partnerId)
+      const previousQuery = supabase.from("appointments").select("id, status, start_date, price").eq("partner_id", partnerId)
+      if (storeId) {
+        scopeQueryToStores(currentQuery, storeId)
+        scopeQueryToStores(previousQuery, storeId)
+      }
       const [currentResult, previousResult] = await Promise.all([
-        supabase
-          .from("appointments")
-          .select("id, customer_name, service_name, staff_name, price, duration_minutes, status, start_date, start_time, source")
-          .eq("partner_id", partnerId)
+        currentQuery
           .gte("start_date", from)
           .neq("source", "unavailable")
           .order("start_date", { ascending: false })
           .order("start_time")
           .limit(600),
-        supabase
-          .from("appointments")
-          .select("id, status, start_date, price")
-          .eq("partner_id", partnerId)
+        previousQuery
           .gte("start_date", previousFrom)
           .lt("start_date", from)
           .neq("source", "unavailable")
@@ -226,11 +227,11 @@ const getCachedAppointmentsData = cache(async (partnerId: string, period: Period
         attendanceRate,
       }
     },
-    [`report-appointments-${partnerId}-${period}`],
+    [`report-appointments-${partnerId}-${period}-${storeId || "all"}`],
     { tags: [REPORT_TAGS.agendamentos(partnerId, period)], revalidate: 120 }
   )()
 })
 
-export async function getAppointmentsReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedAppointmentsData(partnerId, period)
+export async function getAppointmentsReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedAppointmentsData(partnerId, period, storeId)
 }

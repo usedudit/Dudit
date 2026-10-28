@@ -7,6 +7,7 @@ import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface MarketingReportData {
   revenueBySource: { label: string; value: number }[]
@@ -28,35 +29,26 @@ export interface MarketingReportData {
 }
 
 const fetchMarketingDataStatic = unstable_cache(
-  async (partnerId: string, period: Period) => {
+  async (partnerId: string, period: Period, storeId = "") => {
     const supabase = createAdminClient()
     const { today, from } = getDateRangeWithPrevious(period)
 
+    const ordersQuery = supabase.from("orders").select("id, total_amount, order_source, created_at").eq("partner_id", partnerId)
+    const couponsQuery = supabase.from("coupons").select("id, code, usage_limit, discount_type, discount_value, is_active").eq("partner_id", partnerId).eq("is_active", true)
+    const campaignsQuery = supabase.from("campaigns").select("id, name, is_active, starts_at, ends_at, store_ids").eq("partner_id", partnerId)
+    if (storeId) {
+      scopeQueryToStores(ordersQuery, storeId)
+      scopeQueryToStores(couponsQuery, storeId)
+    }
+    const couponUsagesQuery = supabase.from("coupon_usages").select("coupon_id, order_id, used_at").gte("used_at", `${from}T00:00:00`)
     const [ordersResult, couponsResult, couponUsagesResult, campaignsResult] = await Promise.all([
-      supabase
-        .from("orders")
-        .select("id, total_amount, order_source, created_at")
-        .eq("partner_id", partnerId)
+      ordersQuery
         .gte("created_at", `${from}T00:00:00`)
         .order("created_at", { ascending: false })
         .limit(500),
-      supabase
-        .from("coupons")
-        .select("id, code, usage_limit, discount_type, discount_value, is_active")
-        .eq("partner_id", partnerId)
-        .eq("is_active", true)
-        .limit(200),
-      supabase
-        .from("coupon_usages")
-        .select("coupon_id, order_id, used_at")
-        .gte("used_at", `${from}T00:00:00`)
-        .limit(500),
-      supabase
-        .from("campaigns")
-        .select("id, name, is_active, starts_at, ends_at")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: false })
-        .limit(50),
+      couponsQuery.limit(200),
+      couponUsagesQuery.limit(500),
+      campaignsQuery.order("created_at", { ascending: false }).limit(50),
     ])
 
     if (ordersResult.error) throw ordersResult.error
@@ -78,7 +70,8 @@ const fetchMarketingDataStatic = unstable_cache(
     const topSourcePercent = totalRevenue > 0 && topSourceEntry ? Math.round((topSourceEntry[1] / totalRevenue) * 100) : 0
 
     const coupons = couponsResult.data || []
-    const couponUsages = couponUsagesResult.data || []
+    const selectedOrderIds = new Set(orders.map((order: any) => order.id))
+    const couponUsages = (couponUsagesResult.data || []).filter((usage: any) => !storeId || selectedOrderIds.has(usage.order_id))
 
     const usageCountMap = new Map<string, number>()
     for (const u of couponUsages) {
@@ -130,7 +123,10 @@ const fetchMarketingDataStatic = unstable_cache(
       }
     })
 
-    const campaigns = (campaignsResult.data || []).map((c: any) => ({
+    const selectedStores = storeId.split(",").filter(Boolean)
+    const campaigns = (campaignsResult.data || [])
+      .filter((c: any) => selectedStores.length === 0 || !Array.isArray(c.store_ids) || c.store_ids.length === 0 || c.store_ids.some((id: string) => selectedStores.includes(id)))
+      .map((c: any) => ({
       id: c.id,
       name: c.name,
       isActive: c.is_active,
@@ -166,10 +162,10 @@ const fetchMarketingDataStatic = unstable_cache(
   { tags: ["reports"], revalidate: 120 }
 )
 
-const getCachedMarketingData = cache(async (partnerId: string, period: Period = "monthly") => {
-  return fetchMarketingDataStatic(partnerId, period)
+const getCachedMarketingData = cache(async (partnerId: string, period: Period = "monthly", storeId = "") => {
+  return fetchMarketingDataStatic(partnerId, period, storeId)
 })
 
-export async function getMarketingReportData(partnerId: string, period: Period = "monthly") {
-  return getCachedMarketingData(partnerId, period)
+export async function getMarketingReportData(partnerId: string, period: Period = "monthly", storeId = "") {
+  return getCachedMarketingData(partnerId, period, storeId)
 }

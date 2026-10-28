@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { scopeQueryToStores } from "@/lib/data/store-scope"
 
 export interface SubscriptionReportData {
   activeCount: number
@@ -21,12 +22,13 @@ export interface SubscriptionReportData {
 
 export async function getSubscriptionReportData(
   partnerId: string,
-  period: "daily" | "weekly" | "monthly" | "yearly" = "monthly"
+  period: "daily" | "weekly" | "monthly" | "yearly" = "monthly",
+  storeId = ""
 ): Promise<SubscriptionReportData> {
   const supabase = getAdminClient()
 
   // 1. Fetch all subscriptions for the partner
-  const { data: subs, error: subsErr } = await supabase
+  let subscriptionsQuery = supabase
     .from("recurring_subscriptions")
     .select(`
       id, status, started_at, cancelled_at, next_execution_at,
@@ -34,6 +36,8 @@ export async function getSubscriptionReportData(
       recurring_subscription_items(item_type, quantity, unit_price, product_id, products(name))
     `)
     .eq("partner_id", partnerId)
+  if (storeId) scopeQueryToStores(subscriptionsQuery, storeId)
+  const { data: subs, error: subsErr } = await subscriptionsQuery
 
   if (subsErr) throw subsErr
 
@@ -128,10 +132,12 @@ export async function getSubscriptionReportData(
   }
 
   // 5. Query execution history for renewal rate and upcoming cycles
-  const { data: executions } = await supabase
+  let executionsQuery = supabase
     .from("recurring_executions")
-    .select("id, status, scheduled_for, order_id, orders(situation)")
+    .select("id, status, scheduled_for, order_id, orders(situation, store_id)")
     .eq("partner_id", partnerId)
+  if (storeId) scopeQueryToStores(executionsQuery, storeId, "orders.store_id")
+  const { data: executions } = await executionsQuery
     .order("scheduled_for", { ascending: false })
     .limit(500)
 
