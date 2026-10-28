@@ -2,7 +2,7 @@ import "server-only"
 
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { checkLimit, getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { resolveActiveResources, type SystemResourceId } from "@/lib/system-resources"
@@ -16,9 +16,24 @@ export interface MarketplaceCapabilities {
   baseOrderFlow: MarketplaceOrderFlow
   /** Checkout de pedidos pode ser concluído pela Dudit? */
   checkoutViaDudit: boolean
+  /** Checkout liberado AGORA (fluxo + recurso + cota mensal do plano). */
+  checkoutOpen: boolean
+  /** Orçamentos podem ser pedidos pela Dudit? */
   quotesViaDudit: boolean
+  /** Orçamento liberado AGORA (fluxo + recurso + cota mensal do plano). */
+  quotesOpen: boolean
   returnsViaDudit: boolean
   appointmentsViaDudit: boolean
+  /** Agendamento liberado AGORA (fluxo + recurso + cota mensal do plano). */
+  appointmentsOpen: boolean
+  /** Mercado Pago pode ser oferecido no checkout? (feature do plano) */
+  mercadoPagoEnabled: boolean
+  /** Cota mensal de pedidos esgotada — a loja atende pelo WhatsApp. */
+  ordersLimitReached: boolean
+  /** Cota mensal de orçamentos esgotada. */
+  quotesLimitReached: boolean
+  /** Cota mensal de agendamentos esgotada. */
+  appointmentsLimitReached: boolean
   deliveriesEnabled: boolean
   couponsEnabled: boolean
   campaignsEnabled: boolean
@@ -51,6 +66,24 @@ function resolveBaseOrderFlow(
 function normalizePhone(value: unknown): string | null {
   const phone = typeof value === "string" ? value.replace(/\D/g, "") : ""
   return phone.length > 0 ? phone : null
+}
+
+/**
+ * A cota mensal do plano já foi consumida?
+ *
+ * Fail-open de propósito: se a leitura das cotas falhar, a vitrine continua
+ * aberta e o `checkoutCartAction` (fonte autoritativa) ainda bloqueia no
+ * momento de fechar o pedido. Falhar fechado aqui derrubaria vendas por um
+ * erro transitório de leitura.
+ */
+async function isMonthlyLimitReached(partnerId: string, limitName: string): Promise<boolean> {
+  try {
+    const result = await checkLimit(partnerId, limitName)
+    return !result.allowed
+  } catch (error: any) {
+    console.warn(`[MARKETPLACE_CAPS] checkLimit(${limitName}) failed:`, error?.message)
+    return false
+  }
 }
 
 /**
@@ -90,6 +123,10 @@ export const resolveMarketplaceCapabilities = cache(
 
     const planSlug = plan?.slug || "free"
     const baseOrderFlow = resolveBaseOrderFlow((partner as any)?.order_flow, businessInfo)
+    const planFeatures = new Set<string>(
+      Array.isArray(plan?.features_json) ? plan!.features_json : [],
+    )
+    const planHasFeature = (feature: string) => planFeatures.has(feature)
 
     let storePhone: string | null = null
     try {
@@ -131,15 +168,35 @@ export const resolveMarketplaceCapabilities = cache(
     if (!hasMinimumPlan(planSlug, "crescer")) reasons.push("plan_crescer_required")
     if (!hasMinimumPlan(planSlug, "escalar")) reasons.push("plan_escalar_required")
 
+    // ── Cotas mensais do plano ────────────────────────────────────────────────
+    // A vitrine precisa saber ANTES de o comprador montar o carrinho se a loja
+    // ainda aceita pedido/orçamento/agendamento. Sem isso, o limite só aparecia
+    // no fim do checkout (ou virava erro seco), depois de tudo preenchido.
+    const [ordersLimitReached, quotesLimitReached, appointmentsLimitReached] = await Promise.all([
+      isMonthlyLimitReached(partnerId, "monthly_orders"),
+      isMonthlyLimitReached(partnerId, "monthly_quotes"),
+      isMonthlyLimitReached(partnerId, "monthly_appointments"),
+    ])
+
+    if (ordersLimitReached) reasons.push("orders_limit_reached")
+    if (quotesLimitReached) reasons.push("quotes_limit_reached")
+    if (appointmentsLimitReached) reasons.push("appointments_limit_reached")
+
+    const checkoutViaDudit = baseOrderFlow === "dudit" && hasResource("orders")
+    // Mercado Pago é feature paga: sem ela a loja só oferece os métodos
+    // manuais ("a combinar", PIX, dinheiro) dentro do checkout da Dudit.
+    const mercadoPagoEnabled = checkoutViaDudit && planHasFeature("mercado_pago_checkout")
+    if (!mercadoPagoEnabled) reasons.push("mercado_pago_unavailable")
+
     const quotesViaDudit =
       baseOrderFlow === "dudit" &&
       hasResource("quotes") &&
-      hasMinimumPlan(planSlug, "crescer")
+      planHasFeature("quotes")
 
     const returnsViaDudit =
       baseOrderFlow === "dudit" &&
       hasResource("returns") &&
-      hasMinimumPlan(planSlug, "crescer")
+      planHasFeature("returns_and_exchanges")
 
     const appointmentsViaDudit =
       baseOrderFlow === "dudit" &&
@@ -154,10 +211,17 @@ export const resolveMarketplaceCapabilities = cache(
       partnerId,
       planSlug,
       baseOrderFlow,
-      checkoutViaDudit: baseOrderFlow === "dudit" && hasResource("orders"),
+      checkoutViaDudit,
+      checkoutOpen: checkoutViaDudit && !ordersLimitReached,
       quotesViaDudit,
+      quotesOpen: quotesViaDudit && !quotesLimitReached,
       returnsViaDudit,
       appointmentsViaDudit,
+      appointmentsOpen: appointmentsViaDudit && !appointmentsLimitReached,
+      mercadoPagoEnabled,
+      ordersLimitReached,
+      quotesLimitReached,
+      appointmentsLimitReached,
       deliveriesEnabled,
       couponsEnabled,
       campaignsEnabled,

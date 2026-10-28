@@ -59,6 +59,12 @@ interface ProductDetailsPageClientProps {
     hideHeaderAndFooter?: boolean
     sponsoredAd?: SponsoredAd | null
     soldCount?: number
+    /** Checkout pela Dudit liberado agora (fluxo + cota mensal do plano). */
+    checkoutOpen?: boolean
+    /** Cota mensal de pedidos do plano esgotada. */
+    ordersLimitReached?: boolean
+    /** WhatsApp da loja para o fallback de atendimento. */
+    whatsappPhone?: string | null
 }
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
@@ -161,6 +167,9 @@ export function ProductDetailsPageClient({
     hideHeaderAndFooter = false,
     sponsoredAd = null,
     soldCount = 0,
+    checkoutOpen = true,
+    ordersLimitReached = false,
+    whatsappPhone = null,
 }: ProductDetailsPageClientProps) {
     const router = useRouter()
     const showPrice = product.show_price_in_store !== false
@@ -1082,6 +1091,40 @@ export function ProductDetailsPageClient({
         setCep(raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw)
     }, [])
 
+    // Loja que não consegue fechar o pedido pela Dudit agora (fluxo WhatsApp ou
+    // cota mensal do plano esgotada): a compra continua pelo WhatsApp, com o
+    // produto já no resumo da mensagem. O checkout também bloqueia no servidor.
+    const canCheckoutViaDudit = checkoutOpen !== false
+    const checkoutWhatsAppUrl = useMemo(() => {
+        const digits = String(whatsappPhone || partner.phone || "").replace(/\D/g, "")
+        const formattedPhone = digits.startsWith("55")
+            ? digits
+            : digits.length >= 10
+                ? `55${digits}`
+                : digits
+        if (!formattedPhone) return null
+        const priceLabel = showPrice && pricing?.bestPrice ? ` por ${formatMoney(pricing.bestPrice)}` : ""
+        const reason = ordersLimitReached
+            ? " Quero finalizar a compra por aqui, como a loja está atendendo."
+            : " Quero finalizar a compra."
+        return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(
+            `Olá! Vi o produto "${product.name}"${priceLabel} na Dudit.${reason}`,
+        )}`
+    }, [whatsappPhone, partner.phone, showPrice, pricing?.bestPrice, ordersLimitReached, product.name])
+
+    const openCheckoutWhatsApp = useCallback(() => {
+        if (!checkoutWhatsAppUrl) {
+            notifyError("WhatsApp indisponível", "A loja não cadastrou um número de WhatsApp para atendimento.")
+            return
+        }
+        trackEvent("whatsapp_lead_clicked", {
+            product_id: product.id,
+            partner_id: partner.id,
+            store_id: product.store_id,
+        })
+        window.open(checkoutWhatsAppUrl, "_blank")
+    }, [checkoutWhatsAppUrl, notifyError, product.id, product.store_id, partner.id])
+
     const handleAddToCart = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
@@ -1089,6 +1132,10 @@ export function ProductDetailsPageClient({
         }
         if (isClosedAndBlocking) {
             notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
+        if (!canCheckoutViaDudit) {
+            openCheckoutWhatsApp()
             return
         }
 
@@ -1102,6 +1149,10 @@ export function ProductDetailsPageClient({
             const token = await fetchCSRFTokenSingleton() || ""
             const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id, product.store_id, selectedAddonsList)
             if (result.error) {
+                if ((result as any).whatsappFallback) {
+                    openCheckoutWhatsApp()
+                    return
+                }
                 notifyError("Erro ao adicionar à sacola", result.error)
             } else {
                 invalidateCartCache()
@@ -1120,7 +1171,7 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError])
+    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError, canCheckoutViaDudit, openCheckoutWhatsApp])
 
     const handleBuyNow = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
@@ -1129,6 +1180,10 @@ export function ProductDetailsPageClient({
         }
         if (isClosedAndBlocking) {
             notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
+        if (!canCheckoutViaDudit) {
+            openCheckoutWhatsApp()
             return
         }
 
@@ -1216,7 +1271,7 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset, deliveryConfig, isClosedAndBlocking, notifyError])
+    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset, deliveryConfig, isClosedAndBlocking, notifyError, canCheckoutViaDudit, openCheckoutWhatsApp])
 
 
     const shareMessage = useMemo(() => {
@@ -1804,13 +1859,37 @@ export function ProductDetailsPageClient({
                     </div>
                 ) : (
                     <div className="hidden lg:block">
-                        <Button disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
-                            {partner.isShowcaseActive === false ? "Vitrine Inativa" : isClosedAndBlocking ? "Loja Fechada" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
-                        </Button>
-                        <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
-                            disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleAddToCart}>
-                            {loading ? "Adicionando..." : "Adicionar à sacola"}
-                        </Button>
+                        {!canCheckoutViaDudit ? (
+                            checkoutWhatsAppUrl ? (
+                                <a
+                                    href={checkoutWhatsAppUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => trackEvent("whatsapp_lead_clicked", { product_id: product.id, partner_id: partner.id, store_id: product.store_id })}
+                                    className="w-full mb-8 h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                                >
+                                    <WhatsappIcon size={20} className="fill-white" />
+                                    Finalizar pelo WhatsApp
+                                </a>
+                            ) : (
+                                <InfoCard
+                                    title="Atendimento pelo WhatsApp"
+                                    message="Esta loja está atendendo os pedidos pelo WhatsApp, mas não cadastrou um número. Tente novamente mais tarde."
+                                    color="orange"
+                                    className="mb-8"
+                                />
+                            )
+                        ) : (
+                            <>
+                                <Button disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
+                                    {partner.isShowcaseActive === false ? "Vitrine Inativa" : isClosedAndBlocking ? "Loja Fechada" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                                </Button>
+                                <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
+                                    disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleAddToCart}>
+                                    {loading ? "Adicionando..." : "Adicionar à sacola"}
+                                </Button>
+                            </>
+                        )}
                     </div>
                 )
             )}
@@ -2908,6 +2987,23 @@ export function ProductDetailsPageClient({
                                         </a>
                                     )
                                 })()
+                            ) : !canCheckoutViaDudit ? (
+                                checkoutWhatsAppUrl ? (
+                                    <a
+                                        href={checkoutWhatsAppUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => trackEvent("whatsapp_lead_clicked", { product_id: product.id, partner_id: partner.id, store_id: product.store_id })}
+                                        className="flex-1 h-12 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-sm"
+                                    >
+                                        <WhatsappIcon size={20} className="fill-white" />
+                                        Finalizar pelo WhatsApp
+                                    </a>
+                                ) : (
+                                    <p className="flex-1 text-center text-sm text-brand-inactive-text dark:text-dark-body">
+                                        Atendimento pelo WhatsApp — a loja ainda não cadastrou um número.
+                                    </p>
+                                )
                             ) : (
                                 <>
                                     <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"

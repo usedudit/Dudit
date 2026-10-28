@@ -570,6 +570,27 @@ export async function addToCartAction(
     return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
   }
 
+  // 3.0.1. Fluxo e cota mensal do plano: se a loja não consegue fechar o pedido
+  // pela Dudit agora (fluxo WhatsApp ou cota do mês esgotada), o comprador não
+  // deve nem montar a sacola — vai direto para o WhatsApp. O checkout continua
+  // validando isso no servidor (fonte autoritativa); aqui é o bloqueio cedo.
+  const addCapabilities = await resolveMarketplaceCapabilities(partnerId, {
+    storeId: effectiveStoreId || null,
+  })
+  if (!addCapabilities.checkoutOpen) {
+    return {
+      error: addCapabilities.ordersLimitReached
+        ? "A loja está atendendo os pedidos pelo WhatsApp no momento."
+        : "Esta loja finaliza os pedidos pelo WhatsApp. Continue o atendimento por lá.",
+      whatsappFallback: true,
+      whatsappReason: addCapabilities.ordersLimitReached
+        ? "A loja atingiu o limite de pedidos do mês."
+        : "A loja finaliza os pedidos pelo WhatsApp.",
+      whatsappPhone: addCapabilities.whatsappPhone,
+      whatsappCode: addCapabilities.ordersLimitReached ? "ORDER_LIMIT_REACHED" : "RESOURCE_DISABLED",
+    }
+  }
+
   // 3.1. Validação de Estoque e Status Ativo
   const parentProd = variantId ? (entity.products as any) : entity
   const isItemActive = variantId
@@ -1020,6 +1041,37 @@ export async function checkoutCartAction(
     )
   }
 
+  // Mercado Pago é feature paga do plano. Sem ela, o checkout só aceita os
+  // métodos manuais da loja ("a combinar", PIX, dinheiro). Isso é validado no
+  // servidor porque o `paymentMethod` vem do cliente.
+  if (!marketplaceCapabilities.mercadoPagoEnabled) {
+    const { data: manualPaymentMethods } = await adminClient
+      .from("payment_methods")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .limit(1)
+
+    // Loja sem Mercado Pago (pelo plano) e sem nenhuma forma manual configurada
+    // não teria como receber: o atendimento continua pelo WhatsApp em vez de
+    // morrer num erro depois de tudo preenchido.
+    if (!manualPaymentMethods || manualPaymentMethods.length === 0) {
+      return {
+        ...whatsappFallback(
+          "A loja está atendendo os pedidos pelo WhatsApp no momento.",
+        ),
+        whatsappCode: "PAYMENT_UNAVAILABLE",
+      }
+    }
+
+    if (useMercadoPago) {
+      return {
+        error:
+          "O pagamento online não está disponível nesta loja. Escolha uma das formas de pagamento combinadas com o vendedor.",
+      }
+    }
+  }
+
   const hasSubscriptionLine = resolvedLines.some((l: any) => l.itemType === "subscription")
   const requiresDelivery =
     deliveryType === "delivery" &&
@@ -1242,14 +1294,22 @@ export async function checkoutCartAction(
   ])
 
   if (!limitCheck.allowed && !isWhatsappFlow) {
-    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos.", whatsappFallback: true }
+    // Nunca vazar "faça upgrade" para o comprador: a loja simplesmente está
+    // atendendo pelo WhatsApp neste momento.
+    return {
+      ...whatsappFallback("A loja está atendendo os pedidos pelo WhatsApp no momento."),
+      whatsappCode: "ORDER_LIMIT_REACHED",
+    }
   }
 
   // Linhas de agendamento consomem a cota mensal de agendamentos do vendedor
   if (resolvedLines.some((l) => l.itemType === "service_booking")) {
     const bookingLimitCheck = await checkLimit(partnerId, "monthly_appointments")
     if (!bookingLimitCheck.allowed) {
-      return { error: bookingLimitCheck.message || "A agenda atingiu o limite mensal de agendamentos." }
+      return {
+        ...whatsappFallback("A agenda desta loja está sendo atendida pelo WhatsApp no momento."),
+        whatsappCode: "APPOINTMENT_LIMIT_REACHED",
+      }
     }
   }
 

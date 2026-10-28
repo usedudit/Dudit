@@ -2,7 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
-import { getPartnerPlan, checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
+import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
 import { createNotification } from "@/lib/services/notification.service"
@@ -67,26 +67,26 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
             const partnerId = partner.id
             const partnerUserId = partner.user_id
 
-            // 2. Check partner plan: must be 'crescer' or 'escalar'
-            const partnerPlan = await getPartnerPlan(partnerId)
-            if (!hasMinimumPlan(partnerPlan.slug, "crescer")) {
-                return errorResponse("Este prestador recebe solicitações de orçamento apenas via WhatsApp.", { whatsappFallback: true })
-            }
-
+            // 2. Orçamentos pelo Dudit: fluxo da loja + feature do plano
+            // (o free tem cota de 10/mês). A cota é validada logo abaixo.
             const capabilities = await resolveMarketplaceCapabilities(partnerId, {
                 storeId: (service as any).store_id || input.storeId || null,
             })
             if (!capabilities.quotesViaDudit) {
                 return errorResponse(
-                    "Os orçamentos estão desativados nesta loja. Fale diretamente pelo WhatsApp.",
+                    "Este prestador recebe solicitações de orçamento apenas via WhatsApp.",
                     { whatsappFallback: true, whatsappPhone: capabilities.whatsappPhone },
                 )
             }
 
-            // 3. Check monthly quotes limit
+            // 3. Cota mensal de orçamentos do plano. Ao atingir, o atendimento
+            // segue pelo WhatsApp — sem mencionar plano/upgrade ao comprador.
             const limitCheck = await checkLimit(partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
-                return errorResponse("O prestador atingiu o limite de orçamentos para este mês. Entre em contato via WhatsApp.", { whatsappFallback: true })
+                return errorResponse(
+                    "Este prestador está atendendo os orçamentos pelo WhatsApp no momento.",
+                    { whatsappFallback: true, whatsappPhone: capabilities.whatsappPhone },
+                )
             }
 
             // 4. Fetch buyer profile for customer sync

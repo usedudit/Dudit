@@ -356,7 +356,9 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)
   const depositEnabled = Boolean(partnerRow?.service_deposit_enabled)
   const serviceDepositMpEnabled = Boolean(partnerRow?.service_deposit_enabled && partnerRow?.mp_user_id)
-  const mpConnected = Boolean(input.mpConnected ?? partnerRow?.mp_user_id)
+  const mpConnected =
+    marketplaceCapabilities.mercadoPagoEnabled &&
+    Boolean(input.mpConnected ?? partnerRow?.mp_user_id)
 
   const depositAvailable =
     requirements.hasServiceLines &&
@@ -447,7 +449,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
-      orderFlow: marketplaceCapabilities.checkoutViaDudit
+      orderFlow: marketplaceCapabilities.checkoutOpen
         ? marketplaceCapabilities.baseOrderFlow
         : "whatsapp",
       planSlug: plan?.slug || "free",

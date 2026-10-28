@@ -12,6 +12,7 @@ import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
@@ -113,9 +114,12 @@ export default async function ProductDetailsPage({
 
 
   // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
-  const [variants, reviews] = await Promise.all([
+  const [variants, reviews, capabilities] = await Promise.all([
     getProductVariants(product.id),
-    getProductReviews(product.id)
+    getProductReviews(product.id),
+    product.partner_id
+      ? resolveMarketplaceCapabilities(product.partner_id, { storeId: product.store_id || null })
+      : Promise.resolve(null),
   ])
 
 
@@ -194,6 +198,9 @@ export default async function ProductDetailsPage({
         currentUserId={user?.id || null}
         userProfile={userProfile}
         cartCount={cartCount}
+        checkoutOpen={capabilities ? capabilities.checkoutOpen : true}
+        ordersLimitReached={capabilities?.ordersLimitReached ?? false}
+        whatsappPhone={capabilities?.whatsappPhone ?? null}
       />
 
       <MarketplaceFooter />

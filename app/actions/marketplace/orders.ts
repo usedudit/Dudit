@@ -63,7 +63,7 @@ export async function createOrderAction(data: {
       variantId,
       csrf_token: data.csrf_token,
     })
-    if (prep.error) return { error: prep.error }
+    if ("error" in prep) return prep
     cartItemId = prep.cartItemId
   } else if (data.itemType === "service") {
     const prep = await addPurchasableServiceToCartAction({

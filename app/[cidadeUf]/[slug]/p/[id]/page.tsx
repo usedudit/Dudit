@@ -12,6 +12,7 @@ import { getProductUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
+import { resolveMarketplaceCapabilities } from "@/lib/marketplace-capabilities"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
@@ -117,7 +118,7 @@ export default async function ProductDetailsPage({
 
 
   // 2. Fetch variants + reviews + sold count in parallel (Deduplicated but fresh)
-  const [variants, reviews, detailAds, soldCount] = await Promise.all([
+  const [variants, reviews, detailAds, soldCount, capabilities] = await Promise.all([
     getProductVariants(product.id),
     getProductReviews(product.id, storeId),
     getSponsoredAdsForSlot("detail", {
@@ -129,6 +130,9 @@ export default async function ProductDetailsPage({
       state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
     }),
     getProductSoldCount(product.id),
+    product.partner_id
+      ? resolveMarketplaceCapabilities(product.partner_id, { storeId: product.store_id || null })
+      : Promise.resolve(null),
   ])
   const detailAd = detailAds[0] ?? null
 
@@ -189,6 +193,9 @@ export default async function ProductDetailsPage({
         cartCount={cartCount}
         sponsoredAd={detailAd}
         soldCount={soldCount}
+        checkoutOpen={capabilities ? capabilities.checkoutOpen : true}
+        ordersLimitReached={capabilities?.ordersLimitReached ?? false}
+        whatsappPhone={capabilities?.whatsappPhone ?? null}
       />
 
       <MarketplaceFooter />

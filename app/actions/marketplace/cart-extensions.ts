@@ -160,6 +160,21 @@ export async function addServiceBookingToCartAction(
       whatsappPhone: capabilities.whatsappPhone,
     }
   }
+  // Cota mensal de agendamentos e de pedidos: sem ela o checkout não fecha,
+  // então nem deixa a reserva entrar na sacola.
+  if (!capabilities.appointmentsOpen || !capabilities.checkoutOpen) {
+    return {
+      error: "A loja está atendendo os agendamentos pelo WhatsApp no momento.",
+      whatsappFallback: true,
+      whatsappReason: capabilities.appointmentsLimitReached
+        ? "A agenda atingiu o limite de agendamentos do mês."
+        : "A loja está atendendo pelo WhatsApp.",
+      whatsappPhone: capabilities.whatsappPhone,
+      whatsappCode: capabilities.appointmentsLimitReached
+        ? "APPOINTMENT_LIMIT_REACHED"
+        : "ORDER_LIMIT_REACHED",
+    }
+  }
 
   if (
     service.deleted_at ||
@@ -345,7 +360,10 @@ export async function prepareProductBuyNowCheckoutAction(input: {
     input.storeId,
     input.selectedAddons,
   )
-  if (addResult.error) return { error: addResult.error }
+  // O `addToCartAction` já aplica o bloqueio de fluxo/cota do plano (fonte
+  // autoritativa) e devolve os campos de fallback do WhatsApp — eles precisam
+  // chegar ao cliente para o "Comprar agora" virar atendimento pelo WhatsApp.
+  if (addResult.error) return addResult
 
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()

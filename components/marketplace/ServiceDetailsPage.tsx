@@ -44,7 +44,6 @@ import { AddToCollectionModal } from "./AddToCollectionModal"
 import { RequestQuoteModal } from "./RequestQuoteModal"
 import { ReportModal } from "./ReportModal"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
-import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
@@ -83,9 +82,14 @@ interface ServiceDetailsPageClientProps {
     userProfile?: any
     cartCount?: number
     sponsoredAd?: SponsoredAd | null
-    partnerPlanSlug?: string
     quotesViaDudit?: boolean
     appointmentsViaDudit?: boolean
+    /** Orçamento liberado agora (feature + cota mensal do plano). */
+    quotesOpen?: boolean
+    /** Agendamento liberado agora (feature + cota mensal do plano). */
+    appointmentsOpen?: boolean
+    /** Checkout pela Dudit liberado agora (fluxo + cota mensal de pedidos). */
+    checkoutOpen?: boolean
     whatsappPhone?: string | null
 }
 
@@ -168,9 +172,11 @@ export function ServiceDetailsPageClient({
     userProfile,
     cartCount,
     sponsoredAd = null,
-    partnerPlanSlug = "free",
-    quotesViaDudit = true,
-    appointmentsViaDudit = true,
+    quotesViaDudit = false,
+    appointmentsViaDudit = false,
+    quotesOpen = false,
+    appointmentsOpen = false,
+    checkoutOpen = false,
     whatsappPhone = null,
 }: ServiceDetailsPageClientProps) {
     const router = useRouter()
@@ -899,6 +905,21 @@ export function ServiceDetailsPageClient({
         }
     }, [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
 
+    // Agendamento pela Dudit depende da cota de agendamentos E do checkout
+    // (a reserva termina no checkout). Quando qualquer um bloqueia, o
+    // agendamento continua pelo WhatsApp da loja.
+    const bookingOpen = appointmentsViaDudit && appointmentsOpen && checkoutOpen
+    const openBookingWhatsApp = useCallback(() => {
+        const cleanPhone = partner.phone ? String(partner.phone).replace(/\D/g, "") : ""
+        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+        if (!formattedPhone) {
+            notifyError("WhatsApp indisponível", "A loja não cadastrou um número de WhatsApp para atendimento.")
+            return
+        }
+        const msg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de agendar um horário.`)
+        window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank")
+    }, [partner.phone, service.name, notifyError])
+
     const handleBookNowCheckout = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
@@ -906,6 +927,10 @@ export function ServiceDetailsPageClient({
         }
         if (isClosedAndBlocking) {
             notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
+        if (!bookingOpen) {
+            openBookingWhatsApp()
             return
         }
 
@@ -980,7 +1005,7 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, isClosedAndBlocking, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, isClosedAndBlocking, notifyError, bookingOpen, openBookingWhatsApp])
 
     const handleAddBookingToCart = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
@@ -989,6 +1014,10 @@ export function ServiceDetailsPageClient({
         }
         if (isClosedAndBlocking) {
             notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
+        if (!bookingOpen) {
+            openBookingWhatsApp()
             return
         }
 
@@ -1022,13 +1051,12 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError, bookingOpen, openBookingWhatsApp])
 
     const handleRequestQuoteClick = useCallback(() => {
         if (isProductOwner) return
-        const canUseSystemQuote = hasMinimumPlan(partnerPlanSlug || "free", "crescer")
         const isWhatsappFlow = partner.orderFlow === "whatsapp"
-        if (!canUseSystemQuote || isWhatsappFlow || !quotesViaDudit) {
+        if (!quotesOpen || isWhatsappFlow || !quotesViaDudit) {
             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
             const startingPriceFormatted = formatCurrency(Number(service.price || 0))
@@ -1042,7 +1070,7 @@ export function ServiceDetailsPageClient({
             return
         }
         setShowRequestQuoteModal(true)
-    }, [isProductOwner, partnerPlanSlug, partner.phone, partner.orderFlow, service.name, service.price, userId, router, quotesViaDudit])
+    }, [isProductOwner, partner.phone, partner.orderFlow, service.name, service.price, userId, router, quotesViaDudit, quotesOpen])
 
     const handleLearnMoreClick = useCallback(() => {
         const descEl = document.getElementById("service-description")
@@ -1490,7 +1518,7 @@ export function ServiceDetailsPageClient({
                             </span>
                         </Button>
                     </div>
-                ) : !appointmentsViaDudit ? (
+                ) : !bookingOpen ? (
                     <div className="hidden lg:block mb-4">
                         {appointmentsWhatsAppUrl ? (
                             <a
@@ -2421,7 +2449,7 @@ export function ServiceDetailsPageClient({
                                     Solicitar orçamento
                                 </Button>
                             </>
-                        ) : !appointmentsViaDudit ? (
+                        ) : !bookingOpen ? (
                             <div className="flex-1 min-w-0">
                                 {appointmentsWhatsAppUrl ? (
                                     <a

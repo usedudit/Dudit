@@ -315,6 +315,21 @@ async function handler(request: NextRequest) {
       )
     }
 
+    // Mercado Pago é feature do plano. Pedidos novos de lojas sem a feature
+    // (ex.: free) não podem gerar cobrança online — o pagamento é combinado
+    // diretamente com o vendedor. Pedidos já existentes seguem pagáveis.
+    if (!existingOrderId && !capabilities.mercadoPagoEnabled) {
+      return NextResponse.json(
+        {
+          error:
+            "O pagamento online não está disponível nesta loja. Combine o pagamento diretamente com o vendedor.",
+          whatsappFallback: true,
+          whatsappPhone: capabilities.whatsappPhone,
+        },
+        { status: 409 },
+      )
+    }
+
     if (
       !existingOrderId &&
       normalizedDeliveryType === "delivery" &&
