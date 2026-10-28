@@ -429,8 +429,6 @@ export function CheckoutPageClient() {
     const checkoutCapabilities = checkoutContext?.capabilities
     const mercadoPagoEnabled = checkoutCapabilities?.mercadoPagoEnabled ?? false
     const mpAvailable = Boolean(partnerInfo?.mpConnected) && mercadoPagoEnabled
-    // A loja tem MP conectado, mas o plano atual não inclui a feature.
-    const planBlocksMp = Boolean(partnerInfo?.mpConnected) && !mercadoPagoEnabled
 
     const serviceLines = useMemo(() => {
         return checkoutContext?.lines?.filter(l => l.lineKind === "service_booking") || []
@@ -840,11 +838,13 @@ export function CheckoutPageClient() {
 
     // Auto-set paymentOption to "traditional" for non-MP stores (only if pickup payment is allowed or not in pickup mode)
     const rawPickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
-    // Loja que exige pagamento online na retirada mas está num plano sem
-    // Mercado Pago: exigir online deixaria o pedido sem nenhuma forma de
-    // pagamento. Nesse caso o pagamento é combinado na retirada (manual).
+    // Loja que exige pagamento online na retirada, mas não pode cobrar online
+    // agora (plano sem Mercado Pago ou loja sem MP conectado): exigir online
+    // deixaria o pedido sem nenhuma forma de pagamento. Nesse caso o pagamento
+    // é combinado na retirada (manual), em vez de travar o checkout no fim.
+    const canPayOnline = mpAvailable
     const pickupPolicyFromContext =
-        planBlocksMp && rawPickupPolicy === "require_online_payment"
+        !canPayOnline && rawPickupPolicy === "require_online_payment"
             ? "allow_pickup_payment"
             : rawPickupPolicy
     const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
