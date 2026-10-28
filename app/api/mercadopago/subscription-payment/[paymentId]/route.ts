@@ -80,58 +80,71 @@ export async function GET(
       return NextResponse.json({ error: "Acesso negado a esta assinatura" }, { status: 403 })
     }
 
-    // ── Auto-reactivate and synchronize subscription when payment is approved ──
+    // ── Synchronize subscription when the payment settles ──
+    // The next cycle comes from the subscription anchor (calendar months), never
+    // from a hardcoded +30 days on the payment date.
     let reactivated = false
-    if (paymentData.status === "approved") {
+    if (["approved", "processed", "rejected", "cancelled", "refunded", "charged_back"].includes(paymentData.status)) {
       try {
-        const now = new Date()
-        const currentEnd = targetSub.current_period_end ? new Date(targetSub.current_period_end) : null
-        const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
-          ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
-          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+        const { chargeFromMpPayment } = await import("@/lib/billing/record-charge")
+        const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+        const charge = chargeFromMpPayment(paymentData, paymentId)
 
-        const { error: updateError } = await adminClient
-          .from("subscriptions")
-          .update({
-            status: "active",
-            past_due_at: null,
-            current_period_start: now.toISOString(),
-            current_period_end: nextEnd.toISOString(),
-            updated_at: now.toISOString(),
-          })
-          .eq("id", targetSub.id)
+        const chargeDateRaw = paymentData.date_approved || paymentData.date_created
+        const chargeDate = chargeDateRaw ? new Date(chargeDateRaw) : null
+        const validChargeDate = chargeDate && !isNaN(chargeDate.getTime()) ? chargeDate : null
 
-        if (!updateError) {
-          reactivated = true
-          const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
-          invalidatePartnerPlanCache(targetSub.partner_id)
+        // A late payment of an already cancelled subscription is recorded but
+        // never restores access.
+        if (targetSub.status === "cancelled") {
+          await syncSubscriptionToBilling(targetSub.id, "webhook", {
+            status: "cancelled",
+            charge,
+            chargeCycleStart: validChargeDate,
+            notify: false,
+          }).catch((err) => console.error("[SUBSCRIPTION_PAYMENT_SYNC] Billing sync error:", err))
+        } else {
+          const targetStatus =
+            charge.status === "approved"
+              ? "active"
+              : ["rejected", "refunded", "chargeback"].includes(charge.status)
+                ? "past_due"
+                : targetSub.status
 
-          const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-          await syncSubscriptionToBilling(targetSub.id, "manual", "active", now, nextEnd).catch((err) => {
+          await syncSubscriptionToBilling(targetSub.id, "manual", {
+            status: targetStatus,
+            cycleStart: charge.status === "approved" ? validChargeDate : undefined,
+            charge,
+            chargeCycleStart: validChargeDate,
+          }).catch((err) => {
             console.error("[SUBSCRIPTION_PAYMENT_SYNC] Billing sync error:", err)
           })
 
-          try {
-            const minuteBucket = Math.floor(Date.now() / 60000)
-            const idempotencyKey = `subscription_reactivated:${targetSub.partner_id}:${targetSub.mercado_pago_subscription_id}:${minuteBucket}`
-
-            await adminClient.from("billing_events").insert({
-              partner_id: targetSub.partner_id,
-              event_type: "subscription_reactivated",
-              amount: Number(paymentData.transaction_amount || 0),
-              provider: "mercado_pago",
-              metadata: {
-                mp_subscription_id: targetSub.mercado_pago_subscription_id,
-                mp_payment_id: paymentId.toString(),
-                payment_method: paymentData.payment_method_id || "pix",
-                sync_source: "status_poll",
-              },
-              idempotency_key: idempotencyKey,
-            })
-          } catch {}
+          reactivated = charge.status === "approved" && targetSub.status !== "active"
         }
+
+        try {
+          const minuteBucket = Math.floor(Date.now() / 60000)
+          const idempotencyKey = `subscription_payment:${targetSub.partner_id}:${paymentId}:${minuteBucket}`
+
+          await adminClient.from("billing_events").insert({
+            partner_id: targetSub.partner_id,
+            event_type:
+              charge.status === "approved" ? "subscription_reactivated" : "subscription_payment_updated",
+            amount: Number(paymentData.transaction_amount || 0),
+            provider: "mercado_pago",
+            metadata: {
+              mp_subscription_id: targetSub.mercado_pago_subscription_id,
+              mp_payment_id: paymentId.toString(),
+              payment_method: paymentData.payment_method_id || "pix",
+              payment_status: paymentData.status,
+              sync_source: "status_poll",
+            },
+            idempotency_key: idempotencyKey,
+          })
+        } catch {}
       } catch (syncErr: any) {
-        SecureLogger.error("Failed to auto-reactivate subscription on payment check", {
+        SecureLogger.error("Failed to sync subscription on payment check", {
           paymentId,
           error: syncErr.message,
         })

@@ -3,6 +3,193 @@ import { generateInvoiceData } from "./invoice-generator"
 import { logBillingAudit } from "./audit"
 import type { BillingInvoice } from "./types"
 
+type AdminClient = ReturnType<typeof getAdminClient>
+
+interface InvoiceContext {
+  purchase: any
+  payments: any[]
+  partnerDetails: {
+    name: string
+    document: string | null
+    address: string
+    email: string | null
+    phone: string | null
+    image_url: string | null
+  }
+  customerDetails: {
+    name: string
+    document: string | null
+    email: string | null
+    phone: string | null
+    address: string | null
+  } | null
+  purchaseableDetails: { name?: string; description?: string }
+  periodStart: string | null
+  periodEnd: string | null
+}
+
+async function loadInvoiceContext(
+  admin: AdminClient,
+  purchaseId: string,
+): Promise<InvoiceContext | null> {
+  const { data: purchase, error: purchaseError } = await admin
+    .from("billing_purchases")
+    .select("*, partners:partners!billing_purchases_partner_id_fkey(*)")
+    .eq("id", purchaseId)
+    .maybeSingle()
+
+  if (purchaseError || !purchase) return null
+
+  const { data: payments } = await admin
+    .from("billing_payments")
+    .select("*")
+    .eq("purchase_id", purchaseId)
+    .order("created_at", { ascending: false })
+
+  // Merchant data comes from the matrix store (partners no longer carries
+  // name/email/phone/logo).
+  const { data: storeData } = await admin
+    .from("stores")
+    .select("cnpj, cpf, phone, logo_url, name, address_id, city, state")
+    .eq("partner_id", purchase.partner_id)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const partnerDoc = storeData?.cnpj || storeData?.cpf || ""
+
+  // Merchant address: from the matrix store's address row when available,
+  // falling back to the store's city/state.
+  let merchantAddress = ""
+  if (storeData?.address_id) {
+    const { data: storeAddr } = await admin
+      .from("addresses")
+      .select("*")
+      .eq("id", storeData.address_id)
+      .maybeSingle()
+    if (storeAddr) {
+      merchantAddress = buildAddressText(storeAddr)
+    }
+  }
+  if (!merchantAddress) {
+    const cityState = [storeData?.city, storeData?.state].filter(Boolean).join("/")
+    merchantAddress = cityState || ""
+  }
+
+  // Merchant billing email (subscription billing email when applicable).
+  let merchantEmail: string | null = null
+  if (purchase.subscription_id) {
+    const { data: sub } = await admin
+      .from("subscriptions")
+      .select("billing_email")
+      .eq("id", purchase.subscription_id)
+      .maybeSingle()
+    if (sub?.billing_email) merchantEmail = sub.billing_email
+  }
+
+  let customerDetails: InvoiceContext["customerDetails"] = null
+  if (purchase.user_id) {
+    // Customer of a subscription invoice is the owner of the partner
+    // (the person who pays for the plan), not the merchant itself.
+    const [profileRes, emailRes, addrRes, subRes] = await Promise.all([
+      admin
+        .from("user_profiles")
+        .select("full_name, phone")
+        .eq("user_id", purchase.user_id)
+        .maybeSingle(),
+      admin
+        .from("profiles")
+        .select("email")
+        .eq("id", purchase.user_id)
+        .maybeSingle(),
+      admin
+        .from("addresses")
+        .select("*")
+        .eq("user_id", purchase.user_id)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      purchase.subscription_id
+        ? admin
+          .from("subscriptions")
+          .select("billing_email, mercado_pago_subscription_id")
+          .eq("id", purchase.subscription_id)
+          .maybeSingle()
+        : Promise.resolve({ data: null as any }),
+    ])
+
+    // Mercado Pago returns the payer info (first/last name, email - no phone)
+    // on the preapproval. Prefer it for the customer display when available.
+    const mpPayer: { name?: string; email?: string | null } = {}
+    if (subRes?.data?.mercado_pago_subscription_id) {
+      try {
+        const { getMpPlatformAccessToken } = await import("@/lib/services/mercadopago/subscriptions")
+        const token = await getMpPlatformAccessToken()
+        const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${subRes.data.mercado_pago_subscription_id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (mpRes.ok) {
+          const mp = await mpRes.json()
+          const mpName = [mp.payer_first_name, mp.payer_last_name].filter(Boolean).join(" ")
+          if (mpName) mpPayer.name = mpName
+          if (mp.payer_email) mpPayer.email = mp.payer_email
+        }
+      } catch (err: any) {
+        console.warn("[InvoiceGeneration] MP payer fetch failed:", err?.message)
+      }
+    }
+
+    const billingEmail = subRes?.data?.billing_email || null
+
+    if (profileRes.data || emailRes.data || mpPayer.name) {
+      const ownerEmail = mpPayer.email || billingEmail || emailRes.data?.email || null
+      const ownerAddress = addrRes.data ? buildAddressText(addrRes.data) : ""
+
+      customerDetails = {
+        name: mpPayer.name || profileRes.data?.full_name || "Usuário",
+        document: null,
+        email: ownerEmail,
+        phone: profileRes.data?.phone || null,
+        address: ownerAddress || null,
+      }
+    }
+  }
+
+  const purchaseableDetails: { name?: string; description?: string } = {}
+  if (purchase.purchaseable_type === "plan" && purchase.purchaseable_id) {
+    const { data: plan } = await admin
+      .from("plans")
+      .select("name, slug")
+      .eq("id", purchase.purchaseable_id)
+      .maybeSingle()
+    if (plan) {
+      purchaseableDetails.name = `Plano ${plan.name}`
+      purchaseableDetails.description = plan.slug
+    }
+  }
+
+  // The purchase's own billing period always wins. It is the cycle this
+  // invoice belongs to; `subscriptions.current_period_*` is a moving target.
+  const periodStart: string | null = purchase.billing_period_start || null
+  const periodEnd: string | null = purchase.billing_period_end || null
+
+  return {
+    purchase,
+    payments: (payments || []) as any[],
+    partnerDetails: {
+      name: storeData?.name || "Empresa",
+      document: partnerDoc,
+      address: merchantAddress,
+      email: merchantEmail,
+      phone: storeData?.phone || null,
+      image_url: storeData?.logo_url || null,
+    },
+    customerDetails,
+    purchaseableDetails,
+    periodStart,
+    periodEnd,
+  }
+}
+
 /**
  * Generate (or fetch existing) invoice for a purchase.
  *
@@ -11,7 +198,8 @@ import type { BillingInvoice } from "./types"
  * check it BEFORE calling this function.
  *
  * Idempotent: if the purchase already has an invoice, it returns the existing
- * invoice instead of creating a duplicate.
+ * invoice instead of creating a duplicate. Use `refreshInvoiceForPurchase`
+ * when the payment of the cycle changes.
  */
 export async function generateInvoiceForPurchase(
   purchaseId: string,
@@ -42,186 +230,27 @@ export async function generateInvoiceForPurchase(
       }
     }
 
-    const { data: purchase, error: purchaseError } = await admin
-      .from("billing_purchases")
-      .select("*, partners:partners!billing_purchases_partner_id_fkey(*)")
-      .eq("id", purchaseId)
-      .maybeSingle()
-
-    if (purchaseError || !purchase) {
+    const context = await loadInvoiceContext(admin, purchaseId)
+    if (!context) {
       return { success: false, error: "Compra não encontrada" }
     }
 
-    const { data: payments } = await admin
-      .from("billing_payments")
-      .select("*")
-      .eq("purchase_id", purchaseId)
-      .order("created_at", { ascending: false })
-
-    // Merchant data comes from the matrix store (partners no longer carries
-    // name/email/phone/logo).
-    const { data: storeData } = await admin
-      .from("stores")
-      .select("cnpj, cpf, phone, logo_url, name, address_id, city, state")
-      .eq("partner_id", purchase.partner_id)
-      .order("is_headquarters", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    const partnerDoc = storeData?.cnpj || storeData?.cpf || ""
-
-    // Merchant address: from the matrix store's address row when available,
-    // falling back to the store's city/state.
-    let merchantAddress = ""
-    if (storeData?.address_id) {
-      const { data: storeAddr } = await admin
-        .from("addresses")
-        .select("*")
-        .eq("id", storeData.address_id)
-        .maybeSingle()
-      if (storeAddr) {
-        merchantAddress = buildAddressText(storeAddr)
-      }
-    }
-    if (!merchantAddress) {
-      const cityState = [storeData?.city, storeData?.state].filter(Boolean).join("/")
-      merchantAddress = cityState || ""
-    }
-
-    // Merchant billing email (subscription billing email when applicable).
-    let merchantEmail: string | null = null
-    if (purchase.subscription_id) {
-      const { data: sub } = await admin
-        .from("subscriptions")
-        .select("billing_email")
-        .eq("id", purchase.subscription_id)
-        .maybeSingle()
-      if (sub?.billing_email) merchantEmail = sub.billing_email
-    }
-
-    let customerDetails: { name: string; document: string | null; email: string | null; phone: string | null; address: string | null } | null = null
-    if (purchase.user_id) {
-      // Customer of a subscription invoice is the owner of the partner
-      // (the person who pays for the plan), not the merchant itself.
-      const [profileRes, emailRes, addrRes, subRes] = await Promise.all([
-        admin
-          .from("user_profiles")
-          .select("full_name, phone")
-          .eq("user_id", purchase.user_id)
-          .maybeSingle(),
-        admin
-          .from("profiles")
-          .select("email")
-          .eq("id", purchase.user_id)
-          .maybeSingle(),
-        admin
-          .from("addresses")
-          .select("*")
-          .eq("user_id", purchase.user_id)
-          .order("is_default", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        purchase.subscription_id
-          ? admin
-            .from("subscriptions")
-            .select("billing_email, mercado_pago_subscription_id")
-            .eq("id", purchase.subscription_id)
-            .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ])
-
-      // Mercado Pago returns the payer info (first/last name, email - no phone)
-      // on the preapproval. Prefer it for the customer display when available.
-      let mpPayer: { name?: string; email?: string | null } = {}
-      if (subRes?.data?.mercado_pago_subscription_id) {
-        try {
-          const { getMpPlatformAccessToken } = await import("@/lib/services/mercadopago/subscriptions")
-          const token = await getMpPlatformAccessToken()
-          const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${subRes.data.mercado_pago_subscription_id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          if (mpRes.ok) {
-            const mp = await mpRes.json()
-            const mpName = [mp.payer_first_name, mp.payer_last_name].filter(Boolean).join(" ")
-            if (mpName) mpPayer.name = mpName
-            if (mp.payer_email) mpPayer.email = mp.payer_email
-          }
-        } catch (err: any) {
-          console.warn("[InvoiceGeneration] MP payer fetch failed:", err?.message)
-        }
-      }
-
-      const billingEmail = subRes?.data?.billing_email || null
-
-      if (profileRes.data || emailRes.data || mpPayer.name) {
-        const ownerEmail = mpPayer.email || billingEmail || emailRes.data?.email || null
-        let ownerAddress = ""
-        if (addrRes.data) {
-          ownerAddress = buildAddressText(addrRes.data)
-        }
-
-        customerDetails = {
-          name: mpPayer.name || profileRes.data?.full_name || "Usuário",
-          document: null,
-          email: ownerEmail,
-          phone: profileRes.data?.phone || null,
-          address: ownerAddress || null,
-        }
-      }
-    }
-
-    const purchaseableDetails: { name?: string; description?: string } = {}
-    if (purchase.purchaseable_type === "plan" && purchase.purchaseable_id) {
-      const { data: plan } = await admin
-        .from("plans")
-        .select("name, slug")
-        .eq("id", purchase.purchaseable_id)
-        .maybeSingle()
-      if (plan) {
-        purchaseableDetails.name = `Plano ${plan.name}`
-        purchaseableDetails.description = plan.slug
-      }
-    }
-
-    let periodStart: string | null = null
-    let periodEnd: string | null = null
-    if (purchase.subscription_id) {
-      const { data: sub } = await admin
-        .from("subscriptions")
-        .select("current_period_start, current_period_end")
-        .eq("id", purchase.subscription_id)
-        .maybeSingle()
-      if (sub) {
-        periodStart = sub.current_period_start
-        periodEnd = sub.current_period_end
-      }
-    }
-
-    // Prefer the purchase's own billing period when available.
-    if (purchase.billing_period_start) periodStart = purchase.billing_period_start
-    if (purchase.billing_period_end) periodEnd = purchase.billing_period_end
-
     const { invoiceNumber, verificationHash, invoiceData } = await generateInvoiceData(
-      purchase as any,
-      (payments || []) as any,
-      {
-        name: storeData?.name || "Empresa",
-        document: partnerDoc,
-        address: merchantAddress,
-        email: merchantEmail,
-        phone: storeData?.phone || null,
-        image_url: storeData?.logo_url || null,
-      },
-      customerDetails,
-      purchaseableDetails,
-      periodStart,
-      periodEnd,
+      context.purchase as any,
+      context.payments as any,
+      context.partnerDetails,
+      context.customerDetails,
+      context.purchaseableDetails,
+      context.periodStart,
+      context.periodEnd,
+      { createdAt: resolveInvoiceEmission(context) },
     )
 
     const { data: invoice, error: invoiceError } = await admin
       .from("billing_invoices")
       .insert({
         purchase_id: purchaseId,
-        partner_id: purchase.partner_id,
+        partner_id: context.purchase.partner_id,
         invoice_number: invoiceNumber,
         verification_hash: verificationHash,
         invoice_data: invoiceData,
@@ -238,7 +267,7 @@ export async function generateInvoiceForPurchase(
       .update({ invoice_id: invoice.id })
       .eq("id", purchaseId)
 
-    await logBillingAudit("billing.invoice.generated", purchase.partner_id, {
+    await logBillingAudit("billing.invoice.generated", context.purchase.partner_id, {
       purchase_id: purchaseId,
       invoice_id: invoice.id,
       invoice_number: invoiceNumber,
@@ -249,6 +278,122 @@ export async function generateInvoiceForPurchase(
   } catch (error: any) {
     return { success: false, error: error.message || "Erro ao gerar fatura" }
   }
+}
+
+/**
+ * Refresh the frozen invoice snapshot of a purchase after its payment changes.
+ *
+ * Keeps the invoice number, verification hash and emission timestamp — only the
+ * mutable fields (status, paid_at, method, amounts, period) are rebuilt, so the
+ * printed invoice always agrees with the purchase list/details.
+ */
+export async function refreshInvoiceForPurchase(
+  purchaseId: string,
+  actorUserId?: string | null,
+): Promise<{ success: boolean; data?: BillingInvoice; error?: string }> {
+  try {
+    const admin = getAdminClient()
+
+    const { data: purchaseRow } = await admin
+      .from("billing_purchases")
+      .select("invoice_id, partner_id")
+      .eq("id", purchaseId)
+      .maybeSingle()
+
+    if (!purchaseRow?.invoice_id) {
+      return generateInvoiceForPurchase(purchaseId, actorUserId)
+    }
+
+    const { data: invoiceRow } = await admin
+      .from("billing_invoices")
+      .select("*")
+      .eq("id", purchaseRow.invoice_id)
+      .maybeSingle()
+
+    if (!invoiceRow) {
+      return generateInvoiceForPurchase(purchaseId, actorUserId)
+    }
+
+    const context = await loadInvoiceContext(admin, purchaseId)
+    if (!context) {
+      return { success: false, error: "Compra não encontrada" }
+    }
+
+    const existingData = (invoiceRow.invoice_data || {}) as any
+    const { invoiceData } = await generateInvoiceData(
+      context.purchase as any,
+      context.payments as any,
+      context.partnerDetails,
+      context.customerDetails,
+      context.purchaseableDetails,
+      context.periodStart,
+      context.periodEnd,
+      {
+        invoiceNumber: invoiceRow.invoice_number,
+        verificationHash: invoiceRow.verification_hash,
+        createdAt: existingData.created_at || invoiceRow.created_at,
+      },
+    )
+
+    // Preserve branding/visual overrides that may have been applied later.
+    const merged = {
+      ...invoiceData,
+      ...(existingData.primaryColor ? { primaryColor: existingData.primaryColor } : {}),
+      ...(existingData.secondaryColor ? { secondaryColor: existingData.secondaryColor } : {}),
+    }
+
+    const { data: updated, error } = await admin
+      .from("billing_invoices")
+      .update({ invoice_data: merged, updated_at: new Date().toISOString() })
+      .eq("id", invoiceRow.id)
+      .select()
+      .single()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    await logBillingAudit("billing.invoice.refreshed", context.purchase.partner_id, {
+      purchase_id: purchaseId,
+      invoice_id: invoiceRow.id,
+      invoice_number: invoiceRow.invoice_number,
+      payment_status: context.payments[0]?.status || null,
+    }, actorUserId || null)
+
+    return { success: true, data: updated as BillingInvoice }
+  } catch (error: any) {
+    return { success: false, error: error.message || "Erro ao atualizar fatura" }
+  }
+}
+
+/**
+ * Emission date of an invoice.
+ *
+ * - Recurring subscription cycles: emission = cycle start (the same date as the
+ *   vencimento), so the printed invoice matches the cycle even when the webhook
+ *   arrives a day later.
+ * - Manual PIX: emission = the moment the charge was generated (that is when the
+ *   partner could actually pay it); the vencimento still comes from the cycle.
+ */
+function resolveInvoiceEmission(context: InvoiceContext): string {
+  const purchase = context.purchase
+  const fallback = purchase.created_at || new Date().toISOString()
+  if (purchase.purchase_type !== "subscription") return fallback
+
+  const oldestPayment = context.payments.length > 0
+    ? context.payments[context.payments.length - 1]
+    : null
+  const method = String(
+    oldestPayment?.payment_method_type || purchase.metadata?.payment_method || "",
+  ).toLowerCase()
+  const isManualCharge =
+    method === "pix" || purchase.metadata?.synced_via === "manual"
+
+  if (isManualCharge) {
+    return oldestPayment?.created_at || fallback
+  }
+
+  return purchase.billing_period_start || oldestPayment?.created_at || fallback
 }
 
 function buildAddressText(addr: {

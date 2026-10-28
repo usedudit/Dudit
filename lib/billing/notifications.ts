@@ -6,6 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 type BillingNotificationType =
     | "billing.payment_received"
     | "billing.payment_failed"
+    | "billing.payment_reminder"
     | "billing.invoice_available"
     | "billing.subscription_cancelled"
     | "billing.subscription_renewed"
@@ -17,6 +18,7 @@ type BillingNotificationType =
 const notificationLabels: Record<BillingNotificationType, string> = {
     "billing.payment_received": "Pagamento recebido",
     "billing.payment_failed": "Falha no pagamento",
+    "billing.payment_reminder": "Pagamento pendente",
     "billing.invoice_available": "Fatura disponível",
     "billing.subscription_cancelled": "Assinatura cancelada",
     "billing.subscription_renewed": "Assinatura renovada",
@@ -24,6 +26,30 @@ const notificationLabels: Record<BillingNotificationType, string> = {
     "billing.refund_requested": "Solicitação de reembolso enviada",
     "billing.refund_approved": "Reembolso aprovado",
     "billing.refund_rejected": "Solicitação de reembolso recusada",
+}
+
+/** Where the notification should take the user (subscription management). */
+const SUBSCRIPTION_SETTINGS_HREF = "/erp/configuracoes?tab=assinatura"
+
+function billingHref(type: BillingNotificationType): string {
+    if (type.startsWith("billing.refund")) return "/erp/configuracoes"
+    return SUBSCRIPTION_SETTINGS_HREF
+}
+
+function billingIdempotencyKey(
+    type: BillingNotificationType,
+    userId: string,
+    partnerId: string,
+    metadata: Record<string, any>,
+): string {
+    const subject =
+        metadata.subscription_id ||
+        metadata.purchaseId ||
+        metadata.refundRequestId ||
+        partnerId
+    const cycle = metadata.cycle_key || metadata.cycle || ""
+    const bucket = metadata.idempotency_bucket || ""
+    return `billing:${type}:${subject}:${userId}:${cycle}:${bucket}`
 }
 
 function mapBillingTypeToNotificationType(type: BillingNotificationType): "order_refunded" | "subscription_renewed" | "subscription_created" | "admin_announcement" {
@@ -136,9 +162,9 @@ export async function sendBillingNotification(
     try {
         const title = notificationLabels[type] || "Notificação de Assinatura"
         const message = metadata.message || ""
-        const href = type.startsWith("billing.refund") ? "/erp/configuracoes" : "/ddt-admin/billing/reembolsos"
+        const href = billingHref(type)
         const notifType = mapBillingTypeToNotificationType(type)
-        const idempotencyKey = `billing:${type}:${metadata.refundRequestId || metadata.purchaseId || partnerId}:${userId}:${Date.now()}`
+        const idempotencyKey = billingIdempotencyKey(type, userId, partnerId, metadata)
 
         // 1. Notificação In-App na Dudit
         const { notification } = await createNotification({
@@ -176,7 +202,7 @@ export async function sendBillingNotification(
         }
 
         // 3. Email (apenas para planos pagos)
-        if (metadata.is_paid && metadata.plan_price > 0) {
+        if (metadata.plan_price > 0) {
             try {
                 if (type === "billing.subscription_renewed") {
                     await sendBillingEmail(
@@ -188,10 +214,12 @@ export async function sendBillingNotification(
                             metadata.next_billing_date || new Date().toISOString(),
                         ),
                     )
-                } else if (type === "billing.payment_failed") {
+                } else if (type === "billing.payment_failed" || type === "billing.payment_reminder") {
                     await sendBillingEmail(
                         userId,
-                        "Dudit - Falha no Pagamento da Assinatura",
+                        type === "billing.payment_reminder"
+                            ? "Dudit - Pagamento da Assinatura Pendente"
+                            : "Dudit - Falha no Pagamento da Assinatura",
                         buildPaymentFailedEmailHtml(
                             metadata.plan_name || "Pago",
                             3,
@@ -218,12 +246,12 @@ export async function notifyPartnerTeam(
 
         const title = notificationLabels[type] || "Notificação de Reembolso"
         const message = metadata.message || ""
-        const href = type.startsWith("billing.refund") ? "/erp/configuracoes" : "/ddt-admin/billing/reembolsos"
+        const href = billingHref(type)
         const notifType = mapBillingTypeToNotificationType(type)
 
         await Promise.all(
             userIds.map(async (userId) => {
-                const idempotencyKey = `billing:${type}:${metadata.refundRequestId || metadata.purchaseId || partnerId}:${userId}:${Date.now()}`
+                const idempotencyKey = billingIdempotencyKey(type, userId, partnerId, metadata)
 
                 // 1. Notificação In-App na Dudit
                 const { notification } = await createNotification({

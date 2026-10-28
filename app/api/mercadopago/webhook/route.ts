@@ -313,6 +313,10 @@ async function processWebhookWithRetry(
       console.log(`[WEBHOOK] Handling subscription event "${type}" for resource ${paymentId}`)
       const { getMpPlatformAccessToken } = await import("@/lib/services/mercadopago/subscriptions")
       const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+      const {
+        chargeFromAuthorizedPayment,
+        authorizedPaymentCycleDate,
+      } = await import("@/lib/billing/record-charge")
       const accessToken = await getMpPlatformAccessToken()
 
       if (type === "subscription_preapproval") {
@@ -342,8 +346,19 @@ async function processWebhookWithRetry(
             if (preapprovalData.status === "authorized") targetStatus = "active"
             else if (preapprovalData.status === "cancelled") targetStatus = "cancelled"
             else if (preapprovalData.status === "paused") targetStatus = "paused"
+            else if (preapprovalData.status === "pending") targetStatus = "pending"
 
-            await syncSubscriptionToBilling(sub.id, "webhook", targetStatus)
+            // A locally cancelled subscription never comes back through a
+            // preapproval event — a new subscription has a new preapproval.
+            if (sub.status === "cancelled" && targetStatus !== "cancelled") {
+              console.log(`[WEBHOOK] Subscription ${sub.id} is cancelled, ignoring "${targetStatus}"`)
+              return
+            }
+
+            await syncSubscriptionToBilling(sub.id, "webhook", {
+              status: targetStatus,
+              cancellationReason: targetStatus === "cancelled" ? "user" : undefined,
+            })
             console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via preapproval event (${preapprovalData.status})`)
             return
           }
@@ -369,47 +384,39 @@ async function processWebhookWithRetry(
               .maybeSingle()
 
             if (sub) {
-              const previousStatus = sub.status
-              const targetStatus = authPayData.status === "approved" ? "active" : "past_due"
-              await syncSubscriptionToBilling(sub.id, "webhook", targetStatus)
-              console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via authorized payment (${authPayData.status})`)
+              // Mercado Pago uses `processed` / `waiting_for_gateway` / `recycling`
+              // for authorized payments — not `approved`.
+              const charge = chargeFromAuthorizedPayment(authPayData)
+              const cycleDate = authorizedPaymentCycleDate(authPayData)
 
-              // Notify on renewal (approved payment)
-              if (authPayData.status === "approved" && previousStatus === "active") {
-                try {
-                  const { data: partner } = await supabase
-                    .from("partners")
-                    .select("user_id")
-                    .eq("id", sub.partner_id)
-                    .single()
-
-                  const { data: plan } = await supabase
-                    .from("plans")
-                    .select("name, price")
-                    .eq("id", sub.plan_id)
-                    .maybeSingle()
-
-                  if (partner?.user_id && plan && Number(plan.price || 0) > 0) {
-                    const { sendBillingNotification } = await import("@/lib/billing/notifications")
-                    await sendBillingNotification(
-                      "billing.subscription_renewed",
-                      partner.user_id,
-                      sub.partner_id,
-                      {
-                        message: `Sua assinatura do plano ${plan.name} foi renovada automaticamente.`,
-                        subscription_id: sub.id,
-                        mp_subscription_id: preapprovalId.toString(),
-                        plan_name: plan.name,
-                        plan_price: Number(plan.price || 0),
-                        is_paid: true,
-                      }
-                    )
-                  }
-                } catch (notifyErr: any) {
-                  console.error("[WEBHOOK] Failed to send renewal notification:", notifyErr.message)
+              // Late charge of a cancelled subscription: never resurrect it.
+              // The charge is still recorded (money moved) but access stays off.
+              if (sub.status === "cancelled") {
+                console.log(`[WEBHOOK] Late authorized payment for cancelled subscription ${sub.id}; recording charge only`)
+                if (charge.gatewayPaymentId) {
+                  await syncSubscriptionToBilling(sub.id, "webhook", {
+                    status: "cancelled",
+                    charge,
+                    chargeCycleStart: cycleDate,
+                    notify: false,
+                  }).catch(console.error)
                 }
+                return
               }
 
+              const targetStatus =
+                charge.status === "approved"
+                  ? "active"
+                  : ["rejected", "refunded", "chargeback"].includes(charge.status)
+                    ? "past_due"
+                    : sub.status
+              await syncSubscriptionToBilling(sub.id, "webhook", {
+                status: targetStatus,
+                cycleStart: cycleDate,
+                charge,
+                chargeCycleStart: cycleDate,
+              })
+              console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via authorized payment (${authPayData.status})`)
               return
             }
           }
@@ -598,106 +605,117 @@ async function processWebhookWithRetry(
     // ── Check if this is a SaaS subscription manual payment (preapproval linked to subscriptions table) ──
     const saasPreapprovalId = paymentInfo.preapproval_id || paymentInfo.metadata?.preapproval_id
     const saasExternalRef = paymentInfo.external_reference
-    if (saasPreapprovalId || saasExternalRef) {
+    const saasMetadataSubscriptionId = paymentInfo.metadata?.subscription_id
+    if (saasPreapprovalId || saasExternalRef || saasMetadataSubscriptionId) {
       console.log(`[WEBHOOK] Checking for SaaS subscription payment (preapproval: ${saasPreapprovalId}, ext_ref: ${saasExternalRef})`)
 
-      let saasSubscription = null
+      let saasSubscription: any = null
+
+      const subColumns = "id, partner_id, status, plan_id, mercado_pago_subscription_id, created_at, current_period_start, current_period_end, billing_email, billing_anchor_day"
 
       if (saasPreapprovalId) {
         const { data: sub } = await supabase
           .from("subscriptions")
-          .select("id, partner_id, status, plan_id, mercado_pago_subscription_id, current_period_end, billing_email")
+          .select(subColumns)
           .eq("mercado_pago_subscription_id", saasPreapprovalId)
           .maybeSingle()
         saasSubscription = sub
-      } else if (saasExternalRef) {
-        const { data: sub } = await supabase
-          .from("subscriptions")
-          .select("id, partner_id, status, plan_id, mercado_pago_subscription_id, current_period_end, billing_email")
-          .eq("id", saasExternalRef)
-          .maybeSingle()
-        saasSubscription = sub
+      }
+
+      // Manual PIX uses the subscription id as external_reference / metadata.
+      if (!saasSubscription && (saasMetadataSubscriptionId || saasExternalRef)) {
+        const candidate = saasMetadataSubscriptionId || saasExternalRef
+        if (typeof candidate === "string" && isUuid(candidate)) {
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select(subColumns)
+            .eq("id", candidate)
+            .maybeSingle()
+          saasSubscription = sub
+        }
+      }
+
+      // A charge created locally may reference an already existing purchase.
+      if (!saasSubscription) {
+        const { findChargeCycleByGatewayId } = await import("@/lib/billing/record-charge")
+        const local = await findChargeCycleByGatewayId(paymentId.toString())
+        if (local) {
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select(subColumns)
+            .eq("id", local.subscriptionId)
+            .maybeSingle()
+          saasSubscription = sub
+        }
       }
 
       if (saasSubscription) {
         console.log(`[WEBHOOK] Found SaaS subscription ${saasSubscription.id} for payment ${paymentId}`)
 
-        if (paymentInfo.status === "approved" && ["past_due", "failed", "unpaid", "pending"].includes(saasSubscription.status)) {
-          // Reactivate subscription
-          console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from ${saasSubscription.status} to active`)
+        const { chargeFromMpPayment } = await import("@/lib/billing/record-charge")
+        const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+        const charge = chargeFromMpPayment(paymentInfo, paymentId)
 
-          const now = new Date()
-          const currentEnd = saasSubscription.current_period_end ? new Date(saasSubscription.current_period_end) : null
-          const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
-            ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
-            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+        // The charge belongs to the cycle of the payment's real date (PIX is
+        // generated at the start of the cycle it pays).
+        const chargeDateRaw = paymentInfo.date_approved || paymentInfo.date_created
+        const chargeDate = chargeDateRaw ? new Date(chargeDateRaw) : null
+        const validChargeDate = chargeDate && !isNaN(chargeDate.getTime()) ? chargeDate : null
 
-          const { error: updateError } = await supabase
-            .from("subscriptions")
-            .update({
-              status: "active",
-              past_due_at: null,
-              current_period_start: now.toISOString(),
-              current_period_end: nextEnd.toISOString(),
-              updated_at: now.toISOString(),
-            })
-            .eq("id", saasSubscription.id)
-
-          if (!updateError) {
-            // Invalidate cache and sync billing
-            const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
-            invalidatePartnerPlanCache(saasSubscription.partner_id)
-
-            const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-            await syncSubscriptionToBilling(saasSubscription.id, "webhook", "active", now, nextEnd).catch(console.error)
-
-            // Log billing event
-            try {
-              const minuteBucket = Math.floor(Date.now() / 60000)
-              const idempotencyKey = `subscription_reactivated:${saasSubscription.partner_id}:${saasSubscription.mercado_pago_subscription_id}:${minuteBucket}`
-
-              await supabase.from("billing_events").insert({
-                partner_id: saasSubscription.partner_id,
-                event_type: "subscription_reactivated",
-                amount: Number(paymentInfo.transaction_amount || 0),
-                provider: "mercado_pago",
-                metadata: {
-                  mp_subscription_id: saasSubscription.mercado_pago_subscription_id,
-                  mp_payment_id: paymentId.toString(),
-                  previous_status: "past_due",
-                  payment_method: "pix",
-                },
-                idempotency_key: idempotencyKey,
-              })
-            } catch (billErr: any) {
-              console.error("[WEBHOOK] Failed to log billing event:", billErr.message)
-            }
-
-            // Notify partner owner
-            const { data: partner } = await supabase
-              .from("partners")
-              .select("user_id")
-              .eq("id", saasSubscription.partner_id)
-              .single()
-
-            if (partner?.user_id) {
-              const { sendBillingNotification } = await import("@/lib/billing/notifications")
-              await sendBillingNotification(
-                "billing.payment_received",
-                partner.user_id,
-                saasSubscription.partner_id,
-                {
-                  message: `Pagamento manual da assinatura aprovado! A assinatura foi reativada e o próximo vencimento foi estendido.`,
-                  subscription_id: saasSubscription.id,
-                  mp_payment_id: paymentId.toString(),
-                  amount: paymentInfo.transaction_amount,
-                }
-              )
-            }
-
-            console.log(`[WEBHOOK] SaaS subscription ${saasSubscription.id} reactivated successfully`)
-          }
+        // Late charge of a cancelled subscription: record the money, never
+        // restore access (the plan is already downgraded).
+        if (saasSubscription.status === "cancelled") {
+          console.log(`[WEBHOOK] Late payment for cancelled subscription ${saasSubscription.id}; recording charge only`)
+          await syncSubscriptionToBilling(saasSubscription.id, "webhook", {
+            status: "cancelled",
+            charge,
+            chargeCycleStart: validChargeDate,
+            notify: false,
+          }).catch(console.error)
+          return
         }
+
+        const isApproved = charge.status === "approved"
+        const isRejected = charge.status === "rejected" || charge.status === "cancelled"
+
+        // Approved settles the open cycle; rejected/refunded puts the plan past
+        // due; pending/processing keeps the current access state untouched.
+        let targetStatus = saasSubscription.status
+        if (isApproved) targetStatus = "active"
+        else if (isRejected) targetStatus = "past_due"
+        else if (["past_due", "pending"].includes(saasSubscription.status) && charge.status === "pending") {
+          targetStatus = saasSubscription.status
+        }
+
+        await syncSubscriptionToBilling(saasSubscription.id, "webhook", {
+          status: targetStatus,
+          cycleStart: isApproved ? validChargeDate : undefined,
+          charge,
+          chargeCycleStart: validChargeDate,
+        })
+
+        try {
+          const minuteBucket = Math.floor(Date.now() / 60000)
+          const idempotencyKey = `subscription_payment:${saasSubscription.partner_id}:${paymentId}:${minuteBucket}`
+
+          await supabase.from("billing_events").insert({
+            partner_id: saasSubscription.partner_id,
+            event_type: isApproved ? "subscription_reactivated" : "subscription_payment_updated",
+            amount: Number(paymentInfo.transaction_amount || 0),
+            provider: "mercado_pago",
+            metadata: {
+              mp_subscription_id: saasSubscription.mercado_pago_subscription_id,
+              mp_payment_id: paymentId.toString(),
+              previous_status: saasSubscription.status,
+              payment_status: paymentInfo.status,
+            },
+            idempotency_key: idempotencyKey,
+          })
+        } catch (billErr: any) {
+          console.error("[WEBHOOK] Failed to log billing event:", billErr.message)
+        }
+
+        console.log(`[WEBHOOK] SaaS subscription ${saasSubscription.id} payment ${paymentInfo.status} recorded`)
         return
       }
     }

@@ -342,6 +342,51 @@ export async function createMpSubscription(
 // ─── Cancel Subscription ────────────────────────────────────────────────────
 
 /**
+ * Cancel a preapproval directly on Mercado Pago.
+ * Best-effort: returns the failure instead of throwing so callers can keep the
+ * local state consistent even when MP is unavailable.
+ */
+export async function cancelMpPreapproval(
+  mpPreapprovalId: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!mpPreapprovalId) return { success: false, error: "Missing preapproval id" }
+
+  try {
+    const accessToken = await getMpPlatformAccessToken()
+    const response = await fetch(
+      `https://api.mercadopago.com/preapproval/${mpPreapprovalId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ status: "cancelled" }),
+        signal: AbortSignal.timeout(8_000),
+      },
+    )
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      SecureLogger.error("MP subscription cancellation failed", {
+        status: response.status,
+        mpId: mpPreapprovalId,
+        body: body.slice(0, 200),
+      })
+      return { success: false, error: `MP ${response.status}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    SecureLogger.error("MP cancellation network error", {
+      error: err instanceof Error ? err.message : "Unknown",
+      mpId: mpPreapprovalId,
+    })
+    return { success: false, error: err instanceof Error ? err.message : "Unknown" }
+  }
+}
+
+/**
  * Cancel a subscription. If it has a MP subscription ID, cancels on MP too.
  * If the subscription has remaining paid time, schedules cancellation for period end
  * (cancel_at_period_end = true) so the partner retains access until current_period_end.
@@ -378,33 +423,7 @@ export async function cancelMpSubscription(
 
   // Cancel recurring billing on MP if present
   if (sub.mercado_pago_subscription_id) {
-    try {
-      const accessToken = await getMpPlatformAccessToken()
-
-      const response = await fetch(
-        `https://api.mercadopago.com/preapproval/${sub.mercado_pago_subscription_id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ status: "cancelled" }),
-        }
-      )
-
-      if (!response.ok) {
-        SecureLogger.error("MP subscription cancellation failed", {
-          status: response.status,
-          mpId: sub.mercado_pago_subscription_id,
-        })
-      }
-    } catch (err) {
-      SecureLogger.error("MP cancellation network error", {
-        error: err instanceof Error ? err.message : "Unknown",
-        mpId: sub.mercado_pago_subscription_id,
-      })
-    }
+    await cancelMpPreapproval(sub.mercado_pago_subscription_id)
   }
 
   const now = new Date().toISOString()
@@ -502,7 +521,11 @@ export async function cancelMpSubscription(
 
   try {
     const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-    await syncSubscriptionToBilling(sub.id, "manual", "cancelled")
+    await syncSubscriptionToBilling(sub.id, "manual", {
+      status: "cancelled",
+      previousStatus: sub.status,
+      cancellationReason: "user",
+    })
   } catch (syncErr: any) {
     SecureLogger.error("Failed to sync billing on cancellation", { error: syncErr.message, subscriptionId: sub.id })
   }

@@ -11,6 +11,7 @@ import {
   getPartnerPlan,
   getPartnerSubscription,
   getUsageCounters,
+  PAST_DUE_GRACE_PERIOD_DAYS,
 } from "@/lib/services/subscription.service"
 import {
   createMpSubscription,
@@ -67,7 +68,10 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
         }
       : null
 
-    // Enrich with MP subscription status and auto-sync with Mercado Pago if authorized
+    // Enrich with Mercado Pago status (display only).
+    // The local status is owned by the billing sync (webhook + reconciliation).
+    // A preapproval being "authorized" does NOT mean the current cycle was paid,
+    // so we never flip the subscription to active from a page load.
     if (
       subscriptionPayload &&
       subscription?.mercado_pago_subscription_id &&
@@ -75,58 +79,40 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     ) {
       try {
         const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
-        if (mpStatus?.next_payment_date) {
-          subscriptionPayload.next_payment_date = mpStatus.next_payment_date as string
-        }
-
-        // Auto-heal / Auto-sync: If Mercado Pago confirms the subscription is authorized,
-        // but local DB still has it as past_due, failed, unpaid, or pending:
-        if (
-          mpStatus?.status === "authorized" &&
-          ["past_due", "failed", "unpaid", "pending"].includes(subscription.status)
-        ) {
-          const admin = getAdminClient()
-          const now = new Date()
-          const nextEnd = mpStatus.next_payment_date
-            ? new Date(mpStatus.next_payment_date as string)
-            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-          await admin
-            .from("subscriptions")
-            .update({
-              status: "active",
-              past_due_at: null,
-              current_period_start: now.toISOString(),
-              current_period_end: nextEnd.toISOString(),
-              updated_at: now.toISOString(),
-            })
-            .eq("id", subscription.id)
-
-          const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
-          invalidatePartnerPlanCache(partner.id)
-
-          const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-          await syncSubscriptionToBilling(subscription.id, "manual", "active", now, nextEnd).catch(console.error)
-
-          subscriptionPayload.status = "active"
-          subscriptionPayload.current_period_start = now.toISOString()
-          subscriptionPayload.current_period_end = nextEnd.toISOString()
-          subscription.status = "active"
-        }
+        subscriptionPayload.mp_status = mpStatus?.status ?? null
       } catch {
-        // Non-critical: fall back to current_period_end on the client.
+        // Non-critical: fall back to the local state.
       }
     }
 
-    // Provide upcoming charge date ONLY if subscription will renew (cancel_at_period_end is false)
+    // Upcoming charge date comes from the calendar anchor, never from MP's
+    // next_payment_date (which can drift after retries).
     if (subscriptionPayload && subscription && !subscription.cancel_at_period_end) {
-      if (!subscriptionPayload.next_payment_date) {
-        const periods = computeSubscriptionPeriods(subscription)
-        subscriptionPayload.next_payment_date = periods.nextStart.toISOString()
+      const periods = computeSubscriptionPeriods(subscription)
+      subscriptionPayload.next_payment_date = periods.nextStart.toISOString()
+      subscriptionPayload.billing_cycle_start = periods.periodStart.toISOString()
+      subscriptionPayload.billing_cycle_end = periods.periodEnd.toISOString()
+    }
+
+    // Grace period visibility (3 days from the first failure).
+    if (subscriptionPayload && subscription) {
+      if (subscription.status === "past_due" && subscription.past_due_at) {
+        const graceDeadline = new Date(
+          new Date(subscription.past_due_at).getTime() +
+            PAST_DUE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+        )
+        subscriptionPayload.grace_period_ends_at = graceDeadline.toISOString()
+        subscriptionPayload.grace_days_left = Math.max(
+          0,
+          Math.ceil((graceDeadline.getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
+        )
+      } else {
+        subscriptionPayload.grace_period_ends_at = null
+        subscriptionPayload.grace_days_left = null
       }
     }
 
-    // ── Fetch the overdue/pending invoice from billing if subscription is past_due ──
+    // ── Overdue/open invoice of the current cycle ──
     let nextInvoice: any = null
     if (
       subscriptionPayload &&
@@ -140,24 +126,30 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
           .from("billing_purchases")
           .select("*, billing_invoices(*)")
           .eq("subscription_id", subscription.id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false })
+          .in("status", ["pending", "failed"])
+          .order("billing_period_start", { ascending: false })
           .limit(1)
           .maybeSingle()
 
         if (pendingPurchase) {
           const invoice = (pendingPurchase as any).billing_invoices?.[0] || null
+          const dueDate = pendingPurchase.billing_period_start || null
           nextInvoice = {
             purchase_id: pendingPurchase.id,
             invoice_id: invoice?.id || pendingPurchase.invoice_id || null,
             invoice_number: invoice?.invoice_number || null,
-            due_date: pendingPurchase.billing_period_start
-              || (pendingPurchase.metadata?.due_date || null)
-              || subscription.current_period_start,
+            // Vencimento = início do ciclo desta fatura.
+            due_date: dueDate,
             period_start: pendingPurchase.billing_period_start || null,
             period_end: pendingPurchase.billing_period_end || null,
             amount: Number(pendingPurchase.total_amount || plan.price),
             status: pendingPurchase.status,
+            days_overdue: dueDate
+              ? Math.max(
+                  0,
+                  Math.floor((Date.now() - new Date(dueDate).getTime()) / (24 * 60 * 60 * 1000)),
+                )
+              : null,
           }
         }
       } catch (err: any) {

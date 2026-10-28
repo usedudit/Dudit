@@ -293,52 +293,36 @@ async function processSubscriptionWebhook(
       return
     }
 
-    // Keep the period end in sync with MP's real next charge date.
-    // MP returns next_payment_date for authorized preapprovals.
-    const mpNextPayment = mpData?.next_payment_date
-      ? new Date(mpData.next_payment_date)
-      : null
-    const periodEndMs = sub.current_period_end ? new Date(sub.current_period_end).getTime() : null
-    const periodEndChanged = mpNextPayment && periodEndMs !== mpNextPayment.getTime()
+    // A local cancellation is final for this preapproval. A late/duplicated
+    // webhook must never resurrect a plan that was cancelled (grace expiry,
+    // refund, account deletion). A new subscription has its own preapproval.
+    if (sub.status === "cancelled" && newStatus !== "cancelled") {
+      console.log(`[SUB_WEBHOOK] Subscription ${sub.id} is cancelled, ignoring "${newStatus}"`)
+      return
+    }
 
-    // Idempotent: skip only if status is unchanged AND the period end matches MP.
-    if (sub.status === newStatus && !periodEndChanged) {
+    // Idempotent: nothing to do when the status did not change. Periods are
+    // derived from the real cycle anchor, never from `next_payment_date`.
+    if (sub.status === newStatus) {
       console.log(`[SUB_WEBHOOK] Subscription ${sub.id} already in status "${newStatus}", skipping`)
       return
     }
 
-    // Guard: don't regress from cancelled
-    if (sub.status === "cancelled" && newStatus !== "active") {
-      console.log(`[SUB_WEBHOOK] Subscription ${sub.id} is cancelled, not regressing to "${newStatus}"`)
-      return
-    }
-
     // ── Build update payload ──
-    const updatePayload: any = {}
-    if (sub.status !== newStatus) {
-      updatePayload.status = newStatus
-    }
-
-    if (newStatus === "active" || (sub.status === "active" && periodEndChanged)) {
-      const now = new Date()
-      const nextPeriodEnd = mpNextPayment ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-      // On renewal (already active), roll the period start forward to the old end.
-      const prevEnd = sub.current_period_end ? new Date(sub.current_period_end) : null
-      updatePayload.current_period_start = sub.current_period_start
-        && (!prevEnd || prevEnd.getTime() > now.getTime())
-        ? sub.current_period_start
-        : (prevEnd && sub.status === "active" ? prevEnd : now).toISOString()
-
-      updatePayload.current_period_end = nextPeriodEnd.toISOString()
-      // Clear past_due_at when active
-      updatePayload.past_due_at = null
-    }
+    const updatePayload: any = { status: newStatus }
 
     if (newStatus === "past_due") {
       // Record the EXACT moment the subscription enters past_due.
-      // This is the deterministic anchor for the grace period.
+      // This is the deterministic anchor for the grace period; it is set once
+      // and never extended by retries.
       updatePayload.past_due_at = new Date().toISOString()
+    }
+
+    if (newStatus === "active") {
+      updatePayload.past_due_at = null
+      updatePayload.cancel_at_period_end = false
+      updatePayload.cancelled_at = null
+      updatePayload.ended_at = null
     }
 
     if (newStatus === "cancelled") {
@@ -406,13 +390,14 @@ async function processSubscriptionWebhook(
 
     // ── Invalidate plan cache and sync billing ONLY after actual status change ──
     invalidatePartnerPlanCache(sub.partner_id)
-    await syncSubscriptionToBilling(
-      sub.id,
-      "webhook",
-      newStatus,
-      updatePayload.current_period_start ? new Date(updatePayload.current_period_start) : undefined,
-      updatePayload.current_period_end ? new Date(updatePayload.current_period_end) : undefined
-    ).catch(console.error)
+    const effectiveStatus = updatePayload.status || sub.status
+    await syncSubscriptionToBilling(sub.id, "webhook", {
+      status: effectiveStatus,
+      // The row was updated above; tell sync which status it came from so the
+      // transition notification is not lost.
+      previousStatus: sub.status,
+      cancellationReason: effectiveStatus === "cancelled" ? "user" : undefined,
+    }).catch(console.error)
 
     // ── Log billing event (for audit trail, separate from idempotency) ──
     await logBillingEvent(supabase, sub.partner_id, `subscription_${newStatus}`, null, {
@@ -442,111 +427,22 @@ async function processSubscriptionWebhook(
       },
     })
 
-    // ── Notify partner owner on payment failure ──
+    // Partner notifications are centralized in syncSubscriptionToBilling so a
+    // webhook and a reconciliation of the same transition never notify twice.
+    // Here we only add the internal Discord alert for payment failures.
     if (newStatus === "past_due" && sub.status !== "past_due") {
-      try {
-        const { data: partner } = await supabase
-          .from("partners")
-          .select("user_id")
-          .eq("id", sub.partner_id)
-          .single()
-
-        const { data: plan } = await supabase
-          .from("plans")
-          .select("name, price")
-          .eq("id", sub.plan_id)
-          .maybeSingle()
-
-        if (partner?.user_id) {
-          const isPaid = plan ? Number(plan.price || 0) > 0 : false
-          const { sendBillingNotification } = await import("@/lib/billing/notifications")
-          await sendBillingNotification(
-            "billing.payment_failed",
-            partner.user_id,
-            sub.partner_id,
-            {
-              message: `O pagamento da assinatura falhou. A assinatura entrou em status "Atrasado". Você tem 3 dias para regularizar antes da suspensão dos recursos.`,
-              subscription_id: sub.id,
-              mp_subscription_id: resourceId,
-              plan_name: plan?.name || null,
-              plan_price: plan ? Number(plan.price || 0) : 0,
-              is_paid: isPaid,
-            }
-          )
-        }
-
-        // Webhook Discord: notificar pagamento de assinatura falhou (fail-open)
-        sendPaymentFailed({
-          partnerId: sub.partner_id,
-          amount: sub.plan?.price || undefined,
-          errorCode: "PAST_DUE",
-          errorMessage: "Pagamento da assinatura falhou - status past_due",
-          provider: "Mercado Pago",
-        }).catch(err => console.warn("[SUB_WEBHOOK] Discord payment failed webhook failed (non-blocking):", err))
-      } catch (notifyErr: any) {
-        console.error("[SUB_WEBHOOK] Failed to send payment failed notification:", notifyErr.message)
-      }
+      sendPaymentFailed({
+        partnerId: sub.partner_id,
+        amount: sub.plan?.price || undefined,
+        errorCode: "PAST_DUE",
+        errorMessage: "Pagamento da assinatura falhou - status past_due",
+        provider: "Mercado Pago",
+      }).catch(err => console.warn("[SUB_WEBHOOK] Discord payment failed webhook failed (non-blocking):", err))
     }
 
     console.log(
       `[SUB_WEBHOOK] ✅ Subscription ${sub.id} updated: "${sub.status}" → "${newStatus}" (MP verified: "${mpStatus}")`,
     )
-
-    // ── Sync billing state ──
-    try {
-      await syncSubscriptionToBilling(sub.id, "webhook")
-      console.log(`[SUB_WEBHOOK] Billing synced for subscription ${sub.id}`)
-    } catch (syncErr: any) {
-      // Non-critical: billing sync failure must not break the webhook
-      SecureLogger.error("[SUB_WEBHOOK] Billing sync error", { error: syncErr.message, subscriptionId: sub.id })
-    }
-
-    // ── Notify partner on renewal (active → active or past_due → active) ──
-    if (newStatus === "active" && (sub.status === "active" || sub.status === "past_due")) {
-      try {
-        const { data: partner } = await supabase
-          .from("partners")
-          .select("user_id")
-          .eq("id", sub.partner_id)
-          .single()
-
-        const { data: plan } = await supabase
-          .from("plans")
-          .select("name, price")
-          .eq("id", sub.plan_id)
-          .maybeSingle()
-
-        if (partner?.user_id && plan) {
-          const isPaid = Number(plan.price || 0) > 0
-          const notificationType = sub.status === "past_due"
-            ? "billing.payment_received"
-            : "billing.subscription_renewed"
-
-          const message = sub.status === "past_due"
-            ? `Pagamento da assinatura aprovado! Seu plano ${plan.name} foi reativado com sucesso.`
-            : `Sua assinatura do plano ${plan.name} foi renovada automaticamente.`
-
-          const { sendBillingNotification } = await import("@/lib/billing/notifications")
-          await sendBillingNotification(
-            notificationType,
-            partner.user_id,
-            sub.partner_id,
-            {
-              message,
-              subscription_id: sub.id,
-              mp_subscription_id: resourceId,
-              plan_name: plan.name,
-              plan_price: Number(plan.price || 0),
-              is_paid: isPaid,
-              next_billing_date: updatePayload.current_period_end || null,
-            }
-          )
-        }
-      } catch (notifyErr: any) {
-        console.error("[SUB_WEBHOOK] Failed to send renewal notification:", notifyErr.message)
-      }
-    }
-
     console.log("[SUB_WEBHOOK] ==========================================================\n")
   } catch (error: any) {
     if (attempt < MAX_RETRIES - 1) {

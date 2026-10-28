@@ -135,6 +135,14 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                             <p className="text-sm text-brand-inactive-text font-medium">Parceiro</p>
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{purchase.partner_name || purchase.partner_id}</p>
                         </div>
+                        <div>
+                            <p className="text-sm text-brand-inactive-text font-medium">Status</p>
+                            <div className="mt-1">
+                                <Badge variant={getStatusVariant(purchase.status, purchase.metadata)}>
+                                    {getStatusLabel(purchase.status, purchase.metadata)}
+                                </Badge>
+                            </div>
+                        </div>
                         {purchase.description && (
                             <div>
                                 <p className="text-sm text-brand-inactive-text font-medium">Descrição</p>

@@ -35,6 +35,8 @@ export interface Subscription {
   trial_end: string | null
   current_period_start: string | null
   current_period_end: string | null
+  past_due_at: string | null
+  billing_anchor_day?: number | null
   cancel_at_period_end: boolean
   cancelled_at: string | null
   ended_at: string | null
@@ -77,9 +79,73 @@ export interface SubscriptionWithPlan extends Subscription {
 /**
  * Grace period for past_due subscriptions.
  * Users keep access for this many days after a payment failure.
- * After this period, they're downgraded to the free plan.
+ * After this period, the Mercado Pago preapproval is cancelled (so it stops
+ * retrying and can never charge a cancelled plan) and the partner is
+ * downgraded to the free plan.
  */
-const PAST_DUE_GRACE_PERIOD_DAYS = 3
+export const PAST_DUE_GRACE_PERIOD_DAYS = 3
+
+/**
+ * Cancel a past_due subscription whose grace period expired.
+ *
+ * Idempotent: safe to call from request-time plan resolution and from cron.
+ */
+export async function expirePastDueSubscription(sub: {
+  id: string
+  partner_id: string
+  mercado_pago_subscription_id?: string | null
+}): Promise<void> {
+  const admin = getAdminClient()
+  const nowIso = new Date().toISOString()
+
+  // 1. Stop Mercado Pago from retrying / charging a cancelled plan.
+  if (sub.mercado_pago_subscription_id) {
+    try {
+      const { cancelMpPreapproval } = await import("@/lib/services/mercadopago/subscriptions")
+      await cancelMpPreapproval(sub.mercado_pago_subscription_id)
+    } catch (err: any) {
+      console.error("[SUBSCRIPTION] Failed to cancel MP preapproval on grace expiry:", err?.message)
+    }
+  }
+
+  // 2. Close the subscription locally.
+  await admin
+    .from("subscriptions")
+    .update({
+      status: "cancelled",
+      cancelled_at: nowIso,
+      ended_at: nowIso,
+      cancel_at_period_end: false,
+      updated_at: nowIso,
+    })
+    .eq("id", sub.id)
+
+  // 3. Close the open billing cycle + notify the partner.
+  try {
+    const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+    await syncSubscriptionToBilling(sub.id, "reconciliation", {
+      status: "cancelled",
+      // The row was already flipped to cancelled above; preserve the real
+      // transition so the partner gets the cancellation notification.
+      previousStatus: "past_due",
+      cancellationReason: "payment_failure",
+    })
+  } catch (err: any) {
+    console.error("[SUBSCRIPTION] Failed to sync billing on grace expiry:", err?.message)
+  }
+
+  // 4. Downgrade resources to the free plan.
+  try {
+    const { enforcePlanLimitsAndArchiveExcess } = await import(
+      "@/lib/services/subscription-archiver.service"
+    )
+    await enforcePlanLimitsAndArchiveExcess(sub.partner_id)
+  } catch (archErr: any) {
+    console.error("[SUBSCRIPTION] Error archiving on grace expiry:", archErr.message)
+  }
+
+  partnerPlanCache.delete(sub.partner_id)
+}
 
 // ─── In-memory Cache ────────────────────────────────────────────────────────
 
@@ -194,6 +260,44 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
   if (error || !data) return null
   return data as Plan
 }
+
+/**
+ * Lightweight status snapshot for the global subscription banner.
+ * Unlike getPartnerSubscription, it also returns cancelled subscriptions so the
+ * ERP can tell the partner their plan was cancelled (instead of silently
+ * falling back to the free plan).
+ */
+export interface SubscriptionBannerInfo {
+  status: string
+  past_due_at: string | null
+  trial_end: string | null
+  plan_name: string | null
+}
+
+export const getPartnerSubscriptionBannerInfo = cache(
+  async (partnerId: string): Promise<SubscriptionBannerInfo | null> => {
+    const admin = getAdminClient()
+    const { data, error } = await admin
+      .from("subscriptions")
+      .select("status, past_due_at, trial_end, plan_snapshot, plan:plans!plan_id(name)")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !data) return null
+
+    return {
+      status: String(data.status),
+      past_due_at: (data as any).past_due_at || null,
+      trial_end: (data as any).trial_end || null,
+      plan_name:
+        (data as any).plan?.name ||
+        ((data as any).plan_snapshot as any)?.name ||
+        null,
+    }
+  },
+)
 
 /**
  * Get the non-cancelled subscription for a partner, or null.
@@ -389,17 +493,20 @@ export const getPartnerPlan = cache(async (partnerId: string): Promise<Plan> => 
         Date.now() - PAST_DUE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
       )
 
-      const pastDueSub = candidates.find((s: any) => {
-        if (s.status !== "past_due") return false
+      const pastDueCandidates = candidates.filter((s: any) => s.status === "past_due")
+      const graceAnchorFor = (s: any) =>
+        s.past_due_at ? new Date(s.past_due_at) : new Date(s.created_at)
 
-        // past_due_at: exact moment payment failure was confirmed via webhook.
-        // Grace = N days from that moment.
-        const graceAnchor = s.past_due_at
-          ? new Date(s.past_due_at)
-          : new Date(s.created_at)
+      // Expired grace: cancel MP + close the subscription, then downgrade.
+      const expired = pastDueCandidates.filter((s: any) => graceAnchorFor(s) < graceCutoff)
+      for (const expiredSub of expired) {
+        console.warn(
+          `[SUBSCRIPTION] Partner ${partnerId} past_due beyond ${PAST_DUE_GRACE_PERIOD_DAYS}-day grace (${expiredSub.id}). Cancelling.`,
+        )
+        await expirePastDueSubscription(expiredSub)
+      }
 
-        return graceAnchor >= graceCutoff
-      })
+      const pastDueSub = pastDueCandidates.find((s: any) => graceAnchorFor(s) >= graceCutoff)
 
       if (pastDueSub?.plan) {
         console.warn(

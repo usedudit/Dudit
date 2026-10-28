@@ -304,6 +304,8 @@ interface SubscriptionData {
         trial_end: string | null
         payment_provider: string
         next_payment_date?: string | null
+        grace_period_ends_at?: string | null
+        grace_days_left?: number | null
     } | null
     next_invoice?: {
         purchase_id: string | null
@@ -853,6 +855,32 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                     {/* Content Body */}
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+
+                        {subData?.subscription?.status === "past_due" && (
+                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100">
+                                <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold">Pagamento da assinatura em atraso</p>
+                                    <p className="text-xs opacity-90">
+                                        {(subData.subscription.grace_days_left ?? 0) > 0
+                                            ? `Regularize em até ${subData.subscription.grace_days_left} dia${subData.subscription.grace_days_left === 1 ? "" : "s"} para não perder os recursos do plano.`
+                                            : "Regularize agora para reativar os recursos do plano."}
+                                        {subData.subscription.grace_period_ends_at
+                                            ? ` Prazo: ${formatDate(subData.subscription.grace_period_ends_at)}.`
+                                            : ""}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="destructive"
+                                    className="hidden sm:flex h-9 shrink-0"
+                                    onClick={handleGenerateManualPayment}
+                                    disabled={manualPaymentModal.loading}
+                                    isLoading={manualPaymentModal.loading}
+                                >
+                                    Pagar agora
+                                </Button>
+                            </div>
+                        )}
 
                         {/* Top 2 Cards: Current Plan & Next Invoices (Equal Size & Side-by-Side) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 items-stretch">

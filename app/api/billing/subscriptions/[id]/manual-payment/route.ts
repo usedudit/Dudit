@@ -56,10 +56,13 @@ export async function POST(
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
     }
 
-    // Allow manual payment for past_due, failed, or unpaid subscriptions
-    const allowedStatuses = ["past_due", "failed", "unpaid"]
+    // Allow manual payment for past_due and for cycles still waiting to settle.
+    const allowedStatuses = ["past_due", "failed", "unpaid", "pending"]
     if (!allowedStatuses.includes(subscription.status)) {
-      return NextResponse.json({ error: "Apenas assinaturas em atraso ou pendentes de pagamento podem gerar pagamento manual" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Apenas assinaturas em atraso ou com pagamento pendente podem gerar pagamento manual" },
+        { status: 400 },
+      )
     }
 
     if (!subscription.mercado_pago_subscription_id) {
@@ -112,6 +115,28 @@ export async function POST(
     }
 
     const mpPayment = await mpResponse.json()
+
+    // Persist the pending charge immediately so the invoice/details reflect the
+    // PIX before it is paid. The cycle is the current cycle — never a new +30d
+    // period. Emission is the real PIX generation time, due date is the cycle
+    // start (handled by InvoicePreview).
+    try {
+      const { recordSubscriptionCharge, chargeFromMpPayment } = await import("@/lib/billing/record-charge")
+      const charge = chargeFromMpPayment(mpPayment, mpPayment.id)
+      await recordSubscriptionCharge({
+        subscriptionId,
+        context: "manual",
+        charge,
+        cycleStart: new Date(),
+      })
+    } catch (chargeErr: any) {
+      // The PIX exists on MP; the webhook will still record it when paid.
+      SecureLogger.error("Failed to persist pending manual charge", {
+        subscriptionId,
+        paymentId: mpPayment?.id,
+        error: chargeErr?.message,
+      })
+    }
 
     const pixData = mpPayment.point_of_interaction?.transaction_data ? {
       qrCode: mpPayment.point_of_interaction.transaction_data.qr_code,

@@ -28,11 +28,16 @@ import {
   getActivePartnerId,
   getActiveStoreId,
 } from "@/lib/auth/partner-context"
-import { getPartnerPlan } from "@/lib/services/subscription.service"
+import {
+  getPartnerPlan,
+  getPartnerSubscriptionBannerInfo,
+  PAST_DUE_GRACE_PERIOD_DAYS,
+} from "@/lib/services/subscription.service"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { resolveEffectivePermissions } from "@/lib/store-members"
 import { OfflineBanner } from "@/components/pwa/OfflineBanner"
+import { SubscriptionStatusBanner } from "@/components/erp/SubscriptionStatusBanner"
 import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
@@ -162,9 +167,10 @@ export default async function ERPLayout({
   const businessMode = normalizeBusinessInfo(context.businessInfo).mode
   const isDesapego = businessMode === "desapego"
 
-  // Stage 2: Parallel fetch partner plan, initial stores, store cookie, and sidebar cookie
-  const [partnerPlan, initialStoresRes, activeStoreId, cookieStore] = await Promise.all([
+  // Stage 2: Parallel fetch partner plan, subscription banner state, initial stores, store cookie, and sidebar cookie
+  const [partnerPlan, subscriptionBanner, initialStoresRes, activeStoreId, cookieStore] = await Promise.all([
     getPartnerPlan(context.partnerId),
+    getPartnerSubscriptionBannerInfo(context.partnerId).catch(() => null),
     isDesapego
       ? createAdminClient()
           .from("stores")
@@ -206,6 +212,17 @@ export default async function ERPLayout({
   const sidebarCookie = cookieStore.get("dudit_sidebar_state")
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
+  // Days left in the 3-day grace period (past_due subscriptions).
+  const graceDaysLeft = (() => {
+    if (subscriptionBanner?.status !== "past_due") return null
+    const anchor = subscriptionBanner.past_due_at
+      ? new Date(subscriptionBanner.past_due_at)
+      : new Date()
+    const deadline =
+      anchor.getTime() + PAST_DUE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    return Math.max(0, Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000)))
+  })()
+
   const effectiveActiveStoreId = (activeStoreId && initialStores.some((s: any) => s.id === activeStoreId))
     ? activeStoreId
     : (initialStores.length > 0 ? (initialStores.find((s: any) => s.is_headquarters)?.id || initialStores[0].id) : null)
@@ -244,6 +261,12 @@ export default async function ERPLayout({
                     <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
                       <OfflineBanner variant="erp" />
                       <ERPHeader userProfile={userProfile} />
+                      <SubscriptionStatusBanner
+                        status={subscriptionBanner?.status ?? null}
+                        graceDaysLeft={graceDaysLeft}
+                        planName={subscriptionBanner?.plan_name ?? partnerPlan.name ?? null}
+                        trialEnd={subscriptionBanner?.trial_end ?? null}
+                      />
                       <ERPResourceGuard>
                         {children}
                       </ERPResourceGuard>

@@ -9,6 +9,14 @@ export function getNotificationHref(params: {
 }): string {
   const { type, entityType, entityId, data, audience } = params
 
+  // Platform billing notifications always carry their own destination
+  // (/erp/configuracoes?tab=assinatura), not the marketplace subscription page.
+  if (typeof data?.billing_type === "string" && data.billing_type.startsWith("billing.")) {
+    if (typeof data.href === "string" && data.href.startsWith("/")) {
+      return data.href
+    }
+  }
+
   if (type === "admin_announcement") {
     const url = data?.url
     return typeof url === "string" && url.startsWith("/") ? url : "/"

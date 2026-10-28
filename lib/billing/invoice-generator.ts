@@ -56,11 +56,16 @@ export async function generateInvoiceData(
     purchaseableDetails?: { name?: string; code?: string; description?: string } | null,
     periodStart?: string | null,
     periodEnd?: string | null,
+    identity?: { invoiceNumber?: string | null; verificationHash?: string | null; createdAt?: string | null } | null,
 ): Promise<{ invoiceNumber: string; verificationHash: string; invoiceData: InvoiceData }> {
-    const sequence = await getNextSequenceNumber()
-    const invoiceNumber = generateInvoiceNumber(sequence)
-    const verificationHash = await generateVerificationHash(invoiceNumber, purchase.id)
+    // The sequence is only consumed when a new invoice number is needed.
+    const sequence = identity?.invoiceNumber ? null : await getNextSequenceNumber()
+    const invoiceNumber = identity?.invoiceNumber ?? generateInvoiceNumber(sequence as number)
+    const verificationHash =
+        identity?.verificationHash ?? (await generateVerificationHash(invoiceNumber, purchase.id))
 
+    // The invoice reflects the payment of its own cycle — never the global
+    // subscription status (which can be past_due while this cycle is paid).
     const mainPayment = payments.find((p) => p.status === "approved") || payments[0]
 
     const items: InvoiceItem[] = [
@@ -77,8 +82,11 @@ export async function generateInvoiceData(
     const invoiceData: InvoiceData = {
         invoice_number: invoiceNumber,
         verification_hash: verificationHash,
-        created_at: new Date().toISOString(),
-        status: "issued",
+        created_at: identity?.createdAt ?? new Date().toISOString(),
+        status:
+            mainPayment?.status === "refunded" || mainPayment?.status === "chargeback"
+                ? "refunded"
+                : "issued",
 
         partner: {
             name: partnerDetails.name,
@@ -108,7 +116,9 @@ export async function generateInvoiceData(
             method_label: getPaymentMethodLabel(mainPayment?.payment_method_type || null),
             gateway: purchase.gateway,
             gateway_label: getGatewayLabel(purchase.gateway),
-            status: getStatusLabel(purchase.status),
+            // Raw payment status: the invoice is "paid" only when the payment
+            // of this cycle is approved (or has a paid_at timestamp).
+            status: mainPayment?.status || purchase.status,
             paid_at: mainPayment?.paid_at || null,
             installments: mainPayment?.payment_method_details?.installments || null,
         },

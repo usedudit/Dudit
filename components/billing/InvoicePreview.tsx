@@ -153,7 +153,7 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Vencimento</span>
-                                            <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.end || data.created_at)}</span>
+                                            <span className="font-bold text-sm text-brand-dark">{formatDate(data.period?.start || data.created_at)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Status</span>

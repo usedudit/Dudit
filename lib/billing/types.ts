@@ -33,6 +33,8 @@ export interface BillingPurchase {
     invoice_id: string | null
     billing_period_start: string | null
     billing_period_end: string | null
+    /** Calendar date (America/Sao_Paulo) that identifies the billing cycle. */
+    billing_cycle_start: string | null
     created_at: string
     updated_at: string
 }
