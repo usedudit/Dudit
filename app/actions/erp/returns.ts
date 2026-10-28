@@ -23,6 +23,7 @@ import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sy
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import type { ReturnRequestListItem } from "@/lib/returns/types"
 import { getReturnableQuantities } from "@/lib/returns/returnable-quantities"
+import { userOwnsBuyerOrder, resolveBuyerCustomerId } from "@/lib/orders/buyer-access"
 import {
     canRequestOrderCancellation,
     extractMercadoPagoPaidAmount,
@@ -706,17 +707,18 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number, return_policy_snapshot")
+            .select("id, partner_id, buyer_id, customer_id, store_id, situation, delivery_status, order_number, return_policy_snapshot")
             .eq("id", base.orderId)
             .single()
 
         if (orderError || !order) throw new Error("Pedido nao encontrado")
         partnerId = order.partner_id
         addMonitoringBreadcrumb({ domain: "returns", message: "marketplace_create.started", metadata: { entityId: orderId, partnerId, resolution } })
-        if (order.buyer_id !== user.id) throw new Error("Sem permissao")
+        if (!(await userOwnsBuyerOrder(order, user.id))) throw new Error("Sem permissao")
         if (order.situation !== "paid" && order.situation !== "partially_paid") {
             throw new Error("Não é permitido criar solicitação para pedidos não pagos.")
         }
+        const buyerCustomerId = await resolveBuyerCustomerId(order, user.id)
 
         // Check partner plan and returns module capability
         const plan = await getPartnerPlan(order.partner_id)
@@ -797,11 +799,21 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             p_origin_request_id: null,
             p_origin_type: null,
             p_store_id: order.store_id || null,
-            p_customer_id: order.buyer_id || null,
+            p_customer_id: buyerCustomerId,
         })
 
         if (error) throw error
         const requestId = String((created as any)?.id || "")
+
+        // Linked ERP orders keep the customers.id in buyer_id, so the RPC stores
+        // that id as customer_user_id. Normalize it to the marketplace user id so
+        // the buyer keeps access to their own return request.
+        if (requestId && order.buyer_id !== user.id) {
+            await supabase
+                .from("return_requests")
+                .update({ customer_user_id: user.id })
+                .eq("id", requestId)
+        }
 
         // Persist structured buyer reason (drives marketplace fault penalty)
         if (requestId && base.reasonCategory) {
@@ -872,15 +884,16 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, store_id, situation, delivery_status, order_number")
+            .select("id, partner_id, buyer_id, customer_id, store_id, situation, delivery_status, order_number")
             .eq("id", data.orderId)
             .single()
 
         if (orderError || !order) throw new Error("Pedido nao encontrado")
-        if (order.buyer_id !== user.id) throw new Error("Sem permissao")
+        if (!(await userOwnsBuyerOrder(order, user.id))) throw new Error("Sem permissao")
         if (!canRequestOrderCancellation(order)) {
             throw new Error("Este pedido ja esta em entrega. Para continuar, solicite devolução, troca ou reembolso.")
         }
+        const buyerCustomerId = await resolveBuyerCustomerId(order, user.id)
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: order.partner_id,
@@ -898,11 +911,21 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
             p_origin_request_id: null,
             p_origin_type: null,
             p_store_id: order.store_id || null,
-            p_customer_id: order.buyer_id || null,
+            p_customer_id: buyerCustomerId,
         })
 
         if (error) throw error
         const requestId = String((created as any)?.id || "")
+
+        // Linked ERP orders keep the customers.id in buyer_id, so the RPC stores
+        // that id as customer_user_id. Normalize it to the marketplace user id so
+        // the buyer keeps access to their own cancellation request.
+        if (requestId && order.buyer_id !== user.id) {
+            await supabase
+                .from("return_requests")
+                .update({ customer_user_id: user.id })
+                .eq("id", requestId)
+        }
 
         await revalidateReturns(order.partner_id, data.orderId, requestId)
 

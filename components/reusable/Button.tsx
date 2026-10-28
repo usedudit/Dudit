@@ -49,7 +49,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             filled:
                 "bg-gray-100 dark:bg-dark-border hover:bg-gray-100/50 dark:hover:bg-dark-border/50 focus-visible:ring-gray-300 dark:focus-visible:ring-dark-border",
             link:
-                "text-sm font-bold text-brand-dark dark:text-dark-heading decoration-gray-300 hover:text-brand-green flex items-center hover:underline"
+                "text-sm font-bold text-brand-dark dark:text-dark-heading decoration-gray-300 hover:text-brand-green flex items-center hover:underline dudit-link-btn",
         }
 
         const sizeClass = sizes[size as keyof typeof sizes] || sizes.default

@@ -3480,26 +3480,26 @@ export function CheckoutPageClient() {
                                     requirements={requirements}
                                     deliveryType={formData.deliveryType}
                                     onDeliveryTypeChange={handleDeliveryTypeChange}
-                                     partnerId={partnerId}
-                                     deliveryPlanEnabled={deliveryPlanEnabled}
-                                     deliveryEnabled={deliveryEnabled}
-                                     pickupEnabled={pickupEnabled}
-                                     shippingEnabled={shippingEnabled}
-                                     partnerAddressLabel={partnerAddressLabel}
-                                     deliveryError={displayDeliveryError}
-                                     carrierOptions={carrierSectionVisible ? carrierOptions : []}
-                                     selectedCarrierServiceId={selectedCarrierServiceId}
-                                     carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
-                                     carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
-                                     onSelectCarrier={handleCarrierSelect}
-                                     deliveryFree={deliveryFree}
-                                     schedulingLines={schedulingLines}
-                                     lines={checkoutContext?.lines || []}
-                                     onFulfillmentModesSave={handleBulkFulfillmentModesSave}
-                                     deliveryAddress={formData.deliveryAddress || ""}
-                                     destinationCoords={selectedAddress?.latitude && selectedAddress?.longitude
-                                         ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
-                                         : undefined}
+                                    partnerId={partnerId}
+                                    deliveryPlanEnabled={deliveryPlanEnabled}
+                                    deliveryEnabled={deliveryEnabled}
+                                    pickupEnabled={pickupEnabled}
+                                    shippingEnabled={shippingEnabled}
+                                    partnerAddressLabel={partnerAddressLabel}
+                                    deliveryError={displayDeliveryError}
+                                    carrierOptions={carrierSectionVisible ? carrierOptions : []}
+                                    selectedCarrierServiceId={selectedCarrierServiceId}
+                                    carrierQuoteLoading={carrierSectionVisible && carrierQuoteLoading}
+                                    carrierError={carrierSectionVisible && !carrierQuoteLoading ? carrierError : null}
+                                    onSelectCarrier={handleCarrierSelect}
+                                    deliveryFree={deliveryFree}
+                                    schedulingLines={schedulingLines}
+                                    lines={checkoutContext?.lines || []}
+                                    onFulfillmentModesSave={handleBulkFulfillmentModesSave}
+                                    deliveryAddress={formData.deliveryAddress || ""}
+                                    destinationCoords={selectedAddress?.latitude && selectedAddress?.longitude
+                                        ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                                        : undefined}
                                     addressProps={{
                                         loadingAddresses,
                                         userAddresses,
@@ -4012,10 +4012,12 @@ export function CheckoutPageClient() {
                                         message="Alguns horários não estão mais disponíveis."
                                         color="orange"
                                         bottomElement={
-                                            <ChevronRightIcon
-                                                className="text-brand-inactive-text cursor-pointer"
+                                            <Button
+                                                variant="link"
                                                 onClick={() => setShowServiceUnavailableModal(true)}
-                                            />
+                                            >
+                                                Ver detalhes
+                                            </Button>
                                         }
                                     />
                                 )}

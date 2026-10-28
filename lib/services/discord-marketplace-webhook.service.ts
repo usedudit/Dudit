@@ -112,6 +112,57 @@ export async function sendModerationImageFlagged(payload: {
   })
 }
 
+// --- Texto Marcado (Re-checagem em background) ---
+
+export async function sendModerationTextFlagged(payload: {
+  entityType: string
+  entityId: string
+  partnerId?: string
+  reason?: string
+  categories?: string[]
+}): Promise<{ success: boolean; error?: string }> {
+  const url = MODERATION_URL()
+  if (!isValidUrl(url)) return { success: true }
+
+  const typeLabels: Record<string, string> = {
+    product: "Produto",
+    service: "Serviço",
+    review: "Avaliação",
+    community_video: "Vídeo da comunidade",
+  }
+
+  const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+    {
+      name: "📌 Entidade",
+      value: `${typeLabels[payload.entityType] || payload.entityType}: ${maskId(payload.entityId)}`,
+      inline: true,
+    },
+  ]
+
+  if (payload.partnerId) {
+    fields.push({ name: "🏢 Parceiro", value: maskId(payload.partnerId), inline: true })
+  }
+  if (payload.categories?.length) {
+    fields.push({ name: "Categorias", value: payload.categories.join(", "), inline: false })
+  }
+  if (payload.reason) {
+    fields.push({ name: "Motivo", value: truncate(payload.reason), inline: false })
+  }
+
+  return postToDiscord(url, {
+    username: "Dudit Moderação",
+    avatar_url: "https://dudit.com.br/icon-192x192.png",
+    embeds: [{
+      title: "🚨 Conteúdo reprovado na re-checagem",
+      color: 0xef4444,
+      description: "O item tinha sido publicado porque a IA estourou o timeout. A re-checagem em background reprovou e ele foi removido do marketplace.",
+      fields,
+      footer: { text: formatDateTime() },
+      timestamp: new Date().toISOString(),
+    }],
+  })
+}
+
 // --- Denúncia Criada ---
 
 export async function sendMarketplaceReport(payload: {

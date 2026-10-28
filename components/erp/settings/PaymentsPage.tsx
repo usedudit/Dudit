@@ -367,7 +367,7 @@ export function PaymentsPage({
                                                             color="blue"
                                                             bottomElement={
                                                                 <Link href="/erp/configuracoes?tab=integracoes">
-                                                                    <Button variant="link" className="text-brand-blue hover:text-brand-blue/70">Conectar Mercado Pago</Button>
+                                                                    <Button variant="link">Conectar Mercado Pago</Button>
                                                                 </Link>
                                                             }
                                                         />

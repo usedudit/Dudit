@@ -60,25 +60,32 @@ function initializePostHog(): void {
 if (hasAnalyticsConsent()) initializePostHog()
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
-    const [consent, setConsent] = useState<"accepted" | "rejected" | "unset">("unset")
+    const [isPreferencesOpen, setIsPreferencesOpen] = useState(false)
 
     useEffect(() => {
-        const saved = document.cookie
-            .split(";")
-            .map((part) => part.trim())
-            .find((part) => part.startsWith(`${CONSENT_COOKIE}=`))
-            ?.split("=")[1]
-        setConsent(saved === "accepted" || saved === "rejected" ? saved : "unset")
-
-        const reopen = () => setConsent("unset")
+        const reopen = () => setIsPreferencesOpen(true)
+        const sync = () => {
+            if (hasAnalyticsConsent()) {
+                initializePostHog()
+                posthog.opt_in_capturing()
+                posthog.startSessionRecording()
+            } else if (posthog.__loaded) {
+                posthog.stopSessionRecording()
+                posthog.opt_out_capturing()
+            }
+        }
         window.addEventListener("dudit:privacy-settings", reopen)
-        return () => window.removeEventListener("dudit:privacy-settings", reopen)
+        window.addEventListener("dudit:analytics-consent", sync)
+        return () => {
+            window.removeEventListener("dudit:privacy-settings", reopen)
+            window.removeEventListener("dudit:analytics-consent", sync)
+        }
     }, [])
 
     const saveConsent = (choice: "accepted" | "rejected") => {
         const secure = window.location.protocol === "https:" ? "; Secure" : ""
         document.cookie = `${CONSENT_COOKIE}=${choice}; Path=/; Max-Age=15552000; SameSite=Lax${secure}`
-        setConsent(choice)
+        setIsPreferencesOpen(false)
 
         if (choice === "accepted") {
             initializePostHog()
@@ -95,7 +102,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     return (
         <PHProvider client={posthog}>
             {children}
-            {consent === "unset" && (
+            {isPreferencesOpen && (
                 <aside
                     aria-label="Preferências de privacidade"
                     className="fixed inset-x-4 bottom-4 z-[100] mx-auto max-w-2xl rounded-2xl border border-brand-border bg-white p-5 shadow-2xl"

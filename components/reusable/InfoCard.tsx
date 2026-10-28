@@ -11,48 +11,58 @@ interface InfoCardProps {
   bottomElement?: React.ReactNode
 }
 
-const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; border: string }> = {
+const colorMap: Record<
+  InfoCardColor,
+  { bg: string; text: string; bar: string; border: string; linkHover: string }
+> = {
   orange: {
     bg: "bg-[#fff7ed] dark:bg-orange-900/20",
     text: "text-orange-700 dark:text-orange-300/80",
     bar: "bg-orange-500",
-    border: "border-orange-100 dark:border-orange-900/30"
+    border: "border-orange-100 dark:border-orange-900/30",
+    linkHover: "hover:text-orange-800 dark:hover:text-orange-400",
   },
   green: {
     bg: "bg-[#ecfdf5] dark:bg-emerald-900/20",
     text: "text-emerald-900 dark:text-emerald-100",
     bar: "bg-emerald-500",
-    border: "border-emerald-100 dark:border-emerald-900/30"
+    border: "border-emerald-100 dark:border-emerald-900/30",
+    linkHover: "hover:text-emerald-800 dark:hover:text-emerald-400",
   },
   gray: {
     bg: "bg-brand-gray dark:bg-brand-border/50",
     text: "text-brand-dark dark:text-dark-heading",
     bar: "bg-brand-border dark:bg-dark-border/50",
-    border: "border-gray-200 dark:border-dark-border"
+    border: "border-gray-200 dark:border-dark-border",
+    linkHover: "hover:text-brand-dark/80 dark:hover:text-dark-heading/80",
   },
   red: {
     bg: "bg-red-50 dark:bg-red-900/10",
     text: "text-red-700 dark:text-red-300/80",
     bar: "bg-red-400",
-    border: "border-red-100 dark:border-red-900/30"
+    border: "border-red-100 dark:border-red-900/30",
+    linkHover: "hover:text-red-800 dark:hover:text-red-300",
   },
   yellow: {
     bg: "bg-yellow-50 dark:bg-yellow-900/10",
     text: "text-yellow-900 dark:text-yellow-300/80",
     bar: "bg-yellow-500",
-    border: "border-yellow-100 dark:border-yellow-900/30"
+    border: "border-yellow-100 dark:border-yellow-900/30",
+    linkHover: "hover:text-yellow-800 dark:hover:text-yellow-300",
   },
   blue: {
     bg: "bg-blue-50 dark:bg-blue-900/20",
     text: "text-blue-700 dark:text-blue-300/80",
     bar: "bg-blue-500",
-    border: "border-blue-100 dark:border-blue-900/30"
+    border: "border-blue-100 dark:border-blue-900/30",
+    linkHover: "hover:text-blue-800 dark:hover:text-blue-400",
   },
   purple: {
     bg: "bg-purple-50 dark:bg-purple-900/10",
     text: "text-purple-700 dark:text-purple-300/80",
     bar: "bg-purple-500",
-    border: "border-purple-100 dark:border-purple-900/30"
+    border: "border-purple-100 dark:border-purple-900/30",
+    linkHover: "hover:text-purple-800 dark:hover:text-purple-400",
   },
 }
 
@@ -74,7 +84,13 @@ export function InfoCard({ title, message, color = "orange", className = "", rig
           )}
         </div>
         {bottomElement && (
-          <div className="shrink-0 flex items-center justify-start">
+          // The wrapper carries the card text color so any link button placed
+          // here automatically inherits the title color (no per-button color
+          // classNames needed). The `hover:` shade dims slightly on hover.
+          <div
+            data-infocard-bottom
+            className={`shrink-0 flex items-center justify-start ${c.text} ${c.linkHover}`}
+          >
             {bottomElement}
           </div>
         )}

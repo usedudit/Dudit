@@ -892,7 +892,6 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                                     alert.actionHref && (
                                         <Button
                                             variant="link"
-                                            className={alert.type === "danger" ? "text-brand-orange hover:text-brand-orange/70" : "text-brand-red hover:text-brand-red/70"}
                                             onClick={() => router.push(alert.actionHref!)}
                                         >
                                             {alert.actionLabel}

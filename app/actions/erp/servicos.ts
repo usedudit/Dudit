@@ -32,6 +32,7 @@ import {
     roundMoney,
 } from "@/lib/erp/pricing-alerts"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
+import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
 
 import { headers } from "next/headers"
 
@@ -236,6 +237,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         }
 
         // Moderação de texto (nome + descrição) antes de gravar
+        let moderationDeferred = false
         if (!data.isDuplicate) {
             const moderation = await moderateProductContent({
                 name: data.name,
@@ -245,6 +247,8 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             if (!moderation.valid) {
                 return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
             }
+            // Timeout/queda da IA: não bloqueia; re-checa em background.
+            moderationDeferred = !!moderation.infraFailure
         }
 
         const serviceData: any = {
@@ -322,6 +326,16 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         if (insertError) return errorResponse(insertError.message)
 
+        if (moderationDeferred && inserted?.id) {
+            await scheduleDeferredTextModeration({
+                entityType: "service",
+                entityId: inserted.id,
+                partnerId: finalPartnerId,
+                autoApprove: !(data.requiresManualModeration || data.requires_manual_moderation),
+                texts: [data.name, data.description],
+            })
+        }
+
         if (inserted?.id) await invalidateServiceCache(inserted.id, finalPartnerId, 'create')
         await revalidateServices(finalPartnerId, inserted?.id)
         revalidatePath("/erp/servicos")
@@ -341,7 +355,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (!serviceId) return errorResponse("ID do serviço não fornecido")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, name, description, moderation_status, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "edit", user)
@@ -349,16 +363,25 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
 
-        // Moderação apenas dos campos de texto alterados
-        if (data.name !== undefined || data.description !== undefined) {
+        // Moderação apenas dos campos de texto alterados (o form envia tudo).
+        const currentName = typeof existing.name === "string" ? existing.name.trim() : ""
+        const currentDescription = typeof existing.description === "string" ? existing.description.trim() : ""
+        const nameChanged = data.name !== undefined && String(data.name ?? "").trim() !== currentName
+        const descriptionChanged =
+            data.description !== undefined && String(data.description ?? "").trim() !== currentDescription
+
+        let moderationDeferred = false
+        if (nameChanged || descriptionChanged) {
             const moderation = await moderateProductContent({
-                name: data.name,
-                description: data.description,
+                name: nameChanged ? data.name : undefined,
+                description: descriptionChanged ? data.description : undefined,
                 userId: existing.partner_id,
             })
             if (!moderation.valid) {
                 return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
             }
+            // Timeout/queda da IA: não bloqueia; re-checa em background.
+            moderationDeferred = !!moderation.infraFailure
         }
 
         if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
@@ -466,6 +489,17 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
 
         await invalidateServiceCache(serviceId, existing.partner_id, 'update')
         await revalidateServices(existing.partner_id, serviceId)
+
+        if (moderationDeferred) {
+            await scheduleDeferredTextModeration({
+                entityType: "service",
+                entityId: serviceId,
+                partnerId: existing.partner_id,
+                autoApprove: existing.moderation_status === "approved" && !(data.requiresManualModeration || data.requires_manual_moderation),
+                texts: [data.name, data.description],
+            })
+        }
+
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {

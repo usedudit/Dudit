@@ -1156,6 +1156,18 @@ select:disabled,
   border-left-color: #18181b !important;
 }
 
+/* ==========================================================================
+   INFOCARD - bottomElement link buttons
+   --------------------------------------------------------------------------
+   Any `variant="link"` button placed in an InfoCard's `bottomElement`
+   automatically inherits the card's title text color (and its hover shade)
+   without needing per-button color classNames like
+   `text-brand-blue hover:text-brand-blue/70`.
+   ========================================================================== */
+[data-infocard-bottom] .dudit-link-btn {
+  color: inherit !important;
+}
+
 .mapboxgl-popup-close-button {
   top: 8px !important;
   right: 8px !important;

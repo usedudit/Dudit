@@ -1,5 +1,8 @@
 # WhatsApp Automation - Cron Architecture
 
+> Scheduler setup, secret rotation and troubleshooting: see
+> [`cron-job-org.md`](./cron-job-org.md).
+
 ## Overview
 
 The WhatsApp automation system uses a **fully serverless architecture**:

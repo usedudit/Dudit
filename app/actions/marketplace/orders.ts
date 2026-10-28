@@ -1,7 +1,7 @@
 "use server"
 
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser } from "@/lib/auth/authorization"
+import { userOwnsBuyerOrder } from "@/lib/orders/buyer-access"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { releaseOrderInventory } from "@/lib/stock/reservations"
@@ -110,11 +110,11 @@ export async function cancelBuyerOrderAction(orderId: string) {
     return { error: "Não autenticado" }
   }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = getAdminClient()
 
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("id, situation, buyer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
+    .select("id, situation, buyer_id, customer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
     .eq("id", orderId)
     .single()
 
@@ -122,7 +122,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
     return { error: "Pedido não encontrado" }
   }
 
-  if (order.buyer_id !== user.id) {
+  if (!(await userOwnsBuyerOrder(order, user.id))) {
     return { error: "Sem permissão" }
   }
 
@@ -242,10 +242,10 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
     return { error: "Não autenticado" }
   }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = getAdminClient()
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("buyer_id, partner_id")
+    .select("buyer_id, customer_id, partner_id")
     .eq("id", orderId)
     .single()
 
@@ -253,7 +253,7 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
     return { error: "Pedido não encontrado" }
   }
 
-  if (order.buyer_id !== user.id) {
+  if (!(await userOwnsBuyerOrder(order, user.id))) {
     return { error: "Sem permissão" }
   }
 
@@ -273,12 +273,12 @@ export async function confirmOrderFulfillmentAction(orderId: string) {
     return { error: "Não autenticado" }
   }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = getAdminClient()
 
   // 1. Fetch order details with items
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("id, buyer_id, partner_id, delivery_status, situation, order_items(id, product_id, service_id, line_type, quantity)")
+    .select("id, buyer_id, customer_id, partner_id, delivery_status, situation, order_items(id, product_id, service_id, line_type, quantity)")
     .eq("id", orderId)
     .single()
 
@@ -286,7 +286,7 @@ export async function confirmOrderFulfillmentAction(orderId: string) {
     return { error: "Pedido não encontrado" }
   }
 
-  if (order.buyer_id !== user.id) {
+  if (!(await userOwnsBuyerOrder(order, user.id))) {
     return { error: "Sem permissão" }
   }
 

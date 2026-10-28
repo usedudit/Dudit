@@ -59,12 +59,16 @@ aplica o status com a mesma lógica do webhook.
 
 - Rota: `GET /api/cron/superfrete-reconcile`
 - Auth: `Authorization: Bearer $CRON_SECRET`
-- Sugestão de agenda: a cada 15 minutos (`*/15 * * * *`)
+- Agenda atual: a cada 15 minutos (`*/15`), cadastrada em
+  `America/Sao_Paulo` (a cadência não muda)
 - Limite: 60 etiquetas por execução (concorrência 5), apenas etiquetas abertas
   (`pending`, `released`, `posted`, `in_transit`) criadas nos últimos 45 dias.
-- Resposta: `{ success, checked, processed, failed, total }`
+- Orçamento: 22 s por execução (o cron-job.org corta em 30 s); o que não couber
+  volta em `deferred` e entra na próxima rodada.
+- Resposta: `{ success, checked, processed, failed, total, deferred, elapsedMs }`
 
-Cadastro no cron-job.org:
+Cadastro no cron-job.org (detalhes e rotação de segredo em
+[`cron-job-org.md`](./cron-job-org.md)):
 
 ```
 URL:    https://SEU_DOMINIO/api/cron/superfrete-reconcile

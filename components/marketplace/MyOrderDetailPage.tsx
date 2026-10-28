@@ -838,21 +838,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasMixedItems = hasAnyService && hasProducts;
     const storeDeleted = isStoreDeleted(order);
     const isCancelled = order.situation === "cancelled";
-    // Orders that only appear here through the linked ERP customer are managed
-    // by the seller in the ERP. Marketplace actions (cancel, returns, receipt
-    // confirmation) require buyer_id = auth user, so they are not available.
+    // Orders linked through an ERP customer are managed by the seller, but the
+    // buyer owns them just like a marketplace order: cancellation, returns and
+    // receipt confirmation follow the same rules.
     const isErpOrder = Boolean(order.is_erp_order);
-    const canCancelOrder = !isErpOrder && canRequestOrderCancellation(order) && !hasActiveReturn;
-    const canRequestResolution = !isErpOrder && canRequestPostFulfillmentResolution(order);
+    const canCancelOrder = canRequestOrderCancellation(order) && !hasActiveReturn;
+    const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnRequestButton = !isErpOrder && isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canRequestOrderCancellation(order) && !isCancelled && hasReturnableItems && !storeDeleted;
 
     const returnButtonLabel = order.delivery_status === "delivered"
         ? (showExchangeOption ? "Solicitar troca ou devolução" : "Solicitar devolução")
         : (showStoreCreditOption ? "Solicitar reembolso ou vale-compra" : "Solicitar reembolso");
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
-    const showConfirmReceiptButton = !isErpOrder && !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
+    const showConfirmReceiptButton = !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
 
     const renderFulfillmentButtons = () => {
         if (showConfirmReceiptButton) {
@@ -995,7 +995,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     message={`Sinal confirmado. Falta pagar ${formatCurrency(depositSummary.remainingBalance)} do saldo para concluir o pedido.`}
                     color="orange"
                     bottomElement={
-                        <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={handlePixClick} disabled={loadingPayment}>
+                        <Button variant="link" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar saldo
                         </Button>
@@ -1023,7 +1023,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
                     color="red"
                     bottomElement={
-                        <Button variant="link" className="text-brand-red hover:text-brand-red/70" onClick={handlePixClick} disabled={loadingPayment}>
+                        <Button variant="link" onClick={handlePixClick} disabled={loadingPayment}>
                             {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                             Pagar agora
                         </Button>
@@ -1037,7 +1037,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`}
                 color="orange"
                 bottomElement={
-                    <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={handlePixClick} disabled={loadingPayment}>
+                    <Button variant="link" onClick={handlePixClick} disabled={loadingPayment}>
                         {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                         Pagar agora
                     </Button>
@@ -1690,7 +1690,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     canReport ? (
                         <Button
                             variant="link"
-                            className={returnStatusCfg.color === "gray" ? "text-brand-dark dark:text-dark-heading" : `text-brand-${returnStatusCfg.color} hover:text-brand-${returnStatusCfg.color}/70`}
                             onClick={() => setReportReturnOpen(true)}
                         >
                             Reportar à Dudit
@@ -1718,7 +1717,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <div className="text-left flex-1 min-w-0">
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
                             <span>Pedido #{orderNumber}</span>
-                            {isErpOrder && <Badge variant="gray" icon={null}>ERP</Badge>}
+                            {isErpOrder && <Badge variant="gray" icon={null}>Via loja</Badge>}
                         </h1>
                         <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{dateStrFull}</p>
                     </div>
@@ -1760,7 +1759,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     order.recurring_subscription_id ? (
                                                         <Button
                                                             variant="link"
-                                                            className="text-brand-blue hover:text-brand-blue/70"
                                                             onClick={() =>
                                                                 window.open(`/assinaturas?tab=assinaturas&view=${order.recurring_subscription_id}`)
                                                             }
@@ -1774,7 +1772,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         <FormSection title={
                                             <div className="flex items-center gap-2">
                                                 <span>Pedido #{orderNumber}</span>
-                                                {isErpOrder && <Badge variant="gray" icon={null}>ERP</Badge>}
+                                                {isErpOrder && <Badge variant="gray" icon={null}>Via loja</Badge>}
                                                 {order.situation === "cancelled" && (
                                                     <Badge variant="red">Cancelado</Badge>
                                                 )}
@@ -2085,9 +2083,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         className="mt-4"
                                                         bottomElement={
                                                             <Button
+                                                                variant="link"
                                                                 onClick={handlePixClick}
                                                                 disabled={loadingPayment}
-                                                                className="text-brand-orange hover:text-brand-orange/70"
                                                             >
                                                                 {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
                                                                 Pagar via Pix
@@ -2105,7 +2103,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 variant="link"
                                                                 onClick={handleWhatsAppExchangeDifference}
                                                                 leftIcon={<WhatsappIcon />}
-                                                                className="text-brand-blue hover:text-brand-blue/70"
                                                             >
                                                                 Combinar no WhatsApp
                                                             </Button>
@@ -2258,9 +2255,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                 {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
                                                     <InfoCard
-                                                        message={isErpOrder
-                                                            ? "Este pedido foi registrado pela loja no ERP. Para cancelamentos, trocas ou devoluções, fale diretamente com a loja."
-                                                            : "Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."}
+                                                        message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."
                                                         color="gray"
                                                     />
                                                 )}
@@ -2358,9 +2353,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                         {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && !hasActiveReturn && (
                                             <InfoCard
-                                                message={isErpOrder
-                                                    ? "Este pedido foi registrado pela loja no ERP. Para cancelamentos, trocas ou devoluções, fale diretamente com a loja."
-                                                    : "Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."}
+                                                message="Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso."
                                                 color="gray"
                                             />
                                         )}

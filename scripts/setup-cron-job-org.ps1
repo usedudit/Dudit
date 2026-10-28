@@ -96,7 +96,12 @@ if ($UpdateSecret) {
   $skipped = 0
   $failed = 0
 
+  $first = $true
   foreach ($job in $existingJobs | Sort-Object jobId) {
+    # API permite 5 req/s: espaca tambem as leituras dos jobs que serao pulados.
+    if (-not $first) { Start-Sleep -Milliseconds 500 }
+    $first = $false
+
     $secretName = Resolve-SecretName $job.url
     $newSecret = if ($secretName) { $secrets[$secretName] } else { $null }
 
@@ -149,9 +154,6 @@ if ($UpdateSecret) {
       Write-Host "FAIL $($job.jobId): $($_.Exception.Message)" -ForegroundColor Red
       $failed++
     }
-
-    # API permite 5 req/s; mantemos folga (PATCH + leitura de confirmacao).
-    Start-Sleep -Milliseconds 500
   }
 
   if ($DryRun) {
@@ -273,6 +275,8 @@ foreach ($job in $jobs) {
         headers = @{ Authorization = "Bearer $secret" }
         body    = ""
       }
+      # onSuccess = "voltou a funcionar depois de uma falha", nao um e-mail por
+      # execucao bem-sucedida (ver JobNotificationSettings na API).
       notification   = @{
         onFailure      = $true
         onFailureCount = 1
@@ -311,8 +315,9 @@ foreach ($job in $jobs) {
     $failed++
   }
 
-  # API limita a 1 request/segundo e 5 por minuto na criacao.
-  Start-Sleep -Milliseconds 1200
+  # API limita a criacao a 1 req/s e 5 req/min. 13 s entre criacoes garante as
+  # duas coisas numa janela movel de 60 s (5 requests no maximo).
+  Start-Sleep -Seconds 13
 }
 
 if (-not $DryRun) {

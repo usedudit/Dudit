@@ -2,7 +2,10 @@ import { task } from "@trigger.dev/sdk/v3"
 import { executeWhatsappScheduledJob, executeWhatsappRetryBatch } from "./whatsapp-jobs"
 import { processWhatsappMessageById } from "@/lib/services/whatsapp-dispatch.service"
 import type { WhatsappScheduledJobPayload } from "./whatsapp-jobs"
-import { processPendingModerationJobs } from "@/lib/moderation/process-moderation-jobs"
+import {
+  runDeferredTextModeration,
+  type DeferredTextModerationPayload,
+} from "@/lib/moderation/deferred-moderation"
 import {
   executeNotificationScheduledJob,
   type NotificationScheduledJobPayload,
@@ -52,9 +55,7 @@ export const whatsappSendMessage = task({
 })
 
 /**
- * Processa jobs de moderação de texto pendentes.
- * Chamado a cada 5 minutos via cron-job.org → /api/moderation/process
- * Usa Llama Guard 3 (Cloudflare AI) para moderar nomes e descrições.
+ * Processa notificações agendadas (lembretes de WhatsApp etc.).
  */
 export const notificationScheduledJob = task({
   id: "notification-scheduled-job",
@@ -69,14 +70,25 @@ export const notificationScheduledJob = task({
   },
 })
 
+/**
+ * Re-checa em background um texto que estourou o timeout da moderação inline.
+ * Enfileirado por `scheduleDeferredTextModeration`.
+ */
 export const moderationTextJob = task({
   id: "moderation-text-job",
+  maxDuration: 60,
   retry: {
-    maxAttempts: 1,
+    maxAttempts: 5,
+    factor: 2,
+    minTimeoutInMs: 2_000,
+    maxTimeoutInMs: 60_000,
+    randomize: true,
   },
-  run: async () => {
-    const metrics = await processPendingModerationJobs()
-    return metrics
+  run: async (payload: DeferredTextModerationPayload) => {
+    if (!payload?.entityId || !payload?.entityType) {
+      return { status: "skipped" as const }
+    }
+    return runDeferredTextModeration(payload)
   },
 })
 

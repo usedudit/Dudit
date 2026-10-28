@@ -58,6 +58,7 @@ export default function AuthView({
     const [email, setEmail] = useState(initialEmail)
     const [password, setPassword] = useState("")
     const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [acceptedAnalytics, setAcceptedAnalytics] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -70,6 +71,13 @@ export default function AuthView({
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
     const isSubmittingRef = useRef(false)
     const [isSupportOpen, setIsSupportOpen] = useState(false)
+
+    const saveAnalyticsPreference = (accepted: boolean) => {
+        const secure = window.location.protocol === "https:" ? "; Secure" : ""
+        const choice = accepted ? "accepted" : "rejected"
+        document.cookie = `dudit_analytics_consent=${choice}; Path=/; Max-Age=15552000; SameSite=Lax${secure}`
+        window.dispatchEvent(new Event("dudit:analytics-consent"))
+    }
 
     const changeMode = (newMode: AuthMode) => {
         setMode(newMode)
@@ -154,9 +162,11 @@ export default function AuthView({
 
     const handleGoogleAuth = async () => {
         if (isSubmittingRef.current || isLoading) return
+        if (mode === "signup" && !acceptedTerms) return
         isSubmittingRef.current = true
         setIsLoading(true)
         try {
+            if (mode === "signup") saveAnalyticsPreference(acceptedAnalytics)
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             await supabase.auth.signInWithOAuth({
                 provider: "google",
@@ -173,6 +183,7 @@ export default function AuthView({
     const handleAuthSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (isSubmittingRef.current || isLoading) return
+        if (mode === "signup" && !acceptedTerms) return
         isSubmittingRef.current = true
         setIsLoading(true)
         setError(null)
@@ -216,6 +227,7 @@ export default function AuthView({
                 }
 
                 if (data.user) {
+                    saveAnalyticsPreference(acceptedAnalytics)
                     try {
                         await Promise.all(
                             CURRENT_LEGAL_DOCUMENTS.map((doc) =>
@@ -534,7 +546,7 @@ export default function AuthView({
                                     <h2 className="text-2xl text-brand-dark dark:text-dark-heading mb-8 font-medium">
                                         {mode === "login" ? "Entre com suas redes sociais" : "Crie com suas redes"}
                                     </h2>
-                                    <Button type="button" variant="outline" onClick={handleGoogleAuth} className="w-full gap-3 pl-4 bg-transparent">
+                                    <Button type="button" variant="outline" onClick={handleGoogleAuth} disabled={mode === "signup" && !acceptedTerms} className="w-full gap-3 pl-4 bg-transparent">
                                         <div className="w-6 flex justify-center">
                                             <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
                                                 <path d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="#4285F4" />
@@ -583,9 +595,19 @@ export default function AuthView({
                                         )}
 
                                         {mode === "signup" && (
-                                            <div className="flex items-center gap-2 pt-1">
-                                                <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
-                                                <label htmlFor="terms" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de uso</Link></label>
+                                            <div className="space-y-3 pt-1">
+                                                <div className="flex items-start gap-2">
+                                                    <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
+                                                    <label htmlFor="terms" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
+                                                        Li e aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de Uso</Link> e estou ciente da <Link href="/institucional/privacidade" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Política de Privacidade</Link>.
+                                                    </label>
+                                                </div>
+                                                <div className="flex items-start gap-2">
+                                                    <Checkbox id="analytics-consent" checked={acceptedAnalytics} onChange={(checked) => setAcceptedAnalytics(checked as boolean)} />
+                                                    <label htmlFor="analytics-consent" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
+                                                        Aceito métricas de uso e gravação de sessões para ajudar a melhorar a Dudit. Opcional; posso alterar essa escolha depois nas preferências de privacidade.
+                                                    </label>
+                                                </div>
                                             </div>
                                         )}
 

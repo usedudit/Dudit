@@ -2249,7 +2249,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/ordens-de-servico?view=${sourceServiceOrder.id}`,
@@ -2271,7 +2270,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/orcamentos?view=${sourceQuote.id}`,
@@ -2297,7 +2295,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/recorrentes/assinaturas?tab=assinaturas&view=${sourceSubscriptionId}`,
@@ -2419,7 +2416,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/ordens-de-servico?view=${sourceServiceOrder.id}`,
@@ -2443,7 +2439,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/orcamentos?view=${sourceQuote.id}`,
@@ -2471,7 +2466,6 @@ export default function OrderDetailView({
                               bottomElement={
                                 <Button
                                   variant="link"
-                                  className="text-brand-blue hover:text-brand-blue/70"
                                   onClick={() =>
                                     window.open(
                                       `/erp/recorrentes/assinaturas?tab=assinaturas&view=${sourceSubscriptionId}`,

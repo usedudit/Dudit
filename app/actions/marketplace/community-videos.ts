@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
+import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getR2PublicUrl } from "@/lib/r2/r2-server-config"
@@ -251,6 +252,7 @@ export async function createCommunityVideo(data: {
     if (data.title?.trim()) textsToModerate.push(data.title.trim())
     if (data.description?.trim()) textsToModerate.push(data.description.trim())
 
+    let moderationDeferred = false
     if (textsToModerate.length > 0) {
       const moderation = await moderateProductContent({
         name: data.title,
@@ -260,6 +262,7 @@ export async function createCommunityVideo(data: {
       if (!moderation.valid) {
         return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
       }
+      moderationDeferred = !!moderation.infraFailure
     }
 
     const { data: video, error } = await supabase
@@ -280,6 +283,18 @@ export async function createCommunityVideo(data: {
       .single()
 
     if (error) return { success: false, error: error.message }
+
+    // Vídeo já nasce pending (revisão manual). Se a IA estourou o timeout,
+    // re-checa em background só para reprovar conteúdo obviamente impróprio.
+    if (moderationDeferred) {
+      await scheduleDeferredTextModeration({
+        entityType: "community_video",
+        entityId: video.id,
+        partnerId: partner.id,
+        autoApprove: false,
+        texts: [data.title, data.description],
+      })
+    }
 
     await safeRevalidateTag(TAGS.communityVideos)
     return { success: true, data: { id: video.id } }
@@ -309,15 +324,33 @@ export async function updateCommunityVideo(
 
     if (!partner) return { success: false, error: "Partner não encontrado" }
 
-    if (data.title !== undefined || data.description !== undefined) {
+    const { data: existingVideo } = await supabase
+      .from("community_videos")
+      .select("title, description")
+      .eq("id", id)
+      .eq("partner_id", partner.id)
+      .maybeSingle()
+
+    const currentTitle = typeof existingVideo?.title === "string" ? existingVideo.title.trim() : null
+    const currentDescription =
+      typeof existingVideo?.description === "string" ? existingVideo.description.trim() : null
+    const titleChanged =
+      data.title !== undefined && (currentTitle === null || data.title.trim() !== currentTitle)
+    const descriptionChanged =
+      data.description !== undefined &&
+      (currentDescription === null || data.description.trim() !== currentDescription)
+
+    let moderationDeferred = false
+    if (titleChanged || descriptionChanged) {
       const moderation = await moderateProductContent({
-        name: data.title,
-        description: data.description,
+        name: titleChanged ? data.title : undefined,
+        description: descriptionChanged ? data.description : undefined,
         userId: partner.id,
       })
       if (!moderation.valid) {
         return { success: false, error: moderation.error || "Conteúdo não aprovado pela moderação" }
       }
+      moderationDeferred = !!moderation.infraFailure
     }
 
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -333,6 +366,16 @@ export async function updateCommunityVideo(
       .eq("partner_id", partner.id)
 
     if (error) return { success: false, error: error.message }
+
+    if (moderationDeferred) {
+      await scheduleDeferredTextModeration({
+        entityType: "community_video",
+        entityId: id,
+        partnerId: partner.id,
+        autoApprove: false,
+        texts: [data.title, data.description],
+      })
+    }
 
     await safeRevalidateTag(TAGS.communityVideo(id))
     return { success: true }

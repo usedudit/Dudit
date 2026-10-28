@@ -1249,39 +1249,39 @@ export default function PromotionFormPage({
                                                         placeholder="Descrição para controle interno ou exibição pública"
                                                     />
 
-                                                     <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">Público da Campanha</p>
-                                                     <div className="flex flex-col sm:flex-row gap-3">
-                                                         <ListItem
-                                                             title="Todos os Clientes"
-                                                             description="A campanha vale para toda a base de clientes"
-                                                             onClick={() => !isReadOnly && (markDirty(), setCampScope("all"))}
-                                                             className="flex-1 px-4 py-3"
-                                                             right={
-                                                                  <RadioButton
-                                                                      checked={campScope === "all"}
-                                                                      onChange={() => !isReadOnly && (markDirty(), setCampScope("all"))}
-                                                                      name="custScope"
-                                                                      value="all"
-                                                                  />
-                                                             }
-                                                         />
-                                                         <ListItem
-                                                             title="Clientes Específicos"
-                                                             description="A campanha vale apenas para clientes selecionados"
-                                                             onClick={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
-                                                             className="flex-1 px-4 py-3"
-                                                             right={
-                                                                  <RadioButton
-                                                                      checked={campScope === "specific"}
-                                                                      onChange={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
-                                                                      name="custScope"
-                                                                      value="specific"
-                                                                  />
-                                                             }
-                                                     />
-                                                     </div>
+                                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">Público da Campanha</p>
+                                                    <div className="flex flex-col sm:flex-row gap-3">
+                                                        <ListItem
+                                                            title="Todos os Clientes"
+                                                            description="A campanha vale para toda a base de clientes"
+                                                            onClick={() => !isReadOnly && (markDirty(), setCampScope("all"))}
+                                                            className="flex-1 px-4 py-3"
+                                                            right={
+                                                                <RadioButton
+                                                                    checked={campScope === "all"}
+                                                                    onChange={() => !isReadOnly && (markDirty(), setCampScope("all"))}
+                                                                    name="custScope"
+                                                                    value="all"
+                                                                />
+                                                            }
+                                                        />
+                                                        <ListItem
+                                                            title="Clientes Específicos"
+                                                            description="A campanha vale apenas para clientes selecionados"
+                                                            onClick={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
+                                                            className="flex-1 px-4 py-3"
+                                                            right={
+                                                                <RadioButton
+                                                                    checked={campScope === "specific"}
+                                                                    onChange={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
+                                                                    name="custScope"
+                                                                    value="specific"
+                                                                />
+                                                            }
+                                                        />
+                                                    </div>
 
-                                                     {campScope === "specific" && renderSelectedCustomersList()}
+                                                    {campScope === "specific" && renderSelectedCustomersList()}
                                                 </FormSection>
                                             </div>
 
@@ -1433,11 +1433,11 @@ export default function PromotionFormPage({
                                                                         }}
                                                                         disabled={isReadOnly}
                                                                     />
-                                                </div>
-                                            )}
+                                                                </div>
+                                                            )}
 
-                                            {editingRule.promotion_type === "buy_x_pay_y" && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                            {editingRule.promotion_type === "buy_x_pay_y" && (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <Input
                                                                         label="Leve (Qtd a Comprar)"
                                                                         name="buy_quantity"
@@ -1511,7 +1511,6 @@ export default function PromotionFormPage({
                                                                                 bottomElement={
                                                                                     <Button
                                                                                         variant="link"
-                                                                                        className="text-brand-red hover:text-brand-red/70"
                                                                                         onClick={() => setIsGiftSheetOpen(true)}
                                                                                     >
                                                                                         Adicionar brinde
@@ -1584,7 +1583,7 @@ export default function PromotionFormPage({
                                                                         })()}
                                                                     </div>
                                                                 </FormSection>
-                                                                )}
+                                                            )}
 
                                                             {editingRule.promotion_type === "free_shipping" && (
                                                                 <FormSection title="Frete Grátis" hasSeparator>
@@ -1596,35 +1595,35 @@ export default function PromotionFormPage({
                                                                         />
                                                                     </div>
                                                                 </FormSection>
-                                                                )}
+                                                            )}
 
-                                                             {editingRule.promotion_type !== "free_shipping" && (
-                                                                 <>
-                                                            <FormDropdown
-                                                                label="Escopo de Aplicação"
-                                                                value={editingRule.apply_scope || "entire_cart"}
-                                                                setValue={(val) => {
-                                                                    markDirty()
-                                                                    setScopeSearch("")
-                                                                    setScopePage(1)
-                                                                    setEditingRule({ ...editingRule, apply_scope: val })
-                                                                }}
-                                                                disabled={isReadOnly}
-                                                                options={[
-                                                                    { value: "entire_cart", label: "Toda a Sacola" },
-                                                                    { value: "specific_products", label: "Produtos Específicos" },
-                                                                    { value: "category", label: "Categorias Específicas" },
-                                                                    ...(scopeData.services && scopeData.services.length > 0 ? [{ value: "specific_services", label: "Serviços Específicos" }] : [])
-                                                                ]}
-                                                            />
+                                                            {editingRule.promotion_type !== "free_shipping" && (
+                                                                <>
+                                                                    <FormDropdown
+                                                                        label="Escopo de Aplicação"
+                                                                        value={editingRule.apply_scope || "entire_cart"}
+                                                                        setValue={(val) => {
+                                                                            markDirty()
+                                                                            setScopeSearch("")
+                                                                            setScopePage(1)
+                                                                            setEditingRule({ ...editingRule, apply_scope: val })
+                                                                        }}
+                                                                        disabled={isReadOnly}
+                                                                        options={[
+                                                                            { value: "entire_cart", label: "Toda a Sacola" },
+                                                                            { value: "specific_products", label: "Produtos Específicos" },
+                                                                            { value: "category", label: "Categorias Específicas" },
+                                                                            ...(scopeData.services && scopeData.services.length > 0 ? [{ value: "specific_services", label: "Serviços Específicos" }] : [])
+                                                                        ]}
+                                                                    />
 
-                                                            {editingRule.apply_scope === "specific_products" && renderSelectedProductsList()}
-                                                            {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
-                                                            {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
-                                                            </>
-                                                        )}
+                                                                    {editingRule.apply_scope === "specific_products" && renderSelectedProductsList()}
+                                                                    {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
+                                                                    {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
+                                                                </>
+                                                            )}
 
-                                                    </FormSection>
+                                                        </FormSection>
                                                     </div>
 
                                                     {/* Right Column: Rule limits and status */}

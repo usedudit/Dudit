@@ -10,6 +10,7 @@ import { can } from "@/lib/permissions/can"
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
 import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { userOwnsBuyerOrder } from "@/lib/orders/buyer-access"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -458,10 +459,14 @@ export async function requireOrderAccess(
 ): Promise<{ role: "buyer" | "seller" }> {
   const user = await requireUser()
 
-  const supabase = await getSupabaseServerClient()
+  // Staff roles are resolved with the request-scoped client, but linked ERP
+  // orders are not visible to the buyer through RLS (buyer_id holds the
+  // customers.id). Read the ownership fields with the admin client and return
+  // the role explicitly so downstream authorization stays unchanged.
+  const supabase = getAdminClient()
   const { data: order } = await supabase
     .from("orders")
-    .select("buyer_id, partner_id")
+    .select("buyer_id, customer_id, partner_id")
     .eq("id", orderId)
     .single()
 
@@ -469,7 +474,7 @@ export async function requireOrderAccess(
     throw new ForbiddenError("Pedido não encontrado")
   }
 
-  if (order.buyer_id === user.id) {
+  if (await userOwnsBuyerOrder(order, user.id)) {
     return { role: "buyer" }
   }
 

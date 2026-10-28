@@ -419,8 +419,8 @@ export function MyOrdersListClient({
                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
                                                                         {order.is_erp_order && (
-                                                                            <Tooltip text="Pedido registrado pela loja no ERP">
-                                                                                <Badge variant="gray" icon={null} className="scale-90 whitespace-nowrap">ERP</Badge>
+                                                                            <Tooltip text="Pedido registrado pela loja">
+                                                                                <Badge variant="gray" icon={null} className="scale-90 whitespace-nowrap">Via loja</Badge>
                                                                             </Tooltip>
                                                                         )}
                                                                         <span className="hidden lg:inline">•</span>

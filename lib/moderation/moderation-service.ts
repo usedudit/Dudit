@@ -9,8 +9,12 @@ const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID || ""
 const CF_TOKEN = process.env.CLOUDFLARE_AI_TOKEN || ""
 const CF_MODEL = "@cf/meta/llama-guard-3-8b"
 // Workers AI tem cold start irregular: já medimos de 300ms até ~23s no mesmo
-// modelo. 12s cobre o caso comum e evita travar o formulário do usuário.
-const CF_TIMEOUT_MS = Number(process.env.MODERATION_AI_TIMEOUT_MS) || 12_000
+// modelo. O formulário não pode pagar 12s, então tentamos por 3s e, se estourar,
+// o chamador agenda uma re-checagem em background (Trigger.dev) — timeout nunca
+// mais significa "não moderou".
+const CF_TIMEOUT_MS = Number(process.env.MODERATION_AI_TIMEOUT_MS) || 3_000
+/** Timeout generoso para a re-checagem em background, onde ninguém está esperando. */
+export const MODERATION_BACKGROUND_TIMEOUT_MS = 20_000
 
 const CACHE_VERSION = "v2"
 const CACHE_TTL = 60 * 60 * 24 * 7 // 7 dias
@@ -153,7 +157,7 @@ type AiVerdict = { safe: boolean; categories: string[]; degraded: boolean }
  * Classifica UM texto. Retorna `degraded: true` quando não foi possível falar
  * com a Cloudflare — nesse caso NÃO sabemos se é seguro, e o chamador decide.
  */
-async function classifyWithAi(text: string): Promise<AiVerdict> {
+async function classifyWithAi(text: string, timeoutMs: number = CF_TIMEOUT_MS): Promise<AiVerdict> {
   if (!CF_ACCOUNT_ID || !CF_TOKEN) {
     console.error(
       "[MODERATION] CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_AI_TOKEN ausente: moderação por IA desativada."
@@ -166,7 +170,7 @@ async function classifyWithAi(text: string): Promise<AiVerdict> {
       method: "POST",
       headers: { Authorization: `Bearer ${CF_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify({ messages: [{ role: "user", content: text }] }),
-      signal: AbortSignal.timeout(CF_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
 
     if (!res.ok) {
@@ -196,10 +200,58 @@ async function classifyWithAi(text: string): Promise<AiVerdict> {
       degraded: false,
     }
   } catch (err: any) {
-    const reason = err?.name === "TimeoutError" ? `timeout após ${CF_TIMEOUT_MS}ms` : err?.message || String(err)
+    const reason = err?.name === "TimeoutError" ? `timeout após ${timeoutMs}ms` : err?.message || String(err)
     console.error("[MODERATION] Falha ao chamar a Cloudflare AI:", reason)
     return { safe: true, categories: [], degraded: true }
   }
+}
+
+type PendingText = { original: string; normalized: string }
+type ClassifiedText = { item: PendingText; verdict: AiVerdict }
+
+/**
+ * Classifica vários textos gastando o mínimo de chamadas possível:
+ *  - 1 texto  → 1 chamada
+ *  - N textos → 1 chamada com todos juntos.
+ *
+ * Só re-checa individualmente quando o conjunto vem `unsafe`, para saber qual
+ * campo causou o bloqueio e não envenenar o cache com falso positivo nos campos
+ * que estavam ok. Esse caso é raro (só quando algo é bloqueado).
+ */
+async function classifyTexts(pending: PendingText[], timeoutMs: number): Promise<ClassifiedText[]> {
+  if (pending.length === 0) return []
+
+  if (pending.length === 1) {
+    const item = pending[0]
+    return [{ item, verdict: await classifyWithAi(item.normalized, timeoutMs) }]
+  }
+
+  // Evita estourar o contexto do modelo juntando descrições gigantes.
+  const combinedLength = pending.reduce((total, item) => total + item.normalized.length + 2, 0)
+  if (combinedLength > 6_000) {
+    return Promise.all(
+      pending.map(async (item) => ({
+        item,
+        verdict: await classifyWithAi(item.normalized, timeoutMs),
+      }))
+    )
+  }
+
+  const combinedVerdict = await classifyWithAi(
+    pending.map((p) => p.normalized).join("\n\n"),
+    timeoutMs
+  )
+
+  if (combinedVerdict.degraded || combinedVerdict.safe) {
+    return pending.map((item) => ({ item, verdict: combinedVerdict }))
+  }
+
+  return Promise.all(
+    pending.map(async (item) => ({
+      item,
+      verdict: await classifyWithAi(item.normalized, timeoutMs),
+    }))
+  )
 }
 
 // ============================================================================
@@ -242,19 +294,27 @@ export type ModerationResponse = {
  * Modera uma lista de textos.
  *
  * Estratégia:
- *  1. Blocklist local pt-BR (sempre roda, mesmo offline)
- *  2. Cache por texto
- *  3. Llama Guard 3 na Cloudflare (1 chamada por texto, em paralelo)
+ *  1. Blocklist local pt-BR (sempre roda, mesmo offline, custo zero)
+ *  2. Cache por texto (Redis, 7 dias)
+ *  3. Llama Guard 3 na Cloudflare — UMA chamada para todos os textos que não
+ *     estão no cache. Se o conjunto vier `unsafe`, re-checa individualmente
+ *     para atribuir o problema ao campo certo.
  *
- * Em falha de infraestrutura retorna `passed: true` + `degraded: true` e
- * registra o erro — antes isso passava 100% silencioso e ninguém percebia.
+ * Em falha de infraestrutura retorna `passed: true` + `degraded: true`. O
+ * chamador deve usar `degraded` para agendar uma re-checagem em background
+ * (ver `lib/moderation/deferred-moderation.ts`).
  */
-export async function checkTextSafety(texts: string[], userId?: string): Promise<ModerationResponse> {
+export async function checkTextSafety(
+  texts: string[],
+  userId?: string,
+  options?: { timeoutMs?: number }
+): Promise<ModerationResponse> {
   const cleaned = (texts ?? []).map((t) => (t ?? "").trim()).filter(Boolean)
   if (cleaned.length === 0) return { passed: true }
 
+  const timeoutMs = options?.timeoutMs ?? CF_TIMEOUT_MS
   const flaggedTexts: Array<{ text: string; categories: string[] }> = []
-  const pending: Array<{ original: string; normalized: string }> = []
+  const pending: PendingText[] = []
   const seen = new Set<string>()
 
   for (const original of cleaned) {
@@ -292,25 +352,39 @@ export async function checkTextSafety(texts: string[], userId?: string): Promise
   }
 
   if (pending.length > 0) {
-    const verdicts = await Promise.all(
-      pending.map(async ({ original, normalized }) => {
+    // 1. Cache em paralelo (1 GET por texto).
+    const verdicts = new Map<string, AiVerdict>()
+    await Promise.all(
+      pending.map(async ({ normalized }) => {
         const cacheKey = `moderation:text:${CACHE_VERSION}:${await sha256(normalized)}`
-
         const cached = await readCache(cacheKey)
-        if (cached) return { original, ...cached, degraded: false }
-
-        const verdict = await classifyWithAi(normalized)
-        if (!verdict.degraded) {
-          await writeCache(cacheKey, { safe: verdict.safe, categories: verdict.categories })
-        }
-        return { original, ...verdict }
+        if (cached) verdicts.set(normalized, { safe: cached.safe, categories: cached.categories, degraded: false })
       })
     )
 
-    for (const v of verdicts) {
-      if (v.degraded) degraded = true
-      if (!v.safe) {
-        flaggedTexts.push({ text: truncate(v.original), categories: v.categories })
+    // 2. Só o que não está no cache vai para a IA. Se der para juntar tudo em
+    // uma chamada, melhor: evita um segundo cold start e metade do custo.
+    const uncached = pending.filter((p) => !verdicts.has(p.normalized))
+    if (uncached.length > 0) {
+      const classified = await classifyTexts(uncached, timeoutMs)
+
+      await Promise.all(
+        classified.map(async ({ item, verdict }) => {
+          verdicts.set(item.normalized, verdict)
+          if (!verdict.degraded) {
+            const cacheKey = `moderation:text:${CACHE_VERSION}:${await sha256(item.normalized)}`
+            await writeCache(cacheKey, { safe: verdict.safe, categories: verdict.categories })
+          }
+        })
+      )
+    }
+
+    for (const { original, normalized } of pending) {
+      const verdict = verdicts.get(normalized)
+      if (!verdict) continue
+      if (verdict.degraded) degraded = true
+      if (!verdict.safe) {
+        flaggedTexts.push({ text: truncate(original), categories: verdict.categories })
       }
     }
   }

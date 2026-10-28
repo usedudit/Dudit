@@ -39,6 +39,7 @@ import {
     sortPricingAlerts,
 } from "@/lib/erp/pricing-alerts"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
+import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
 import { headers } from "next/headers"
 
 const _deleteFromR2 = async (url: string) => {
@@ -560,17 +561,15 @@ export async function createProductComprehensiveAction(data: {
             data.featured = false
         }
 
-        // 5. MODERAÇÃO DE TEXTO (nome + descrição) antes de tocar no banco
-        if (!data.isDuplicate) {
-            const moderation = await moderateProductContent({
+        // 5. MODERAÇÃO DE TEXTO (nome + descrição) antes de tocar no banco.
+        // Dispara junto da normalização de vídeo para não somar latência.
+        const moderationPromise = data.isDuplicate
+            ? null
+            : moderateProductContent({
                 name: data.name,
                 description: data.description,
                 userId: finalPartnerId,
             })
-            if (!moderation.valid) {
-                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
-            }
-        }
 
         // SKU: sanitização e geração automática caso venha vazio ou 'Gerar automaticamente'
         const rawSku = data.sku?.trim()
@@ -584,6 +583,17 @@ export async function createProductComprehensiveAction(data: {
             video_duration: data.videoDuration || null,
             video_provider_id: data.videoProviderId || null,
         })
+
+        // Timeout/queda da IA não bloqueia o cadastro: marca como adiado e
+        // agenda uma re-checagem em background depois do INSERT.
+        let moderationDeferred = false
+        if (moderationPromise) {
+            const moderation = await moderationPromise
+            if (!moderation.valid) {
+                return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
+            }
+            moderationDeferred = !!moderation.infraFailure
+        }
 
         // Duplicata: clona imagens e vídeos para arquivos independentes no R2,
         // para que excluir a mídia do produto original não afete as cópias.
@@ -744,6 +754,16 @@ export async function createProductComprehensiveAction(data: {
         }
 
         const createdProductId = insertedProduct.id
+
+        if (moderationDeferred) {
+            await scheduleDeferredTextModeration({
+                entityType: "product",
+                entityId: createdProductId,
+                partnerId: finalPartnerId,
+                autoApprove: !data.requiresManualModeration,
+                texts: [data.name, data.description],
+            })
+        }
 
         // IBS/CBS (2027) ainda não fazem parte da RPC de criação: grava direto.
         // Defaults da operação padrão de 2027 (CST 000 / cClassTrib 000001).
@@ -962,16 +982,26 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
-        // Moderação apenas dos campos de texto que estão sendo alterados.
-        if (data.name !== undefined || data.description !== undefined) {
+        // Moderação apenas dos campos de texto que realmente mudaram.
+        // O formulário envia nome/descrição em toda edição, então comparar com o
+        // valor atual evita uma chamada de IA a cada "salvar preço".
+        const currentName = typeof product.name === "string" ? product.name.trim() : ""
+        const currentDescription = typeof product.description === "string" ? product.description.trim() : ""
+        const nameChanged = data.name !== undefined && String(data.name ?? "").trim() !== currentName
+        const descriptionChanged =
+            data.description !== undefined && String(data.description ?? "").trim() !== currentDescription
+
+        let moderationDeferred = false
+        if (nameChanged || descriptionChanged) {
             const moderation = await moderateProductContent({
-                name: data.name,
-                description: data.description,
+                name: nameChanged ? data.name : undefined,
+                description: descriptionChanged ? data.description : undefined,
                 userId: product.partner_id,
             })
             if (!moderation.valid) {
                 return errorResponse(moderation.error || "Conteúdo não aprovado pela moderação")
             }
+            moderationDeferred = !!moderation.infraFailure
         }
 
         const supabase = await getSupabaseServerClient()
@@ -1168,6 +1198,16 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'update')
+
+        if (moderationDeferred) {
+            await scheduleDeferredTextModeration({
+                entityType: "product",
+                entityId: productId,
+                partnerId: product.partner_id,
+                autoApprove: product.moderation_status === "approved" && !data.requiresManualModeration,
+                texts: [data.name, data.description],
+            })
+        }
 
         // Fire-and-forget: low stock notification
         if (data.stockQuantity !== undefined || data.minStock !== undefined) {

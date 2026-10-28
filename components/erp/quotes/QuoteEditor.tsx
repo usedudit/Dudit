@@ -163,12 +163,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             bottomElement={
                                 <div className="flex items-center gap-2">
                                     {caps.showReopenCta && props.onReopenQuote && (
-                                        <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={props.onReopenQuote}>
+                                        <Button variant="link" onClick={props.onReopenQuote}>
                                             Reabrir como rascunho
                                         </Button>
                                     )}
                                     {caps.showDuplicateCta && props.onDuplicateQuote && (
-                                        <Button variant="link" className="text-brand-orange hover:text-brand-orange/70" onClick={props.onDuplicateQuote}>
+                                        <Button variant="link" onClick={props.onDuplicateQuote}>
                                             Duplicar orçamento
                                         </Button>
                                     )}

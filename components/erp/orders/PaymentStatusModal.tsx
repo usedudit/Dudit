@@ -1000,7 +1000,6 @@ export default function PaymentStatusModal({
                             manualPolicy.canOverride && !overrideEnabled ? (
                               <Button
                                 variant="link"
-                                className={overrideEnabled ? "text-brand-blue hover:text-brand-blue/70" : "text-brand-orange hover:text-brand-orange/70"}
                                 onClick={() => setShowOverrideConfirm(true)}
                               >
                                 Autorizar

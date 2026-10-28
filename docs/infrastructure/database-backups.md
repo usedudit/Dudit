@@ -2,6 +2,9 @@
 
 Esta solução faz um backup lógico diário do PostgreSQL do Supabase e o envia para um bucket privado do Cloudflare R2.
 
+O cadastro do job, a rotação do `BACKUP_CRON_SECRET` e o troubleshooting do
+cron-job.org estão em [`cron-job-org.md`](./cron-job-org.md).
+
 ```text
 cron-job.org (1x por dia)
   -> POST /api/internal/jobs/backup-database

@@ -393,7 +393,6 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                                         onClick={handlePauseAllSubscriptions}
                                         isLoading={pausingAll}
                                         disabled={pausingAll || saving}
-                                        className="w-full sm:w-auto"
                                     >
                                         Pausar todas as assinaturas ativas
                                     </Button>

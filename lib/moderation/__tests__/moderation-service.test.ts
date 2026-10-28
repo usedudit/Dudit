@@ -137,4 +137,28 @@ describe("checkTextSafety", () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
+
+  it("combina vários textos em uma única chamada quando estão fora do cache", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(aiResponse("safe"))
+
+    const result = await mod.checkTextSafety(["Nome do produto", "Descrição do produto"])
+
+    expect(result.passed).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("re-checa individualmente quando o conjunto é unsafe, para atribuir o campo", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(aiResponse("unsafe\nS10")) // conjunto
+      .mockResolvedValueOnce(aiResponse("safe")) // nome
+      .mockResolvedValueOnce(aiResponse("unsafe\nS10")) // descrição
+
+    const result = await mod.checkTextSafety(["nome ok", "descricao ruim"])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(result.passed).toBe(false)
+    expect(result.flaggedTexts).toHaveLength(1)
+    expect(result.flaggedTexts?.[0].text).toContain("descricao ruim")
+  })
 })
