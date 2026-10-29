@@ -37,8 +37,10 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
       const periodOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
       const prevOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
       const allOrdersQuery = supabase.from("orders").select("id, customer_name, customer_id, total_amount, created_at").eq("partner_id", partnerId)
+      // NOTE: customers is a GLOBAL table (partner-level, not store-level)
+      // per the multi-store architecture. store_id was dropped and never
+      // re-added, so we must NOT scope the customers query to a store.
       if (storeId) {
-        scopeQueryToStores(customersQuery, storeId)
         scopeQueryToStores(periodOrdersQuery, storeId)
         scopeQueryToStores(prevOrdersQuery, storeId)
         scopeQueryToStores(allOrdersQuery, storeId)

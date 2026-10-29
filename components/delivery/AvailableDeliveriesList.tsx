@@ -96,6 +96,9 @@ export default function AvailableDeliveriesList() {
     const refreshCooldownRef = useRef(false)
     const [isCooldown, setIsCooldown] = useState(false)
     const knownOfferIdsRef = useRef<Set<string>>(new Set())
+    const offersLoadInFlightRef = useRef(false)
+    const refreshPendingRef = useRef(false)
+    const pendingRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const openView = (id: string) => {
         router.push(`/entregadores/entregas-disponiveis?view=${id}`)
@@ -132,8 +135,14 @@ export default function AvailableDeliveriesList() {
     }
 
     const loadOffers = useCallback(async (isRefresh = false, force = false) => {
+        if (isRefresh && !force && refreshCooldownRef.current) return
+        if (offersLoadInFlightRef.current) {
+            if (isRefresh) refreshPendingRef.current = true
+            return
+        }
+        offersLoadInFlightRef.current = true
+
         if (isRefresh && !force) {
-            if (refreshCooldownRef.current) return
             setIsRefreshing(true)
             refreshCooldownRef.current = true
             setIsCooldown(true)
@@ -171,8 +180,26 @@ export default function AvailableDeliveriesList() {
         } catch (e: any) {
             toast.error(e?.message || "Erro inesperado ao buscar ofertas.")
         } finally {
+            offersLoadInFlightRef.current = false
             setIsLoading(false)
             setIsRefreshing(false)
+
+            // Realtime can emit several changes while this request is running.
+            // Collapse them into one follow-up fetch instead of overlapping calls.
+            if (refreshPendingRef.current && pendingRefreshTimerRef.current === null) {
+                refreshPendingRef.current = false
+                pendingRefreshTimerRef.current = setTimeout(() => {
+                    pendingRefreshTimerRef.current = null
+                    void loadOffers(true, true)
+                }, 400)
+            }
+        }
+    }, [])
+
+    useEffect(() => () => {
+        if (pendingRefreshTimerRef.current) {
+            clearTimeout(pendingRefreshTimerRef.current)
+            pendingRefreshTimerRef.current = null
         }
     }, [])
 

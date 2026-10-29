@@ -1309,6 +1309,26 @@ async function fulfillMarketplaceOrderIfNeeded(
   orderId: string,
 ) {
   try {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("order_source, checkout_fulfillment")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (!order) return;
+
+    const source = (order.order_source || "").toLowerCase().trim();
+    const isMarketplace =
+      source === "vitrine online" ||
+      source === "marketplace" ||
+      source === "online store" ||
+      Boolean((order.checkout_fulfillment as any)?.lines?.length) ||
+      Boolean((order.checkout_fulfillment as any)?.depositCheckout);
+
+    if (!isMarketplace) {
+      return;
+    }
+
     const { fulfillMarketplaceOrder } =
       await import("@/lib/services/marketplace-checkout-fulfillment");
     await fulfillMarketplaceOrder(supabase, orderId);
@@ -2983,11 +3003,6 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   }
 
   if (paymentState.situation === "paid") {
-    if (data.salesChannel !== "Presencial") {
-      postOrderPromises.push(
-        fulfillMarketplaceOrderIfNeeded(supabase, order.id),
-      );
-    }
     if (
       !data.skipPostPaymentSellerSideEffects &&
       capabilities.hasProductivity

@@ -341,12 +341,21 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   const { openPlanUpgrade } = usePlanUpgrade()
   const reports = useMemo(() => createReports(props), [props])
   const availableCategories = useMemo(() => CATEGORIES.filter((category) => reports.some((report) => report.category === category.id)), [reports])
-  const tab = searchParams.get("tab")
-  const selectedReport = reports.find((report) => report.id === tab) || null
+  const [activeReportId, setActiveReportId] = useState<string | null>(() => searchParams.get("tab"))
+  const selectedReport = reports.find((report) => report.id === activeReportId) || null
   const compare = searchParams.get("compare") || "none"
   const visibleColumns = selectedReport?.columns.filter((column) => !(column.id === "previous" && compare === "none")) || []
   const [activeCategory, setActiveCategory] = useState<ReportCategory>(availableCategories[0]?.id || "vendas")
   const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    const syncReportFromUrl = () => {
+      setActiveReportId(new URLSearchParams(window.location.search).get("tab"))
+    }
+
+    window.addEventListener("popstate", syncReportFromUrl)
+    return () => window.removeEventListener("popstate", syncReportFromUrl)
+  }, [])
 
   useEffect(() => {
     if (selectedReport) setActiveCategory(selectedReport.category)
@@ -379,10 +388,14 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
       openPlanUpgrade(report.minimumPlan)
       return
     }
+    setActiveReportId(report.id)
     pushUrl(withReportUrl(report.id))
   }
 
-  const closeReport = () => pushUrl(withReportUrl())
+  const closeReport = () => {
+    setActiveReportId(null)
+    pushUrl(withReportUrl())
+  }
   const selectStore = (storeId: string) => {
     const url = new URL(window.location.href)
     if (storeId) url.searchParams.set("store", storeId)

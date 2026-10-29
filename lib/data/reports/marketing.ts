@@ -35,7 +35,7 @@ const fetchMarketingDataStatic = unstable_cache(
 
     const ordersQuery = supabase.from("orders").select("id, total_amount, order_source, created_at").eq("partner_id", partnerId)
     const couponsQuery = supabase.from("coupons").select("id, code, usage_limit, discount_type, discount_value, is_active").eq("partner_id", partnerId).eq("is_active", true)
-    const campaignsQuery = supabase.from("campaigns").select("id, name, is_active, starts_at, ends_at, store_ids").eq("partner_id", partnerId)
+    const campaignsQuery = supabase.from("campaigns").select("id, name, is_active, starts_at, ends_at, store_id").eq("partner_id", partnerId)
     if (storeId) {
       scopeQueryToStores(ordersQuery, storeId)
       scopeQueryToStores(couponsQuery, storeId)
@@ -125,7 +125,7 @@ const fetchMarketingDataStatic = unstable_cache(
 
     const selectedStores = storeId.split(",").filter(Boolean)
     const campaigns = (campaignsResult.data || [])
-      .filter((c: any) => selectedStores.length === 0 || !Array.isArray(c.store_ids) || c.store_ids.length === 0 || c.store_ids.some((id: string) => selectedStores.includes(id)))
+      .filter((c: any) => selectedStores.length === 0 || !c.store_id || selectedStores.includes(c.store_id))
       .map((c: any) => ({
       id: c.id,
       name: c.name,

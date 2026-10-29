@@ -56,7 +56,15 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     return { success: false as const, error: error?.message || "Pedido não encontrado" }
   }
 
-  const orderItems: any[] = order.order_items || []
+  const breakdown = calculateOrderFinancialBreakdown(order, order.order_items)
+  return {
+    success: true as const,
+    data: breakdown,
+  }
+}
+
+export function calculateOrderFinancialBreakdown(order: any, itemsInput?: any[]): FinancialBreakdownData {
+  const orderItems: any[] = itemsInput || order.order_items || []
 
   // ── Separate products and services ──
   const productItems = orderItems.filter((item: any) => !item.service_id && item.line_type !== "service_booking")
@@ -111,6 +119,9 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   let totalFixedFees = 0
   let totalInterest = 0
   let totalBreakdownMethodDiscount = 0
+  let totalRepassedFees = 0
+  let totalRepassedFixedFees = 0
+  let totalRepassedInterest = 0
   const feeLines: { method: string; fee: number }[] = []
   const fixedFeeLines: { method: string; fee: number }[] = []
 
@@ -118,7 +129,7 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
 
   // Use breakdown for per-method display, stored columns for totals
   for (const entry of paymentBreakdown) {
-    const method = String(entry.method || "").toLowerCase().trim()
+    const method = String(entry.method || "").trim()
     const bearer = String(entry.feeBearer || "merchant").toLowerCase().trim()
     const isCustomerBearer = bearer === "customer" || bearer === "buyer"
     const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
@@ -129,8 +140,6 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
       totalBreakdownMethodDiscount += pmDiscount
     }
 
-    // Only merchant-borne fees/interest are costs for the business.
-    // Fees (feeAmount, fixedFeeAmount) follow feeBearer; installment cost follows installmentFeeBearer.
     const installmentFeeBearer = String(entry.installmentFeeBearer || "merchant").toLowerCase().trim()
     const isCustomerInstallmentBearer = installmentFeeBearer === "customer" || installmentFeeBearer === "buyer"
     const pFee = Math.max(0, Number(entry.feeAmount || 0))
@@ -139,26 +148,41 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     const entryInstallmentCost = Math.max(0, Number(entry.installmentCostAmount || 0))
     const entryFixedInterest = Math.max(0, entryInterest - entryInstallmentCost)
 
-    // Merchant absorbs fees only when feeBearer is merchant
-    if (!isCustomerBearer) {
-      if (pFee > 0) {
-        totalPercentageFees += pFee
-        feeLines.push({ method, fee: pFee })
+    // Percentage fee (taxa) - sempre é um custo cobrado pelo gateway do método
+    if (pFee > 0) {
+      totalPercentageFees += pFee
+      feeLines.push({ method: method || "pagamento", fee: pFee })
+      if (isCustomerBearer) {
+        totalRepassedFees += pFee
       }
-      if (fFee > 0) {
-        totalFixedFees += fFee
-        fixedFeeLines.push({ method, fee: fFee })
-      }
-      totalInterest += entryFixedInterest
     }
 
-    // Merchant absorbs installment cost only when installmentFeeBearer is merchant
-    if (!isCustomerInstallmentBearer) {
+    // Fixed fee (custo fixo do método) - custo cobrado pelo gateway
+    if (fFee > 0) {
+      totalFixedFees += fFee
+      fixedFeeLines.push({ method: method || "pagamento", fee: fFee })
+      if (isCustomerBearer) {
+        totalRepassedFixedFees += fFee
+      }
+    }
+
+    // Juros
+    if (entryFixedInterest > 0) {
+      totalInterest += entryFixedInterest
+      if (isCustomerBearer) {
+        totalRepassedInterest += entryFixedInterest
+      }
+    }
+    if (entryInstallmentCost > 0) {
       totalInterest += entryInstallmentCost
+      if (isCustomerInstallmentBearer) {
+        totalRepassedInterest += entryInstallmentCost
+      }
     }
   }
 
   // Use breakdown values when available, fallback to stored columns when no breakdown
+  const storedMethodExtra = Math.max(0, Number(order.payment_method_extra_amount || 0))
   const finalMethodDiscount = hasBreakdown
     ? totalBreakdownMethodDiscount
     : storedMethodDiscount
@@ -168,15 +192,18 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const mergedInterest = hasBreakdown ? totalInterest : storedMethodInterest
 
   if (mergedFee > 0 && feeLines.length === 0) {
-    feeLines.push({ method: "pagamento", fee: mergedFee })
+    feeLines.push({ method: String(order.payment_method || "pagamento"), fee: mergedFee })
   }
   if (mergedFixedFee > 0 && fixedFeeLines.length === 0) {
-    fixedFeeLines.push({ method: "pagamento", fee: mergedFixedFee })
+    fixedFeeLines.push({ method: String(order.payment_method || "pagamento"), fee: mergedFixedFee })
   }
 
   totalPercentageFees = mergedFee
   totalFixedFees = mergedFixedFee
   totalInterest = mergedInterest
+  if (!hasBreakdown && storedMethodExtra > 0) {
+    totalRepassedFees = storedMethodExtra
+  }
 
   // ── Delivery subsidy ──
   const deliveryBreakdownObj: any = order.delivery_breakdown || {}
@@ -198,7 +225,17 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   if (productsValue > 0) revenueLines.push({ label: "Valor dos produtos", value: productsValue })
   if (servicesValue > 0) revenueLines.push({ label: "Valor dos serviços", value: servicesValue })
   if (deliveryFee > 0 && deliveryPayer === "customer") revenueLines.push({ label: "Entrega", value: deliveryFee })
-  const totalRevenue = round2(productsValue + servicesValue + (deliveryPayer === "customer" ? deliveryFee : 0))
+  if (totalRepassedFees > 0) revenueLines.push({ label: "Taxa do método repassada", value: totalRepassedFees })
+  if (totalRepassedFixedFees > 0) revenueLines.push({ label: "Custo do método repassado", value: totalRepassedFixedFees })
+  if (totalRepassedInterest > 0) revenueLines.push({ label: "Juros repassados", value: totalRepassedInterest })
+  const totalRevenue = round2(
+    productsValue +
+    servicesValue +
+    (deliveryPayer === "customer" ? deliveryFee : 0) +
+    totalRepassedFees +
+    totalRepassedFixedFees +
+    totalRepassedInterest,
+  )
 
   // ── Build discounts section ──
   const discountLines: FinancialBreakdownLine[] = []
@@ -218,7 +255,7 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   }
   for (const f of fixedFeeLines) {
     const displayName = f.method.charAt(0).toUpperCase() + f.method.slice(1)
-    costLines.push({ label: `Custo fixo (${displayName})`, value: -f.fee })
+    costLines.push({ label: `Custo do método (${displayName})`, value: -f.fee })
   }
   if (totalInterest > 0) costLines.push({ label: "Juros", value: -totalInterest })
   if (deliverySubsidy > 0) costLines.push({ label: "Subsídio da entrega", value: -deliverySubsidy })
@@ -231,14 +268,11 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
   const netMargin = totalRevenue > 0 ? round2((netProfit / totalRevenue) * 100) : 0
 
   return {
-    success: true as const,
-    data: {
-      revenue: { label: "Receita", lines: revenueLines, total: totalRevenue },
-      discounts: { label: "Descontos", lines: discountLines, total: totalDiscounts },
-      costs: { label: "Custos", lines: costLines, total: totalCosts },
-      totalDeductions,
-      netProfit,
-      netMargin,
-    } satisfies FinancialBreakdownData,
+    revenue: { label: "Receita", lines: revenueLines, total: totalRevenue },
+    discounts: { label: "Descontos", lines: discountLines, total: totalDiscounts },
+    costs: { label: "Custos", lines: costLines, total: totalCosts },
+    totalDeductions,
+    netProfit,
+    netMargin,
   }
 }

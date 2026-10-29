@@ -1107,6 +1107,17 @@ export async function fulfillMarketplaceOrder(
     return { success: false, error: "Pedido não encontrado." }
   }
 
+  const isMarketplace =
+    isMarketplaceOrderSource(order.order_source) ||
+    Boolean((order.checkout_fulfillment as any)?.lines?.length) ||
+    Boolean((order.checkout_fulfillment as any)?.depositCheckout)
+
+  // Pedidos que não pertencem ao marketplace (ex.: pedidos manuais do ERP, vendas de balcão)
+  // não devem ser processados pelo fulfillment do marketplace nem ter agendamentos criados automaticamente.
+  if (!isMarketplace) {
+    return { success: true, skipped: true }
+  }
+
   const idempotencyKey = `fulfill:order:${orderId}`
 
   const { data: existingFulfillment } = await supabase
@@ -1136,8 +1147,13 @@ export async function fulfillMarketplaceOrder(
   // erased `lines`, so a paid order can arrive here without booking metadata
   // even though its `order_items` still describe the service. Rebuild the
   // booking group (flagged for reschedule) instead of silently skipping it.
+  // NEVER run this fallback for non-deposit orders or manual orders.
   let existingOrderAppointmentIds: string[] = []
-  if (paymentConfirmed && serviceGroups.length === 0) {
+  const isDepositCheckoutWithoutLines =
+    Boolean((order.checkout_fulfillment as any)?.depositCheckout) &&
+    !(payload?.lines || []).length
+
+  if (isMarketplace && paymentConfirmed && serviceGroups.length === 0 && isDepositCheckoutWithoutLines) {
     const { data: orderAppointments } = await supabase
       .from("appointments")
       .select("id")
@@ -1159,7 +1175,7 @@ export async function fulfillMarketplaceOrder(
 
   const expectedGroups = serviceGroups.length + existingOrderAppointmentIds.length
 
-  const isMarketplace = isMarketplaceOrderSource(order.order_source)
+
 
   if (existingFulfillment?.status === "completed") {
     const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []

@@ -32,6 +32,17 @@ de verão). O job do SuperFrete é o único fora de UTC: ele foi criado manualme
 em `America/Sao_Paulo`, mas a cadência de 15 min não muda nada. Se quiser
 padronizar, edite o fuso para `UTC` e mantenha os minutos `0, 15, 30, 45`.
 
+### Expiração de pedidos tem um único agendador
+
+`Dudit - Expirar pedidos` no cron-job.org é o único agendador da expiração
+automática. A rota `/api/cron/expire-orders` aplica as regras do Mercado Pago e
+também cuida dos efeitos relacionados ao cancelamento, como liberação de
+estoque, etiquetas, sincronizações e auditoria. O job antigo de `pg_cron`
+(`dudit-expire-orders-every-minute`) foi removido porque alterava o pedido
+diretamente no banco e concorria com essa rota, sem executar todos esses efeitos.
+Os demais jobs de manutenção e limpeza do banco continuam no `pg_cron`; eles
+não substituem nem duplicam os jobs HTTP deste inventário.
+
 ### O que **não** está agendado (de propósito)
 
 | Rota | Motivo |

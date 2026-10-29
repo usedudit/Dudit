@@ -169,6 +169,7 @@ function normalizePlan(item: any) {
 }
 
 const cityCoordsCache = new Map<string, { lat: number; lng: number } | null>()
+const cityCoordsInflight = new Map<string, Promise<{ lat: number; lng: number } | null>>()
 
 const normalizePlaceValue = (value: string | null | undefined) =>
     (value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
@@ -246,6 +247,8 @@ export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ l
     if (cityCoordsCache.has(cidadeSlug)) {
         return cityCoordsCache.get(cidadeSlug) || null
     }
+    const inflight = cityCoordsInflight.get(cidadeSlug)
+    if (inflight) return inflight
 
     const parts = cidadeSlug.split("-")
     const state = parts.pop()?.toUpperCase() || ""
@@ -256,31 +259,40 @@ export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ l
         return null
     }
 
-    const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
-    const dbCity = resolved?.city
-    const dbState = resolved?.state || state
+    const promise = (async () => {
+        try {
+            const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
+            const dbCity = resolved?.city
+            const dbState = resolved?.state || state
 
-    if (!dbCity) {
-        cityCoordsCache.set(cidadeSlug, null)
-        return null
-    }
+            if (!dbCity) {
+                cityCoordsCache.set(cidadeSlug, null)
+                return null
+            }
 
-    const supabase = getAdminClient()
-    const { data, error } = await supabase
-        .from("addresses")
-        .select("latitude, longitude")
-        .ilike("city", dbCity)
-        .eq("state", dbState)
-        .not("latitude", "is", null)
-        .limit(1)
+            const supabase = getAdminClient()
+            const { data, error } = await supabase
+                .from("addresses")
+                .select("latitude, longitude")
+                .ilike("city", dbCity)
+                .eq("state", dbState)
+                .not("latitude", "is", null)
+                .limit(1)
 
-    if (error || !data || data.length === 0) {
-        cityCoordsCache.set(cidadeSlug, null)
-        return null
-    }
-    const result = { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
-    cityCoordsCache.set(cidadeSlug, result)
-    return result
+            if (error || !data || data.length === 0) {
+                cityCoordsCache.set(cidadeSlug, null)
+                return null
+            }
+            const result = { lat: Number(data[0].latitude), lng: Number(data[0].longitude) }
+            cityCoordsCache.set(cidadeSlug, result)
+            return result
+        } finally {
+            cityCoordsInflight.delete(cidadeSlug)
+        }
+    })()
+
+    cityCoordsInflight.set(cidadeSlug, promise)
+    return promise
 }
 
 /**

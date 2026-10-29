@@ -2125,7 +2125,7 @@ const PaymentModal = ({
         };
     }, [view, splitPreview, paymentCalculation]);
 
-    const displayTransactionTotal = paymentStatus === "success" && successSnapshot
+    const displayTransactionTotal = (paymentStatus === "success" || paymentStatus === "processing") && successSnapshot
         ? successSnapshot.displayOrderTotal
         : view === 'split'
             ? (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : chargeTarget)
@@ -2235,8 +2235,16 @@ const PaymentModal = ({
 
     const handlePaymentApproved = useCallback((orderNumber?: string) => {
         const paidNow = existingPaidAmount + chargeTarget;
-        const isUnder = paidNow < fullOrderTotal - 0.005;
-        const remainingPartial = Math.max(0, fullOrderTotal - paidNow);
+        const pricingDiscount = Number(currentPricingTotals.paymentMethodDiscountAmount || 0);
+        const isMerchantFee = (currentPricingTotals.feeBearer || "merchant") === "merchant";
+        const isMerchantInstallment = (currentPricingTotals.installmentFeeBearer || "merchant") === "merchant";
+        const pricingCustomerFee = !isMerchantFee ? (Number(currentPricingTotals.feeAmount || 0) + Number(currentPricingTotals.fixedFeeAmount || 0)) : 0;
+        const pricingCustomerInterest = (!isMerchantFee ? Math.max(0, Number(currentPricingTotals.interestAmount || 0) - Number(currentPricingTotals.installmentCostAmount || 0)) : 0)
+            + (!isMerchantInstallment ? Number(currentPricingTotals.installmentCostAmount || 0) : 0);
+        const expectedFinalOrderTotal = Math.max(0, fullOrderTotal - pricingDiscount + pricingCustomerFee + pricingCustomerInterest);
+
+        const isUnder = paidNow < expectedFinalOrderTotal - 0.005;
+        const remainingPartial = Math.max(0, expectedFinalOrderTotal - paidNow);
         const snapshotBreakdown = [
             { method: mpStep === "pix" ? "Pix (Mercado Pago)" : "Boleto (Mercado Pago)", amount: chargeTarget }
         ];
@@ -2247,8 +2255,8 @@ const PaymentModal = ({
             shippingFee: Number(shippingFee || 0),
             otherCosts: Number(otherCosts || 0),
             discountAmount: Number(discountAmount || 0),
-            total,
-            displayOrderTotal: fullOrderTotal,
+            total: expectedFinalOrderTotal,
+            displayOrderTotal: expectedFinalOrderTotal,
             totalPaid: paidNow,
             change: 0,
             isUnderpaid: isUnder,
@@ -2917,10 +2925,22 @@ const PaymentModal = ({
             : (view === 'money' && wantsChange
                 ? Math.max(payWithAmount, totalPaidCalculated)
                 : (payloadPaidAmount > 0.009 ? payloadPaidAmount : totalPaidCalculated));
+        const pricingDiscount = Number(currentPricingTotals.paymentMethodDiscountAmount || 0);
+        const isMerchantFee = (currentPricingTotals.feeBearer || "merchant") === "merchant";
+        const isMerchantInstallment = (currentPricingTotals.installmentFeeBearer || "merchant") === "merchant";
+        const pricingCustomerFee = !isMerchantFee ? (Number(currentPricingTotals.feeAmount || 0) + Number(currentPricingTotals.fixedFeeAmount || 0)) : 0;
+        const pricingCustomerInterest = (!isMerchantFee ? Math.max(0, Number(currentPricingTotals.interestAmount || 0) - Number(currentPricingTotals.installmentCostAmount || 0)) : 0)
+            + (!isMerchantInstallment ? Number(currentPricingTotals.installmentCostAmount || 0) : 0);
+        const expectedFinalOrderTotal = view === 'split'
+            ? existingPaidAmount + (splitPreview && 'success' in splitPreview && splitPreview.success ? splitPreview.finalTotal : chargeTarget)
+            : (view === 'money' || view === 'card' || view === 'pix' || view === 'store_credit')
+                ? existingPaidAmount + finalTotalWithMethodPricing
+                : Math.max(0, fullOrderTotal - pricingDiscount + pricingCustomerFee + pricingCustomerInterest);
+
         const snapshotIsUnderpaid = isPendingPayment
-            ? (fullOrderTotal > existingPaidAmount + 0.005)
-            : (Math.min(snapshotTotalPaid, fullOrderTotal) < fullOrderTotal - 0.005);
-        const snapshotRemainingPartial = Math.max(0, fullOrderTotal - Math.min(snapshotTotalPaid, fullOrderTotal));
+            ? (expectedFinalOrderTotal > existingPaidAmount + 0.005)
+            : (Math.min(snapshotTotalPaid, expectedFinalOrderTotal) < expectedFinalOrderTotal - 0.005);
+        const snapshotRemainingPartial = Math.max(0, expectedFinalOrderTotal - Math.min(snapshotTotalPaid, expectedFinalOrderTotal));
         const snapshotChange = isPendingPayment ? 0 : (view === 'money' && wantsChange ? Math.max(0, payWithAmount - paymentBaseAmount) : changeAmount);
 
         setSuccessSnapshot({
@@ -2929,8 +2949,8 @@ const PaymentModal = ({
             shippingFee: Number(shippingFee || 0),
             otherCosts: Number(otherCosts || 0),
             discountAmount: Number(discountAmount || 0),
-            total,
-            displayOrderTotal: fullOrderTotal,
+            total: expectedFinalOrderTotal,
+            displayOrderTotal: expectedFinalOrderTotal,
             totalPaid: snapshotTotalPaid,
             change: snapshotChange,
             isUnderpaid: snapshotIsUnderpaid,

@@ -1210,7 +1210,14 @@ export default function TransactionsPage({
             setFinanceAccountId(mpDefaults.accountId)
             setMpPaymentLocked(true)
         } else {
-            const initialMethod = transaction.paymentMethodId || (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+            // When paymentMethodId is a UUID (sales/integrated installments),
+            // resolve it to a standard label so the dropdown displays correctly.
+            const matchedMethod = transaction.paymentMethodId && sanitizeUUID(transaction.paymentMethodId as string) !== null
+                ? getMatchedPaymentMethod(transaction.paymentMethodId as string)
+                : null
+            const initialMethod = matchedMethod
+                ? (resolveStandardPaymentMethod(matchedMethod.name) || matchedMethod.name || "Pix")
+                : (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
             setPaymentMethodId(initialMethod)
 
             const matched = getMatchedPaymentMethod(initialMethod)
@@ -1307,7 +1314,7 @@ export default function TransactionsPage({
                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                     interestAmount: "0",
                     discountAmount: "0",
-                    paymentMethodId: row.paymentMethodId || resolveStandardPaymentMethod(row.paymentType) || "Pix",
+                    paymentMethodId: resolveStandardPaymentMethod(row.paymentType) || row.paymentMethodId || "Pix",
                 }
             }
             setSettlePaymentsByInstallment(nextState)
@@ -1410,7 +1417,14 @@ export default function TransactionsPage({
                 setFinanceAccountId(mpDefaults.accountId)
                 setMpPaymentLocked(true)
             } else {
-                const initialMethod = row.paymentMethodId || (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
+                // When paymentMethodId is a UUID (sales/integrated installments),
+                // resolve it to a standard label so the dropdown displays correctly.
+                const matchedMethod = row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null
+                    ? getMatchedPaymentMethod(row.paymentMethodId)
+                    : null
+                const initialMethod = matchedMethod
+                    ? (resolveStandardPaymentMethod(matchedMethod.name) || matchedMethod.name || "Pix")
+                    : (row.paymentType && row.paymentType !== "Não informado" ? row.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
                 setPaymentMethodId(initialMethod)
                 const matched = getMatchedPaymentMethod(initialMethod)
                 if (matched?.default_finance_account_id) {
@@ -2052,6 +2066,7 @@ export default function TransactionsPage({
                                                                                 }))}
                                                                                 options={STANDARD_PAYMENT_METHODS}
                                                                                 placeholder="Selecione"
+                                                                                disabled={Boolean(row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null)}
                                                                             />
                                                                         </td>
                                                                         <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
@@ -2158,6 +2173,7 @@ export default function TransactionsPage({
                                                                         }))}
                                                                         options={STANDARD_PAYMENT_METHODS}
                                                                         placeholder="Selecione"
+                                                                        disabled={Boolean(row.paymentMethodId && sanitizeUUID(row.paymentMethodId) !== null)}
                                                                     />
                                                                     <MoneyInput
                                                                         label="Juros"
