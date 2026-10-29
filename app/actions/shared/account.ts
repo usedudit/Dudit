@@ -74,12 +74,14 @@ export async function requestAccountDeletionCodeAction(
 
       const { data: activeSub } = await admin
         .from("subscriptions")
-        .select("id, status")
+        .select("id, status, cancel_at_period_end")
         .eq("partner_id", partner.id)
         .in("status", ["active", "trialing", "past_due"])
         .maybeSingle()
 
-      if (activeSub) {
+      // A subscription already scheduled to cancel at period end is leaving;
+      // it shouldn't block account deletion.
+      if (activeSub && !activeSub.cancel_at_period_end) {
         return { error: "active_subscription" }
       }
     }

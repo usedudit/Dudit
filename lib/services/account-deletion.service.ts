@@ -92,15 +92,18 @@ export class AccountDeletionService {
         return { success: false, error: "Somente o proprietário principal (OWNER) da conta pode realizar a exclusão." }
       }
 
-      // 1.2. Mercado Pago check: block deletion if has active platform subscription
+      // 1.2. Mercado Pago check: block deletion only if there's a subscription
+      // that is still actively billing. A subscription scheduled to cancel at
+      // period end (cancel_at_period_end=true) has already been told to leave,
+      // so it doesn't block account deletion.
       const { data: activeSub } = await admin
         .from("subscriptions")
-        .select("id, status")
+        .select("id, status, cancel_at_period_end")
         .eq("partner_id", partner.id)
         .in("status", ["active", "trialing", "past_due"])
         .maybeSingle()
 
-      if (activeSub) {
+      if (activeSub && !activeSub.cancel_at_period_end) {
         return { success: false, error: "active_subscription" }
       }
     }
