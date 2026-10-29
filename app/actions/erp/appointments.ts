@@ -28,6 +28,7 @@ import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { resolveAppointmentCustomerIds } from "@/lib/erp/appointment-customer-resolution"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -149,42 +150,6 @@ function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?
     marketplace_order_id: input.orderId || input.marketplaceOrderId || null,
     order_item_id: input.orderItemId || null,
   }
-}
-
-/**
- * Appointments reference customers(id). Marketplace orders, however, carry the
- * buyer's auth user id in `buyer_id`, which is not a customers.id. Resolve the
- * real customer id so the insert never fails on the customer FK.
- */
-async function resolveAppointmentCustomerId(
-  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
-  partnerId: string,
-  rawCustomerId?: string | null,
-): Promise<string | null> {
-  const candidate = String(rawCustomerId || "").trim()
-  if (!candidate) return null
-
-  // Only UUIDs can be customer ids; this also keeps the PostgREST filter safe.
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)
-  if (!isUuid) return null
-
-  const { data: direct } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("id", candidate)
-    .eq("partner_id", partnerId)
-    .maybeSingle()
-  if (direct?.id) return direct.id as string
-
-  // `buyer_id` may be the marketplace user id (auth.users.id).
-  const { data: byUser } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .or(`user_id.eq.${candidate},marketplace_user_id.eq.${candidate}`)
-    .limit(1)
-    .maybeSingle()
-  return (byUser?.id as string) || null
 }
 
 async function getPartnerContextWithPermission(permission: "view" | "create" | "edit" | "delete") {
@@ -769,28 +734,32 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
     const { user, partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("create")
     const supabase = await getSupabaseServerClient()
-    const rows = await Promise.all(
-      payload.map(async (item) => {
-        const row = toDbPayload(item, partnerId, contextStoreId)
-
-        // Never trust the client-provided customer id: marketplace orders send
-        // the buyer's auth user id, which is not a customers.id and would make
-        // the insert fail with a foreign key violation.
-        row.customer_id = await resolveAppointmentCustomerId(supabase, partnerId, row.customer_id)
-
-        if (!row.customer_id && row.marketplace_order_id) {
-          const { data: linkedOrder } = await supabase
-            .from("orders")
-            .select("customer_id")
-            .eq("id", row.marketplace_order_id)
-            .eq("partner_id", partnerId)
-            .maybeSingle()
-          row.customer_id = (linkedOrder?.customer_id as string | null) || null
-        }
-
-        return row
-      }),
+    const rows = payload.map((item) => toDbPayload(item, partnerId, contextStoreId))
+    const customerIds = await resolveAppointmentCustomerIds(
+      supabase,
+      partnerId,
+      rows.map((row) => row.customer_id),
     )
+
+    // Orders are also resolved in one partner-scoped read instead of one read
+    // per appointment. The value is only a fallback when no customer matched.
+    const fallbackOrderIds = Array.from(new Set(rows
+      .filter((row) => !customerIds.get(String(row.customer_id || "").trim()) && row.marketplace_order_id)
+      .map((row) => row.marketplace_order_id as string)))
+    const { data: fallbackOrders } = fallbackOrderIds.length > 0
+      ? await supabase.from("orders").select("id, customer_id").eq("partner_id", partnerId).in("id", fallbackOrderIds)
+      : { data: [] as Array<{ id: string; customer_id: string | null }> }
+    const customerIdByOrderId = new Map((fallbackOrders || []).map((order) => [String(order.id), order.customer_id as string | null]))
+
+    for (const row of rows) {
+      const rawCustomerId = String(row.customer_id || "").trim()
+      // Never trust a client-provided customer ID: marketplace orders may pass
+      // an auth user ID, which must be resolved to this partner's customer row.
+      row.customer_id = customerIds.get(rawCustomerId) || null
+      if (!row.customer_id && row.marketplace_order_id) {
+        row.customer_id = customerIdByOrderId.get(row.marketplace_order_id) || null
+      }
+    }
 
     // -- Idempotency guard for order_item_id --
     if (rows[0] && rows[0].order_item_id) {
@@ -849,6 +818,34 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
     const createdRows = data || []
 
+    // Fetch linked item/order state once per unique ID. These are reads only;
+    // order creation, appointment updates, stock work, and financial work below
+    // remain sequential so their existing dependency and partial-failure order
+    // is preserved.
+    const linkedOrderIds = new Set<string>()
+    const orderItemIdsToResolve = new Set<string>()
+    for (let i = 0; i < createdRows.length; i++) {
+      const row = createdRows[i]
+      const linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || (payload[i] as any)?.marketplaceOrderId
+      const orderItemId = row.order_item_id || payload[i]?.orderItemId || (payload[i] as any)?.order_item_id
+      if (linkedOrderId) linkedOrderIds.add(String(linkedOrderId))
+      else if (orderItemId) orderItemIdsToResolve.add(String(orderItemId))
+    }
+    const linkedOrderItemsResult = orderItemIdsToResolve.size > 0
+      ? await supabase.from("order_items").select("id, order_id").in("id", Array.from(orderItemIdsToResolve))
+      : { data: [] as Array<{ id: string; order_id: string | null }> }
+    const orderIdByOrderItemId = new Map((linkedOrderItemsResult.data || []).map((item) => [String(item.id), item.order_id as string | null]))
+    for (const orderId of orderIdByOrderItemId.values()) {
+      if (orderId) linkedOrderIds.add(orderId)
+    }
+    const linkedOrdersResult = linkedOrderIds.size > 0
+      ? await supabase
+        .from("orders")
+        .select("id, situation")
+        .in("id", Array.from(linkedOrderIds))
+      : { data: [] as Array<{ id: string; situation: string | null }> }
+    const situationByOrderId = new Map((linkedOrdersResult.data || []).map((order) => [String(order.id), order.situation as string | null]))
+
     // -- Post-insert processing (optimized: skip unnecessary work, batch where safe) --
     // Receivable sync is only needed for appointments with price > 0
     // Unavailable slots (price=0) never need receivables
@@ -859,29 +856,16 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       let linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || (payload[i] as any)?.marketplaceOrderId
       const orderItemId = row.order_item_id || payload[i]?.orderItemId || (payload[i] as any)?.order_item_id
 
-      if (!linkedOrderId && orderItemId) {
-        const { data: orderItem } = await supabase
-          .from("order_items")
-          .select("order_id")
-          .eq("id", orderItemId)
-          .maybeSingle()
-        if (orderItem?.order_id) {
-          linkedOrderId = orderItem.order_id
-        }
-      }
+      if (!linkedOrderId && orderItemId) linkedOrderId = orderIdByOrderItemId.get(String(orderItemId)) || null
 
       if (linkedOrderId) {
         // Appointment is linked to an existing order (ERP/POS service sale)
         // Skip creating a new order and skip creating new receivables!
-        const { data: existingOrder } = await supabase
-          .from("orders")
-          .select("id, situation")
-          .eq("id", linkedOrderId)
-          .maybeSingle()
+        const existingOrderSituation = situationByOrderId.get(String(linkedOrderId))
 
-        const targetPaymentStatus = existingOrder?.situation === "paid"
+        const targetPaymentStatus = existingOrderSituation === "paid"
           ? "paid"
-          : (existingOrder?.situation === "partially_paid" ? "partially_paid" : "unpaid")
+          : (existingOrderSituation === "partially_paid" ? "partially_paid" : "unpaid")
 
         await supabase
           .from("appointments")

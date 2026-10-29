@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountDeletionService } from "./account-deletion.service"
 import { ForbiddenError } from "@/lib/auth/authorization"
 
@@ -68,12 +68,19 @@ vi.mock("@/lib/redis", () => ({
   }
 }))
 
+vi.mock("@trigger.dev/sdk/v3", () => ({
+  tasks: { trigger: vi.fn().mockResolvedValue({ id: "trigger-run-test" }) },
+}))
+
 describe("Account Deletion E2E Integration Suite", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv("TRIGGER_SECRET_KEY", "test-trigger-secret")
     mockSingle.mockReset()
     mockMaybeSingle.mockReset()
   })
+
+  afterEach(() => vi.unstubAllEnvs())
 
   // 1. COMPLETE CYCLE & STATE TRANSITIONS
   it("E2E Scenario: Full deletion cycle and linear state transitions", async () => {

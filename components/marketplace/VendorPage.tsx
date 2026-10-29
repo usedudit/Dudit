@@ -2194,13 +2194,15 @@ function GalleryTab({ gallery = [] }: GalleryTabProps) {
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {gallery.map((img, idx) => {
-                        const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img)
+                        const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img, "medium")
                         return (
                             <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray dark:bg-dark-border/30">
                                 <img
                                     src={srcUrl}
                                     alt={`Galeria ${idx + 1}`}
                                     className="w-full h-full object-cover cursor-pointer"
+                                    loading="lazy"
+                                    decoding="async"
                                     onClick={() => openLightbox(idx)}
                                 />
                             </div>

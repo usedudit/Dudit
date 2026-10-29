@@ -7,6 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { can } from "@/lib/permissions/can"
 import type { RoleId } from "@/lib/permissions/rbac-types"
+import { ALL_ROLES, canModifyUser, canUserInviteRole } from "@/lib/permissions/partner-roles"
 import { unstable_cache } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
@@ -405,6 +406,17 @@ export async function updateTeamMemberRole(
             return { success: false, error: "Acesso negado." }
         }
 
+        // Server Actions are directly callable, so enforce the role hierarchy
+        // here instead of relying on the role choices hidden by the UI.
+        const actorRole = String(access.roleId || "").toUpperCase() as PartnerRole
+        const requestedRole = String(newRole || "").toUpperCase()
+        if (!ALL_ROLES.includes(requestedRole as PartnerRole)) {
+            return { success: false, error: "Cargo inválido." }
+        }
+        if (!canUserInviteRole(actorRole, requestedRole as PartnerRole)) {
+            return { success: false, error: "Você não pode atribuir esse cargo." }
+        }
+
         // Get target member
         const { data: targetRecord } = await admin
             .from("partner_users")
@@ -418,12 +430,12 @@ export async function updateTeamMemberRole(
         }
 
         const targetRoleId = String(targetRecord.role_id || "delivery").toLowerCase() as RoleId
-        if (targetRoleId === "owner" && access.roleId !== "owner") {
+        if (!canModifyUser(actorRole, targetRoleId.toUpperCase() as PartnerRole)) {
             return { success: false, error: "O proprietário da loja não pode ser alterado." }
         }
 
-        const newRoleIdLower = String(newRole || "").toLowerCase()
-        const newRoleUpper = String(newRole || "").toUpperCase()
+        const newRoleIdLower = requestedRole.toLowerCase()
+        const newRoleUpper = requestedRole
 
         // Update partner_users
         const { error } = await admin

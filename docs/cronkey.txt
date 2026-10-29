@@ -1,1 +1,0 @@
-Cadastrar o cron no cron-job.org: GET https://SEU_DOMINIO/api/cron/superfrete-reconcile, header Authorization: Bearer $CRON_SECRET, agenda */15 * * * *.

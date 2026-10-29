@@ -39,6 +39,20 @@ export const resolveEffectivePermissions = cache(async (
 
     const supabase = createAdminClient()
 
+    // A store ID is not authorized by the caller's partner ID alone. Resolve
+    // the relationship from the database before using any store_members row;
+    // otherwise a crafted (partnerId, storeId) pair could cross tenant bounds.
+    if (storeId) {
+        const { data: store } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("id", storeId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+
+        if (!store) return null
+    }
+
     // 0. Check if user is partner owner (bypass partner_users table)
     const { data: ownerPartner } = await supabase
         .from("partners")

@@ -277,7 +277,13 @@ export async function revalidatePartnerStatus() {
  * - Role do usuário muda
  */
 export async function revalidateUserAccess(userId: string) {
-    await safeRevalidateTag(TAGS.userAccess(userId))
+    try {
+        // Authorization data must not use stale-while-revalidate after a role
+        // change or membership revocation. Wait for a fresh access record.
+        revalidateTag(TAGS.userAccess(userId), { expire: 0 })
+    } catch {
+        // Match the other revalidation helpers' resilience during render paths.
+    }
 }
 
 /**

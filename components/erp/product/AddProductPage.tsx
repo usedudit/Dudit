@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import dynamic from "next/dynamic"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
@@ -33,7 +34,6 @@ import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import NcmSelectionModal from "./NcmSelectionModal"
-import ImageAnalysisModal from "./ImageAnalysisModal"
 import { ProductGeneralTab } from "./ProductGeneralTab"
 import { ProductVariationsTab } from "./ProductVariationsTab"
 import { ProductSuppliersTab } from "./ProductSuppliersTab"
@@ -41,6 +41,10 @@ import { ProductMarketplaceTab } from "./ProductMarketplaceTab"
 import { ProductMetricsTab } from "./ProductMetricsTab"
 import { getStoreFulfillmentCapabilitiesAction } from "@/app/actions/shared/delivery"
 import { DEFAULT_STORE_FULFILLMENT_CAPABILITIES, type StoreFulfillmentCapabilities } from "@/lib/commerce/capabilities"
+
+const ImageAnalysisModal = dynamic(() => import("./ImageAnalysisModal"), {
+    loading: () => null,
+})
 
 const NUMERIC_FIELDS = new Set([
     "price", "costPrice", "stock", "minStock", "maxStock", "promotional_price",
@@ -1389,12 +1393,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     onSelect={handleNcmSelect}
                     isLoading={isLoadingNcmSuggestion}
                 />
-                <ImageAnalysisModal
-                    isOpen={isImageAnalysisModalOpen}
-                    onClose={() => setIsImageAnalysisModalOpen(false)}
-                    onAnalyze={handleAnalyzeImages}
-                    isLoading={isAnalyzingImage}
-                />
+                {isImageAnalysisModalOpen && (
+                    <ImageAnalysisModal
+                        isOpen
+                        onClose={() => setIsImageAnalysisModalOpen(false)}
+                        onAnalyze={handleAnalyzeImages}
+                        isLoading={isAnalyzingImage}
+                    />
+                )}
                 <DefaultModal
                     isOpen={metadataModal.isOpen}
                     onClose={() => setMetadataModal(prev => ({ ...prev, isOpen: false }))}

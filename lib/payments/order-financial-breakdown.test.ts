@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { calculateOrderFinancialBreakdown } from "@/app/actions/erp/order-financial-breakdown"
+import { calculateOrderFinancialBreakdown } from "@/lib/payments/order-financial-breakdown"
 
 describe("calculateOrderFinancialBreakdown", () => {
   it("order with repassed credit card fees and absorbed installment interest", () => {

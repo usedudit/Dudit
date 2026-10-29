@@ -3,10 +3,13 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { requireUser, requireStorePermission, requirePartnerAccess } from "@/lib/auth/authorization"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
+import { ALL_ROLES, canModifyUser, canUserInviteRole } from "@/lib/permissions/partner-roles"
+import type { PartnerRole } from "@/lib/permissions/types"
 
 interface StoreMemberRow {
     id: string
@@ -44,6 +47,38 @@ export async function addStoreMemberAction(
         if (!can(access as RbacUserLike, "settings.settings_team")) {
             return { success: false, error: "Apenas Proprietários e Administradores podem adicionar membros." }
         }
+        const actorRole = String(access.roleId || "").toUpperCase() as PartnerRole
+
+        const admin = getAdminClient()
+        const [{ data: target }, { data: store }] = await Promise.all([
+            admin
+                .from("partner_users")
+                .select("id, role_id")
+                .eq("id", partnerUserId)
+                .eq("partner_id", partnerId)
+                .maybeSingle(),
+            admin
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .eq("partner_id", partnerId)
+                .maybeSingle(),
+        ])
+
+        if (!target || !store) {
+            return { success: false, error: "Membro ou loja não pertence a este parceiro." }
+        }
+
+        const targetRole = String(target.role_id || "delivery").toUpperCase() as PartnerRole
+        const assignedRole = String(role || target.role_id || "delivery").toUpperCase() as PartnerRole
+        if (!canModifyUser(actorRole, targetRole) ||
+            !ALL_ROLES.includes(assignedRole) ||
+            !canUserInviteRole(actorRole, assignedRole)) {
+            return { success: false, error: "Você não pode atribuir esse cargo a este membro." }
+        }
+        if (permissions != null && actorRole !== "OWNER" && actorRole !== "ADMIN") {
+            return { success: false, error: "Somente proprietários e administradores podem personalizar permissões." }
+        }
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase
@@ -78,8 +113,52 @@ export async function updateStoreMemberAction(
     permissions?: unknown | null
 ): Promise<ActionResponse<void>> {
     try {
-        await requireUser()
+        const user = await requireUser()
         await requireStorePermission(storeId, partnerId, "stores", "manage_members")
+        const actor = await requirePartnerAccess(partnerId, user)
+        const actorRole = String(actor.roleId || "").toUpperCase() as PartnerRole
+
+        const admin = getAdminClient()
+        const [{ data: targetMembership }, { data: store }] = await Promise.all([
+            admin
+                .from("store_members")
+                .select("partner_user_id, store_id")
+                .eq("id", memberId)
+                .eq("store_id", storeId)
+                .maybeSingle(),
+            admin
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .eq("partner_id", partnerId)
+                .maybeSingle(),
+        ])
+
+        if (!targetMembership || !store) {
+            return { success: false, error: "Membro ou loja não pertence a este parceiro." }
+        }
+
+        const { data: target } = await admin
+            .from("partner_users")
+            .select("id, role_id")
+            .eq("id", targetMembership.partner_user_id)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+
+        if (!target) {
+            return { success: false, error: "Membro ou loja não pertence a este parceiro." }
+        }
+
+        const targetRole = String(target.role_id || "delivery").toUpperCase() as PartnerRole
+        const assignedRole = String(role || target.role_id || "delivery").toUpperCase() as PartnerRole
+        if (!canModifyUser(actorRole, targetRole) ||
+            !ALL_ROLES.includes(assignedRole) ||
+            !canUserInviteRole(actorRole, assignedRole)) {
+            return { success: false, error: "Você não pode atribuir esse cargo a este membro." }
+        }
+        if (permissions != null && actorRole !== "OWNER" && actorRole !== "ADMIN") {
+            return { success: false, error: "Somente proprietários e administradores podem personalizar permissões." }
+        }
 
         const supabase = await getSupabaseServerClient()
         const updateData: Record<string, unknown> = {}
@@ -116,11 +195,33 @@ export async function removeStoreMemberAction(
         await requireUser()
         await requireStorePermission(storeId, partnerId, "stores", "manage_members")
 
+        const admin = getAdminClient()
+        const { data: membership } = await admin
+            .from("store_members")
+            .select("partner_user_id")
+            .eq("id", memberId)
+            .eq("store_id", storeId)
+            .maybeSingle()
+        if (!membership) {
+            return { success: false, error: "Membro não encontrado nesta loja." }
+        }
+
+        const { data: target } = await admin
+            .from("partner_users")
+            .select("id")
+            .eq("id", membership.partner_user_id)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!target) {
+            return { success: false, error: "Membro não pertence a este parceiro." }
+        }
+
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase
             .from("store_members")
             .delete()
             .eq("id", memberId)
+            .eq("store_id", storeId)
 
         if (error) throw new Error(error.message)
 
@@ -141,7 +242,21 @@ export async function listUserStoresAction(
     partnerUserId: string,
     partnerId: string
 ): Promise<{ id: string; store_id: string; role: string | null }[]> {
-    await requireUser()
+    const user = await requireUser()
+    const access = await requirePartnerAccess(partnerId, user)
+    if (!can(access as RbacUserLike, "settings.settings_team")) {
+        throw new Error("Acesso negado")
+    }
+
+    const admin = getAdminClient()
+    const { data: target } = await admin
+        .from("partner_users")
+        .select("id")
+        .eq("id", partnerUserId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+    if (!target) throw new Error("Membro não pertence a este parceiro")
+
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
         .from("store_members")
@@ -164,6 +279,37 @@ export async function saveMemberStoreAccessAction(params: {
         const access = await requirePartnerAccess(partnerId, user)
         if (!can(access as RbacUserLike, "settings.settings_team")) {
             return { success: false, error: "Apenas Proprietários e Administradores podem alterar os acessos às lojas dos membros." }
+        }
+
+        const admin = getAdminClient()
+        const [{ data: target }, stores] = await Promise.all([
+            admin
+                .from("partner_users")
+                .select("id, role_id")
+                .eq("id", partnerUserId)
+                .eq("partner_id", partnerId)
+                .maybeSingle(),
+            storeAccesses.length > 0
+                ? admin
+                    .from("stores")
+                    .select("id")
+                    .eq("partner_id", partnerId)
+                    .in("id", [...new Set(storeAccesses.map((item) => item.storeId))])
+                : Promise.resolve({ data: [] as Array<{ id: string }> }),
+        ])
+
+        if (!target || (stores.data || []).length !== new Set(storeAccesses.map((item) => item.storeId)).size) {
+            return { success: false, error: "Membro ou loja não pertence a este parceiro." }
+        }
+
+        const actorRole = String(access.roleId || "").toUpperCase() as PartnerRole
+        const targetRole = String(target.role_id || "delivery").toUpperCase() as PartnerRole
+        if (!canModifyUser(actorRole, targetRole) ||
+            storeAccesses.some(({ role }) => {
+                const assignedRole = String(role || "").toUpperCase() as PartnerRole
+                return !ALL_ROLES.includes(assignedRole) || !canUserInviteRole(actorRole, assignedRole)
+            })) {
+            return { success: false, error: "Você não pode atribuir esses cargos a este membro." }
         }
 
         const supabase = await getSupabaseServerClient()

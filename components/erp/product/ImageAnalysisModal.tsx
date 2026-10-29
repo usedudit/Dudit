@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Button, Spinner } from "@/components/reusable"
 import { UploadIcon, SparklesIcon, XIcon, ImageIcon } from "@/lib/icons"
@@ -30,6 +30,11 @@ export const ImageAnalysisModal: React.FC<Props> = ({
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const [previewUrls, setPreviewUrls] = useState<string[]>([])
+    const previewUrlsRef = useRef<string[]>([])
+
+    useEffect(() => () => {
+        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    }, [])
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || [])
@@ -61,6 +66,7 @@ export const ImageAnalysisModal: React.FC<Props> = ({
         validFiles.slice(0, remainingSlots).forEach((file) => {
             newUrls.push(URL.createObjectURL(file))
         })
+        previewUrlsRef.current = newUrls
         setPreviewUrls(newUrls)
 
         if (fileInputRef.current) {
@@ -76,6 +82,7 @@ export const ImageAnalysisModal: React.FC<Props> = ({
         newFiles.splice(index, 1)
         newUrls.splice(index, 1)
 
+        previewUrlsRef.current = newUrls
         setSelectedFiles(newFiles)
         setPreviewUrls(newUrls)
     }
@@ -124,7 +131,8 @@ export const ImageAnalysisModal: React.FC<Props> = ({
 
     const handleClose = () => {
         // Limpar URLs de preview
-        previewUrls.forEach((url) => URL.revokeObjectURL(url))
+        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+        previewUrlsRef.current = []
         setPreviewUrls([])
         setSelectedFiles([])
         onClose()

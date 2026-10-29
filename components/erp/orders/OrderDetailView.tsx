@@ -60,7 +60,7 @@ import BottomSheet from "@/components/BottomSheet";
 import DefaultModal from "@/components/reusable/DefaultModal";
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal";
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown";
-import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown";
+import type { FinancialBreakdownData } from "@/lib/payments/order-financial-breakdown";
 import {
   hasReceivedMpPayment,
   getOrderDepositSummary,
