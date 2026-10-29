@@ -265,7 +265,7 @@ export function ServiceDetailsPageClient({
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
         const isShowcaseActive = (store?.is_showcase_active ?? p?.is_showcase_active ?? true) !== false
         const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p?.accept_orders_when_closed ?? true) !== false
-        const timezone = store?.timezone || p?.timezone || "America/Sao_Paulo"
+        const timezone = store?.timezone || "America/Sao_Paulo"
 
         const rawOrderFlow = p?.order_flow
         const orderFlow = (rawOrderFlow === "whatsapp" || rawOrderFlow === "dudit")

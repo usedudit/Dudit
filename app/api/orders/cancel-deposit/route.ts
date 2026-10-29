@@ -118,6 +118,8 @@ export async function POST(request: NextRequest) {
             source: "erp",
         })
 
+        const { revalidateOrderHistory } = await import("@/lib/utils/revalidation");
+        await revalidateOrderHistory(orderId);
         revalidatePath(`/order/${order.order_number}`);
         revalidatePath("/erp/pedidos");
         return NextResponse.json({ success: true }, { status: 200 });

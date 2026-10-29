@@ -1126,6 +1126,34 @@ async function processWebhookWithRetry(
         }
       }
 
+      // Log audit event for deposit approved via webhook (partially_paid)
+      if (orderStatus === "partially_paid" && previousSituation !== "partially_paid") {
+        try {
+          const { logAuditEvent } = await import("@/lib/services/timeline.service")
+          await logAuditEvent({
+            partnerId,
+            actorUserId: null,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "deposit_paid",
+            changeLines: [
+              "confirmou o recebimento do sinal via Mercado Pago.",
+              `Sinal: R$ ${Number(paymentInfo.transaction_amount || 0).toFixed(2)}`,
+            ],
+            source: "system",
+            metadata: {
+              oldStatus: previousSituation,
+              newStatus: "Parcialmente Pago",
+              mpPaymentStatus: paymentInfo.status,
+            },
+          })
+          const { revalidateOrderHistory } = await import("@/lib/utils/revalidation")
+          await revalidateOrderHistory(orderId)
+        } catch (auditErr: any) {
+          console.error("[WEBHOOK] Error logging deposit_paid audit event:", auditErr.message)
+        }
+      }
+
       // Log audit event for payment approved via webhook
       if (orderStatus === "paid" && previousSituation !== "paid") {
         try {
@@ -1147,6 +1175,8 @@ async function processWebhookWithRetry(
               mpPaymentStatus: paymentInfo.status,
             },
           })
+          const { revalidateOrderHistory } = await import("@/lib/utils/revalidation")
+          await revalidateOrderHistory(orderId)
         } catch (auditErr: any) {
           console.error("[WEBHOOK] Error logging payment audit event:", auditErr.message)
         }

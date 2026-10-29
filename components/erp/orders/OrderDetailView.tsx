@@ -810,13 +810,6 @@ export default function OrderDetailView({
   const detailedInterestAmount = breakdownTotals.customerInterest;
   const detailedFeeAmount = breakdownTotals.customerFee;
   const detailedFixedFeeAmount = breakdownTotals.customerFixedFee;
-  const absorbedInterestAmount = breakdownTotals.merchantInterest;
-  const absorbedFeeAmount = breakdownTotals.merchantFee;
-  const absorbedFixedFeeAmount = breakdownTotals.merchantFixedFee;
-  const hasAbsorbedCosts =
-    absorbedInterestAmount > 0.009 ||
-    absorbedFeeAmount > 0.009 ||
-    absorbedFixedFeeAmount > 0.009;
   const subtotalValue =
     Number(order.subtotal_value || 0) > 0
       ? Number(order.subtotal_value || 0)
@@ -2142,56 +2135,7 @@ export default function OrderDetailView({
                                     }
                                   />
                                 )}
-                              {hasAbsorbedCosts && (
-                                <PaymentRow
-                                  label="Taxas Absorvidas"
-                                  value={
-                                    <span className="text-brand-green font-bold text-sm">
-                                      -{" "}
-                                      {formatCurrency(
-                                        absorbedInterestAmount +
-                                        absorbedFeeAmount +
-                                        absorbedFixedFeeAmount,
-                                      )}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {hasAbsorbedCosts &&
-                                absorbedInterestAmount > 0.009 && (
-                                  <PaymentRow
-                                    label="Juros Absorvido"
-                                    value={
-                                      <span className="text-brand-green font-bold text-sm">
-                                        -{" "}
-                                        {formatCurrency(absorbedInterestAmount)}
-                                      </span>
-                                    }
-                                  />
-                                )}
-                              {hasAbsorbedCosts &&
-                                absorbedFeeAmount > 0.009 && (
-                                  <PaymentRow
-                                    label="Taxa Absorvida"
-                                    value={
-                                      <span className="text-brand-green font-bold text-sm">
-                                        - {formatCurrency(absorbedFeeAmount)}
-                                      </span>
-                                    }
-                                  />
-                                )}
-                              {hasAbsorbedCosts &&
-                                absorbedFixedFeeAmount > 0.009 && (
-                                  <PaymentRow
-                                    label="Custo Fixo Absorvido"
-                                    value={
-                                      <span className="text-brand-green font-bold text-sm">
-                                        -{" "}
-                                        {formatCurrency(absorbedFixedFeeAmount)}
-                                      </span>
-                                    }
-                                  />
-                                )}
+
                               {changeAmount > 0.009 && (
                                 <PaymentRow
                                   label="Troco"
@@ -3140,53 +3084,7 @@ export default function OrderDetailView({
                                   }
                                 />
                               )}
-                            {hasAbsorbedCosts && (
-                              <PaymentRow
-                                label="Taxas Absorvidas"
-                                value={
-                                  <span className="text-brand-green font-bold text-sm">
-                                    -{" "}
-                                    {formatCurrency(
-                                      absorbedInterestAmount +
-                                      absorbedFeeAmount +
-                                      absorbedFixedFeeAmount,
-                                    )}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {hasAbsorbedCosts &&
-                              absorbedInterestAmount > 0.009 && (
-                                <PaymentRow
-                                  label="Juros Absorvido"
-                                  value={
-                                    <span className="text-brand-green font-bold text-sm">
-                                      - {formatCurrency(absorbedInterestAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                            {hasAbsorbedCosts && absorbedFeeAmount > 0.009 && (
-                              <PaymentRow
-                                label="Taxa Absorvida"
-                                value={
-                                  <span className="text-brand-green font-bold text-sm">
-                                    - {formatCurrency(absorbedFeeAmount)}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {hasAbsorbedCosts &&
-                              absorbedFixedFeeAmount > 0.009 && (
-                                <PaymentRow
-                                  label="Custo Fixo Absorvido"
-                                  value={
-                                    <span className="text-brand-green font-bold text-sm">
-                                      - {formatCurrency(absorbedFixedFeeAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
+
                             {changeAmount > 0.009 && (
                               <PaymentRow
                                 label="Troco"

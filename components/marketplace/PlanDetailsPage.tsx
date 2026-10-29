@@ -125,7 +125,7 @@ export function PlanDetailsPageClient({
         const storeName = store?.name || p?.name || p?.storeName || "Vendedor da Dudit"
         const isShowcaseActive = (store?.is_showcase_active ?? p.is_showcase_active ?? plan.is_showcase_active ?? true) !== false
         const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p.accept_orders_when_closed ?? plan.accept_orders_when_closed ?? true) !== false
-        const timezone = store?.timezone || p.timezone || plan.timezone || "America/Sao_Paulo"
+        const timezone = store?.timezone || plan.timezone || "America/Sao_Paulo"
 
         return {
             isShowcaseActive,

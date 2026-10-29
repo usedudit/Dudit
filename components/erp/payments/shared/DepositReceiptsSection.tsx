@@ -1,4 +1,3 @@
-import React from "react"
 import { Badge, Button } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"

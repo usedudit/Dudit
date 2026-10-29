@@ -3101,7 +3101,7 @@ export async function getTransactionDetailsAction(
                     .maybeSingle(),
                 supabase
                     .from("transactions")
-                    .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type")
+                    .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type, payment_method_id")
                     .eq("partner_id", partnerId)
                     .eq("installment_group_id", row.installment_group_id)
                     .order("installment_number", { ascending: true }),
@@ -3109,13 +3109,14 @@ export async function getTransactionDetailsAction(
             if (igGroup && igGroup.total_amount != null) {
                 installmentGroupTotalAmount = Math.abs(Number(igGroup.total_amount) || 0) || null
             }
+            const groupTxIds = (groupRows || []).map((g: any) => String(g.id))
             const paymentByTx = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
             let paymentRows: any[] = []
             const res = await supabase
                 .from("transaction_payments")
                 .select("transaction_id, amount, base_amount, interest_amount, discount_amount, payment_method_id")
                 .eq("partner_id", partnerId)
-                .eq("transaction_id", row.id)
+                .in("transaction_id", groupTxIds.length > 0 ? groupTxIds : [row.id])
             paymentRows = res.data || []
             for (const p of paymentRows) {
                 const tid = String((p as any).transaction_id || "")
@@ -3159,11 +3160,9 @@ export async function getTransactionDetailsAction(
 
             currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
-            // Show ONLY the current parcel (the selected transaction). Other installments
-            // in the group are listed on the Transactions page, not in this detail view.
-            const currentGroupRow = (groupRows || []).find((g: any) => String(g.id) === String(row.id))
-            const groupRowsAll = currentGroupRow
-                ? [currentGroupRow]
+            // Show ALL parcelas da transação (installment group) in the detail view.
+            const groupRowsAll = (groupRows || []).length > 0
+                ? groupRows
                 : [{
                     id: row.id,
                     installment_number: row.installment_number,
@@ -3173,6 +3172,7 @@ export async function getTransactionDetailsAction(
                     original_amount: row.original_amount,
                     amount: row.amount,
                     payment_type: row.payment_type,
+                    payment_method_id: row.payment_method_id,
                 }]
             installmentBreakdown = (groupRowsAll as any[]).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))

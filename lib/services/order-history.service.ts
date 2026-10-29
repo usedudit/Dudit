@@ -146,6 +146,29 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
       )
     }
 
+    // Format deposit events for human readability in ERP & Marketplace
+    if (entry.entry_type === "deposit_cancelled") {
+      actorName = "Sinal cancelado"
+      changeLines = changeLines.map(line =>
+        line.startsWith("cancelou") ? "O sinal do pedido foi cancelado pelo vendedor." : line
+      )
+    } else if (entry.entry_type === "deposit_created") {
+      actorName = "Cobrança de sinal gerada"
+      changeLines = changeLines.map(line =>
+        line.startsWith("gerou") ? "Nova cobrança de sinal gerada via Mercado Pago." : line
+      )
+    } else if (entry.entry_type === "deposit_paid") {
+      actorName = "Sinal pago"
+      changeLines = changeLines.map(line =>
+        line.startsWith("confirmou") ? "Recebimento do sinal confirmado." : line
+      )
+    } else if (entry.entry_type === "deposit_expired") {
+      actorName = "Sinal expirado"
+      changeLines = changeLines.map(line =>
+        line.startsWith("expirou") ? "O prazo para pagamento do sinal expirou." : line
+      )
+    }
+
     // Rewrite return status changes for ERP view
     if (entry.entry_type && entry.entry_type.startsWith("return_") && entry.entry_type !== "return_created") {
       changeLines = changeLines.map(line => {

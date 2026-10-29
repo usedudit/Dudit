@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { computePaymentLine, computePaymentBreakdown, deriveAdjustmentType } from "./financial-engine"
-import type { PaymentMethodFeeConfig } from "./calculation"
+import { calculatePaymentAmounts, type PaymentMethodFeeConfig } from "./calculation"
 
 const discountPix: PaymentMethodFeeConfig = {
   feePercent: 0,
@@ -319,5 +319,70 @@ describe("computePaymentBreakdown - split payments", () => {
     })
     expect(r.totalEffectiveAmount).toBe(54.4)
     expect(r.remainingBalance).toBe(0) // clamped to 0
+  })
+})
+
+describe("credit card with customer fees and merchant-absorbed installment cost", () => {
+  const cardConfig: PaymentMethodFeeConfig = {
+    feePercent: 0.79,
+    feeFixed: 0.19,
+    feeBearer: "customer",
+    installmentFeeBearer: "merchant",
+    discountPercent: 2,
+    maxInstallments: 6,
+    installmentFees: [
+      { installmentNumber: 2, feePercent: 2 },
+    ],
+  }
+
+  it("1x installment: 0% interest, discount 2%, fee repassed to customer (0 absorbed)", () => {
+    const calc = calculatePaymentAmounts({
+      originalAmount: 1.50,
+      paymentMethod: cardConfig,
+      installmentNumber: 1,
+    })
+
+    expect(calc.paymentMethodDiscountAmount).toBe(0.03)
+    expect(calc.feeAmount).toBe(0.01)
+    expect(calc.fixedFeeAmount).toBe(0.19)
+    expect(calc.interestAmount).toBe(0)
+    expect(calc.installmentCostAmount).toBe(0)
+    expect(calc.finalAmount).toBe(1.67)
+
+    // Absorbed costs calculation
+    const isMerchantFee = cardConfig.feeBearer === "merchant"
+    const isMerchantInstallment = cardConfig.installmentFeeBearer === "merchant"
+    const fixedInterest = Math.max(0, calc.interestAmount - (calc.installmentCostAmount || 0))
+    const absorbedInterest = isMerchantFee ? fixedInterest : 0
+    const absorbedFee = isMerchantFee ? (calc.feeAmount + calc.fixedFeeAmount) : 0
+    const absorbedInstallmentCost = isMerchantInstallment ? (calc.installmentCostAmount || 0) : 0
+    const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost
+
+    expect(totalAbsorbed).toBe(0)
+  })
+
+  it("2x installment: 2% installment interest absorbed by merchant (0.03 absorbed)", () => {
+    const calc = calculatePaymentAmounts({
+      originalAmount: 1.50,
+      paymentMethod: cardConfig,
+      installmentNumber: 2,
+    })
+
+    expect(calc.paymentMethodDiscountAmount).toBe(0.03)
+    expect(calc.feeAmount).toBe(0.01)
+    expect(calc.fixedFeeAmount).toBe(0.19)
+    expect(calc.installmentCostAmount).toBe(0.03)
+    expect(calc.finalAmount).toBe(1.67)
+
+    // Absorbed costs calculation
+    const isMerchantFee = cardConfig.feeBearer === "merchant"
+    const isMerchantInstallment = cardConfig.installmentFeeBearer === "merchant"
+    const fixedInterest = Math.max(0, calc.interestAmount - (calc.installmentCostAmount || 0))
+    const absorbedInterest = isMerchantFee ? fixedInterest : 0
+    const absorbedFee = isMerchantFee ? (calc.feeAmount + calc.fixedFeeAmount) : 0
+    const absorbedInstallmentCost = isMerchantInstallment ? (calc.installmentCostAmount || 0) : 0
+    const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost
+
+    expect(totalAbsorbed).toBe(0.03)
   })
 })

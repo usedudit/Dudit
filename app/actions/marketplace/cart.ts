@@ -348,7 +348,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
           ? partnerStore.accept_orders_when_closed
           : true)
       const openingHours = store?.opening_hours || partnerStore?.opening_hours || partner?.opening_hours || null
-      const timezone = store?.timezone || partnerStore?.timezone || partner?.timezone || "America/Sao_Paulo"
+      const timezone = store?.timezone || partnerStore?.timezone || "America/Sao_Paulo"
       const isStoreCurrentlyOpen = isStoreOpen(openingHours, new Date(), timezone)
       const isAcceptingOrders = isShowcaseActive && (acceptOrdersWhenClosed || isStoreCurrentlyOpen)
 

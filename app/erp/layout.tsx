@@ -37,7 +37,6 @@ import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { resolveEffectivePermissions } from "@/lib/store-members"
 import { OfflineBanner } from "@/components/pwa/OfflineBanner"
-import { SubscriptionStatusBanner } from "@/components/erp/SubscriptionStatusBanner"
 import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
@@ -260,12 +259,14 @@ export default async function ERPLayout({
                     <ERPSidebar />
                     <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
                       <OfflineBanner variant="erp" />
-                      <ERPHeader userProfile={userProfile} />
-                      <SubscriptionStatusBanner
-                        status={subscriptionBanner?.status ?? null}
-                        graceDaysLeft={graceDaysLeft}
-                        planName={subscriptionBanner?.plan_name ?? partnerPlan.name ?? null}
-                        trialEnd={subscriptionBanner?.trial_end ?? null}
+                      <ERPHeader
+                        userProfile={userProfile}
+                        subscription={{
+                          status: subscriptionBanner?.status ?? null,
+                          graceDaysLeft,
+                          planName: subscriptionBanner?.plan_name ?? partnerPlan.name ?? null,
+                          trialEnd: subscriptionBanner?.trial_end ?? null,
+                        }}
                       />
                       <ERPResourceGuard>
                         {children}

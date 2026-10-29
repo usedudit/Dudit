@@ -3638,13 +3638,12 @@ export function CheckoutPageClient() {
                                         />
                                     )}
                                     {!mpAvailable && !storefrontMethods.length ? (
-                                        <div className="flex items-center gap-3 py-2">
-                                            <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                            <div>
-                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
-                                            </div>
-                                        </div>
+                                        <ListItem
+                                            icon={MoneyIcon}
+                                            title="A combinar"
+                                            description="O pagamento será combinado diretamente com o vendedor."
+                                            className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                        />
                                     ) : mpAvailable && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierCheckoutEngaged) ? (
                                         <>
                                             <div className="space-y-1 mb-4">
@@ -4159,13 +4158,12 @@ export function CheckoutPageClient() {
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
                                     {!mpAvailable && !storefrontMethods.length ? (
-                                        <div className="flex items-center gap-3 py-2">
-                                            <MoneyIcon className="w-12 h-12 p-2.5 rounded-xl bg-brand-slate dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                            <div>
-                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">O pagamento será combinado diretamente com o vendedor.</p>
-                                            </div>
-                                        </div>
+                                        <ListItem
+                                            icon={MoneyIcon}
+                                            title="A combinar"
+                                            description="O pagamento será combinado diretamente com o vendedor."
+                                            className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                        />
                                     ) : mpAvailable && (checkoutContext?.partner.orderFlow !== "whatsapp" || carrierCheckoutEngaged) ? (
                                         <div className="space-y-1">
                                             <ListItem

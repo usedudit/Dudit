@@ -115,6 +115,7 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
     rawPartner.city = addr?.city || rawStore.city || rawPartner.addresses?.[0]?.city || null
     rawPartner.state = addr?.state || rawStore.state || rawPartner.addresses?.[0]?.state || null
     rawPartner.opening_hours = rawStore.opening_hours || rawPartner.opening_hours
+    rawPartner.timezone = rawStore.timezone || rawPartner.timezone || "America/Sao_Paulo"
     rawPartner.latitude = addr?.latitude || rawPartner.latitude
     rawPartner.longitude = addr?.longitude || rawPartner.longitude
     // Recursos do sistema são definidos no parceiro; a loja não os sobrescreve.

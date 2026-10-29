@@ -123,9 +123,9 @@ export async function getOrderFinancialBreakdownAction(orderId: string, partnerI
     const isCustomerBearer = bearer === "customer" || bearer === "buyer"
     const adjType = String(entry.adjustmentType || "").toLowerCase().trim()
 
-    // Payment method discount applies ONLY if merchant absorbs it (not customer-repassed fee/interest)
+    // Payment method discount applies to order total
     const pmDiscount = Math.max(0, Number(entry.paymentMethodDiscountAmount || 0))
-    if (pmDiscount > 0 && !isCustomerBearer && (adjType === "discount" || adjType === "" || adjType === "none")) {
+    if (pmDiscount > 0 && (adjType === "discount" || adjType === "" || adjType === "none")) {
       totalBreakdownMethodDiscount += pmDiscount
     }
 

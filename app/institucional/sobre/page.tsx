@@ -52,7 +52,7 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                     <div className="relative z-10 w-full max-w-[460px]">
                         <img
                             src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                            alt="Dino Dudit Sobre Nós"
+                            alt="Sobre Nós"
                             className="w-full h-auto object-contain"
                         />
                     </div>

@@ -112,6 +112,8 @@ type ServiceGroup = {
   services: GroupedService[]
   totalPrice: number
   totalDuration: number
+  /** True when the time was inferred (booking metadata was lost) and must be rescheduled. */
+  needsReschedule?: boolean
 }
 
 /**
@@ -507,6 +509,7 @@ async function createGroupedBookingFromMetadata(
     bufferMinutes: 0,
     storeId: params.group.services[0]?.storeId || null,
   })
+  const needsReschedule = Boolean(params.group.needsReschedule) || !slotOk
 
   const endTime = computeEndTime(params.group.time, params.group.totalDuration)
   const combinedServiceName = params.group.services.map((s) => s.serviceName).join(", ")
@@ -522,7 +525,7 @@ async function createGroupedBookingFromMetadata(
     .maybeSingle()
 
   if (existing?.id) {
-    const needsReschedule = Boolean(existing.needs_reschedule)
+    const needsReschedule = Boolean(existing.needs_reschedule) || Boolean(params.group.needsReschedule)
     const remaining = Math.max(0, params.group.totalPrice - params.paidAmount)
     const receivableId = await syncAppointmentReceivable({
       supabase,
@@ -600,10 +603,10 @@ async function createGroupedBookingFromMetadata(
       sales_channel: STOREFRONT_CHANNEL,
       fulfillment_mode:
         params.group.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
-      needs_reschedule: !slotOk,
+      needs_reschedule: needsReschedule,
       pricing_unit: "Por Serviço",
       notes: params.group.services[0]?.notes || null,
-      status: !slotOk
+      status: needsReschedule
         ? "Reservado"
         : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
           ? "Confirmado"
@@ -635,7 +638,7 @@ async function createGroupedBookingFromMetadata(
           appointmentId,
           partnerId: params.partnerId,
           oldStatus: null,
-          newStatus: !slotOk
+          newStatus: needsReschedule
             ? "Reservado"
             : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
               ? "Confirmado"
@@ -923,6 +926,167 @@ async function linkMpPreapproval(
   }
 }
 
+async function resolveFallbackStaff(
+  supabase: SupabaseClient,
+  partnerId: string,
+  storeId: string | null,
+  preferredPartnerUserId?: string | null,
+): Promise<{ id: string; name: string } | null> {
+  const { data: activeUsers } = await supabase
+    .from("partner_users")
+    .select("id, user_id, role_id, role, is_active, created_at")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+
+  const users = (activeUsers || []) as Array<{
+    id: string
+    user_id?: string | null
+    role_id?: string | null
+    role?: string | null
+  }>
+  if (users.length === 0) return null
+
+  let chosen = preferredPartnerUserId
+    ? users.find((u) => u.id === preferredPartnerUserId)
+    : undefined
+
+  if (!chosen && storeId) {
+    const { data: members } = await supabase
+      .from("store_members")
+      .select("partner_user_id")
+      .eq("store_id", storeId)
+    const memberIds = new Set((members || []).map((m: any) => m.partner_user_id))
+    chosen = users.find((u) => memberIds.has(u.id))
+  }
+
+  if (!chosen) {
+    chosen =
+      users.find((u) => u.role_id === "owner") ||
+      users.find((u) => u.role?.toLowerCase() === "owner") ||
+      users[0]
+  }
+
+  let name = "Equipe"
+  if (chosen?.user_id) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("full_name")
+      .eq("user_id", chosen.user_id)
+      .maybeSingle()
+    if (profile?.full_name) name = profile.full_name
+  }
+
+  return { id: chosen.id, name }
+}
+
+/**
+ * Rebuilds a booking group from `order_items` when
+ * `checkout_fulfillment.lines` was lost (older deposit writes replaced the whole
+ * column). The original date/time/staff cannot be recovered, so the group is
+ * flagged `needsReschedule` and gets a placeholder slot on the order day.
+ */
+async function reconstructServiceGroupsFromOrderItems(
+  supabase: SupabaseClient,
+  order: {
+    id: string
+    partner_id: string
+    store_id?: string | null
+    seller_partner_user_id?: string | null
+    created_at?: string | null
+  },
+): Promise<ServiceGroup[]> {
+  const { data: items, error } = await supabase
+    .from("order_items")
+    .select("id, product_id, product_name, product_price, quantity, subtotal, line_type, service_id, fulfillment_mode")
+    .eq("order_id", order.id)
+
+  if (error) {
+    console.error("[fulfillment] could not load order_items for fallback booking:", error)
+    return []
+  }
+
+  const serviceItems = (items || []).filter(
+    (item: any) =>
+      item.line_type === "service_booking" ||
+      (!item.product_id && item.service_id),
+  )
+  if (serviceItems.length === 0) return []
+
+  const serviceIds = Array.from(
+    new Set(serviceItems.map((item: any) => item.service_id).filter(Boolean)),
+  ) as string[]
+
+  const servicesById = new Map<string, any>()
+  if (serviceIds.length > 0) {
+    const { data: services } = await supabase
+      .from("services")
+      .select("id, name, duration_minutes, store_id")
+      .eq("partner_id", order.partner_id)
+      .in("id", serviceIds)
+    for (const service of services || []) servicesById.set(service.id, service)
+  }
+
+  const storeId =
+    order.store_id ||
+    Array.from(servicesById.values()).find((service) => service?.store_id)?.store_id ||
+    null
+
+  const staff = await resolveFallbackStaff(
+    supabase,
+    order.partner_id,
+    storeId,
+    order.seller_partner_user_id || null,
+  )
+  if (!staff) {
+    console.error("[fulfillment] fallback booking skipped: no staff found for partner", order.partner_id)
+    return []
+  }
+
+  const createdAt = order.created_at ? new Date(order.created_at) : new Date()
+  const validCreatedAt = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt
+  const date = validCreatedAt.toISOString().slice(0, 10)
+  const time = "09:00"
+
+  const groupedServices: GroupedService[] = serviceItems.map((item: any) => {
+    const service = item.service_id ? servicesById.get(item.service_id) : null
+    const quantity = Math.max(1, Number(item.quantity || 1))
+    const unitPrice = Number(item.product_price || 0)
+    const duration = Math.max(1, Number(service?.duration_minutes || 30))
+    return {
+      serviceName: service?.name || item.product_name || "Serviço",
+      serviceId: item.service_id || null,
+      fullPrice: Number(item.subtotal ?? unitPrice * quantity) || unitPrice * quantity,
+      durationMinutes: duration * quantity,
+      notes: null,
+      storeId: service?.store_id || storeId || undefined,
+      unitPrice,
+      quantity,
+    }
+  })
+
+  const totalPrice = groupedServices.reduce((sum, service) => sum + service.fullPrice, 0)
+  const totalDuration = groupedServices.reduce((sum, service) => sum + service.durationMinutes, 0)
+
+  return [
+    {
+      key: `fallback|${staff.id}|${date}|${time}`,
+      staffId: staff.id,
+      staffName: staff.name,
+      date,
+      time,
+      fulfillmentMode:
+        (serviceItems[0] as any)?.fulfillment_mode === "customer_location"
+          ? "customer_location"
+          : "on_site",
+      services: groupedServices,
+      totalPrice,
+      totalDuration,
+      needsReschedule: true,
+    },
+  ]
+}
+
 export async function fulfillMarketplaceOrder(
   supabase: SupabaseClient,
   orderId: string,
@@ -933,7 +1097,8 @@ export async function fulfillMarketplaceOrder(
     .select(`
       id, partner_id, buyer_id, store_id, situation, customer_id, checkout_fulfillment,
       order_source, finance_account_id, customer_name, delivery_type, delivery_address, payment_method,
-      paid_amount, amount_paid, total_amount, delivery_fee, delivery_breakdown
+      paid_amount, amount_paid, total_amount, delivery_fee, delivery_breakdown,
+      seller_partner_user_id, created_at
     `)
     .eq("id", orderId)
     .single()
@@ -959,8 +1124,7 @@ export async function fulfillMarketplaceOrder(
       !line.bookingMetadata.instantPurchase &&
       line.bookingMetadata.staffId,
   )
-  const serviceGroups = groupServiceBookingLines(serviceBookingLines)
-  const expectedGroups = serviceGroups.length
+  let serviceGroups = groupServiceBookingLines(serviceBookingLines)
 
   const paymentConfirmed = isPaymentConfirmedForFulfillment(order)
   const orderPaidAmount = getOrderPaidAmount(order)
@@ -968,12 +1132,39 @@ export async function fulfillMarketplaceOrder(
   const orderFullyPaid =
     orderTotalAmount > 0.005 && orderPaidAmount >= orderTotalAmount - 0.005
 
+  // Older deposit writes replaced the whole `checkout_fulfillment` column and
+  // erased `lines`, so a paid order can arrive here without booking metadata
+  // even though its `order_items` still describe the service. Rebuild the
+  // booking group (flagged for reschedule) instead of silently skipping it.
+  let existingOrderAppointmentIds: string[] = []
+  if (paymentConfirmed && serviceGroups.length === 0) {
+    const { data: orderAppointments } = await supabase
+      .from("appointments")
+      .select("id")
+      .eq("marketplace_order_id", orderId)
+      .eq("partner_id", order.partner_id)
+
+    if (orderAppointments && orderAppointments.length > 0) {
+      existingOrderAppointmentIds = orderAppointments.map((appointment: any) => appointment.id as string)
+    } else {
+      serviceGroups = await reconstructServiceGroupsFromOrderItems(supabase, {
+        id: orderId,
+        partner_id: order.partner_id,
+        store_id: order.store_id,
+        seller_partner_user_id: (order as any).seller_partner_user_id,
+        created_at: (order as any).created_at,
+      })
+    }
+  }
+
+  const expectedGroups = serviceGroups.length + existingOrderAppointmentIds.length
+
   const isMarketplace = isMarketplaceOrderSource(order.order_source)
 
   if (existingFulfillment?.status === "completed") {
     const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
     if (paymentConfirmed) {
-      if (appointmentIds.length >= expectedGroups && payload?.lines) {
+      if (appointmentIds.length >= expectedGroups && serviceGroups.length > 0) {
         for (const group of serviceGroups) {
           const { paidAmount: groupPaidAmount, paymentStatus: groupPaymentStatus } = resolveGroupPayment({
             paymentConfirmed,
@@ -987,7 +1178,8 @@ export async function fulfillMarketplaceOrder(
             .update({
               paid_amount: groupPaidAmount,
               payment_status: groupPaymentStatus,
-              status: "Confirmado",
+              needs_reschedule: Boolean(group.needsReschedule),
+              status: group.needsReschedule ? "Reservado" : "Confirmado",
             })
             .eq("marketplace_order_id", orderId)
             .eq("staff_partner_user_id", group.staffId)
@@ -1037,7 +1229,7 @@ export async function fulfillMarketplaceOrder(
     return { success: false, error: "Pedido ainda não está pago." }
   }
 
-  if (!payload?.lines?.length) {
+  if (!payload?.lines?.length && serviceGroups.length === 0 && existingOrderAppointmentIds.length === 0) {
     if (isMarketplace && paymentConfirmed) {
       await onMarketplaceOrderPaid(supabase, orderId)
     }
@@ -1090,7 +1282,7 @@ export async function fulfillMarketplaceOrder(
   }
 
   const result: CheckoutFulfillmentResult = {
-    appointmentIds: [],
+    appointmentIds: [...existingOrderAppointmentIds],
     subscriptionIds: [],
     executionIds: [],
   }
@@ -1126,12 +1318,18 @@ export async function fulfillMarketplaceOrder(
       })
     )
 
-    const hasProductLines = payload.lines.some(
+    const hasProductLines = (payload?.lines || []).some(
       (line) => (line.itemType as string) === "product" || (line.itemType as string) === "variant",
     )
-    const isMixedOrder = hasProductLines && serviceBookingLines.length > 0
+    const isMixedOrder = hasProductLines && serviceGroups.length > 0
 
     for (const { group, bookingResult } of bookingResults) {
+      // Always record the created appointment (including reschedule-pending ones)
+      // so `checkout_fulfillments` can be marked completed and stays idempotent.
+      if (bookingResult.appointmentId) {
+        result.appointmentIds!.push(bookingResult.appointmentId)
+      }
+
       if (bookingResult.needsReschedule) {
         result.rescheduleRequired = result.rescheduleRequired || []
         for (const svc of group.services) {
@@ -1142,8 +1340,6 @@ export async function fulfillMarketplaceOrder(
           })
         }
       } else if (bookingResult.appointmentId) {
-        result.appointmentIds!.push(bookingResult.appointmentId)
-
         if (order.payment_method === "Assinatura (Créditos)" || order.payment_method === "subscription_credits") {
           const { data: customer } = await supabase
             .from("customers")
@@ -1209,7 +1405,7 @@ export async function fulfillMarketplaceOrder(
       }
     }
 
-    const subscriptionLines = payload.lines.filter(
+    const subscriptionLines = (payload?.lines || []).filter(
       (line) => line.itemType === "subscription" && line.recurringPlanId
     )
     for (const line of subscriptionLines) {
@@ -1224,7 +1420,7 @@ export async function fulfillMarketplaceOrder(
         recurringPlanId: line.recurringPlanId!,
         orderId,
         deliveryType: subDeliveryType,
-        deliveryAddress: order.delivery_address || payload.deliveryAddress,
+        deliveryAddress: order.delivery_address || payload?.deliveryAddress,
         financeAccountId: order.finance_account_id,
         deliveryFee: order.delivery_fee ?? 0,
         deliveryBreakdown: (order.delivery_breakdown as Record<string, unknown> | null) ?? null,

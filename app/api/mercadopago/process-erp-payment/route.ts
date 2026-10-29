@@ -13,6 +13,7 @@ import {
 } from "@/lib/services/payments/mercadopago-integration"
 import { createMercadoPagoPayment } from "@/lib/mercadopago/payment-client"
 import { verifyPaymentQuote } from "@/lib/mercadopago/payment-quote"
+import { mergeCheckoutFulfillment } from "@/lib/payments/order-financial-state"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -360,21 +361,105 @@ async function handler(request: NextRequest) {
 
     // If this is a deposit charge against an existing order, persist deposit metadata
     if (body.isDepositCharge && orderId && body.depositMeta) {
-      const { buildDepositCheckoutMeta } = await import("@/lib/services/marketplace-checkout-amounts")
-      const depositCheckout = body.depositMeta
+      const depositCheckout = body.depositMeta as Record<string, any>
+      // Never replace the whole column: `checkout_fulfillment.lines` carries the
+      // booking date/time/staff used later to create the appointment.
+      const { data: currentOrder } = await adminClient
+        .from("orders")
+        .select("order_number, checkout_fulfillment, partner_id")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+      const currentFulfillment = (currentOrder?.checkout_fulfillment as Record<string, any>) || {}
+      const existingHistory = Array.isArray(currentFulfillment.depositCheckoutHistory)
+        ? currentFulfillment.depositCheckoutHistory
+        : []
+
+      const depositAmount = Number(
+        depositCheckout.initialChargeAmount ||
+        depositCheckout.depositAmount ||
+        depositCheckout.serviceDepositAmount ||
+        body.amount ||
+        0
+      )
+
+      const createdAt = new Date().toISOString()
+      const updatedDepositCheckout = {
+        ...depositCheckout,
+        depositStatus: "pending",
+        sinalPaid: false,
+        createdAt,
+        mpPaymentId: mpPaymentId.toString(),
+      }
+
+      const mergedFulfillment = mergeCheckoutFulfillment(
+        currentFulfillment,
+        {
+          ...depositCheckout,
+          depositCheckout: updatedDepositCheckout,
+          depositCheckoutHistory: [
+            ...existingHistory,
+            {
+              ...updatedDepositCheckout,
+              action: "created",
+              depositStatus: "pending",
+              createdAt,
+              createdBy: user?.id || null,
+              mpPaymentId: mpPaymentId.toString(),
+              depositAmount,
+            },
+          ],
+        },
+      )
+
       await adminClient
         .from("orders")
         .update({
           mp_payment_id: mpPaymentId.toString(),
           payment_provider: "Mercado Pago",
-          checkout_fulfillment: {
-            ...(depositCheckout as Record<string, unknown>),
-            depositCheckout,
-          },
-          updated_at: new Date().toISOString(),
+          payment_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          checkout_fulfillment: mergedFulfillment,
+          updated_at: createdAt,
         })
         .eq("id", orderId)
         .eq("partner_id", partnerId)
+
+      try {
+        const { logAuditEvent } = await import("@/lib/services/timeline.service")
+        await logAuditEvent({
+          partnerId,
+          actorUserId: user?.id || null,
+          entityType: "order",
+          entityId: orderId,
+          actionType: "deposit_created",
+          changeLines: [
+            "gerou uma nova cobrança de sinal para o pedido.",
+            `Sinal: R$ ${depositAmount.toFixed(2)}`,
+          ],
+          metadata: {
+            orderNumber: currentOrder?.order_number,
+            depositAmount,
+            initialChargeAmount: depositAmount,
+            mpPaymentId: mpPaymentId.toString(),
+          },
+          source: "erp",
+        })
+      } catch (auditErr: any) {
+        console.error("[process-erp-payment] Error logging deposit_created audit event:", auditErr)
+      }
+
+      try {
+        const { revalidateOrderHistory } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        await revalidateOrderHistory(orderId)
+        if (currentOrder?.order_number) {
+          revalidatePath(`/order/${currentOrder.order_number}`)
+        }
+        revalidatePath("/erp/pedidos")
+      } catch (revalErr: any) {
+        console.error("[process-erp-payment] Error revalidating history:", revalErr)
+      }
     }
 
     // Extrair dados de Pix

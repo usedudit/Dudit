@@ -197,9 +197,7 @@ export const SecurityView = ({
                             </span>
                         </div>
                         <Button
-                            type="button"
-                            variant="outline"
-                            className="text-red-600 border-red-200 hover:bg-red-600 hover:text-white dark:border-red-900 dark:hover:bg-red-950 text-xs font-bold shrink-0 self-start sm:self-center"
+                            variant="outlinered"
                             onClick={onDeleteClick}
                         >
                             Excluir conta

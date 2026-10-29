@@ -115,7 +115,8 @@ const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { 
     const customerInterest = !isMerchantFee ? fixedInterestAmount : 0;
     const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0;
     const customerInstallmentCost = !isMerchantInstallment ? installmentCostAmount : 0;
-    const totalAbsorbed = absorbedInterest + taxa + custoMetodo + absorbedInstallmentCost;
+    const absorbedFee = isMerchantFee ? (taxa + custoMetodo) : 0;
+    const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost;
     return (
         <div className="relative group/payinfo inline-flex shrink-0">
             <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
@@ -318,26 +319,15 @@ const formatInstallmentOptionLabel = (opt: any) => {
     const interestAmount = Number(opt?.totalInterest || 0);
     const installmentCostAmount = Number(opt?.installmentCostAmount || 0);
     const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
-    const feeAmount = Number(opt?.totalFee || 0);
-    const fixedFeeAmount = Number(opt?.fixedFee || 0);
     const feeBearer = opt?.feeBearer || "merchant";
     const installmentFeeBearer = opt?.installmentFeeBearer || "merchant";
-    const passesCostToCustomer = feeBearer !== "merchant" || installmentFeeBearer !== "merchant";
 
-    const parts = [];
-    if (fixedInterestAmount > 0.009) parts.push("juros");
-    if (installmentCostAmount > 0.009) parts.push("custo de parcelamento");
-    if (feeAmount > 0.009) parts.push("taxa");
-    if (fixedFeeAmount > 0.009) parts.push("custo fixo");
+    const customerFixedInterest = feeBearer === "customer" ? fixedInterestAmount : 0;
+    const customerInstallmentCost = installmentFeeBearer === "customer" ? installmentCostAmount : 0;
+    const customerTotalInterest = customerFixedInterest + customerInstallmentCost;
 
-    const pricingName = parts.length > 0 ? parts.join("/") : "taxa";
-    const pricingAmount = fixedInterestAmount + installmentCostAmount + feeAmount + fixedFeeAmount;
-
-    const pricingLabel = pricingAmount > 0.009
-        ? ` · ${formatCurrency(pricingAmount)} ${passesCostToCustomer ? `de ${pricingName}` : `${pricingName} absorvida`}`
-        : "";
-    const freeInterestLabel = pricingAmount <= 0.009 ? " sem juros" : "";
-    return `${installmentsCount}x de ${formatCurrency(installmentValue)}${freeInterestLabel} (Total: ${formatCurrency(finalAmount)}${pricingLabel})`;
+    const interestLabel = customerTotalInterest > 0.009 ? " com juros" : " sem juros";
+    return `${installmentsCount}x de ${formatCurrency(installmentValue)}${interestLabel} (Total: ${formatCurrency(finalAmount)})`;
 };
 
 /** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) - manter os mesmos significados. */
@@ -425,7 +415,17 @@ const PaymentModal = ({
 
     // MP orders: customer already selected the payment method at checkout.
     // Lock the method selection to prevent changes.
+    // Deposit orders (sinal) are an exception: pending deposits stay on the deposit screen,
+    // and the remainder can be received by the seller via any payment method.
+    const isDepositOrder = Boolean(
+        hasPendingExistingDeposit ||
+        existingDepositPending ||
+        existingDepositAmount > 0.009 ||
+        (existingPaidAmount > 0.009 && amountDue !== undefined)
+    );
+
     const isMpOrder = useMemo(() => {
+        if (isDepositOrder) return false;
         if (!originalPaymentProvider) return false;
         const providerNorm = String(originalPaymentProvider).toLowerCase().trim();
         if (!providerNorm.includes("mercado pago")) return false;
@@ -433,7 +433,9 @@ const PaymentModal = ({
         const methodNorm = String(originalPaymentMethod || "").toLowerCase().trim();
         if (!methodNorm || methodNorm === "não informado" || methodNorm === "nao informado") return false;
         return true;
-    }, [originalPaymentProvider, originalPaymentMethod]);
+    }, [isDepositOrder, originalPaymentProvider, originalPaymentMethod]);
+
+    const isLockedMarketplace = !isDepositOrder && (isMarketplaceOrder || isMpOrder);
 
     const [effectiveDepositPercent, setEffectiveDepositPercent] = useState<number | undefined>(propsDepositPercentage)
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
@@ -1178,7 +1180,9 @@ const PaymentModal = ({
         // Only auto-navigate if we're on the initial methods screen
         if (view !== 'methods') return;
 
-        const isMarketplace = (isMarketplaceOrder || isMpOrder) && !!originalPaymentMethod;
+        if (isDepositOrder) return;
+
+        const isMarketplace = isLockedMarketplace && !!originalPaymentMethod;
         if (!isMarketplace) return;
 
         if (existingPaymentBreakdown && existingPaymentBreakdown.length > 1) {
@@ -1228,7 +1232,7 @@ const PaymentModal = ({
 
         setSelectedMethodType(methodType);
         setView(getTargetViewForMethodType(methodType));
-    }, [isOpen, isMarketplaceOrder, isMpOrder, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
+    }, [isOpen, isDepositOrder, isLockedMarketplace, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
     useEffect(() => {
@@ -2155,16 +2159,15 @@ const PaymentModal = ({
         const customerInterest = !isMerchantFee ? fixedInterestAmount : 0;
         const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0;
         const customerInstallmentCost = !isMerchantInstallment ? installmentCostAmount : 0;
+        const absorbedFee = isMerchantFee ? (Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) : 0;
 
-        const totalAbsorbed = absorbedInterest + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0) + absorbedInstallmentCost;
+        const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost;
 
         const tooltipRows = [
-            customerInterest > 0.009 ? { label: "Juros (fixos)", value: formatCurrency(customerInterest) } : null,
-            customerInstallmentCost > 0.009 ? { label: "Custo de parcelamento", value: formatCurrency(customerInstallmentCost) } : null,
             (isMerchantFee && (fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) > 0.009)
                 ? { label: "Juros/taxas absorvidos", value: formatCurrency(fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) } : null,
             (isMerchantInstallment && installmentCostAmount > 0.009)
-                ? { label: "Custo de parcelamento absorvido", value: formatCurrency(installmentCostAmount) } : null,
+                ? { label: "Custo de parcelamento", value: formatCurrency(installmentCostAmount) } : null,
         ].filter(Boolean) as Array<{ label: string; value: string }>;
 
         return [
@@ -2378,7 +2381,7 @@ const PaymentModal = ({
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
-            } else if (isMarketplaceOrder || isMpOrder) {
+            } else if (isLockedMarketplace) {
                 // Marketplace/MP orders: back from payment input closes the modal
                 // since they can't change the payment method
                 onClose();
@@ -2561,7 +2564,7 @@ const PaymentModal = ({
             const methodLeg = {
                 method: (() => {
                     const baseLabel = (() => {
-                        if (isMarketplaceOrder && originalPaymentMethod) {
+                        if (isLockedMarketplace && originalPaymentMethod) {
                             return formatPaymentMethodToFullLabel(originalPaymentMethod);
                         }
                         const selectedMethodObj = selectedMethodId ? activeMethods.find((method: any) => method.id === selectedMethodId) : null;
@@ -2639,8 +2642,17 @@ const PaymentModal = ({
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
 
+        // Calculate expected order total after method pricing (discounts and customer fees/interest)
+        const pricingDiscount = Number(paymentCalculation?.paymentMethodDiscountAmount || 0);
+        const isMerchantFee = (paymentCalculation?.feeBearer || "merchant") === "merchant";
+        const isMerchantInstallment = (paymentCalculation?.installmentFeeBearer || "merchant") === "merchant";
+        const pricingCustomerFee = !isMerchantFee ? (Number(paymentCalculation?.feeAmount || 0) + Number(paymentCalculation?.fixedFeeAmount || 0)) : 0;
+        const pricingCustomerInterest = (!isMerchantFee ? Math.max(0, Number(paymentCalculation?.interestAmount || 0) - Number(paymentCalculation?.installmentCostAmount || 0)) : 0)
+            + (!isMerchantInstallment ? Number(paymentCalculation?.installmentCostAmount || 0) : 0);
+        const expectedOrderTotal = Math.max(0, fullOrderTotal - pricingDiscount + pricingCustomerFee + pricingCustomerInterest);
+
         // Compare against the full order value - chargeTarget may be only the remaining balance.
-        const isUnderpaid = paidToRegister < fullOrderTotal - 0.005;
+        const isUnderpaid = paidToRegister < expectedOrderTotal - 0.005;
 
         // Incorporate deposit payment into the payload when it was generated and confirmed
         let finalPaidAmount = paidToRegister;
@@ -2680,7 +2692,7 @@ const PaymentModal = ({
             if (depositPaid) {
                 finalPaidAmount = existingPaidAmount + depositChargeAmount + singleRegisterAmount;
 
-                const remainingAfterAll = finalPaidAmount - fullOrderTotal;
+                const remainingAfterAll = finalPaidAmount - expectedOrderTotal;
                 if (remainingAfterAll >= -0.005) {
                     finalPaymentStatus = 'paid';
                 } else if (finalPaidAmount > 0.005) {
@@ -2839,7 +2851,14 @@ const PaymentModal = ({
                     } as Record<string, unknown>,
                     paymentStatus: (() => {
                         const totalPaid = Number(payload.paidAmount || 0) + depositChargeAmount;
-                        if (totalPaid >= fullOrderTotal - 0.005) return 'paid';
+                        const pricingDiscount = Number(paymentCalculation?.paymentMethodDiscountAmount || 0);
+                        const isMerchantFee = (paymentCalculation?.feeBearer || "merchant") === "merchant";
+                        const isMerchantInstallment = (paymentCalculation?.installmentFeeBearer || "merchant") === "merchant";
+                        const pricingCustomerFee = !isMerchantFee ? (Number(paymentCalculation?.feeAmount || 0) + Number(paymentCalculation?.fixedFeeAmount || 0)) : 0;
+                        const pricingCustomerInterest = (!isMerchantFee ? Math.max(0, Number(paymentCalculation?.interestAmount || 0) - Number(paymentCalculation?.installmentCostAmount || 0)) : 0)
+                            + (!isMerchantInstallment ? Number(paymentCalculation?.installmentCostAmount || 0) : 0);
+                        const expectedOrderTotal = Math.max(0, fullOrderTotal - pricingDiscount + pricingCustomerFee + pricingCustomerInterest);
+                        if (totalPaid >= expectedOrderTotal - 0.005) return 'paid';
                         if (totalPaid > 0.005) return 'partially_paid';
                         return 'unpaid';
                     })(),
@@ -3091,7 +3110,7 @@ const PaymentModal = ({
                     {paymentStatus === 'input' && (
                         <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                {view !== 'methods' && !isMarketplaceOrder && !isMpOrder && (
+                                {view !== 'methods' && !isLockedMarketplace && (
                                     <motion.button
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -3234,7 +3253,7 @@ const PaymentModal = ({
                                                                 <InfoCard
                                                                     message="A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
                                                                     color="orange"
-                                                                    className="w-full"
+                                                                    className="w-full mb-4"
                                                                 />
                                                             </div>
                                                         </>
@@ -3346,7 +3365,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("cash")}
                                                             />
                                                         )}
@@ -3354,7 +3373,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("pix")}
                                                             />
                                                         )}
@@ -3362,7 +3381,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("credit_card")}
                                                             />
                                                         )}
@@ -3370,7 +3389,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("debit_card")}
                                                             />
                                                         )}
@@ -3378,7 +3397,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={FileIcon}
                                                                 label="Transferência"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("bank_transfer")}
                                                             />
                                                         )}
@@ -3386,17 +3405,17 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Outros"
-                                                                disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                                disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("other")}
                                                             />
                                                         )}
                                                         <PaymentMethodCard
                                                             icon={SplitIcon}
                                                             label="Dividir"
-                                                            disabled={isMarketplaceOrder || isMpOrder || isAlreadyFullyPaid}
+                                                            disabled={isLockedMarketplace || isAlreadyFullyPaid}
                                                             onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                         />
-                                                        {mpConnected && !isMarketplaceOrder && !isMpOrder && !isAlreadyFullyPaid && (
+                                                        {mpConnected && !isLockedMarketplace && !isAlreadyFullyPaid && (
                                                             <button
                                                                 onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
                                                                 className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
@@ -3427,7 +3446,7 @@ const PaymentModal = ({
 
                                     {view === 'money' && (
                                         <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "opacity-60")}>
-                                            {isMarketplaceOrder && (
+                                            {isLockedMarketplace && (
                                                 <div className="w-full max-w-sm mb-4">
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o  método de pagamento." />
                                                 </div>
@@ -3501,7 +3520,7 @@ const PaymentModal = ({
                                     {view === 'store_credit' && (
                                         <motion.div key="store_credit" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
-                                                {isMarketplaceOrder && (
+                                                {isLockedMarketplace && (
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
@@ -3532,11 +3551,11 @@ const PaymentModal = ({
                                     {view === 'pix' && (
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
-                                                {(isMarketplaceOrder || isMpOrder) && (
+                                                {isLockedMarketplace && (
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 )}
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
-                                                {!isMpOrder && (
+                                                {!isLockedMarketplace && (
                                                     <>
                                                         <div className="min-w-0 flex-1">
                                                             <PaymentAmountLabel
@@ -3658,7 +3677,7 @@ const PaymentModal = ({
 
                                     {view === 'card' && (
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "opacity-60")}>
-                                            {isMarketplaceOrder && (
+                                            {isLockedMarketplace && (
                                                 <div className="w-full mb-4">
                                                     <InfoCard color="blue" title="Método escolhido pelo cliente" message="Pagamento via marketplace - não é possível alterar o método de pagamento." />
                                                 </div>
@@ -3682,7 +3701,7 @@ const PaymentModal = ({
                                                     />
                                                 </div>
                                                 {!isFreePlan && selectedMethodObj && normalizeMethodType(selectedMethodObj.type) !== 'debit_card' && (
-                                                    isMarketplaceOrder ? (
+                                                    isLockedMarketplace ? (
                                                         <div>
                                                             <div className="text-brand-inactive-text dark:text-dark-body font-medium mb-1">Parcelas</div>
                                                             <div className="font-bold text-brand-dark dark:text-dark-heading">
@@ -3775,7 +3794,7 @@ const PaymentModal = ({
                                                         const adjPct = Number(pr?.adjustmentPercent || 0)
                                                         const showAdjustment = adjType !== 'none' && adjAmt > 0.005
                                                         return (
-                                                            <div key={p.id} onClick={() => { if (isMarketplaceOrder || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setSplitSelectedType(null); setView('split_method_select'); }}
+                                                            <div key={p.id} onClick={() => { if (isLockedMarketplace || existingPaidAmount > 0.009) return; setEditingPaymentIndex(idx); setSplitSelectedType(null); setView('split_method_select'); }}
                                                                 className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors">
                                                                 <div className="flex items-center gap-2 mb-2">
                                                                     {getIconForMethod(p.method, p.paymentMethodId)({})}
@@ -3857,7 +3876,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("cash")}
                                                             />
                                                         )}
@@ -3865,7 +3884,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("pix")}
                                                             />
                                                         )}
@@ -3873,7 +3892,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("credit_card")}
                                                             />
                                                         )}
@@ -3881,7 +3900,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("debit_card")}
                                                             />
                                                         )}
@@ -3889,7 +3908,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={FileIcon}
                                                                 label="Transferência"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("bank_transfer")}
                                                             />
                                                         )}
@@ -3897,7 +3916,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Crédito do cliente"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => {
                                                                     const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
                                                                     const remainingToPay = Math.max(0, chargeTarget - splitBaseSum);
@@ -3926,7 +3945,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Outros"
-                                                                disabled={isMarketplaceOrder || isMpOrder}
+                                                                disabled={isLockedMarketplace}
                                                                 onClick={() => setSplitSelectedType("other")}
                                                             />
                                                         )}

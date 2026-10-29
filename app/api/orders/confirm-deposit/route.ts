@@ -248,6 +248,8 @@ export async function POST(request: NextRequest) {
             source: "erp",
         })
 
+        const { revalidateOrderHistory } = await import("@/lib/utils/revalidation")
+        await revalidateOrderHistory(order.id)
         revalidatePath(`/order/${order.order_number}`)
         revalidatePath("/erp/pedidos")
 

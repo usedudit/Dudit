@@ -803,7 +803,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         ? propIsShowcaseActive
         : (partner?.isShowcaseActive ?? partner?.is_showcase_active ?? true)
     const openStatus = useMemo(() => {
-        return getOpenNowStatus(partner?.openingHours, undefined, partner?.timezone)
+        return getOpenNowStatus(partner?.openingHours, undefined, partner?.timezone || "America/Sao_Paulo")
     }, [partner?.openingHours, partner?.timezone])
 
     const userCoords = useMemo(() => {
@@ -1693,7 +1693,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             )}
 
             <div ref={mobileTabsRef} className={categoryView ? "hidden" : "lg:hidden"}>
-                <div className="flex items-center gap-4 px-3 mb-6 border-b border-brand-border dark:border-dark-border h-[46px]">
+                <div className="flex items-center gap-2 px-3 mb-6 border-b border-brand-border dark:border-dark-border h-[46px]">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-brand-dark dark:text-white"
@@ -1702,7 +1702,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
 
-                    <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
 
                     {canScrollTabsLeft && (
                         <button
@@ -1740,10 +1740,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
 
                     <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+
                     <Button
+                        variant="outline"
                         onClick={() => setIsCategoryFiltersOpen(true)}
-                        className="h-8 w-8 px-2.5 relative"
-                        leftIcon={<FilterIcon />}
+                        className="h-8 w-8 relative"
+                        leftIcon={<FilterIcon size={16} />}
                     >
                         {categoryActiveFiltersCount > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-green text-white text-[10px] font-bold flex items-center justify-center">
@@ -1755,7 +1757,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut && !categoryView ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
-                <div className="flex items-center gap-4 px-3 h-full">
+                <div className="flex items-center gap-2 px-3 h-full">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
@@ -1763,7 +1765,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     >
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <RepeatIcon size={17} />)}
                     </button>
-                    <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
                     <div data-vendor-tabs-scroll="true" className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full min-w-0">
                         {allTabs.map(tab => (
                             <button
@@ -1776,7 +1778,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </button>
                         ))}
                     </div>
-                    <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
                     <button
                         onClick={() => setIsCategoryFiltersOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white relative"

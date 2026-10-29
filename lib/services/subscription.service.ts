@@ -262,7 +262,7 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
 }
 
 /**
- * Lightweight status snapshot for the global subscription banner.
+ * Lightweight status snapshot for the global subscription status indicator.
  * Unlike getPartnerSubscription, it also returns cancelled subscriptions so the
  * ERP can tell the partner their plan was cancelled (instead of silently
  * falling back to the free plan).

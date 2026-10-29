@@ -298,7 +298,7 @@ export const BusinessDataSubPage = ({
     const effectiveHours = storeHoursObj || partnerHoursObj || {}
 
     const [hours, setHours] = useState(() => normalizeOpeningHours(effectiveHours))
-    const [timezone, setTimezone] = useState<string>(store?.timezone || partner?.timezone || "America/Sao_Paulo")
+    const [timezone, setTimezone] = useState<string>(store?.timezone || "America/Sao_Paulo")
     const [acceptOrdersWhenClosed, setAcceptOrdersWhenClosed] = useState<boolean>(store?.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true)
 
     const [initialState, setInitialState] = useState(() => ({
@@ -308,7 +308,7 @@ export const BusinessDataSubPage = ({
         fiscalProfile: { ...fiscalProfile },
         taxInfo: { ...taxInfo },
         hours: { ...hours },
-        timezone: store?.timezone || partner?.timezone || "America/Sao_Paulo",
+        timezone: store?.timezone || "America/Sao_Paulo",
         acceptOrdersWhenClosed: store?.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
     }))
 

@@ -881,7 +881,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                 </span>
                                                             </div>
                                                         )}
-                                                        <div className="flex justify-between items-center py-2.5">
+                                                        <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Tipo de Pessoa</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                         </div>

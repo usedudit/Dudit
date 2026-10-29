@@ -131,6 +131,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       p.city = store.addresses?.[0]?.city || store.city || p.addresses?.[0]?.city || null
       p.state = store.addresses?.[0]?.state || store.state || p.addresses?.[0]?.state || null
       p.opening_hours = store.opening_hours || p.opening_hours
+      p.timezone = store.timezone || p.timezone || "America/Sao_Paulo"
       p.latitude = store.addresses?.[0]?.latitude || p.latitude
       p.longitude = store.addresses?.[0]?.longitude || p.longitude
       p.business_info = store.business_info || p.business_info

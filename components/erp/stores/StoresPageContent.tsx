@@ -428,14 +428,14 @@ export function StoresPageContent({ partnerId, planGate }: StoresPageContentProp
           ) : filteredStores.length === 0 ? (
             <IconPlaceholder
               placeholderType="image"
-              imageSrc={search ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Estoque.png"}
-              imageAlt="Sem lojas"
+              imageSrc={search ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Filiais.png"}
+              imageAlt="Sem filiais"
               title={search ? "Nenhuma loja encontrada" : "Você ainda não possui filiais cadastradas"}
-              subtitle={search ? "Tente ajustar seus termos de busca." : "Cadastre novas filiais para expandir seu negócio no ERP Dudit."}
+              subtitle={search ? "Tente ajustar seus termos de busca." : "Cadastre novas filiais para gerenciar todo seu negócio na Dudit."}
               itemButton={
                 !search
                   ? {
-                    text: "Criar Nova Loja",
+                    text: "Criar nova filial",
                     action: handleOpenCreate,
                   }
                   : {

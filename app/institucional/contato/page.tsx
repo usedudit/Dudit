@@ -189,8 +189,8 @@ export default function ContatoPage() {
                             >
                                 <div className="relative z-10 w-full max-w-[460px]">
                                     <img
-                                        src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                                        alt="Fale com a Dudit"
+                                        src="https://img.dudit.com.br/static/mascots/FaleConosco.png"
+                                        alt="Fale conosco"
                                         className="w-full h-auto object-contain"
                                     />
                                 </div>

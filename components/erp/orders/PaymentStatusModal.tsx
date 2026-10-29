@@ -1124,6 +1124,7 @@ export default function PaymentStatusModal({
                       <InfoCard
                         color="orange"
                         message="A confirmação é automática. Se o pagamento não for identificado, use “Confirmar recebimento”."
+                        className="w-full mb-4"
                       />
 
                       <div className="flex gap-2">

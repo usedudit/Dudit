@@ -79,7 +79,8 @@ const AbsorbedCostsTooltipBadge = React.memo(
 
     const absorbedInterest = isMerchantFee ? fixedInterestAmount : 0
     const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0
-    const totalAbsorbed = absorbedInterest + taxa + custoMetodo + absorbedInstallmentCost
+    const absorbedFee = isMerchantFee ? (taxa + custoMetodo) : 0
+    const totalAbsorbed = absorbedInterest + absorbedFee + absorbedInstallmentCost
     if (totalAbsorbed <= 0.009) return null
 
     const rows = [

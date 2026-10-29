@@ -158,6 +158,81 @@ export function getDepositCheckoutMeta(
   return raw as DepositCheckoutMeta
 }
 
+/**
+ * Structural keys of `orders.checkout_fulfillment`. They describe what must be
+ * delivered (bookings, subscriptions, buyer/partner, delivery) and must never be
+ * dropped by a later deposit-only write.
+ */
+const CHECKOUT_FULFILLMENT_STRUCTURAL_KEYS = [
+  "version",
+  "buyerId",
+  "partnerId",
+  "lines",
+  "deliveryType",
+  "deliveryAddress",
+] as const
+
+/**
+ * Merges an incoming `checkout_fulfillment` write into the stored value without
+ * losing fulfillment data.
+ *
+ * Deposit charges used to persist `{ ...depositMeta, depositCheckout }`, which
+ * replaced the whole column and erased `lines` (the booking date/time/staff
+ * needed to create appointments). This helper keeps the structural keys and
+ * merges the deposit metadata on top.
+ */
+export function mergeCheckoutFulfillment(
+  existing: Record<string, unknown> | null | undefined,
+  incoming: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!incoming) return (existing as Record<string, unknown>) ?? null
+  if (!existing) return incoming
+
+  const incomingDeposit =
+    incoming.depositCheckout && typeof incoming.depositCheckout === "object"
+      ? (incoming.depositCheckout as Record<string, unknown>)
+      : null
+  const existingDeposit =
+    existing.depositCheckout && typeof existing.depositCheckout === "object"
+      ? (existing.depositCheckout as Record<string, unknown>)
+      : null
+
+  // Legacy deposit payloads spread deposit fields at the top level, which is
+  // fine for deposit metadata but must not win over structural fulfillment data.
+  const merged: Record<string, unknown> = { ...existing, ...incoming }
+
+  for (const key of CHECKOUT_FULFILLMENT_STRUCTURAL_KEYS) {
+    const existingValue = existing[key]
+    if (existingValue === undefined || existingValue === null) continue
+    const incomingValue = incoming[key]
+    const incomingIsEmpty =
+      incomingValue === undefined ||
+      incomingValue === null ||
+      (Array.isArray(incomingValue) && incomingValue.length === 0)
+    if (incomingIsEmpty) merged[key] = existingValue
+  }
+
+  if (incomingDeposit || existingDeposit) {
+    merged.depositCheckout = {
+      ...(existingDeposit || {}),
+      ...(incomingDeposit || {}),
+    }
+  }
+
+  // Legacy shape: deposit metadata spread at top level. Keep those fields in
+  // sync with the merged nested deposit object so readers of either shape work.
+  if (incomingDeposit) {
+    for (const [key, value] of Object.entries(incomingDeposit)) {
+      if (key in merged && CHECKOUT_FULFILLMENT_STRUCTURAL_KEYS.includes(key as any)) {
+        continue
+      }
+      merged[key] = value
+    }
+  }
+
+  return merged
+}
+
 export function patchDepositCheckoutOnPayment(
   checkoutFulfillment: Record<string, unknown> | null | undefined,
   paidAmount: number,

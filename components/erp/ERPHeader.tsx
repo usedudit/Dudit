@@ -16,6 +16,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import BottomSheet from "../BottomSheet"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { SubscriptionStatusButton, type SubscriptionStatusButtonProps } from "./SubscriptionStatusButton"
 import { Switch } from "../reusable/Switch"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { usePermissions } from "@/lib/permission-context"
@@ -30,6 +31,7 @@ interface ERPHeaderProps {
     backHref?: string // Link to go back (e.g., /erp/produtos)
     onBack?: () => void // Custom back logic (e.g. discard changes)
     isSubPage?: boolean // Force ChevronLeftIcon even without backHref
+    subscription?: SubscriptionStatusButtonProps | null
     userProfile?: {
         fullName: string
         email: string
@@ -39,7 +41,7 @@ interface ERPHeaderProps {
     }
 }
 
-export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHref, onBack, isSubPage, userProfile }: ERPHeaderProps) {
+export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHref, onBack, isSubPage, subscription, userProfile }: ERPHeaderProps) {
     const { theme, setTheme } = useTheme()
     const router = useRouter()
     const pathname = usePathname()
@@ -269,6 +271,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {subscription && <SubscriptionStatusButton {...subscription} />}
                         {isPDV && (
                             <button
                                 onClick={() => router.push("/erp/caixa")}

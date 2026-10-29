@@ -2560,7 +2560,7 @@ export default function CreateOrder({
                             originalPaymentProvider={originalPaymentProvider}
                             onConfirm={handleConfirmPayment}
                             deliveryMethod={deliveryMethod}
-                            allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009 && !isMarketplaceOrder}
+                            allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009 && !isAlreadyPaid}
                             depositChargeAmount={depositChargeAmount}
                             depositPercentage={depositSettings.depositPercentage}
                             existingDepositPending={hasPendingExistingDeposit}

@@ -12,7 +12,7 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction, getReturnAuditLogsAction } from '@/app/actions/erp/returns';
-import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/actions/marketplace/orders';
+import { cancelBuyerOrderAction, confirmOrderFulfillmentAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
 import { getPartnerReturnPolicyPublicAction } from '@/app/actions/marketplace/store-policies';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
 import { FileIcon } from '@/lib/icons';
@@ -580,6 +580,29 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [attachments, setAttachments] = useState<any[]>([]);
     const [loadingAttachments, setLoadingAttachments] = useState(false);
     const [storePolicy, setStorePolicy] = useState<any>(null);
+    const [buyerAuditEntries, setBuyerAuditEntries] = useState<any[]>([]);
+    const [loadingBuyerHistory, setLoadingBuyerHistory] = useState(false);
+
+    // Fetch order history for buyer when the history tab is active
+    useEffect(() => {
+        if (!order?.id || activeTab !== "history") return;
+        let cancelled = false;
+        setLoadingBuyerHistory(true);
+        getOrderHistoryForBuyerAction(order.id)
+            .then((res) => {
+                if (cancelled) return;
+                if (res.success && Array.isArray(res.data)) {
+                    setBuyerAuditEntries(res.data);
+                }
+            })
+            .catch((err) => console.error("[MyOrderDetailPage] Error loading history:", err))
+            .finally(() => {
+                if (!cancelled) setLoadingBuyerHistory(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [order?.id, activeTab]);
 
     // Fetch store policy and seller return capabilities (plan & module)
     useEffect(() => {
@@ -780,9 +803,77 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         };
     });
 
-    const combinedHistoryEntries = [...historyEntries, ...mappedReturnHistoryEntries].sort((a, b) => {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
+    // Map deposit history entries from order fulfillment if available (instant fallback)
+    const depositHistoryEntries = useMemo(() => {
+        const history = (order?.checkout_fulfillment as any)?.depositCheckoutHistory;
+        if (!Array.isArray(history) || history.length === 0) return [];
+        return history.map((item: any, idx: number) => {
+            const isCancelled = item.depositStatus === "cancelled" || item.action === "cancelled";
+            const isCreated = item.action === "created" || item.depositStatus === "pending";
+            const isPaid = item.depositStatus === "paid" || item.sinalPaid;
+            const date = item.cancelledAt || item.createdAt || item.paidAt || item.depositPaidAt || order.created_at;
+            const amount = Number(item.depositAmount || item.initialChargeAmount || 0);
+            const amountStr = amount > 0 ? formatCurrency(amount) : null;
+
+            if (isCancelled) {
+                return {
+                    id: `deposit-hist-cancel-${idx}`,
+                    actor_name: "Sinal cancelado",
+                    change_lines: [
+                        "O sinal do pedido foi cancelado pelo vendedor.",
+                        ...(amountStr ? [`Sinal: ${amountStr}`] : []),
+                        ...(item.cancellationReason ? [`Motivo: ${item.cancellationReason}`] : []),
+                    ],
+                    created_at: date,
+                    entry_type: "deposit_cancelled",
+                };
+            }
+            if (isCreated) {
+                return {
+                    id: `deposit-hist-create-${idx}`,
+                    actor_name: "Cobrança de sinal gerada",
+                    change_lines: [
+                        "Nova cobrança de sinal gerada via Mercado Pago.",
+                        ...(amountStr ? [`Sinal: ${amountStr}`] : []),
+                    ],
+                    created_at: date,
+                    entry_type: "deposit_created",
+                };
+            }
+            if (isPaid) {
+                return {
+                    id: `deposit-hist-paid-${idx}`,
+                    actor_name: "Sinal pago",
+                    change_lines: [
+                        "Recebimento do sinal confirmado.",
+                        ...(amountStr ? [`Sinal: ${amountStr}`] : []),
+                    ],
+                    created_at: date,
+                    entry_type: "deposit_paid",
+                };
+            }
+            return null;
+        }).filter(Boolean);
+    }, [order?.checkout_fulfillment, order?.created_at]);
+
+    const combinedHistoryEntries = useMemo(() => {
+        // If buyerAuditEntries has deposit entries, don't duplicate them from depositHistoryEntries
+        const hasAuditDeposit = buyerAuditEntries.some((e: any) =>
+            e.entry_type && String(e.entry_type).startsWith("deposit_")
+        );
+        const effectiveDepositEntries = hasAuditDeposit ? [] : depositHistoryEntries;
+
+        const all = [
+            ...historyEntries,
+            ...mappedReturnHistoryEntries,
+            ...buyerAuditEntries,
+            ...effectiveDepositEntries,
+        ];
+
+        return all.sort((a, b) => {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
+    }, [historyEntries, mappedReturnHistoryEntries, buyerAuditEntries, depositHistoryEntries]);
 
     const orderItems = order?.order_items || [];
     const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking");
@@ -1680,7 +1771,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </span>
                         )}
                         {activeReturnRequest.reported_to_dudit_at && (
-                            <span className="block mt-1 text-xs opacity-80">
+                            <span className="block mt-1">
                                 Reporte enviado à Dudit em {formatDate(activeReturnRequest.reported_to_dudit_at)}.
                             </span>
                         )}
@@ -2388,11 +2479,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
                             <div className="space-y-8">
-                                <HistoryTimeline
-                                    entries={combinedHistoryEntries}
-                                    title="Status do Acompanhamento"
-                                    emptyMessage="Não foram encontrados eventos para este pedido."
-                                />
+                                {loadingBuyerHistory && combinedHistoryEntries.length === 0 ? (
+                                    <div className="flex justify-center py-8">
+                                        <ThreeDotsLoader />
+                                    </div>
+                                ) : (
+                                    <HistoryTimeline
+                                        entries={combinedHistoryEntries}
+                                        title="Status do Acompanhamento"
+                                        emptyMessage="Não foram encontrados eventos para este pedido."
+                                    />
+                                )}
                             </div>
                         </TabsContent>
 

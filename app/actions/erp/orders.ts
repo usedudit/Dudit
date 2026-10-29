@@ -55,6 +55,7 @@ import {
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine";
 import {
   getOrderDepositSummary,
+  mergeCheckoutFulfillment,
   patchDepositCheckoutOnPayment,
 } from "@/lib/payments/order-financial-state";
 import {
@@ -2560,6 +2561,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const isCustomerInstallmentBearer =
       installmentFeeBearer === "customer" || installmentFeeBearer === "buyer";
 
+    // Desconto de meio de pagamento sempre abata o total, independente de quem paga taxas
+    breakdownPaymentMethodDiscountAmount = Math.max(
+      0,
+      breakdownPaymentMethodDiscountAmount + pmDisc,
+    );
+
     if (!isCustomerBearer) {
       paymentMethodInterestAmount = Math.max(
         0,
@@ -2578,10 +2585,6 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       paymentMethodFixedFeeAmount = Math.max(
         0,
         paymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0),
-      );
-      breakdownPaymentMethodDiscountAmount = Math.max(
-        0,
-        breakdownPaymentMethodDiscountAmount + pmDisc,
       );
       if (isCustomerInstallmentBearer) {
         customerExtraFees = Math.max(
@@ -4268,6 +4271,12 @@ export async function updateERPOrderAction(
     const isCustomerInstallmentBearer =
       installmentFeeBearer === "customer" || installmentFeeBearer === "buyer";
 
+    // Desconto de meio de pagamento sempre abata o total, independente de quem paga taxas
+    updateBreakdownPaymentMethodDiscountAmount = Math.max(
+      0,
+      updateBreakdownPaymentMethodDiscountAmount + pmDisc,
+    );
+
     if (!isCustomerBearer) {
       updatePaymentMethodInterestAmount = Math.max(
         0,
@@ -4286,10 +4295,6 @@ export async function updateERPOrderAction(
       updatePaymentMethodFixedFeeAmount = Math.max(
         0,
         updatePaymentMethodFixedFeeAmount + Number(entry.fixedFeeAmount || 0),
-      );
-      updateBreakdownPaymentMethodDiscountAmount = Math.max(
-        0,
-        updateBreakdownPaymentMethodDiscountAmount + pmDisc,
       );
       if (isCustomerInstallmentBearer) {
         updateCustomerExtraFees = Math.max(
@@ -4389,7 +4394,10 @@ export async function updateERPOrderAction(
         : (currentOrder as any).mp_payment_id || null,
     checkout_fulfillment:
       data.checkoutFulfillment !== undefined
-        ? data.checkoutFulfillment
+        ? mergeCheckoutFulfillment(
+            (currentOrder as any).checkout_fulfillment || null,
+            data.checkoutFulfillment as Record<string, unknown> | null,
+          )
         : (currentOrder as any).checkout_fulfillment || null,
     ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
     ...(preparationEstimate || {}),
@@ -6777,7 +6785,10 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
       payment_breakdown: payload.paymentBreakdown || null,
       payment_provider: payload.paymentProvider || null,
       mp_payment_id: payload.mpPaymentId || null,
-      checkout_fulfillment: (payload as any).checkoutFulfillment || null,
+      checkout_fulfillment: mergeCheckoutFulfillment(
+        order.checkout_fulfillment as Record<string, unknown> | null,
+        (payload as any).checkoutFulfillment || null,
+      ),
       finance_account_id: payload.financeAccountId || null,
       total_amount: totalAmountToSave,
       payment_method_discount_amount: paymentMethodDiscountAmount,

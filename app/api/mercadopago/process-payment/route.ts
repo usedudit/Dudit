@@ -1411,6 +1411,7 @@ async function handler(request: NextRequest) {
           amount_paid: isWalletPurchase ? Number(existingOrder.paid_amount || 0) : totalPaidAmount,
           paid_at: isWalletPurchase ? existingOrder.paid_at : (paymentStatus === "approved" ? new Date().toISOString() : existingOrder.paid_at),
           payment_expires_at: paymentExpiresAt,
+          checkout_fulfillment: checkoutFulfillment,
           ...(effectiveStoreId && !existingOrder.store_id ? { store_id: effectiveStoreId } : {}),
         })
         .eq("id", existingOrderId)
