@@ -16,6 +16,45 @@ import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
+async function requireMovementItemAccess(
+    partnerId: string,
+    activeStoreId: string | null,
+    items: Array<{ productId: string; variantId?: string | null }>,
+) {
+    const productIds = Array.from(new Set(items.map((item) => item.productId)))
+    const variantIds = Array.from(new Set(items.map((item) => item.variantId).filter((id): id is string => Boolean(id))))
+    const admin = createAdminClient()
+    const [{ data: products, error: productsError }, { data: variants, error: variantsError }] = await Promise.all([
+        admin.from("products").select("id, partner_id, store_id").eq("partner_id", partnerId).in("id", productIds),
+        variantIds.length > 0
+            ? admin.from("product_variants").select("id, product_id").in("id", variantIds)
+            : Promise.resolve({ data: [] as Array<{ id: string; product_id: string }>, error: null }),
+    ])
+    if (productsError || !products || products.length !== productIds.length) {
+        throw new Error("Um ou mais produtos não pertencem ao parceiro ativo.")
+    }
+    if (variantsError || !variants || variants.length !== variantIds.length) {
+        throw new Error("Uma ou mais variações não foram encontradas.")
+    }
+
+    const productById = new Map<string, any>((products as any[]).map((product: any) => [String(product.id), product]))
+    const variantById = new Map<string, any>((variants || []).map((variant: any) => [String(variant.id), variant]))
+    for (const item of items) {
+        const product = productById.get(String(item.productId))
+        if (!product) throw new Error("Produto não encontrado no parceiro ativo.")
+        if (activeStoreId && product.store_id && product.store_id !== activeStoreId) {
+            throw new Error("O produto pertence a outra loja ativa.")
+        }
+        if (product.store_id) await requireStorePermission(product.store_id, partnerId, "stock_movements", "create")
+        if (item.variantId) {
+            const variant = variantById.get(String(item.variantId))
+            if (!variant || variant.product_id !== item.productId) {
+                throw new Error("A variação não pertence ao produto informado.")
+            }
+        }
+    }
+}
+
 export async function searchProductsForMovement(query: string, storeId?: string | null) {
     if (!query || query.trim().length < 2) return []
 
@@ -102,9 +141,13 @@ export async function createStockMovementAction(data: {
         }
 
         if (!data.productId) return errorResponse("Produto inválido")
+        if (!['in', 'out', 'adjustment'].includes(data.type)) return errorResponse("Tipo de movimentação inválido")
+        if (!Number.isSafeInteger(data.quantity)) return errorResponse("Quantidade inválida")
         if (data.type !== 'adjustment' && data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
         if (data.type === 'adjustment' && data.quantity < 0) return errorResponse("O estoque ajustado não pode ser negativo")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
+
+        await requireMovementItemAccess(partnerId, ctx.activeStoreId || null, [{ productId: data.productId, variantId: data.variantId }])
 
         const supabase = createAdminClient()
 
@@ -161,10 +204,13 @@ export async function createBatchStockMovementAction(data: {
         }
 
         if (!data.items || data.items.length === 0) return errorResponse("Adicione pelo menos um item")
+        if (!Array.isArray(data.items) || data.items.length > 100) return errorResponse("A movimentação deve conter de 1 a 100 itens")
+        if (!['in', 'out', 'adjustment'].includes(data.type)) return errorResponse("Tipo de movimentação inválido")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
 
         for (const item of data.items) {
             if (!item.productId) return errorResponse("Produto inválido em um dos itens")
+            if (!Number.isSafeInteger(item.quantity)) return errorResponse("Quantidade inválida em um dos itens")
             if (data.type !== 'adjustment' && item.quantity <= 0) {
                 return errorResponse("Quantidade deve ser maior que zero em todos os itens")
             }
@@ -172,6 +218,8 @@ export async function createBatchStockMovementAction(data: {
                 return errorResponse("O estoque ajustado não pode ser negativo em nenhum dos itens")
             }
         }
+
+        await requireMovementItemAccess(partnerId, ctx.activeStoreId || null, data.items)
 
         const supabase = createAdminClient()
 
@@ -328,6 +376,7 @@ export async function getStockMovementDetails(id: string) {
                 reason,
                 notes,
                 created_by,
+                store_id,
                 reversed_at,
                 reversed_by,
                 reversal_movement_id,
@@ -343,6 +392,7 @@ export async function getStockMovementDetails(id: string) {
         }
 
         if (!data) return errorResponse("Movimentação não encontrada")
+        if (data.store_id) await requireStorePermission(data.store_id, ctx.partnerId, "stock_movements", "view")
 
         // Fetch child items from stock_movement_items
         const { data: itemsData, error: itemsError } = await supabase
@@ -555,6 +605,8 @@ export async function undoBatchStockMovementsAction(ids: string[], customReason?
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) return errorResponse("Informe de 1 a 100 movimentações para desfazer")
+        if (new Set(ids).size !== ids.length) return errorResponse("A lista contém movimentações repetidas")
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
         const partnerId = ctx.partnerId
@@ -600,11 +652,18 @@ export async function getERPStockMovementsPageAction(
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePermission(partnerId, "stock_movements", "view")
+        const context = await getCurrentPartnerContext(user)
+        if (!context?.partnerId || context.partnerId !== partnerId) {
+            return { success: false, error: "O parceiro informado não corresponde ao contexto ativo" }
+        }
+        await requirePermission(context.partnerId, "stock_movements", "view", user)
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_STOCK_MOVEMENTS_PAGE_SIZE))))
         const fetchLimit = limit + 1
-        const storeId = options?.storeId
+        const storeId = options?.storeId || context.activeStoreId || null
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "stock_movements", "view")
+        }
         const rows = await getCachedErpPage(
             ["erp-stock-movements-page", partnerId, storeId || "all-stores", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
             [TAGS.stockMovements(partnerId)],
@@ -644,6 +703,7 @@ export async function getERPStockMovementsPageAction(
 
 export async function getStockMovementPresignedUploadUrlAction(
   partnerId: string,
+  movementId: string,
   fileName: string,
   fileType: string,
   fileSize: number
@@ -652,8 +712,18 @@ export async function getStockMovementPresignedUploadUrlAction(
   | { success: false; error: string }
 > {
   try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     const user = await requireUser()
     await requirePermission(partnerId, "stock_movements", "create")
+    const supabase = await getSupabaseServerClient()
+    const { data: movement } = await supabase
+      .from("stock_movements")
+      .select("id, store_id")
+      .eq("id", movementId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!movement) return { success: false, error: "Movimentação não encontrada." }
+    if (movement.store_id) await requireStorePermission(movement.store_id, partnerId, "stock_movements", "create")
 
     const plan = await getPartnerPlan(partnerId)
     if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
@@ -701,6 +771,31 @@ export async function saveStockMovementAttachmentAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "stock_movements", "create")
     const user = await requireUser()
+    const supabase = await getSupabaseServerClient()
+    const { data: movement } = await supabase
+      .from("stock_movements")
+      .select("id, store_id")
+      .eq("id", movementId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!movement) return { success: false, error: "Movimentação não encontrada." }
+    if (movement.store_id) await requireStorePermission(movement.store_id, partnerId, "stock_movements", "create")
+
+    const { R2_PREFIXES } = await import("@/lib/r2/config")
+    const { validateKeyOwnership } = await import("@/lib/r2/server")
+    const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`
+    if (
+      typeof fileKey !== "string" ||
+      !validateKeyOwnership(fileKey, user.id) ||
+      !fileKey.startsWith(expectedPrefix) ||
+      fileKey.includes("..") ||
+      fileKey.startsWith("/")
+    ) {
+      return { success: false, error: "Chave de arquivo inválida para este usuário." }
+    }
+    const { validateUploadRequest } = await import("@/lib/security/file-validator")
+    const validation = validateUploadRequest(fileName, fileType, fileSize)
+    if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." }
 
     const plan = await getPartnerPlan(partnerId)
     if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
@@ -724,8 +819,29 @@ export async function saveStockMovementAttachmentAction(
       }
     }
 
+    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+    const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3")
+    const serverConfig = getR2ServerConfig()
+    const s3 = new S3Client({
+      region: "auto",
+      credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
+      endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+    })
+    let actualFileSize: number
+    try {
+      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+      actualFileSize = Number(head.ContentLength)
+      if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType) {
+        return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
+      }
+      const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+      if (!actualValidation.success) return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
+    } finally {
+      s3.destroy()
+    }
+
     let finalHash = fileHash || ""
-    if (!finalHash && fileSize < 5 * 1024 * 1024) {
+    if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
       try {
         const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
         const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
@@ -757,7 +873,7 @@ export async function saveStockMovementAttachmentAction(
         file_key: fileKey,
         file_name: fileName,
         file_type: fileType,
-        file_size: fileSize,
+        file_size: actualFileSize,
         uploaded_by: user.id,
         file_hash: finalHash,
       })

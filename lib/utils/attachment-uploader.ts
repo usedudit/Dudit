@@ -35,11 +35,11 @@ async function getPresignedUrl(
 ): Promise<PresignedUploadResult> {
     switch (entityType) {
         case "order":
-            return getOrderPresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
+            return getOrderPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "service_order":
             return getPresignedUploadUrlAction(partnerId, "service-orders", fileName, fileType, fileSize)
         case "stock_movement":
-            return getStockMovementPresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
+            return getStockMovementPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "transaction":
             return getTransactionPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "return":

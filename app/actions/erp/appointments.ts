@@ -735,6 +735,12 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     const { user, partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("create")
     const supabase = await getSupabaseServerClient()
     const rows = payload.map((item) => toDbPayload(item, partnerId, contextStoreId))
+    // The partner permission is not sufficient for a store-scoped user. Check
+    // every destination store before inserting any appointments.
+    const targetStoreIds = Array.from(new Set(rows.map((row) => row.store_id).filter(Boolean))) as string[]
+    await Promise.all(targetStoreIds.map((targetStoreId) =>
+      requireStorePermission(targetStoreId, partnerId, "appointments", "create"),
+    ))
     const customerIds = await resolveAppointmentCustomerIds(
       supabase,
       partnerId,
@@ -1196,6 +1202,14 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       .single()
     if (currentError || !current) throw currentError || new Error("Agendamento não encontrado")
 
+    if (current.store_id) {
+      await requireStorePermission(current.store_id, partnerId, "appointments", "edit")
+    }
+    const targetStoreId = payload.storeId ?? current.store_id
+    if (targetStoreId && targetStoreId !== current.store_id) {
+      await requireStorePermission(targetStoreId, partnerId, "appointments", "edit")
+    }
+
     const paymentStatusValue = (payload as any)?.paymentStatus ?? current.payment_status
     const paidAmountValue = Math.max(0, Number((payload as any)?.paidAmount ?? current.paid_amount ?? 0))
 
@@ -1534,12 +1548,15 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
     // Log the deletion and optionally notify
     const { data: current } = await supabase
       .from("appointments")
-      .select("id, partner_id, customer_id, customer_name, service_name, start_date, start_time, marketplace_order_id, source, status")
+      .select("id, partner_id, customer_id, customer_name, service_name, start_date, start_time, marketplace_order_id, source, status, store_id")
       .eq("id", appointmentId)
       .eq("partner_id", partnerId)
       .single()
 
     if (current) {
+      if (current.store_id) {
+        await requireStorePermission(current.store_id, partnerId, "appointments", "delete")
+      }
       await logAuditEvent({
         partnerId,
         actorUserId: user.id,
@@ -1594,16 +1611,35 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
 
 export async function deleteUnavailableSeriesAction(partnerId: string, serviceName: string) {
   try {
-    const { user } = await getPartnerContextWithPermission("delete")
+    const { user, partnerId: authorizedPartnerId } = await getPartnerContextWithPermission("delete")
+    if (partnerId !== authorizedPartnerId) {
+      throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    }
     const supabase = await getSupabaseServerClient()
 
-    // Only delete "unavailable" sources with matching service name
+    // Resolve the exact rows first so store-scoped permissions are checked for
+    // every affected store, then delete only those authorized IDs.
+    const { data: unavailableRows, error: lookupError } = await supabase
+      .from("appointments")
+      .select("id, store_id")
+      .eq("partner_id", authorizedPartnerId)
+      .eq("service_name", serviceName)
+      .eq("source", "unavailable")
+
+    if (lookupError) throw lookupError
+    const targetStoreIds = Array.from(new Set((unavailableRows || []).map((row) => row.store_id).filter(Boolean))) as string[]
+    await Promise.all(targetStoreIds.map((targetStoreId) =>
+      requireStorePermission(targetStoreId, authorizedPartnerId, "appointments", "delete"),
+    ))
+
+    const unavailableIds = (unavailableRows || []).map((row) => row.id)
+    if (unavailableIds.length === 0) return { success: true }
+
     const { error } = await supabase
       .from("appointments")
       .delete()
-      .eq("partner_id", partnerId)
-      .eq("service_name", serviceName)
-      .eq("source", "unavailable")
+      .eq("partner_id", authorizedPartnerId)
+      .in("id", unavailableIds)
 
     if (error) throw error
 

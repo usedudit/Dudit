@@ -102,9 +102,11 @@ const verifyAuth = async () => {
 
 const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name", resolvedUser?: any) => {
     const admin = getAdminClient()
+    const columns = selectColumns.split(",").map((column) => column.trim())
+    if (!columns.includes("store_id")) columns.push("store_id")
 
     const [productRes, user] = await Promise.all([
-        admin.from("products").select(selectColumns).eq("id", productId).single(),
+        admin.from("products").select(columns.join(", ")).eq("id", productId).single(),
         resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
     ])
 
@@ -116,6 +118,9 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
         await requirePermission(product.partner_id, "products", requiredAction, user)
     } else {
         await requirePermission(product.partner_id, "products", "view", user)
+    }
+    if (product.store_id) {
+        await requireStorePermission(product.store_id, product.partner_id, "products", requiredAction || "view")
     }
 
     return product
@@ -131,7 +136,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     const admin = getAdminClient()
 
     const [dataRes, user] = await Promise.all([
-        admin.from("products").select("id, partner_id").in("id", sanitized),
+        admin.from("products").select("id, partner_id, store_id").in("id", sanitized),
         resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
     ])
 
@@ -146,7 +151,31 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     // await requireMinimumPlan(partnerId, "crescer")
     await requirePermission(partnerId, "products", "view", user)
 
-    return { sanitized, partnerId, user }
+    return { sanitized, partnerId, user, products: data }
+}
+
+const requireBatchProductStorePermission = async (
+    products: Array<{ store_id?: string | null }>,
+    partnerId: string,
+    resource: "products" | "stock_movements",
+    action: "view" | "create" | "edit" | "delete",
+) => {
+    const storeIds = Array.from(new Set(products.map((product) => product.store_id).filter(Boolean))) as string[]
+    await Promise.all(storeIds.map((storeId) => requireStorePermission(storeId, partnerId, resource, action)))
+}
+
+const requireSuppliersBelongToPartner = async (supplierIds: string[], partnerId: string) => {
+    const ids = Array.from(new Set(supplierIds.map((id) => String(id || "").trim())))
+    if (!ids.length || ids.length > 100 || ids.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+        throw new Error("Fornecedor inválido")
+    }
+    const { data, error } = await getAdminClient()
+        .from("suppliers")
+        .select("id, partner_id")
+        .in("id", ids)
+    if (error || !data || data.length !== ids.length || data.some((supplier: any) => supplier.partner_id !== partnerId)) {
+        throw new Error("Fornecedor não encontrado neste parceiro")
+    }
 }
 
 /**
@@ -183,6 +212,13 @@ const verifyVariantBatchOwnership = async (
 
     const partnerId = partnerIds[0]
     await requirePermission(partnerId, "products", "edit", user)
+    const storeIds = Array.from(new Set(variants
+        .map((variant) => {
+            const product = Array.isArray(variant?.products) ? variant.products[0] : variant?.products
+            return product?.store_id
+        })
+        .filter((id): id is string => typeof id === "string" && id.length > 0)))
+    await Promise.all(storeIds.map((storeId) => requireStorePermission(storeId, partnerId, "products", "edit")))
     return partnerId
 }
 
@@ -548,6 +584,11 @@ export async function createProductComprehensiveAction(data: {
         }
         if (!imagesLimitCheck.allowed) {
             return errorResponse(imagesLimitCheck.message || "Limite de imagens atingido.")
+        }
+        await requireStorePermission(finalStoreId, finalPartnerId, "products", "create")
+        if (Number(data.stockQuantity || 0) !== 0) {
+            await requirePermission(finalPartnerId, "stock_movements", "create", _user)
+            await requireStorePermission(finalStoreId, finalPartnerId, "stock_movements", "create")
         }
         if (hasVariants && !variantsFeatureAllowed) {
             return errorResponse("Seu plano não permite o uso de variantes. Faça upgrade para desbloquear.")
@@ -1243,6 +1284,11 @@ export async function createProductVariantAction(data: {
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
     try {
         const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
+        if (Number(data.stockQuantity || 0) !== 0) {
+            const user = await requireUser()
+            await requirePermission(product.partner_id, "stock_movements", "create", user)
+            if (product.store_id) await requireStorePermission(product.store_id, product.partner_id, "stock_movements", "create")
+        }
 
         // Check subscription feature
         if (!await canUseFeature(product.partner_id, "product_variants")) {
@@ -1335,6 +1381,17 @@ export async function createProductVariantsBatchAction(data: {
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
+        if (data.variants.some((variant) => Number(variant.stockQuantity || 0) !== 0)) {
+            const user = await requireUser()
+            await requirePermission(product.partner_id, "stock_movements", "create", user)
+            if (product.store_id) await requireStorePermission(product.store_id, product.partner_id, "stock_movements", "create")
+        }
+
+        const requestedSkus = data.variants.map((variant) => String(variant.sku || "").trim()).filter(Boolean)
+        if (new Set(requestedSkus).size !== requestedSkus.length) {
+            return errorResponse("Cada variante precisa ter um SKU exclusivo.")
+        }
+
         const supabase = await getSupabaseServerClient()
 
         // 1. Validar plano e buscar variantes existentes em paralelo
@@ -1365,10 +1422,7 @@ export async function createProductVariantsBatchAction(data: {
         // 3. Fazer upsert em lote
         const { data: inserted, error } = await supabase
             .from("product_variants")
-            .upsert(
-                variantsToInsert,
-                { onConflict: 'sku' } // Usa SKU como identificador único
-            )
+            .insert(variantsToInsert)
             .select()
 
         if (error) return errorResponse(error.message)
@@ -1484,7 +1538,7 @@ export async function deleteProductVariantAction(variantId: string): Promise<Act
         if (!variant) return errorResponse("Variante não encontrada")
 
         const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
-        const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
+        const { error } = await supabase.from("product_variants").delete().eq("id", variantId).eq("product_id", variant.product_id)
         if (error) return errorResponse(error.message)
 
         const variantImage = variant.variant_options?.image
@@ -1524,6 +1578,11 @@ export async function updateProductVariantAction(variantId: string, data: {
         if (!variant) return errorResponse("Variante não encontrada")
 
         const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
+        if (data.stockQuantity !== undefined) {
+            const user = await requireUser()
+            await requirePermission(product.partner_id, "stock_movements", "create", user)
+            if (product.store_id) await requireStorePermission(product.store_id, product.partner_id, "stock_movements", "create")
+        }
 
         const payload: any = { updated_at: new Date().toISOString() }
         if (data.variantName !== undefined) payload.variant_name = data.variantName
@@ -1550,7 +1609,7 @@ export async function updateProductVariantAction(variantId: string, data: {
             payload.variant_options = { ...(variant.variant_options || {}), image: data.image }
         }
 
-        const { data: updated, error } = await supabase.from("product_variants").update(payload).eq("id", variantId).select().single()
+        const { data: updated, error } = await supabase.from("product_variants").update(payload).eq("id", variantId).eq("product_id", variant.product_id).select().single()
         if (error) return errorResponse(error.message)
 
         Promise.resolve().then(() => revalidateProducts(product.partner_id, variant.product_id)).catch(console.error)
@@ -1564,12 +1623,14 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
     try {
         const user = await verifyAuth()
         if (!variantIds?.length) return successResponse({ deletedCount: 0 })
+        if (variantIds.length > 100) return errorResponse("Máximo: 100 variantes por operação.")
+        if (new Set(variantIds).size !== variantIds.length) return errorResponse("A lista contém variantes repetidas.")
 
         const supabase = await getSupabaseServerClient()
 
         const { data: variants } = await supabase
             .from("product_variants")
-            .select("id, product_id, variant_options, products!inner(partner_id, partners!inner(user_id))")
+            .select("id, product_id, variant_options, products!inner(partner_id, store_id, partners!inner(user_id))")
             .in("id", variantIds)
 
         if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
@@ -1620,13 +1681,23 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
     try {
         const user = await verifyAuth()
         if (!updates?.length) return successResponse({ updatedCount: 0 })
+        if (updates.length > 100) return errorResponse("Máximo: 100 variantes por operação.")
+        const allowedFields = new Set(["id", "price", "stock", "active", "image"])
+        for (const update of updates) {
+            if (!update || Object.keys(update).some((key) => !allowedFields.has(key))) return errorResponse("Campo inválido na atualização de variantes.")
+            if (update.price !== undefined && (!Number.isFinite(Number(update.price)) || Number(update.price) < 0)) return errorResponse("Preço de variante inválido.")
+            if (update.stock !== undefined && !Number.isFinite(Number(update.stock))) return errorResponse("Estoque de variante inválido.")
+            if (update.active !== undefined && typeof update.active !== "boolean") return errorResponse("Status de variante inválido.")
+            if (update.image !== undefined && (typeof update.image !== "string" || update.image.length > 2048)) return errorResponse("Imagem de variante inválida.")
+        }
 
         const supabase = await getSupabaseServerClient()
         const variantIds = updates.map(u => u.id)
+        if (new Set(variantIds).size !== variantIds.length) return errorResponse("A lista contém variantes repetidas.")
 
         const { data: variants } = await supabase
             .from("product_variants")
-            .select("id, product_id, variant_options, products!inner(partner_id, partners!inner(user_id))")
+            .select("id, product_id, variant_options, products!inner(partner_id, store_id, partners!inner(user_id))")
             .in("id", variantIds)
 
         if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
@@ -1638,9 +1709,17 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
         }
         const productPartnerId = await verifyVariantBatchOwnership(variants, user)
 
-        await Promise.all(updates.map(update => {
+        if (updates.some((update) => update.stock !== undefined)) {
+            await requirePermission(productPartnerId, "stock_movements", "create", user)
+            const storeIds = Array.from(new Set(variants
+                .map((variant: any) => (Array.isArray(variant.products) ? variant.products[0] : variant.products)?.store_id)
+                .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)))
+            await Promise.all(storeIds.map((storeId) => requireStorePermission(storeId, productPartnerId, "stock_movements", "create")))
+        }
+
+        const results = await Promise.all(updates.map(update => {
             const current = variants.find((v: any) => v.id === update.id)
-            if (!current) return
+            if (!current) return Promise.resolve({ error: { message: "Variante não encontrada" } })
 
             const payload: any = { updated_at: new Date().toISOString() }
             if (update.price !== undefined) payload.price_adjustment = update.price
@@ -1649,8 +1728,10 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             if (update.image !== undefined) {
                 payload.variant_options = { ...(current.variant_options || {}), image: update.image }
             }
-            return supabase.from("product_variants").update(payload).eq("id", update.id)
+            return supabase.from("product_variants").update(payload).eq("id", update.id).eq("product_id", current.product_id)
         }))
+        const firstError = results.find((result: any) => result?.error)
+        if (firstError) return errorResponse(firstError.error?.message || "Falha ao atualizar variantes.")
 
         const firstProd = Array.isArray(variants[0]?.products) ? variants[0].products[0] : variants[0]?.products
         if (firstProd?.partner_id) {
@@ -1669,6 +1750,10 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
 export async function linkProductSupplierAction(productId: string, supplierId: string, supplierData?: { costPrice?: number; supplierSku?: string; leadTimeDays?: number }) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        await requirePermission(product.partner_id, "suppliers", "create")
+        await requireSuppliersBelongToPartner([supplierId], product.partner_id)
+        if (supplierData?.costPrice !== undefined && (!Number.isFinite(Number(supplierData.costPrice)) || Number(supplierData.costPrice) < 0)) return { error: "Custo inválido" }
+        if (supplierData?.leadTimeDays !== undefined && (!Number.isInteger(Number(supplierData.leadTimeDays)) || Number(supplierData.leadTimeDays) < 0)) return { error: "Prazo inválido" }
         const admin = getAdminClient()
 
         const { error } = await admin.from("product_suppliers").insert({
@@ -1694,6 +1779,8 @@ export async function linkProductSuppliersBatchAction(productId: string, supplie
     try {
         if (!supplierIds || supplierIds.length === 0) return { success: true }
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        await requirePermission(product.partner_id, "suppliers", "create")
+        await requireSuppliersBelongToPartner(supplierIds, product.partner_id)
         const admin = getAdminClient()
 
         const payload = supplierIds.map((supplierId) => ({
@@ -1720,6 +1807,8 @@ export async function linkProductSuppliersBatchAction(productId: string, supplie
 export async function unlinkProductSupplierAction(productId: string, supplierId: string) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        await requirePermission(product.partner_id, "suppliers", "delete")
+        await requireSuppliersBelongToPartner([supplierId], product.partner_id)
         const admin = getAdminClient()
         const { error } = await admin.from("product_suppliers").delete().eq("product_id", productId).eq("supplier_id", supplierId)
         if (error) return { error: error.message }
@@ -1737,6 +1826,11 @@ export async function unlinkProductSupplierAction(productId: string, supplierId:
 export async function updateProductSupplierAction(productId: string, supplierId: string, data: { costPrice?: number | null; supplierSku?: string | null; leadTimeDays?: number | null }) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        await requirePermission(product.partner_id, "suppliers", "edit")
+        await requireSuppliersBelongToPartner([supplierId], product.partner_id)
+        if (data.costPrice != null && (!Number.isFinite(Number(data.costPrice)) || Number(data.costPrice) < 0)) return { error: "Custo inválido" }
+        if (data.leadTimeDays != null && (!Number.isInteger(Number(data.leadTimeDays)) || Number(data.leadTimeDays) < 0)) return { error: "Prazo inválido" }
+        if (data.supplierSku != null && data.supplierSku.length > 100) return { error: "SKU do fornecedor muito longo" }
         const admin = getAdminClient()
         const updates: any = {}
         if (data.costPrice !== undefined) updates.cost_price = data.costPrice
@@ -1755,6 +1849,10 @@ export async function updateProductSupplierAction(productId: string, supplierId:
 }
 
 export const getCachedSuppliers = async (partnerId: string) => {
+    const user = await requireUser()
+    const context = await getCurrentPartnerContext(user)
+    if (!context?.partnerId || context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    await requirePermission(partnerId, "suppliers", "view", user)
     const rows = await unstable_cache(
         async () => {
             const supabase = getAdminClient()
@@ -1773,17 +1871,18 @@ export const getCachedSuppliers = async (partnerId: string) => {
 export async function getProductSuppliersAction(productId: string) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "view")
+        await requirePermission(product.partner_id, "suppliers", "view")
         const admin = getAdminClient()
         const { data, error } = await admin
             .from("product_suppliers")
             .select(`
                 id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
                 last_purchase_price, last_purchase_date, last_invoice_key,
-                supplier:suppliers(id, name, email, phone, cnpj, cpf, image_url)
+                supplier:suppliers(id, partner_id, name, email, phone, cnpj, cpf, image_url)
             `)
             .eq("product_id", productId)
         if (error) return { error: error.message }
-        const suppliers = await Promise.all((data || []).map(async (ps: any) => ({
+        const suppliers = await Promise.all((data || []).filter((ps: any) => ps.supplier?.partner_id === product.partner_id).map(async (ps: any) => ({
             id: ps.id,
             product_id: ps.product_id,
             supplier_id: ps.supplier_id,
@@ -1835,11 +1934,13 @@ export async function getProductSuppliersOverviewAction(
 ) {
     try {
         const product = await fetchProductAndVerifyOwnership(productId, "view")
+        await requirePermission(product.partner_id, "suppliers", "view")
         const admin = getAdminClient()
         const purchasesPage = options?.purchasesPage || 1
         const purchasesLimit = options?.purchasesLimit || 5
         const offset = (purchasesPage - 1) * purchasesLimit
         const selectedSupplierId = options?.selectedSupplierId || null
+        if (selectedSupplierId) await requireSuppliersBelongToPartner([selectedSupplierId], product.partner_id)
 
         let purchasesQuery = admin
             .from("xml_import_items")
@@ -1861,7 +1962,7 @@ export async function getProductSuppliersOverviewAction(
             admin.from("product_suppliers").select(`
                 id, product_id, supplier_id, cost_price, supplier_sku, lead_time_days,
                 last_purchase_price, last_purchase_date, last_invoice_key,
-                supplier:suppliers(id, name, email, phone, cnpj, cpf, image_url)
+                supplier:suppliers(id, partner_id, name, email, phone, cnpj, cpf, image_url)
             `).eq("product_id", productId),
             purchasesQuery,
             admin.from("purchase_cost_history").select(
@@ -1871,7 +1972,7 @@ export async function getProductSuppliersOverviewAction(
 
         if (suppliersRes.error) return { error: suppliersRes.error.message }
 
-        const suppliers = await Promise.all((suppliersRes.data || []).map(async (ps: any) => ({
+        const suppliers = await Promise.all((suppliersRes.data || []).filter((ps: any) => ps.supplier?.partner_id === product.partner_id).map(async (ps: any) => ({
             id: ps.id,
             product_id: ps.product_id,
             supplier_id: ps.supplier_id,
@@ -1968,7 +2069,9 @@ export async function getProductSupplierDetailsAction(
     try {
         if (!productId || !supplierId) return { error: "Produto ou fornecedor inválido" }
 
-        await fetchProductAndVerifyOwnership(productId, "view")
+        const product = await fetchProductAndVerifyOwnership(productId, "view")
+        await requirePermission(product.partner_id, "suppliers", "view")
+        await requireSuppliersBelongToPartner([supplierId], product.partner_id)
         const admin = getAdminClient()
 
         const purchasesLimit = options?.purchasesLimit || 5
@@ -2038,6 +2141,10 @@ export async function getProductSupplierDetailsAction(
 
 export async function searchSuppliersAction(partnerId: string, search: string) {
     try {
+        const user = await requireUser()
+        const context = await getCurrentPartnerContext(user)
+        if (!context?.partnerId || context.partnerId !== partnerId) return { error: "O parceiro informado não corresponde ao contexto ativo" }
+        await requirePermission(partnerId, "suppliers", "view", user)
         const supabase = await getSupabaseServerClient()
         const sanitized = search.replace(/[%_]/g, "")
         if (!sanitized.trim()) {
@@ -2084,7 +2191,8 @@ export async function getProductPurchaseHistoryAction(
     options?: { limit?: number; offset?: number; supplierId?: string }
 ) {
     try {
-        await fetchProductAndVerifyOwnership(productId, "view")
+        const product = await fetchProductAndVerifyOwnership(productId, "view")
+        await requirePermission(product.partner_id, "suppliers", "view")
         const supabase = await getSupabaseServerClient()
         const limit = options?.limit || 20
         const offset = options?.offset || 0
@@ -2138,7 +2246,8 @@ export async function getProductPurchaseHistoryAction(
 
 export async function getProductCostHistoryAction(productId: string, limit = 10) {
     try {
-        await fetchProductAndVerifyOwnership(productId, "view")
+        const product = await fetchProductAndVerifyOwnership(productId, "view")
+        await requirePermission(product.partner_id, "suppliers", "view")
         const supabase = await getSupabaseServerClient()
         const { data, error } = await supabase
             .from("purchase_cost_history")
@@ -2326,7 +2435,8 @@ export async function updateProductPromotionalPriceAction(params: {
     promotionalPrice: number | null
 }) {
     try {
-        const user = await requireUser()
+        const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id")
+        if (product.partner_id !== params.partnerId) return { error: "Produto não encontrado" }
         await requirePermission(params.partnerId, "products", "edit")
         const admin = getAdminClient()
 
@@ -2492,7 +2602,8 @@ export async function updateProductSalePriceAction(params: {
     clearPromotion?: boolean
 }) {
     try {
-        await requireUser()
+        const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id")
+        if (product.partner_id !== params.partnerId) return { error: "Produto não encontrado" }
         await requirePermission(params.partnerId, "products", "edit")
         const admin = getAdminClient()
 
@@ -2526,11 +2637,12 @@ export async function updateProductSalePriceAction(params: {
 export async function toggleProductStatusAction(productIds: string[], isActive: boolean) {
     try {
         await verifyAuth()
-        const { sanitized, partnerId, user } = await verifyBatchOwnership(productIds)
+        const { sanitized, partnerId, user, products } = await verifyBatchOwnership(productIds)
         await requirePermission(partnerId, "products", "edit", user)
+        await requireBatchProductStorePermission(products, partnerId, "products", "edit")
         const admin = getAdminClient()
 
-        const { error } = await admin.from("products").update({ status: isActive ? "ativo" : "inativo" }).in("id", sanitized)
+        const { error } = await admin.from("products").update({ status: isActive ? "ativo" : "inativo" }).in("id", sanitized).eq("partner_id", partnerId)
         if (error) return { error: error.message }
 
         if (partnerId) {
@@ -2549,8 +2661,9 @@ export async function deleteProductsInBatchAction(productIds: string[], reason?:
     try {
         await verifyAuth()
         const user = await requireUser()
-        const { sanitized, partnerId } = await verifyBatchOwnership(productIds)
+        const { sanitized, partnerId, products: ownershipRows } = await verifyBatchOwnership(productIds)
         await requirePermission(partnerId, "products", "delete")
+        await requireBatchProductStorePermission(ownershipRows, partnerId, "products", "delete")
         const admin = getAdminClient()
 
         // Fetch products details first for audit logging
@@ -2558,7 +2671,7 @@ export async function deleteProductsInBatchAction(productIds: string[], reason?:
 
         // 1. Explicit batch update (soft delete)
         const payload = buildSoftDeletePayload(user.id, reason)
-        const { error } = await admin.from("products").update(payload).in("id", sanitized)
+        const { error } = await admin.from("products").update(payload).in("id", sanitized).eq("partner_id", partnerId)
         if (error) return { error: error.message }
 
         // 2. Log audit event for each product in batch
@@ -2601,8 +2714,53 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
     try {
         await verifyAuth()
         const productIds = updates.map(u => u.id)
-        const { sanitized, partnerId, user } = await verifyBatchOwnership(productIds)
+        const { sanitized, partnerId, user, products } = await verifyBatchOwnership(productIds)
         await requirePermission(partnerId, "products", "edit", user)
+        await requireBatchProductStorePermission(products, partnerId, "products", "edit")
+
+        const allowedFields = new Set(["price", "stock_quantity", "status", "is_active", "isActive", "images"])
+        const normalizedUpdates: Array<{ id: string; data: Record<string, unknown> }> = []
+        for (const update of updates) {
+            if (!update || typeof update !== "object" || !sanitized.includes(update.id)) {
+                return { error: "Produto inválido na atualização em lote" }
+            }
+            const keys = Object.keys(update).filter((key) => key !== "id")
+            if (keys.length === 0 || keys.some((key) => !allowedFields.has(key))) {
+                return { error: "Campo inválido na atualização em lote" }
+            }
+
+            const updateData: Record<string, unknown> = {}
+            if (update.price !== undefined) {
+                const price = Number(update.price)
+                if (!Number.isFinite(price) || price < 0) return { error: "Preço inválido" }
+                updateData.price = price
+            }
+            if (update.stock_quantity !== undefined) {
+                const stock = Number(update.stock_quantity)
+                if (!Number.isFinite(stock)) return { error: "Estoque inválido" }
+                updateData.stock_quantity = stock
+            }
+            const activeValue = update.is_active ?? update.isActive
+            if (activeValue !== undefined) {
+                if (typeof activeValue !== "boolean") return { error: "Status inválido" }
+                updateData.status = activeValue ? "ativo" : "inativo"
+            } else if (update.status !== undefined) {
+                if (update.status !== "ativo" && update.status !== "inativo") return { error: "Status inválido" }
+                updateData.status = update.status
+            }
+            if (update.images !== undefined) {
+                if (!Array.isArray(update.images) || update.images.length > 50 || update.images.some((image: unknown) => typeof image !== "string" || image.length > 2048)) {
+                    return { error: "Imagens inválidas" }
+                }
+                updateData.images = update.images
+            }
+            normalizedUpdates.push({ id: update.id, data: updateData })
+        }
+
+        if (normalizedUpdates.some(({ data }) => "stock_quantity" in data)) {
+            await requirePermission(partnerId, "stock_movements", "create", user)
+            await requireBatchProductStorePermission(products, partnerId, "stock_movements", "create")
+        }
 
         const admin = getAdminClient()
 
@@ -2610,22 +2768,8 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
         // Given Supabase limitations, a series of updates or a specific RPC is best.
         // For now, let's use a Promise.all for simplicity, but strictly validated.
 
-        const results = await Promise.all(updates.map(update => {
-            const { id, ...data } = update
-            if (!sanitized.includes(id)) return Promise.resolve({ error: "Unauthorized ID" })
-
-            // Convert is_active/isActive to status since is_active is a generated column
-            const updateData = { ...data }
-            if (updateData.is_active !== undefined) {
-                updateData.status = updateData.is_active ? "ativo" : "inativo"
-                delete updateData.is_active
-            }
-            if (updateData.isActive !== undefined) {
-                updateData.status = updateData.isActive ? "ativo" : "inativo"
-                delete updateData.isActive
-            }
-
-            return admin.from("products").update(updateData).eq("id", id)
+        const results = await Promise.all(normalizedUpdates.map(({ id, data }) => {
+            return admin.from("products").update(data).eq("id", id).eq("partner_id", partnerId)
         }))
 
         const firstError = results.find(r => r.error)
@@ -2637,7 +2781,7 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
                 invalidateProductCache(id, partnerId, 'update')
             ))
         }
-        return { success: true, count: updates.length }
+        return { success: true, count: normalizedUpdates.length }
     } catch (error: any) {
         return { error: error.message }
     }
@@ -2652,11 +2796,13 @@ export async function duplicateProductsAction(productIds: string[]) {
     try {
         const user = await verifyAuth()
         const supabase = await getSupabaseServerClient()
-        const { data: products } = await supabase.from("products").select("*").in("id", productIds)
+        const { sanitized, partnerId, products: ownershipRows } = await verifyBatchOwnership(productIds, user)
+        await requirePermission(partnerId, "products", "create", user)
+        await requireBatchProductStorePermission(ownershipRows, partnerId, "products", "view")
+        await requireBatchProductStorePermission(ownershipRows, partnerId, "products", "create")
+        const { data: products } = await supabase.from("products").select("*").in("id", sanitized).eq("partner_id", partnerId)
 
-        if (!products?.length) return { success: false, error: "Produtos não encontrados" }
-        const partnerId = products[0].partner_id
-        await requirePermission(partnerId, "products", "create")
+        if (!products?.length || products.length !== sanitized.length) return { success: false, error: "Produtos não encontrados" }
 
         const limitCheck = await checkLimit(partnerId, "items", products.length)
         if (!limitCheck.allowed) {
@@ -2985,9 +3131,15 @@ export async function getERPProductsPageAction(
 > {
     try {
         // await requireMinimumPlan(partnerId, "crescer")
-        await requirePermission(partnerId, "products", "view")
-        if (options?.storeId) {
-            await requireStorePermission(options.storeId, partnerId, "products", "view")
+        const user = await requireUser()
+        const context = await getCurrentPartnerContext(user)
+        if (!context?.partnerId || context.partnerId !== partnerId) {
+            return { success: false, error: "O parceiro informado não corresponde ao contexto ativo" }
+        }
+        await requirePermission(context.partnerId, "products", "view", user)
+        const storeId = options?.storeId || context.activeStoreId || null
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "products", "view")
         }
 
         const cursor = options?.cursor ?? null
@@ -2999,7 +3151,7 @@ export async function getERPProductsPageAction(
             [
                 "erp-products-page",
                 partnerId,
-                options?.storeId || "all-stores",
+                storeId || "all-stores",
                 cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
                 String(limit),
                 String(filterKey),
@@ -3012,7 +3164,7 @@ export async function getERPProductsPageAction(
                     .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
                     .eq("partner_id", partnerId)
 
-                if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
+                if (storeId) q = q.or(`store_id.eq.${storeId},store_id.is.null`)
 
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
                     q = scopeArchivedOnly(q)

@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { requireUser } from "@/lib/auth/authorization";
 import { requireStorePermission } from "@/lib/auth/authorization";
 import { requirePermission } from "@/lib/permissions/access";
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context";
 import { can } from "@/lib/permissions/can";
 import type { RbacUserLike } from "@/lib/permissions/rbac-types";
 import { RateLimitCategory } from "@/lib/rate-limiter";
@@ -2179,7 +2180,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   if (!user) return { error: "Não autenticado" };
 
   const partnerId = data.partnerId;
+  const context = await getCurrentPartnerContext(user);
+  if (!context?.partnerId || context.partnerId !== partnerId) {
+    return { error: "O parceiro informado não corresponde ao contexto ativo" };
+  }
+  data.storeId = data.storeId || context.activeStoreId || undefined;
   const permissionPromise = requirePermission(partnerId, "orders", "create");
+  if (data.storeId) await requireStorePermission(data.storeId, partnerId, "orders", "create");
   const capabilitiesPromise = getPartnerCapabilities(partnerId, {
     storeId: data.storeId,
   });
@@ -3155,6 +3162,9 @@ export async function getOrderDetailsAction(
 
   if (error) return { error: error.message };
   if (data) {
+    if (!opts?.adminBypass && data.store_id) {
+      await requireStorePermission(data.store_id, partnerId, "orders", "view");
+    }
     // P3: resolve cliente e vendedor em paralelo (consultas independentes entre si)
     // em vez de sequencialmente, reduzindo round-trips na abertura do detalhe.
     const resolveCustomer = async () => {
@@ -3678,11 +3688,17 @@ export async function getOrderHistoryAction(
   const supabase = createAdminClient();
   const { data: saleRow } = await supabase
     .from("sales")
-    .select("id")
+    .select("id, store_id")
     .eq("id", orderId)
     .eq("partner_id", partnerId)
     .maybeSingle();
-  if (saleRow?.id) return { success: true, data: [] as any[] };
+  if (saleRow?.id) {
+    if (saleRow.store_id) await requireStorePermission(saleRow.store_id, partnerId, "orders", "view");
+    return { success: true, data: [] as any[] };
+  }
+
+  const { data: order } = await supabase.from("orders").select("store_id").eq("id", orderId).eq("partner_id", partnerId).maybeSingle();
+  if (order?.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view");
 
   const entries = await getOrderHistoryEntries(orderId, partnerId);
   return { success: true, data: entries };
@@ -4906,15 +4922,34 @@ export async function deleteOrdersInBatchAction(
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
+  if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 100) {
+    return { error: "Informe de 1 a 100 pedidos para excluir." };
+  }
+  if (new Set(orderIds).size !== orderIds.length || orderIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+    return { error: "A lista contém IDs inválidos ou repetidos." };
+  }
+
   await requirePermission(partnerId, "orders", "delete");
   const supabase = createAdminClient();
 
-  await supabase.from("order_items").delete().in("order_id", orderIds);
+  const { data: orders, error: lookupError } = await supabase
+    .from("orders")
+    .select("id, store_id")
+    .in("id", orderIds)
+    .eq("partner_id", partnerId);
+  if (lookupError) return { error: lookupError.message };
+  if (!orders || orders.length !== orderIds.length) return { error: "Um ou mais pedidos não foram encontrados neste parceiro." };
+  await Promise.all(orders.filter((order: any) => order.store_id).map((order: any) =>
+    requireStorePermission(order.store_id, partnerId, "orders", "delete"),
+  ));
+
+  const { error: itemDeleteError } = await supabase.from("order_items").delete().in("order_id", orders.map((order: any) => order.id));
+  if (itemDeleteError) return { error: itemDeleteError.message };
 
   const { error } = await supabase
     .from("orders")
     .delete()
-    .in("id", orderIds)
+    .in("id", orders.map((order: any) => order.id))
     .eq("partner_id", partnerId);
 
   if (error) return { error: error.message };
@@ -4931,12 +4966,12 @@ export async function updateOrderNotesAction(input: {
   const user = await requireUser();
   if (!user) return { success: false as const, error: "Não autenticado" };
 
-  await requirePermission(input.partnerId, "orders", "edit");
+  await requirePermission(input.partnerId, "orders", "edit", user);
   const supabase = createAdminClient();
 
   const { data: currentOrder, error: currentOrderError } = await supabase
     .from("orders")
-    .select("id, notes")
+    .select("id, notes, store_id")
     .eq("id", input.orderId)
     .eq("partner_id", input.partnerId)
     .maybeSingle();
@@ -4946,6 +4981,9 @@ export async function updateOrderNotesAction(input: {
       success: false as const,
       error: currentOrderError?.message || "Pedido nÃ£o encontrado.",
     };
+  }
+  if (currentOrder.store_id) {
+    await requireStorePermission(currentOrder.store_id, input.partnerId, "orders", "edit");
   }
 
   const cleanNotes = sanitizeNotes(input.notes) || "";
@@ -5085,6 +5123,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
   ) {
     return { error: "Ação inválida para pedidos." };
   }
+  if (!Array.isArray(payload.orderIds) || payload.orderIds.length === 0 || payload.orderIds.length > 100) {
+    return { error: "Informe de 1 a 100 pedidos para atualizar." };
+  }
+  if (new Set(payload.orderIds).size !== payload.orderIds.length || payload.orderIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+    return { error: "A lista contém IDs inválidos ou repetidos." };
+  }
 
   const access = await requirePermission(
     payload.partnerId,
@@ -5102,7 +5146,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     .in("id", payload.orderIds)
     .eq("partner_id", payload.partnerId);
   const overallWarnings: string[] = [];
-  if (!currentOrders || currentOrders.length === 0) {
+  if (!currentOrders || currentOrders.length !== payload.orderIds.length) {
     return { error: "Nenhum pedido válido foi encontrado para processar." };
   }
 
@@ -6387,13 +6431,21 @@ export async function getERPOrdersPageAction(
   | { success: false; error: string }
 > {
   try {
-    const access = await requirePermission(partnerId, "orders", "view");
+    const user = await requireUser();
+    const context = await getCurrentPartnerContext(user);
+    if (!context?.partnerId || context.partnerId !== partnerId) {
+      return { success: false, error: "O parceiro informado não corresponde ao contexto ativo" };
+    }
+    const access = await requirePermission(partnerId, "orders", "view", user);
     if (!can(access as RbacUserLike, "orders.list")) {
       return {
         success: false,
         error: "Sem permissão para acessar a listagem de pedidos.",
       };
     }
+
+    const storeId = options?.storeId || context.activeStoreId || undefined;
+    if (storeId) await requireStorePermission(storeId, partnerId, "orders", "view");
 
     const cursor = options?.cursor ?? null;
     const limit = Math.max(
@@ -6405,7 +6457,7 @@ export async function getERPOrdersPageAction(
       [
         "erp-orders-page",
         partnerId,
-        options?.storeId || "all-stores",
+        storeId || "all-stores",
         cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
         String(limit),
       ],
@@ -6431,7 +6483,7 @@ export async function getERPOrdersPageAction(
             .from("orders")
             .select(selectClause)
             .eq("partner_id", partnerId);
-          if (options?.storeId) query = query.eq("store_id", options.storeId);
+          if (storeId) query = query.eq("store_id", storeId);
           if (cursor) query = query.or(buildOrdersKeysetOrFilter(cursor));
           return query
             .order("created_at", { ascending: false })
@@ -6676,6 +6728,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     if (orderErr || !order) {
       throw new Error("Pedido não encontrado");
     }
+    if (order.store_id) await requireStorePermission(order.store_id, payload.partnerId, "orders", "edit");
 
     let orderPrice = Number(order.total_amount || 0);
     if (payload.servicePrice !== undefined) {
@@ -6957,10 +7010,11 @@ export async function getAppointmentOrderNumberAction(
     const supabase = await getSupabaseServerClient();
     const { data } = await supabase
       .from("orders")
-      .select("order_number")
+      .select("order_number, store_id")
       .eq("id", orderId)
       .eq("partner_id", partnerId)
       .maybeSingle();
+    if (data?.store_id) await requireStorePermission(data.store_id, partnerId, "orders", "view");
     return data?.order_number || null;
   } catch {
     return null;
@@ -6969,6 +7023,7 @@ export async function getAppointmentOrderNumberAction(
 
 export async function getOrderPresignedUploadUrlAction(
   partnerId: string,
+  orderId: string,
   fileName: string,
   fileType: string,
   fileSize: number,
@@ -6980,10 +7035,22 @@ export async function getOrderPresignedUploadUrlAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL);
     await requirePermission(partnerId, "orders", "edit");
     const user = await requireUser();
+    const supabase = await getSupabaseServerClient();
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, store_id")
+      .eq("id", orderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle();
+    if (!order) return { success: false, error: "Pedido não encontrado." };
+    if (order.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "edit");
 
     const { getUploadKindFromMimeType, getUploadValidationRules } =
       await import("@/lib/r2/config");
     const kind = getUploadKindFromMimeType(fileType) || "image";
+    const { validateUploadRequest } = await import("@/lib/security/file-validator");
+    const uploadValidation = validateUploadRequest(fileName, fileType, fileSize);
+    if (!uploadValidation.success) return { success: false, error: uploadValidation.error || "Arquivo inválido." };
 
     if (kind === "document") {
       const { getPartnerPlan } =
@@ -7042,8 +7109,34 @@ export async function saveOrderAttachmentAction(
   fileHash?: string,
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL);
     await requirePermission(partnerId, "orders", "edit");
     const user = await requireUser();
+    const supabase = await getSupabaseServerClient();
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, store_id")
+      .eq("id", orderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle();
+    if (!order) return { success: false, error: "Pedido não encontrado." };
+    if (order.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "edit");
+
+    const { R2_PREFIXES } = await import("@/lib/r2/config");
+    const { validateKeyOwnership } = await import("@/lib/r2/server");
+    const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`;
+    if (
+      typeof fileKey !== "string" ||
+      !validateKeyOwnership(fileKey, user.id) ||
+      !fileKey.startsWith(expectedPrefix) ||
+      fileKey.includes("..") ||
+      fileKey.startsWith("/")
+    ) {
+      return { success: false, error: "Chave de arquivo inválida para este usuário." };
+    }
+    const { validateUploadRequest } = await import("@/lib/security/file-validator");
+    const validation = validateUploadRequest(fileName, fileType, fileSize);
+    if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." };
     const { getAdminClient } = await import("@/lib/supabase/admin");
     const admin = getAdminClient();
 
@@ -7067,9 +7160,30 @@ export async function saveOrderAttachmentAction(
       };
     }
 
+    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config");
+    const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3");
+    const serverConfig = getR2ServerConfig();
+    const s3 = new S3Client({
+      region: "auto",
+      credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
+      endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+    });
+    let actualFileSize: number;
+    try {
+      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }));
+      actualFileSize = Number(head.ContentLength);
+      if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType) {
+        return { success: false, error: "O arquivo enviado não corresponde aos dados informados." };
+      }
+      const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize);
+      if (!actualValidation.success) return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." };
+    } finally {
+      s3.destroy();
+    }
+
     // 1. Compute/verify hash on server if not provided (fallback for small files)
     let finalHash = fileHash || "";
-    if (!finalHash && fileSize < 5 * 1024 * 1024) {
+    if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
       try {
         const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config");
         const { S3Client, GetObjectCommand } =
@@ -7119,7 +7233,7 @@ export async function saveOrderAttachmentAction(
         file_key: fileKey,
         file_name: fileName,
         file_type: validatedFileType,
-        file_size: fileSize,
+        file_size: actualFileSize,
         uploaded_by: user.id,
         file_hash: finalHash,
       })
@@ -7354,10 +7468,15 @@ export async function getOrdersInsightsAction(
   storeId?: string
 ): Promise<{ error: string } | OrdersInsightsResult> {
   try {
-    await requireUser();
-    await requirePermission(partnerId, "orders", "view");
-    if (storeId) {
-      await requireStorePermission(storeId, partnerId, "orders", "view");
+    const user = await requireUser();
+    const context = await getCurrentPartnerContext(user);
+    if (!context?.partnerId || context.partnerId !== partnerId) {
+      return { error: "O parceiro informado não corresponde ao contexto ativo" };
+    }
+    await requirePermission(partnerId, "orders", "view", user);
+    const effectiveStoreId = storeId || context.activeStoreId || undefined;
+    if (effectiveStoreId) {
+      await requireStorePermission(effectiveStoreId, partnerId, "orders", "view");
     }
     const admin = createAdminClient();
 
@@ -7392,10 +7511,10 @@ export async function getOrdersInsightsAction(
       .is("deleted_at", null)
       .in("status", PENDING_RETURN_INSIGHT_STATUSES);
 
-    if (storeId) {
-      recentQuery = recentQuery.or(`store_id.eq.${storeId},store_id.is.null`);
-      staleQuery = staleQuery.or(`store_id.eq.${storeId},store_id.is.null`);
-      returnsQuery = returnsQuery.or(`store_id.eq.${storeId},store_id.is.null`);
+    if (effectiveStoreId) {
+      recentQuery = recentQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`);
+      staleQuery = staleQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`);
+      returnsQuery = returnsQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`);
     }
 
     const [

@@ -97,7 +97,7 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
 }> = {
     order: {
         fetch: getOrderAttachmentsAction,
-        presigned: (pid, eid, name, type, size) => getOrderPresignedUploadUrlAction(pid, name, type, size),
+        presigned: (pid, eid, name, type, size) => getOrderPresignedUploadUrlAction(pid, eid, name, type, size),
         save: (pid, eid, key, name, type, size, hash) => saveOrderAttachmentAction(pid, eid, key, name, type, size, hash),
         delete: deleteOrderAttachmentAction,
         url: getOrderAttachmentUrlAction
@@ -111,7 +111,7 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
     },
     stock_movement: {
         fetch: getStockMovementAttachmentsAction,
-        presigned: (pid, eid, name, type, size) => getStockMovementPresignedUploadUrlAction(pid, name, type, size),
+        presigned: (pid, eid, name, type, size) => getStockMovementPresignedUploadUrlAction(pid, eid, name, type, size),
         save: (pid, eid, key, name, type, size, hash) => saveStockMovementAttachmentAction(pid, eid, key, name, type, size, hash),
         delete: deleteStockMovementAttachmentAction,
         url: getStockMovementAttachmentUrlAction
