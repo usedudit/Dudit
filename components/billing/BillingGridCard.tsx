@@ -2,10 +2,10 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
+import { Badge, DropdownItem } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
+import { Crown, Tag, CreditCard, ShoppingCart, Calendar, Wallet } from "lucide-react"
 
 const TYPE_ICONS: Record<string, any> = {
     subscription: Crown,
@@ -34,6 +34,7 @@ interface BillingGridCardProps {
     onDetails: () => void
     onCancel?: () => void
     onInvoice?: (invoiceId: string) => void
+    onPay?: () => void
 }
 
 const BillingGridCard = React.memo(
@@ -55,6 +56,7 @@ const BillingGridCard = React.memo(
         onDetails,
         onCancel,
         onInvoice,
+        onPay,
     }: BillingGridCardProps) => {
         const TypeIcon = TYPE_ICONS[type] || Tag
         const dateStr = formatDate(createdAt)
@@ -128,7 +130,14 @@ const BillingGridCard = React.memo(
                                 onCancel={onCancel}
                                 onPrint={invoiceId ? () => onInvoice?.(invoiceId) : undefined}
                                 cancelLabel="Cancelar"
-                            />
+                            >
+                                {onPay && (
+                                    <DropdownItem onClick={onPay}>
+                                        <Wallet size={18} />
+                                        Pagar
+                                    </DropdownItem>
+                                )}
+                            </ActionsDropdown>
                         </div>
                     </div>
                 </div>

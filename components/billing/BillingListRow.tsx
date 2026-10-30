@@ -2,10 +2,10 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
+import { Badge, DropdownItem } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { Crown, Tag, CreditCard, ShoppingCart, Calendar } from "lucide-react"
+import { Crown, Tag, CreditCard, ShoppingCart, Calendar, Wallet } from "lucide-react"
 
 interface ColumnDef {
     id: string
@@ -40,6 +40,7 @@ interface BillingListRowProps {
     onDetails: () => void
     onCancel?: () => void
     onInvoice?: (invoiceId: string) => void
+    onPay?: () => void
 }
 
 const BillingListRow = React.memo(
@@ -59,6 +60,7 @@ const BillingListRow = React.memo(
         onDetails,
         onCancel,
         onInvoice,
+        onPay,
     }: BillingListRowProps) => {
         const dateStr = formatDate(createdAt)
 
@@ -112,7 +114,14 @@ const BillingListRow = React.memo(
                                 onCancel={onCancel}
                                 onPrint={invoiceId ? () => onInvoice?.(invoiceId) : undefined}
                                 cancelLabel="Cancelar"
-                            />
+                            >
+                                {onPay && (
+                                    <DropdownItem onClick={onPay}>
+                                        <Wallet size={18} />
+                                        Pagar
+                                    </DropdownItem>
+                                )}
+                            </ActionsDropdown>
                         </div>
                     )
                 default:

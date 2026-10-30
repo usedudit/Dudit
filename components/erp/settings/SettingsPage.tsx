@@ -172,6 +172,31 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     return () => window.removeEventListener("popstate", handlePopState)
   }, [])
 
+  // Mirror the `tab` search param into local tab/page state. This is what
+  // makes programmatic navigation (Next's router.push, <Link href>...) land on
+  // the right subpage — useSearchParams doesn't emit popstate, so without this
+  // the address bar changes but the settings content stays put.
+  React.useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (!tab) {
+      setActivePage("home")
+      return
+    }
+    if (SLUG_TO_PAGE[tab]) {
+      setActivePage(SLUG_TO_PAGE[tab])
+      if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
+        setActiveTab("empresa")
+      } else if (["sales-settings", "receipts", "payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+        setActiveTab("vendas")
+      } else {
+        setActiveTab("adicionais")
+      }
+    } else if (["empresa", "vendas", "adicionais"].includes(tab)) {
+      setActiveTab(tab)
+      setActivePage("home")
+    }
+  }, [searchParams])
+
   React.useEffect(() => {
     if (activePage !== "home") {
       const titles: Partial<Record<ActivePage, string>> = {

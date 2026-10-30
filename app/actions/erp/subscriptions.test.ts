@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { getSubscriptionStatusAction } from "./subscriptions"
+import { getSubscriptionStatusAction, getSubscriptionPaymentUrlAction } from "./subscriptions"
 
 // ── Mock do cliente supabase ───────────────────────────────────────────────
 const mockMaybeSingle = vi.fn()
@@ -167,5 +167,74 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
 
     expect(res.success).toBe(true)
     expect(res.data.subscription.payment_url).toBeFalsy()
+  })
+})
+
+describe("getSubscriptionPaymentUrlAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    vi.mocked(getPartnerPlan).mockResolvedValue({ id: "plan-1", name: "Crescer", slug: "crescer", price: 19.9, sort_order: 1 } as any)
+    vi.mocked(getPartnerSubscription).mockResolvedValue(null as any)
+    vi.mocked(getUsageCounters).mockResolvedValue({} as any)
+    vi.mocked(computeSubscriptionPeriods).mockReturnValue({
+      periodStart: new Date("2026-10-30T03:00:00.000Z"),
+      periodEnd: new Date("2026-11-30T03:00:00.000Z"),
+      nextStart: new Date("2026-11-30T03:00:00.000Z"),
+      nextEnd: new Date("2026-12-30T03:00:00.000Z"),
+    })
+
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        id: "sub-1",
+        status: "pending",
+        cancel_at_period_end: false,
+        mercado_pago_subscription_id: "preapproval-123",
+      },
+      error: null,
+    })
+  })
+
+  it("returns the MP checkout init_point for a pending subscription with preapproval", async () => {
+    vi.mocked(getMpSubscriptionStatus).mockResolvedValue({
+      status: "pending",
+      init_point: "https://mp.test/checkout/p123",
+    } as any)
+
+    const res: any = await getSubscriptionPaymentUrlAction("sub-1")
+
+    expect(res.success).toBe(true)
+    expect(res.data.payment_url).toBe("https://mp.test/checkout/p123")
+  })
+
+  it("returns null payment_url when the subscription has no MP preapproval", async () => {
+    vi.mocked(getMpSubscriptionStatus).mockResolvedValue({ status: "pending" } as any)
+    mockMaybeSingle.mockResolvedValue({
+      data: { id: "sub-1", status: "pending", cancel_at_period_end: false, mercado_pago_subscription_id: null },
+      error: null,
+    })
+
+    const res: any = await getSubscriptionPaymentUrlAction("sub-1")
+
+    expect(res.success).toBe(true)
+    expect(res.data.payment_url).toBeNull()
+  })
+
+  it("returns null payment_url when the subscription is scheduled to cancel", async () => {
+    vi.mocked(getMpSubscriptionStatus).mockResolvedValue({ status: "active", init_point: "https://mp.test/x" } as any)
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        id: "sub-1",
+        status: "active",
+        cancel_at_period_end: true,
+        mercado_pago_subscription_id: "preapproval-123",
+      },
+      error: null,
+    })
+
+    const res: any = await getSubscriptionPaymentUrlAction("sub-1")
+
+    expect(res.success).toBe(true)
+    expect(res.data.payment_url).toBeNull()
   })
 })

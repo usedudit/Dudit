@@ -14,6 +14,7 @@ import { BillingDetailSheet } from "./BillingDetailSheet"
 import { InvoicePrintModal } from "./InvoicePrintModal"
 import { listPurchasesPageAction, updatePurchaseStatusAction, getPurchaseAction } from "@/app/actions/billing/purchases"
 import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/invoices"
+import { getSubscriptionPaymentUrlAction } from "@/app/actions/erp/subscriptions"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { ArrowUpDownIcon, ShoppingCartIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
@@ -292,6 +293,24 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
         }
     }, [selectedPurchase, page, loadPage])
 
+    // Resolve an MP checkout link for a pending subscription invoice so the
+    // billing history list can offer a per-row "Pagar" action without storing
+    // the init_point in the DB.
+    const handlePay = useCallback(
+        async (p: PurchaseWithRelations) => {
+            if (p.purchase_type !== "subscription" || p.status !== "pending" || !p.subscription_id) {
+                return
+            }
+            const res = await getSubscriptionPaymentUrlAction(p.subscription_id)
+            if (res.success && res.data?.payment_url) {
+                window.location.href = res.data.payment_url
+            } else {
+                toast.error("Pagamento indisponível", "Não foi possível abrir o checkout. Tente novamente mais tarde.")
+            }
+        },
+        [],
+    )
+
     const handleCancel = async () => {
         if (!cancelTarget) return
         const csrf = await fetch("/api/csrf-token").then((r) => r.json()).then((r) => r.token)
@@ -365,6 +384,13 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                         invoiceId={p.invoice_id}
                                         onDetails={() => handleViewDetails(p)}
                                         onInvoice={handlePrintInvoiceById}
+                                        onPay={
+                                            p.purchase_type === "subscription" &&
+                                            p.status === "pending" &&
+                                            !!p.subscription_id
+                                                ? () => handlePay(p)
+                                                : undefined
+                                        }
                                     />
                                 )
                             }
@@ -422,6 +448,13 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                                 invoiceId={p.invoice_id}
                                                 onDetails={() => handleViewDetails(p)}
                                                 onInvoice={handlePrintInvoiceById}
+                                                onPay={
+                                                    p.purchase_type === "subscription" &&
+                                                    p.status === "pending" &&
+                                                    !!p.subscription_id
+                                                        ? () => handlePay(p)
+                                                        : undefined
+                                                }
                                             />
                                         )
                                     }

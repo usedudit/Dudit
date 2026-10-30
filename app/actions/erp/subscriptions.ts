@@ -185,6 +185,39 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
   }
 }
 
+/**
+ * Resolve the Mercado Pago preapproval checkout link for a subscription that is
+ * waiting for payment (status "pending"). Used by the billing history list to
+ * surface a per-row "Pagar" action without storing the init_point in the DB.
+ */
+export async function getSubscriptionPaymentUrlAction(
+  subscriptionId: string,
+): Promise<ActionResponse<{ payment_url: string | null }>> {
+  try {
+    await requireUser()
+    const partner = await requirePartner()
+
+    const admin = getAdminClient()
+    const { data: sub } = await admin
+      .from("subscriptions")
+      .select("mercado_pago_subscription_id, status, cancel_at_period_end")
+      .eq("partner_id", partner.id)
+      .eq("id", subscriptionId)
+      .maybeSingle()
+
+    if (!sub?.mercado_pago_subscription_id || sub.cancel_at_period_end) {
+      return successResponse({ payment_url: null })
+    }
+
+    const mpStatus = await getMpSubscriptionStatus(sub.mercado_pago_subscription_id)
+    const payment_url = typeof mpStatus?.init_point === "string" ? mpStatus.init_point : null
+
+    return successResponse({ payment_url })
+  } catch (error: any) {
+    return errorResponse(error.message)
+  }
+}
+
 // ============================================================================
 // MUTATION ACTIONS
 // ============================================================================
