@@ -20,6 +20,7 @@ import {
     ArrowUpIcon,
     ReturnIcon,
     GiftIcon,
+    ClockIcon,
 } from "@/lib/icons"
 
 const CANCELLATION_REASONS = [
@@ -306,6 +307,7 @@ interface SubscriptionData {
         next_payment_date?: string | null
         grace_period_ends_at?: string | null
         grace_days_left?: number | null
+        payment_url?: string | null
     } | null
     next_invoice?: {
         purchase_id: string | null
@@ -767,6 +769,18 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         }
     }
 
+    const handlePayPending = () => {
+        // Prefer resuming the Mercado Pago preapproval checkout when we have a
+        // link; otherwise fall back to a manual PIX charge.
+        const paymentUrl = subData?.subscription?.payment_url
+        if (paymentUrl) {
+            toast.info("Redirecionando para o pagamento...")
+            window.location.href = paymentUrl
+            return
+        }
+        handleGenerateManualPayment()
+    }
+
     // ─── Render ────────────────────────────────────────────────────────────
 
     const currentPlanSlug = subData?.plan?.slug || "free"
@@ -792,6 +806,11 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     )
 
     const nextInvoice = subData?.next_invoice ?? null
+    const isPendingPayment = subData?.subscription?.status === "pending"
+    const hasPendingInvoice = isPendingPayment && !!nextInvoice
+    // The "next invoice" card should also render for a pending subscription
+    // that already has an open invoice (waiting for payment).
+    const hasBillingInfo = hasActivePaidSub || hasPendingInvoice
     const nextInvoiceDate = (!isScheduledToCancel && !isPeriodExpired)
         ? (nextInvoice?.due_date
             ?? subData?.subscription?.next_payment_date
@@ -874,6 +893,29 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     variant="destructive"
                                     className="hidden sm:flex h-9 shrink-0"
                                     onClick={handleGenerateManualPayment}
+                                    disabled={manualPaymentModal.loading}
+                                    isLoading={manualPaymentModal.loading}
+                                >
+                                    Pagar agora
+                                </Button>
+                            </div>
+                        )}
+
+                        {isPendingPayment && (
+                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+                                <ClockIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold">Assinatura aguardando pagamento</p>
+                                    <p className="text-xs opacity-90">
+                                        {nextInvoice
+                                            ? `Fatura ${nextInvoice.invoice_number ?? ""} de ${formatCurrency(nextInvoice.amount)}${nextInvoice.due_date ? ` com vencimento em ${formatDate(nextInvoice.due_date)}` : ""}. O acesso é liberado após a confirmação do pagamento.`
+                                            : `O pagamento do plano ${subData?.plan?.name ?? ""} ainda não foi confirmado.`}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="destructive"
+                                    className="hidden sm:flex h-9 shrink-0"
+                                    onClick={handlePayPending}
                                     disabled={manualPaymentModal.loading}
                                     isLoading={manualPaymentModal.loading}
                                 >
@@ -994,13 +1036,13 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
-                                            Próxima fatura
+                                            {isPendingPayment ? "Fatura pendente" : "Próxima fatura"}
                                         </span>
                                         {isScheduledToCancel ? (
                                             <Badge variant="gray">
                                                 Cancelada
                                             </Badge>
-                                        ) : !hasActivePaidSub ? (
+                                        ) : !hasBillingInfo ? (
                                             <Badge variant="gray">
                                                 Sem cobranças
                                             </Badge>
@@ -1013,7 +1055,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                                     <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                                         {subData ? (
-                                            (!hasActivePaidSub || isScheduledToCancel)
+                                            (!hasBillingInfo || isScheduledToCancel)
                                                 ? "R$ 0,00"
                                                 : formatCurrency(nextInvoice?.amount ?? currentPlanPrice)
                                         ) : "..."}
@@ -1044,7 +1086,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 </span>
                                             </div>
                                         </>
-                                    ) : !hasActivePaidSub ? (
+                                    ) : !hasBillingInfo ? (
                                         <>
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>

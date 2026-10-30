@@ -80,6 +80,10 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       try {
         const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
         subscriptionPayload.mp_status = mpStatus?.status ?? null
+        // Expose the preapproval checkout link so an abandoned pending
+        // subscription can be paid again from the subscription page.
+        const initPoint = typeof mpStatus?.init_point === "string" ? mpStatus.init_point : null
+        subscriptionPayload.payment_url = initPoint
       } catch {
         // Non-critical: fall back to the local state.
       }
@@ -117,8 +121,7 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
     if (
       subscriptionPayload &&
       subscription &&
-      subscription.status === "past_due" &&
-      plan.slug !== "free"
+      ["past_due", "pending"].includes(subscription.status)
     ) {
       try {
         const admin = getAdminClient()
