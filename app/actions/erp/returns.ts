@@ -429,7 +429,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, customer_id, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
+        orders!order_id(order_number, customer_name, customer_id, total_amount, amount_paid, paid_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id, store_id),
         return_items!return_items_return_request_id_fkey(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_refunds(*),
@@ -441,6 +441,11 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .single()
 
         if (error) throw error
+
+        const requestStoreId = data.store_id || (data as any).orders?.store_id
+        if (requestStoreId) {
+            await requireStorePermission(requestStoreId, partnerId, "orders", "view")
+        }
 
         // Fetch buyer/customer details separately if buyer_id/customer_id is present
         let buyerDetails = null
@@ -531,6 +536,20 @@ export async function getReturnAuditLogsAction(requestId: string) {
         const user = await requireUser()
         if (!user) return { success: false as const, error: "Não autenticado" }
         const supabase = createAdminClient()
+        const { data: request, error: requestError } = await supabase
+            .from("return_requests")
+            .select("id, partner_id, store_id, orders!order_id(store_id)")
+            .eq("id", requestId)
+            .is("deleted_at", null)
+            .maybeSingle()
+        if (requestError) throw requestError
+        if (!request) return { success: false as const, error: "Solicitação de devolução não encontrada." }
+        const access = await requirePermission(request.partner_id, "orders", "view", user)
+        assertPermission(access, "orders.list")
+        const requestStoreId = request.store_id || (request as any).orders?.store_id
+        if (requestStoreId) {
+            await requireStorePermission(requestStoreId, request.partner_id, "orders", "view")
+        }
         const { data, error } = await supabase
             .from("audit_logs")
             .select("*")
@@ -1775,14 +1794,36 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
 }
 
 export async function escalateReturnRequestAction(partnerId: string, requestId: string, reason?: string) {
-    // Webhook Discord: notificar SLA vencido/escalado (fail-open)
+    const user = await requireUser()
+    if (!user) throw new Error("Não autenticado")
+    const access = await requirePermission(partnerId, "orders", "edit", user)
+    assertPermission(access, "orders.can_refund")
     const supabase = createAdminClient()
     const { data: request } = await supabase
         .from("return_requests")
-        .select("id, partner_id, customer_id, customer_email_snapshot, sla_due_at, order_id, orders!order_id(order_number)")
+        .select("id, partner_id, store_id, customer_id, customer_email_snapshot, sla_due_at, order_id, orders!order_id(order_number, store_id)")
         .eq("id", requestId)
         .eq("partner_id", partnerId)
+        .is("deleted_at", null)
         .maybeSingle()
+
+    if (!request) throw new Error("Solicitação de devolução não encontrada.")
+    const requestStoreId = request.store_id || (request as any).orders?.store_id
+    if (requestStoreId) await requireStorePermission(requestStoreId, partnerId, "orders", "can_refund")
+
+    const result = await processReturnRequestAction({
+        partnerId,
+        requestId,
+        action: "escalated",
+        nextStatus: "ESCALATED",
+        refundAmount: 0,
+        storeCreditAmount: 0,
+        returnToInventory: false,
+        notes: reason || "Escalado para moderação Dudit",
+        idempotencyKey: `escalate:${requestId}:${Date.now()}`,
+    })
+
+    if (!(result as any)?.success) return result
 
     if (request) {
         const slaDueAt = request.sla_due_at ? new Date(request.sla_due_at) : null
@@ -1798,17 +1839,7 @@ export async function escalateReturnRequestAction(partnerId: string, requestId: 
         }).catch(err => console.warn("[SLA] Discord webhook failed (non-blocking):", err))
     }
 
-    return processReturnRequestAction({
-        partnerId,
-        requestId,
-        action: "escalated",
-        nextStatus: "ESCALATED",
-        refundAmount: 0,
-        storeCreditAmount: 0,
-        returnToInventory: false,
-        notes: reason || "Escalado para moderação Dudit",
-        idempotencyKey: `escalate:${requestId}:${Date.now()}`,
-    })
+    return result
 }
 
 export async function fetchReturnOrderBucketAction(partnerId: string) {
@@ -2154,10 +2185,41 @@ export async function saveReturnEvidenceAction(
         const maxCount = plan.slug.toLowerCase() === "crescer" ? 2 : 5
         const admin = createAdminClient()
 
+        const { data: request, error: requestErr } = await admin
+            .from("return_requests")
+            .select("id, partner_id, store_id, orders!order_id(store_id)")
+            .eq("id", returnRequestId)
+            .eq("partner_id", partnerId)
+            .is("deleted_at", null)
+            .maybeSingle()
+        if (requestErr) throw requestErr
+        if (!request) return { success: false, error: "Solicitação de devolução não encontrada." }
+        const requestStoreId = request.store_id || (request as any).orders?.store_id || null
+        if (requestStoreId) await requireStorePermission(requestStoreId, partnerId, "orders", "edit")
+
+        const { R2_PREFIXES } = await import("@/lib/r2/config")
+        const { validateKeyOwnership } = await import("@/lib/r2/server")
+        const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`
+        if (
+            typeof fileKey !== "string" ||
+            !validateKeyOwnership(fileKey, user.id) ||
+            !fileKey.startsWith(expectedPrefix) ||
+            fileKey.includes("..") ||
+            fileKey.startsWith("/")
+        ) {
+            return { success: false, error: "Chave de arquivo inválida para este usuário." }
+        }
+        const { validateUploadRequest } = await import("@/lib/security/file-validator")
+        const uploadValidation = validateUploadRequest(fileName, fileType, fileSize)
+        if (!uploadValidation.success) {
+            return { success: false, error: uploadValidation.error || "Arquivo inválido." }
+        }
+
         const { count, error: countErr } = await admin
             .from("return_evidence")
             .select("id", { count: "exact", head: true })
             .eq("return_request_id", returnRequestId)
+            .eq("partner_id", partnerId)
 
         if (countErr) throw countErr
 
@@ -2168,8 +2230,29 @@ export async function saveReturnEvidenceAction(
             }
         }
 
+        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+        const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3")
+        const serverConfig = getR2ServerConfig()
+        const s3 = new S3Client({
+            region: "auto",
+            credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
+            endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+        })
+        let actualFileSize: number
+        try {
+            const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+            actualFileSize = Number(head.ContentLength)
+            if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType || actualFileSize !== fileSize) {
+                return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
+            }
+            const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+            if (!actualValidation.success) return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
+        } finally {
+            s3.destroy()
+        }
+
         let finalHash = fileHash || ""
-        if (!finalHash && fileSize < 5 * 1024 * 1024) {
+        if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
             try {
                 const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
                 const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
@@ -2196,19 +2279,17 @@ export async function saveReturnEvidenceAction(
 
         const fileUrl = fileKey.startsWith("http") ? fileKey : `https://img.dudit.com.br/${fileKey}`
 
-        const ctx = await getCurrentPartnerContext()
-
         const { data, error } = await admin
             .from("return_evidence")
             .insert({
                 return_request_id: returnRequestId,
                 partner_id: partnerId,
-                store_id: ctx?.activeStoreId || null,
+                store_id: requestStoreId,
                 file_url: fileUrl,
                 file_key: fileKey,
                 file_name: fileName,
                 file_type: fileType,
-                file_size: fileSize,
+                file_size: actualFileSize,
                 uploaded_by: user.id,
                 metadata: { fileHash: finalHash }
             })
@@ -2247,13 +2328,14 @@ export async function deleteReturnEvidenceAction(
 
         const { data: request } = await supabase
             .from("return_requests")
-            .select("id, partner_id, store_id")
+            .select("id, partner_id, store_id, orders!order_id(store_id)")
             .eq("id", returnRequestId)
             .eq("partner_id", partnerId)
             .maybeSingle()
         if (!request) return { success: false, error: "Solicitação de devolução não encontrada." }
-        if (request.store_id) {
-            await requireStorePermission(request.store_id, partnerId, "orders", "edit")
+        const requestStoreId = request.store_id || (request as any).orders?.store_id
+        if (requestStoreId) {
+            await requireStorePermission(requestStoreId, partnerId, "orders", "edit")
         }
 
         const { data: evidence } = await supabase
@@ -2302,14 +2384,15 @@ export async function getReturnEvidenceAction(
 
         const { data: request } = await supabase
             .from("return_requests")
-            .select("id, partner_id, store_id, customer_user_id")
+            .select("id, partner_id, store_id, customer_user_id, orders!order_id(store_id)")
             .eq("id", returnRequestId)
             .maybeSingle()
         if (!request || (partnerId && request.partner_id !== partnerId)) {
             return { success: false, error: "Solicitação de devolução não encontrada." }
         }
         if (partnerId) {
-            if (request.store_id) await requireStorePermission(request.store_id, partnerId, "orders", "view")
+            const requestStoreId = request.store_id || (request as any).orders?.store_id
+            if (requestStoreId) await requireStorePermission(requestStoreId, partnerId, "orders", "view")
             else await requirePermission(partnerId, "orders", "view")
         } else if (request.customer_user_id !== user.id) {
             return { success: false, error: "Acesso negado às evidências desta solicitação." }
@@ -2348,7 +2431,7 @@ export async function getReturnEvidenceUrlAction(
         const supabase = await getSupabaseServerClient()
         const { data: request } = await supabase
             .from("return_requests")
-            .select("id, partner_id, store_id, customer_user_id")
+            .select("id, partner_id, store_id, customer_user_id, orders!order_id(store_id)")
             .eq("id", returnRequestId)
             .maybeSingle()
         if (!request || (partnerId && request.partner_id !== partnerId)) {
@@ -2363,8 +2446,9 @@ export async function getReturnEvidenceUrlAction(
         if (!evidence) return { success: false, error: "Arquivo não encontrado nesta solicitação." }
 
         if (partnerId) {
-            if (request.store_id) {
-                await requireStorePermission(request.store_id, partnerId, "orders", "view")
+            const requestStoreId = request.store_id || (request as any).orders?.store_id
+            if (requestStoreId) {
+                await requireStorePermission(requestStoreId, partnerId, "orders", "view")
             } else {
                 await requirePermission(partnerId, "orders", "view")
             }

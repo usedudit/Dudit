@@ -587,8 +587,14 @@ export async function getFinancialTransactionsAction(
     try {
         await requirePermission(partnerId, "financial", "view")
 
+        const context = await getCurrentPartnerContext()
+        if (!context?.partnerId || context.partnerId !== partnerId) {
+            throw new Error("Parceiro ativo inválido.")
+        }
+        const storeId = options?.storeId ?? context.activeStoreId
+        if (storeId) await requireStorePermission(storeId, partnerId, "financial", "view")
+
         const cursor = options?.cursor ?? null
-        const storeId = options?.storeId ?? null
 
         const result = await getCachedErpPage(
             [
@@ -1366,6 +1372,12 @@ export async function updateManualTransactionAction(
             .eq("partner_id", partnerId)
             .single()
         if (currentError || !current) throw new Error(currentError?.message || "Transação não encontrada.")
+        if (current.store_id) {
+            await requireStorePermission(current.store_id, partnerId, "financial", "edit")
+        }
+        if (patch.storeId && patch.storeId !== current.store_id) {
+            await requireStorePermission(patch.storeId, partnerId, "financial", "edit")
+        }
         const isInstallmentTransaction = !!current.installment_group_id
 
         const paid = isStatusPaid(current.status)
@@ -1561,11 +1573,12 @@ export async function cancelPendingTransactionAction(input: {
 
         const { data: tx, error } = await supabase
             .from("transactions")
-            .select("id, partner_id, status, installment_group_id, notes")
+            .select("id, partner_id, status, installment_group_id, notes, store_id")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
         if (error || !tx) throw new Error(error?.message || "Transação não encontrada.")
+        if (tx.store_id) await requireStorePermission(tx.store_id, input.partnerId, "financial", "cancel")
 
         if (String(tx.status || "").toLowerCase() !== "pending") {
             throw new Error("Apenas transações pendentes podem ser canceladas.")
@@ -1629,12 +1642,13 @@ export async function getTransactionForEditAction(transactionId: string, partner
                 status, notes, payment_type, transaction_type, contact_id, customer_id,
                 contact_type, transfer_group_id, refund_kind, reference_note, origin,
                 account_id, category_id, subcategory_id, recurring_id, transaction_date,
-                payment_method_id, installment_group_id, installment_number
+                payment_method_id, installment_group_id, installment_number, store_id
             `)
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
         if (error || !data) throw error || new Error("Transação não encontrada.")
+        if (data.store_id) await requireStorePermission(data.store_id, partnerId, "financial", "view")
 
         return { success: true as const, data }
     } catch (e: any) {
@@ -1680,6 +1694,17 @@ export async function createInstallmentGroupAction(input: {
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
+        await validateTransactionReferences(supabase, input.partnerId, input.storeId, {
+            accountId: input.accountId,
+            paymentMethodId: validPaymentMethodId,
+            customerId: input.customerId,
+            contactId: input.contactId,
+            contactType: input.contactType,
+            categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId,
+        }, "create")
+
         const count = Math.floor(Number(input.installmentsCount) || 0)
         if (!(count >= 1)) throw new Error("Informe a quantidade de parcelas.")
         if (count > 48) throw new Error("Máximo de 48 parcelas.")
@@ -1693,7 +1718,6 @@ export async function createInstallmentGroupAction(input: {
         const eachAmount = Math.round((totalAmount / count) * 100) / 100
         const amountDiff = Math.round((totalAmount - (eachAmount * count)) * 100) / 100
 
-        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
         const resolvedPaymentType = input.paymentType || (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null)
 
         const { data: group, error: groupErr } = await supabase
@@ -1801,13 +1825,13 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         const [groupResult, rowsResult] = await Promise.all([
             supabase
                 .from("installment_groups")
-                .select("id, description, total_amount, installments_count")
+                .select("id, description, total_amount, installments_count, store_id")
                 .eq("id", input.installmentGroupId)
                 .eq("partner_id", input.partnerId)
                 .single(),
             supabase
                 .from("transactions")
-                .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, payment_method_id, payment_type")
+                .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, payment_method_id, payment_type, store_id")
                 .eq("partner_id", input.partnerId)
                 .eq("installment_group_id", input.installmentGroupId)
                 .order("installment_number", { ascending: true }),
@@ -1816,6 +1840,10 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         const { data: rows, error: rowsErr } = rowsResult
         if (groupErr || !group) throw groupErr || new Error("Grupo de parcelas não encontrado.")
         if (rowsErr) throw rowsErr
+        if (group.store_id) await requireStorePermission(group.store_id, input.partnerId, "financial", "view")
+        for (const row of rows || []) {
+            if (row.store_id) await requireStorePermission(row.store_id, input.partnerId, "financial", "view")
+        }
 
         const transactionIds = (rows || []).map((row: any) => row.id).filter(Boolean)
         const paymentMethodIds = new Set<string>()
@@ -2901,6 +2929,16 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
 export async function getTransactionHistoryAction(transactionId: string, partnerId: string) {
     try {
         await requirePermission(partnerId, "financial", "view")
+        const supabase = createAdminClient()
+        const { data: tx, error } = await supabase
+            .from("transactions")
+            .select("id, store_id")
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (error) throw error
+        if (!tx) throw new Error("Transação não encontrada.")
+        if (tx.store_id) await requireStorePermission(tx.store_id, partnerId, "financial", "view")
         const entries = await getTransactionHistoryEntries(transactionId, partnerId)
         return { success: true as const, data: entries }
     } catch (e: any) {
@@ -3053,7 +3091,7 @@ export async function getTransactionDetailsAction(
                     .from("transactions")
                     .select(
                         `
-        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes, store_id,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, created_by_user_id, installment_group_id,
@@ -3068,7 +3106,7 @@ export async function getTransactionDetailsAction(
                         .from("transactions")
                         .select(
                             `
-        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes, store_id,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, installment_group_id,
@@ -3089,6 +3127,10 @@ export async function getTransactionDetailsAction(
 
         if (error || !t) {
             return { success: false, error: "Transação não encontrada." }
+        }
+
+        if ((t as any).store_id) {
+            await requireStorePermission((t as any).store_id, partnerId, "financial", "view")
         }
 
         const row = t as any
@@ -4174,11 +4216,24 @@ export async function updateInstallmentGroupNotesAction(input: {
     notes: string
 }) {
     try {
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "edit")
         const supabase = createAdminClient()
+        const { data: groupRows, error: lookupError } = await supabase
+            .from("transactions")
+            .select("id, store_id")
+            .eq("installment_group_id", input.installmentGroupId)
+            .eq("partner_id", input.partnerId)
+        if (lookupError) throw lookupError
+        if (!groupRows?.length) throw new Error("Parcelamento não encontrado.")
+        for (const row of groupRows) {
+            if (row.store_id) {
+                await requireStorePermission(row.store_id, input.partnerId, "financial", "edit")
+            }
+        }
         const { error } = await supabase
             .from("transactions")
-            .update({ notes: input.notes?.trim() || null, updated_at: new Date().toISOString() })
+            .update({ notes: sanitizeNotes(input.notes), updated_at: new Date().toISOString() })
             .eq("installment_group_id", input.installmentGroupId)
             .eq("partner_id", input.partnerId)
 

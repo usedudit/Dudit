@@ -1131,6 +1131,20 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     {nextInvoiceDate ? formatDate(nextInvoiceDate) : "-"}
                                                 </span>
                                             </div>
+
+                                            {isPendingPayment && nextInvoice && (
+                                                <div className="pt-3">
+                                                    <Button
+                                                        variant="link"
+                                                        className="h-9 w-full text-brand-orange dark:text-amber-400"
+                                                        onClick={handlePayPending}
+                                                        disabled={manualPaymentModal.loading}
+                                                        isLoading={manualPaymentModal.loading}
+                                                    >
+                                                        Pagar fatura
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -1257,11 +1271,17 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                     }
                 >
                     <div className="space-y-4">
-                        <IconPlaceholder
-                            icon={"https://img.dudit.com.br/static/icons/payments/MercadoPago.png"}
-                            title="Pagamento Seguro via Mercado Pago"
-                            subtitle="Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit."
-                        />
+                        <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
+                            <img
+                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                alt="Pix"
+                                className="w-8 h-8 object-contain"
+                                onError={(e) => {
+                                    // Fallback to text/blank if image fails to load
+                                    e.currentTarget.style.display = "none"
+                                }}
+                            />
+                        </div>
 
                         <Input
                             label="Email de faturamento"

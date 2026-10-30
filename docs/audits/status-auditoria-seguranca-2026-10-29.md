@@ -10,7 +10,7 @@
 - Foi corrigida a revalidação de cache de permissões após mudanças de acesso.
 - Durante a validação de build foi encontrada uma incompatibilidade com Next.js 16: um módulo `"use server"` exportava uma função síncrona. A função pura foi movida para um módulo comum.
 - Os testes focados das correções passaram. A suíte completa ainda teve duas falhas nos testes de exclusão de conta por falta de configuração de `TRIGGER_SECRET_KEY`; os fixtures foram ajustados e os testes focados passaram depois disso. A suíte completa não foi repetida.
-- `npm audit` não reportou vulnerabilidades em dependências (incluindo a auditoria de produção). O TypeScript passou antes das últimas alterações, portanto precisa ser executado novamente.
+- `npm audit` não reportou vulnerabilidades em dependências (incluindo a auditoria de produção). `npx tsc --noEmit` foi repetido em 30/10/2026 após as alterações de pedidos e passou.
 - O build ainda precisa ser repetido. O usuário pediu para executar build e TypeScript depois por conta própria. Lint não estava disponível: não há script no `package.json` nem executável ESLint em `node_modules/.bin`.
 - No registro original, a migration não havia sido aplicada. A checagem em 30/10 encontrou `store_members` e a função `can_manage_store_member` no schema exposto pelo Supabase configurado, indicando que a migration está aplicada nesse projeto. O ambiente exato e as policies efetivas ainda não foram confirmados.
 
@@ -257,15 +257,37 @@ O salvamento de anexo aceitava `orderId` sem confirmar o parceiro/loja do pedido
 
 O mesmo problema existia no anexo de movimentação de estoque: o endpoint de salvamento gravava pelo ID recebido com cliente administrativo sem validar parceiro/loja nem chave/objeto R2. Agora emissão e salvamento recebem o ID da movimentação, confirmam vínculo e escopo de loja, exigem chave do usuário e validam metadados reais do objeto. Listagens/insights de pedidos também herdam a loja ativa; pagamento de pedido ligado a agendamento e consulta do número do pedido validam a permissão de loja. Lotes de atualização de status limitam IDs e rejeitam conjuntos incompletos antes de alterar pedidos.
 
-**Validação:** `npx tsc --noEmit` e `git diff --check` passaram. Revisão estática; não houve chamadas ao R2, banco ou provider. A exclusão de pedido continua sendo uma sequência de duas gravações (itens e pedido), portanto falha entre elas pode deixar exclusão parcial; atomicidade transacional permanece pendente. Continuam pendentes as demais Server Actions de pedidos e o restante do ERP.
+**Pagamento e acesso financeiro:** mutações de status/pagamento de pedido exigiam `orders.edit`, embora pudessem criar/alterar registros financeiros. Agora status de pagamento em lote e confirmação de pagamento de agendamento também exigem `financial.edit`; criação de pedido marcado como pago exige `financial.create`. Atualização de pedido exige permissão financeira quando altera situação/valor pago/conta. As contas financeiras fornecidas também são verificadas por parceiro e loja.
+
+**Exclusão em lote:** depois de validar IDs e lojas, a ação agora apaga somente os pedidos numa única instrução; `order_items` usa `ON DELETE CASCADE`, então não há mais remoção separada que possa deixar pedido sem itens se outra FK bloquear a exclusão. Anexos existentes bloqueiam a operação até serem removidos. A migration `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql` altera a referência opcional de movimentação de estoque para `ON DELETE SET NULL` e torna anexos `RESTRICT`, preservando o ledger e evitando objetos R2 órfãos. O usuário informou que aplicou; o ledger e o schema ainda não foram consultados nesta sessão.
+
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram. Revisão estática; não houve chamadas ao R2, banco ou provider. A auditoria das demais Server Actions de pedidos e do restante do ERP continua pendente.
+
+### Financeiro ERP — contas e transações em 30/10/2026
+
+**Achados corrigidos localmente:** editar/excluir contas financeiras e alterar a conta padrão não verificavam a permissão da loja da conta; a limpeza de contas padrão podia atingir outras lojas do parceiro. Agora as ações carregam o escopo da conta, verificam `financial.edit` na loja e limitam a alteração de padrão à mesma loja (incluindo contas globais sem loja). Ao criar conta por loja com saldo inicial, o lançamento de abertura agora recebe o `storeId`, permitindo que a validação de referências e a permissão de loja correspondam à conta. A edição das notas de parcelamento também consulta as transações do grupo e exige permissão em cada loja antes de gravar.
+
+**Continuação da revisão financeira:** a listagem de transações agora usa a loja ativa como padrão e exige `financial.view` na loja selecionada. Leituras de detalhe, edição, histórico e grupos de parcelas verificam o escopo da loja; cancelamento de transação verifica `financial.cancel`. Atualização de transação verifica acesso à loja atual e à loja de destino. A criação de parcelamento agora valida loja, conta, método de pagamento, cliente/contato e categorias antes de inserir o grupo.
+
+**Migrations:** o usuário informou que aplicou todas as migrations criadas até esta rodada, incluindo `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql`. O ledger/schema do banco ainda não foi consultado para confirmação independente.
+
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram. Revisão estática; sem testes de integração ou consultas ao banco. A revisão de outras ações financeiras, atomicidade entre criação de conta e saldo inicial e validação de fluxos reais por loja continua pendente.
+
+### Devoluções e evidências — 30/10/2026
+
+**Achados corrigidos localmente:** `getReturnAuditLogsAction` aceitava qualquer usuário autenticado e consultava `audit_logs` só pelo UUID da solicitação; agora confirma a solicitação, o parceiro, `orders.list` e a loja. O detalhe da devolução e as evidências também conferem a loja do pedido, inclusive quando a solicitação legada não tem `store_id`. `escalateReturnRequestAction` consultava dados e disparava aviso antes da autorização; agora exige `orders.can_refund` e a permissão da loja, processa a transição autorizada e só depois envia o aviso.
+
+O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/loja, aceitava chaves R2 informadas pelo cliente e confiava nos metadados do arquivo. Agora consulta a solicitação ativa no parceiro, exige acesso à loja correspondente, prende a chave ao prefixo do usuário, valida o objeto real no R2 e confere tipo/tamanho antes de gravar. O `store_id` persistido vem da solicitação/pedido, não da loja ativa do navegador.
+
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram. Revisão estática; não foram exercitados R2, banco, Mercado Pago ou notificações externas. Permanecem pendentes testes de integração de reembolso, retry, anexos e transições concorrentes.
 
 ### RPC de movimentação de estoque — 30/10/2026
 
 **Achado confirmado:** `create_batch_stock_movement` é `SECURITY DEFINER` e sua ramificação de variantes validava o par variante/produto, mas não validava o `partner_id` do produto. A Server Action também não confirmava que todos os produtos e variantes enviados pertenciam ao parceiro ativo. Um usuário de um parceiro podia, portanto, fornecer um produto e uma variante de outro parceiro, provocando alteração de estoque via RPC de serviço.
 
-**Correção local:** as ações de movimento simples e em lote agora resolvem todos os produtos e variantes, verificam a relação variante-produto, parceiro e loja antes de chamar a RPC e limitam os lotes. Foi criada a migration `20261030190000_harden_batch_stock_movement_tenant_scope.sql` para impor as verificações de parceiro, relação variante-produto e loja dentro da transação do banco, mantendo execução apenas por `service_role`. A migration ainda não foi aplicada nem validada no ledger/schema; aplicar e confirmar antes de depender da proteção no banco.
+**Correção local:** as ações de movimento simples e em lote agora resolvem todos os produtos e variantes, verificam a relação variante-produto, parceiro e loja antes de chamar a RPC e limitam os lotes. Foi criada a migration `20261030190000_harden_batch_stock_movement_tenant_scope.sql` para impor as verificações de parceiro, relação variante-produto e loja dentro da transação do banco, mantendo execução apenas por `service_role`. O usuário informou que aplicou esta migration; a aplicação não foi confirmada no ledger/schema nesta sessão.
 
-**Validação desta rodada:** `git diff --check` passou. O `npx tsc --noEmit` não apontou erros nos arquivos desta auditoria, mas o comando global falha no arquivo não rastreado `app/actions/erp/subscriptions.test.ts`, com fixtures incompatíveis com `Plan`/`UsageCounters` e acesso não estreitado a `ActionResponse.data`. Esse arquivo apareceu no workspace durante a revisão e não foi editado. Não houve consulta ao banco nem execução da RPC.
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram. Não houve consulta ao banco nem execução da RPC.
 
 **Arquivos alterados nesta revisão:** `app/api/internal/jobs/process-pending-webhooks/route.ts`, `app/api/mercadopago/webhook/route.ts`, `app/api/mercadopago/webhook/subscription/route.ts`, `supabase/functions/mercadopago-webhook/index.ts`.
 
@@ -281,6 +303,7 @@ O mesmo problema existia no anexo de movimentação de estoque: o endpoint de sa
 - [ ] Revisar todas as Server Actions e Route Handlers de ERP para autorização em cada mutação e escopo por parceiro/loja, priorizando pedidos, clientes, produtos, estoque, agendamentos e financeiro.
 - [ ] Revisar ações de lote, IDs relacionados e casos de mass assignment; confirmar que o escopo também é aplicado nas gravações e exclusões.
 - [ ] Confirmar no ledger/grants a aplicação de `20261030170000_restrict_financial_balance_delta.sql` e `20261030180000_atomic_transaction_payment.sql`; testar concorrência/idempotência de pagamentos em homologação.
+- [ ] Confirmar no ledger/schema a aplicação da migration `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql` antes de depender da preservação do histórico de estoque e da restrição de exclusão com anexos. O usuário informou que aplicou.
 - [ ] Reconciliar fluxos de estorno/cancelamento para alinhar efeito no gateway, ledger e saldo local.
 - [ ] Revisar as demais regras de papéis e permissões por módulo, incluindo operações administrativas e convites.
 - [ ] Revisar migrations/policies RLS existentes e comparar com a nova migration; verificar conflitos, tabelas sem RLS, views, RPCs, triggers, grants, Storage e Realtime conforme presentes no projeto.
@@ -309,7 +332,7 @@ O mesmo problema existia no anexo de movimentação de estoque: o endpoint de sa
 
 ## Arquivos tocados nesta etapa conhecida
 
-O diff inclui ainda alterações paralelas no workspace em `components/billing/BillingRefundModal.tsx`; elas não foram editadas nem atribuídas à auditoria nesta retomada.
+O diff inclui ainda alterações paralelas no workspace em `components/erp/payments/shared/MoneyPaymentView.tsx` e `components/erp/settings/SubscriptionSubPage.tsx`; elas não foram editadas nem atribuídas à auditoria nesta retomada.
 
 - `app/actions/erp/team.ts`
 - `app/actions/erp/store-members.ts`

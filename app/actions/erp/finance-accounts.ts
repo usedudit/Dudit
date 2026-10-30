@@ -213,15 +213,19 @@ export async function createFinanceAccountAction(data: {
 
     if (!inserted.integration_source || inserted.integration_source !== "mercadopago") {
       if (Boolean(data.isDefault)) {
-        await supabase
+        let clearDefaultsQuery = supabase
           .from("finance_accounts")
           .update({ is_default: false })
           .eq("partner_id", data.partnerId)
           .eq("type", data.type)
           .neq("id", inserted.id)
           .or("integration_source.is.null,integration_source.neq.mercadopago")
+        clearDefaultsQuery = data.storeId
+          ? clearDefaultsQuery.eq("store_id", data.storeId)
+          : clearDefaultsQuery.is("store_id", null)
+        await clearDefaultsQuery
       } else {
-        const { count } = await supabase
+        let defaultCountQuery = supabase
           .from("finance_accounts")
           .select("id", { count: "exact", head: true })
           .eq("partner_id", data.partnerId)
@@ -229,6 +233,10 @@ export async function createFinanceAccountAction(data: {
           .eq("is_default", true)
           .neq("id", inserted.id)
           .or("integration_source.is.null,integration_source.neq.mercadopago")
+        defaultCountQuery = data.storeId
+          ? defaultCountQuery.eq("store_id", data.storeId)
+          : defaultCountQuery.is("store_id", null)
+        const { count } = await defaultCountQuery
 
         if (!count) {
           await supabase
@@ -259,6 +267,7 @@ export async function createFinanceAccountAction(data: {
         dueDate: today,
         paymentDate: transactionTs,
         transactionDate: transactionTs,
+        storeId: data.storeId || null,
         status: "paid",
         notes: null,
         origin: "manual",
@@ -299,11 +308,12 @@ export async function updateFinanceAccountAction(
 
     const { data: account, error: accErr } = await supabase
       .from("finance_accounts")
-      .select("id, is_system_managed, integration_source, type, is_default")
+      .select("id, is_system_managed, integration_source, type, is_default, store_id")
       .eq("id", id)
       .eq("partner_id", partnerId)
       .single()
     if (accErr || !account) throw new Error("Conta não encontrada.")
+    if (account.store_id) await requireStorePermission(account.store_id, partnerId, "financial", "edit")
 
     if (account.is_system_managed && account.integration_source === "mercadopago") {
       const integration = await findMercadoPagoIntegration(supabase, partnerId)
@@ -339,13 +349,17 @@ export async function updateFinanceAccountAction(
       data.isDefault === true || (data.isDefault === undefined && account.is_default === true)
 
     if (account.integration_source !== "mercadopago" && willBeDefault && ["cash", "bank", "wallet"].includes(targetType)) {
-      await supabase
+      let clearDefaultsQuery = supabase
         .from("finance_accounts")
         .update({ is_default: false })
         .eq("partner_id", partnerId)
         .eq("type", targetType)
         .neq("id", id)
         .or("integration_source.is.null,integration_source.neq.mercadopago")
+      clearDefaultsQuery = account.store_id
+        ? clearDefaultsQuery.eq("store_id", account.store_id)
+        : clearDefaultsQuery.is("store_id", null)
+      await clearDefaultsQuery
     }
 
     const { data: updated, error } = await supabase
@@ -374,11 +388,12 @@ export async function deleteFinanceAccountAction(id: string, partnerId: string) 
 
     const { data: account, error: accErr } = await supabase
       .from("finance_accounts")
-      .select("id, is_system_managed, integration_source")
+      .select("id, is_system_managed, integration_source, store_id")
       .eq("id", id)
       .eq("partner_id", partnerId)
       .single()
     if (accErr || !account) throw new Error("Conta não encontrada.")
+    if (account.store_id) await requireStorePermission(account.store_id, partnerId, "financial", "edit")
 
     if (account.is_system_managed && account.integration_source === "mercadopago") {
       const integration = await findMercadoPagoIntegration(supabase, partnerId)

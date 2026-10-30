@@ -2187,6 +2187,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   data.storeId = data.storeId || context.activeStoreId || undefined;
   const permissionPromise = requirePermission(partnerId, "orders", "create");
   if (data.storeId) await requireStorePermission(data.storeId, partnerId, "orders", "create");
+  if (Number(data.paidAmount || 0) > 0.009 || data.paymentStatus === "paid" || data.paymentStatus === "partially_paid") {
+    await requirePermission(partnerId, "financial", "create", user);
+    if (data.storeId) await requireStorePermission(data.storeId, partnerId, "financial", "create");
+  }
   const capabilitiesPromise = getPartnerCapabilities(partnerId, {
     storeId: data.storeId,
   });
@@ -2236,7 +2240,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     capabilities.hasFinancial && data.financeAccountId
       ? supabase
         .from("finance_accounts")
-        .select("id")
+        .select("id, store_id")
         .eq("id", data.financeAccountId)
         .eq("partner_id", partnerId)
         .limit(1)
@@ -2465,6 +2469,12 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     !financeAccount?.id
   ) {
     return { error: "Conta de recebimento inválida para esta venda." };
+  }
+  if (capabilities.hasFinancial && data.financeAccountId && financeAccount?.store_id) {
+    if (data.storeId && financeAccount.store_id !== data.storeId) {
+      return { error: "A conta financeira pertence a outra loja." };
+    }
+    await requireStorePermission(financeAccount.store_id, partnerId, "financial", "create");
   }
 
   if (Number(data.totalAmount || 0) <= 0) {
@@ -3806,7 +3816,7 @@ export async function updateERPOrderAction(
   const financeAccountPromise = data.financeAccountId
     ? supabase
       .from("finance_accounts")
-      .select("id")
+      .select("id, store_id")
       .eq("id", data.financeAccountId)
       .eq("partner_id", data.partnerId)
       .limit(1)
@@ -3924,6 +3934,22 @@ export async function updateERPOrderAction(
   }
   if (!adminBypass && data.storeId && data.storeId !== currentOrder.store_id) {
     await requireStorePermission(data.storeId, data.partnerId, "orders", "edit");
+  }
+
+  const requestedPaymentSituation = normalizePaymentSituation(data.paymentStatus);
+  const hasPaymentStateChange =
+    requestedPaymentSituation !== currentOrder.situation ||
+    (data.paidAmount !== undefined &&
+      Math.abs(Number(data.paidAmount || 0) - Number(currentOrder.paid_amount || 0)) > 0.009) ||
+    (data.financeAccountId || null) !== (currentOrder.finance_account_id || null);
+  if (!adminBypass && hasPaymentStateChange) {
+    await requirePermission(data.partnerId, "financial", "edit", user);
+    if (currentOrder.store_id) {
+      await requireStorePermission(currentOrder.store_id, data.partnerId, "financial", "edit");
+    }
+    if (data.storeId && data.storeId !== currentOrder.store_id) {
+      await requireStorePermission(data.storeId, data.partnerId, "financial", "edit");
+    }
   }
 
   if (currentOrder.situation === "cancelled" && !adminBypass) {
@@ -4198,6 +4224,13 @@ export async function updateERPOrderAction(
     !financeAccount?.id
   ) {
     return { error: "Conta de recebimento inválida para esta venda." };
+  }
+  if (capabilities.hasFinancial && data.financeAccountId && financeAccount?.store_id) {
+    const targetStoreId = data.storeId || currentOrder.store_id;
+    if (targetStoreId && financeAccount.store_id !== targetStoreId) {
+      return { error: "A conta financeira pertence a outra loja." };
+    }
+    if (!adminBypass) await requireStorePermission(financeAccount.store_id, data.partnerId, "financial", "edit");
   }
 
   if (Number(data.totalAmount || 0) <= 0) {
@@ -4942,10 +4975,17 @@ export async function deleteOrdersInBatchAction(
   await Promise.all(orders.filter((order: any) => order.store_id).map((order: any) =>
     requireStorePermission(order.store_id, partnerId, "orders", "delete"),
   ));
+  const { data: attachments, error: attachmentLookupError } = await supabase
+    .from("order_attachments")
+    .select("id")
+    .in("order_id", orders.map((order: any) => order.id))
+    .limit(1);
+  if (attachmentLookupError) return { error: attachmentLookupError.message };
+  if (attachments?.length) return { error: "Remova os anexos dos pedidos antes de excluí-los." };
 
-  const { error: itemDeleteError } = await supabase.from("order_items").delete().in("order_id", orders.map((order: any) => order.id));
-  if (itemDeleteError) return { error: itemDeleteError.message };
-
+  // order_items uses ON DELETE CASCADE. Delete only parent rows so a RESTRICT
+  // relation (for example a return request) cannot fail after child rows were
+  // already removed in a separate statement.
   const { error } = await supabase
     .from("orders")
     .delete()
@@ -5134,7 +5174,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
     payload.partnerId,
     "orders",
     payload.actionType === "cancel" ? "cancel" : "edit",
+    user,
   );
+  if (payload.actionType === "payment_status") {
+    await requirePermission(payload.partnerId, "financial", "edit", user);
+  }
   const supabase = createAdminClient();
   const capabilities = await getPartnerCapabilities(payload.partnerId);
 
@@ -5154,6 +5198,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
   for (const order of currentOrders as any[]) {
     if (order.store_id) {
       await requireStorePermission(order.store_id, payload.partnerId, "orders", storeAction);
+      if (payload.actionType === "payment_status") {
+        await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
+      }
     }
   }
 
@@ -6715,6 +6762,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     const user = await requireUser();
     if (!user) return { success: false, error: "Não autenticado" };
     await requirePermission(payload.partnerId, "orders", "edit");
+    await requirePermission(payload.partnerId, "financial", "edit", user);
 
     const supabase = await getSupabaseServerClient();
 
@@ -6728,7 +6776,25 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     if (orderErr || !order) {
       throw new Error("Pedido não encontrado");
     }
-    if (order.store_id) await requireStorePermission(order.store_id, payload.partnerId, "orders", "edit");
+    if (order.store_id) {
+      await requireStorePermission(order.store_id, payload.partnerId, "orders", "edit");
+      await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
+    }
+    if (payload.financeAccountId) {
+      const { data: financeAccount } = await supabase
+        .from("finance_accounts")
+        .select("id, store_id")
+        .eq("id", payload.financeAccountId)
+        .eq("partner_id", payload.partnerId)
+        .maybeSingle();
+      if (!financeAccount) return { success: false, error: "Conta financeira inválida para este pedido." };
+      if (financeAccount.store_id) {
+        if (order.store_id && financeAccount.store_id !== order.store_id) {
+          return { success: false, error: "A conta financeira pertence a outra loja." };
+        }
+        await requireStorePermission(financeAccount.store_id, payload.partnerId, "financial", "edit");
+      }
+    }
 
     let orderPrice = Number(order.total_amount || 0);
     if (payload.servicePrice !== undefined) {

@@ -60,7 +60,7 @@ export function MoneyPaymentView({
           baseAllocated={baseAllocated}
           flatAmount={flatAmount}
         />
-        <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
+        <MoneyInput value={amount} onChange={onAmountChange} />
       </div>
       <div className="flex flex-wrap justify-center gap-3 mb-6 mt-4 w-full px-2">
         {[5, 10, 20, 50, 100].map((amt) => (
