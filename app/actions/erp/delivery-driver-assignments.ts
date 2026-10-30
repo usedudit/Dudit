@@ -53,6 +53,16 @@ export async function assignPlatformDriverToDeliveryAction(input: {
   if (!input.deliveryId || !input.driverId || orderIds.length === 0) return { success: false as const, error: "Dados da atribuição inválidos." }
   const admin = getAdminClient()
 
+  if (!orderIds.includes(input.deliveryId)) {
+    const { data: delivery } = await admin
+      .from("deliveries")
+      .select("id")
+      .eq("id", input.deliveryId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle()
+    if (!delivery) return { success: false as const, error: "Entrega não encontrada para este parceiro." }
+  }
+
   if (input.driverId === "dudit_network" || input.driverId === "platform:dudit_network") {
     const { data: orders } = await admin.from("orders").select("id, partner_id, delivery_fee").in("id", orderIds).eq("partner_id", input.partnerId)
     if (!orders || orders.length === 0) return { success: false as const, error: "Pedidos não encontrados." }
@@ -161,6 +171,16 @@ export async function requestDuditDeliveryAction(input: {
 
   if (!orders || orders.length === 0) {
     return { success: false as const, error: "Pedidos não encontrados." }
+  }
+
+  if (input.deliveryId && !orderIds.includes(input.deliveryId)) {
+    const { data: delivery } = await admin
+      .from("deliveries")
+      .select("id")
+      .eq("id", input.deliveryId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle()
+    if (!delivery) return { success: false as const, error: "Entrega não encontrada para este parceiro." }
   }
 
   // Cancel any existing active assignment for these orders before creating the new request

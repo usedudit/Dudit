@@ -1,4 +1,7 @@
+import "server-only"
+
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getAdminClient } from "@/lib/supabase/admin"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { isUuid } from "@/lib/utils/short-id"
 
@@ -123,19 +126,19 @@ async function resolveDefaultSalesAccountId(
 }
 
 async function applyAccountBalanceDelta(
-    supabase: SupabaseClient,
     partnerId: string,
     accountId: string | null,
     amount: number,
 ) {
     if (!accountId || !(Math.abs(amount) > 0.0001)) return
-    const { error } = await supabase.rpc("apply_account_balance_delta", {
+    const { error } = await getAdminClient().rpc("apply_account_balance_delta", {
         p_account_id: accountId,
         p_partner_id: partnerId,
         p_delta: Math.round(amount * 100) / 100,
     })
     if (error) {
         console.error("[TRANSACTION] Erro ao atualizar saldo da conta:", error.message)
+        throw new Error(`Falha ao atualizar saldo da conta financeira: ${error.message}`)
     }
 }
 
@@ -462,7 +465,7 @@ async function refineLedgerEntry(
                     .from("transactions")
                     .update({ amount: saleEntry.net, original_amount: saleEntry.net })
                     .eq("id", settlementTx.id)
-                await applyAccountBalanceDelta(supabase, orderData.partner_id, ctx.accountId, -saleEntry.cost)
+                await applyAccountBalanceDelta(orderData.partner_id, ctx.accountId, -saleEntry.cost)
             }
         }
     }
@@ -645,7 +648,7 @@ export async function createTransactionFromOrder(
                 if (settleError) {
                     console.error(`[TRANSACTION] Erro ao criar liquidação do pedido ${orderData.order_number}:`, settleError.message)
                 } else {
-                    await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, entry.net)
+                    await applyAccountBalanceDelta(orderData.partner_id, accountId, entry.net)
                 }
             }
         }

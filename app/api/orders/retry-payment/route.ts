@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission, requireStorePermission } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { getOrderDepositSummary, shouldShowSinal } from "@/lib/payments/order-financial-state"
@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
     let isPartnerStaff = false
     if (!isBuyer && order.partner_id) {
       try {
-        await requirePartnerAccess(order.partner_id, user)
+        // A team relationship alone is insufficient for a payment mutation.
+        await requirePartnerAccessWithPermission(order.partner_id, "orders", "edit", user)
         isPartnerStaff = true
       } catch (_) {
         isPartnerStaff = false
@@ -65,6 +66,10 @@ export async function POST(request: NextRequest) {
 
     if (!isBuyer && !isPartnerStaff) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
+
+    if (isPartnerStaff && order.store_id) {
+      await requireStorePermission(order.store_id, order.partner_id, "orders", "edit")
     }
 
     let mpAccessToken: string

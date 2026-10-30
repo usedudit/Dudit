@@ -23,6 +23,11 @@ export default function robots(): MetadataRoute.Robots {
                     '/ddt-admin/',
                     '/entregadores/',
                     '/~offline/',
+                    '*?sort=*',
+                    '*?searchValue=*',
+                    '*?category=*',
+                    '*?tab=*',
+                    '*?q=*',
                 ],
             },
             {
@@ -35,6 +40,8 @@ export default function robots(): MetadataRoute.Robots {
                     'Bingbot',
                     'Google-Extended',
                     'Applebot-Extended',
+                    'Meta-ExternalAgent',
+                    'Amazonbot',
                 ],
                 allow: '/',
                 disallow: [

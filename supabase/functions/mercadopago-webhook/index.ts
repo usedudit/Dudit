@@ -16,6 +16,7 @@ interface MpWebhookPayload {
 }
 
 const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024
 
 // Constant-time string comparison for timing attack defense
 function constantTimeEquals(a: string, b: string): boolean {
@@ -51,8 +52,9 @@ async function validateMpSignature(
 		if (!timestamp || !receivedSignature) return false
 
 		// Expired webhook check
-		const timestampMs = parseInt(timestamp, 10) * 1000
-		if (Date.now() - timestampMs > MAX_WEBHOOK_AGE_MS) return false
+		if (!/^\d+$/.test(timestamp)) return false
+		const timestampMs = Number(timestamp) * 1000
+		if (!Number.isSafeInteger(timestampMs) || Math.abs(Date.now() - timestampMs) > MAX_WEBHOOK_AGE_MS) return false
 
 		const idStr = String(resourceId).trim()
 		const idLower = idStr.toLowerCase()
@@ -102,7 +104,8 @@ Deno.serve(async (req: Request) => {
 
 	const supabaseUrl = Deno.env.get("SUPABASE_URL")
 	const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-	const mpWebhookSecret = Deno.env.get("MP_WEBHOOK_SECRET")
+	const webhookSecrets = [Deno.env.get("MP_WEBHOOK_SECRET"), Deno.env.get("MP_SUBSCRIPTION_WEBHOOK_SECRET")]
+		.filter((secret): secret is string => Boolean(secret))
 
 	if (!supabaseUrl || !supabaseServiceKey) {
 		console.error("[Edge Function] Missing Supabase environment variables")
@@ -124,7 +127,21 @@ Deno.serve(async (req: Request) => {
 	}
 
 	try {
-		const payload: MpWebhookPayload = await req.json()
+		const declaredLength = Number(req.headers.get("content-length"))
+		if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+			return new Response(JSON.stringify({ error: "Payload too large" }), {
+				status: 413,
+				headers: { "Content-Type": "application/json" },
+			})
+		}
+		const rawBody = await req.text()
+		if (new TextEncoder().encode(rawBody).byteLength > MAX_WEBHOOK_BODY_BYTES) {
+			return new Response(JSON.stringify({ error: "Payload too large" }), {
+				status: 413,
+				headers: { "Content-Type": "application/json" },
+			})
+		}
+		const payload: MpWebhookPayload = rawBody ? JSON.parse(rawBody) : {}
 		const resourceId = String(payload?.data?.id || "")
 
 		if (!resourceId) {
@@ -134,16 +151,28 @@ Deno.serve(async (req: Request) => {
 			})
 		}
 
-		// Validate signature if secret is configured
-		if (mpWebhookSecret) {
-			const isValid = await validateMpSignature(signature, requestId, resourceId, mpWebhookSecret)
-			if (!isValid) {
-				console.warn("[Edge Function] Invalid signature for resource:", resourceId)
-				return new Response(JSON.stringify({ error: "Invalid signature" }), {
-					status: 401,
-					headers: { "Content-Type": "application/json" },
-				})
+		// Fail closed: never queue an event whose provider signature was not checked.
+		if (webhookSecrets.length === 0) {
+			console.error("[Edge Function] No Mercado Pago webhook secret is configured")
+			return new Response(JSON.stringify({ error: "Webhook configuration error" }), {
+				status: 503,
+				headers: { "Content-Type": "application/json" },
+			})
+		}
+
+		let isValid = false
+		for (const secret of webhookSecrets) {
+			if (await validateMpSignature(signature, requestId, resourceId, secret)) {
+				isValid = true
+				break
 			}
+		}
+		if (!isValid) {
+			console.warn("[Edge Function] Invalid signature for resource:", resourceId)
+			return new Response(JSON.stringify({ error: "Invalid signature" }), {
+				status: 401,
+				headers: { "Content-Type": "application/json" },
+			})
 		}
 
 		const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -166,27 +195,17 @@ Deno.serve(async (req: Request) => {
 				idempotency_key: idempotencyKey,
 			}, {
 				onConflict: "idempotency_key",
+				ignoreDuplicates: true,
 			})
 
 		if (upsertError) {
 			console.error("[Edge Function] Failed to insert webhook event:", upsertError)
-
-			// Fallback: forward to Next.js webhook endpoint directly
-			// This ensures webhooks are still processed if the DB/write fails
-			const appWebhookUrl = Deno.env.get("APP_WEBHOOK_URL")
-			if (appWebhookUrl) {
-				console.log("[Edge Function] Falling back to direct forward...")
-				fetch(appWebhookUrl, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"x-signature": signature,
-						"x-request-id": requestId,
-						"x-forwarded-from": "edge-function-fallback",
-					},
-					body: JSON.stringify(payload),
-				}).catch((e) => console.error("[Edge Function] Fallback forward failed:", e))
-			}
+			// No durable receipt means we must not ACK as accepted; the provider
+			// needs to retry instead of losing an event in a fire-and-forget call.
+			return new Response(JSON.stringify({ error: "Could not queue webhook" }), {
+				status: 503,
+				headers: { "Content-Type": "application/json" },
+			})
 		} else {
 			console.log(`[Edge Function] Webhook queued: type=${payload.type} resourceId=${resourceId} requestId=${requestId}`)
 		}
@@ -198,10 +217,9 @@ Deno.serve(async (req: Request) => {
 		})
 	} catch (err: unknown) {
 		console.error("[Edge Function] Unhandled error:", err)
-		const message = err instanceof Error ? err.message : "Internal server error"
-		// Still return 200 to prevent MP from retrying on our internal errors
-		return new Response(JSON.stringify({ received: true, status: "error", error: message }), {
-			status: 200,
+		// Return a retryable error when durable ingestion failed.
+		return new Response(JSON.stringify({ error: "Webhook ingestion failed" }), {
+			status: 503,
 			headers: { "Content-Type": "application/json" },
 		})
 	}

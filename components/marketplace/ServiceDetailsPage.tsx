@@ -2206,7 +2206,7 @@ export function ServiceDetailsPageClient({
                                         <div key={i} onClick={() => goToImage(i)}
                                             className={`w-full aspect-square rounded-md border cursor-pointer overflow-hidden transition-all
                         ${activeImgIndex === i ? "border-brand-green ring-1 ring-brand-green" : "border-brand-border hover:border-brand-border"}`}>
-                                            <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city}`} />
+                                            <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city}`} loading="lazy" decoding="async" />
                                         </div>
                                     ))}
                                 </div>
@@ -2240,6 +2240,8 @@ export function ServiceDetailsPageClient({
                                                         <motion.img
                                                             key={activeImgIndex}
                                                             src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
+                                                            fetchPriority="high"
+                                                            decoding="async"
                                                             className="absolute inset-0 w-full h-full object-contain cursor-pointer"
                                                             alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
                                                             custom={slideDirection}

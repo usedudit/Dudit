@@ -163,19 +163,44 @@ export function OptimizedMapbox({
         el.style.width = "48px"
         el.style.height = "60px"
 
-        const imageUrl = partner.store_image_url ? getR2ImageUrl(partner.store_image_url) : "https://img.dudit.com.br/static/Placeholder.png"
+        const fallbackImageUrl = "https://img.dudit.com.br/static/Placeholder.png"
+        const candidateImageUrl = partner.store_image_url
+          ? getR2ImageUrl(partner.store_image_url)
+          : fallbackImageUrl
+        let imageUrl = fallbackImageUrl
+        try {
+          const parsedImageUrl = new URL(candidateImageUrl)
+          if (
+            (parsedImageUrl.protocol === "https:" || parsedImageUrl.protocol === "http:") &&
+            !parsedImageUrl.username &&
+            !parsedImageUrl.password
+          ) {
+            imageUrl = parsedImageUrl.href
+          }
+        } catch {
+          // Keep the known-safe fallback for malformed or non-HTTP URLs.
+        }
 
-        el.innerHTML = `
-          <div class="relative w-full h-full flex items-center justify-center flex-col origin-bottom">
-            <!-- Imagem de Fundo (o seu Pointer.png) -->
-            <img src="${CUSTOM_POINTER_IMG}" alt="Pointer" class="absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-md" />
-            
-            <!-- Imagem do parceiro (No centro) -->
-            <div class="absolute top-[6px] left-1/2 -translate-x-1/2 w-[34px] h-[34px] rounded-full overflow-hidden bg-white border border-transparent">
-               <img src="${imageUrl}" class="w-full h-full object-cover pointer-events-none" />
-            </div>
-          </div>
-        `
+        const markerContent = document.createElement("div")
+        markerContent.className = "relative w-full h-full flex items-center justify-center flex-col origin-bottom"
+
+        const pointerImage = document.createElement("img")
+        pointerImage.src = CUSTOM_POINTER_IMG
+        pointerImage.alt = ""
+        pointerImage.setAttribute("aria-hidden", "true")
+        pointerImage.className = "absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-md"
+
+        const avatarFrame = document.createElement("div")
+        avatarFrame.className = "absolute top-[6px] left-1/2 -translate-x-1/2 w-[34px] h-[34px] rounded-full overflow-hidden bg-white border border-transparent"
+
+        const avatarImage = document.createElement("img")
+        avatarImage.src = imageUrl
+        avatarImage.alt = ""
+        avatarImage.className = "w-full h-full object-cover pointer-events-none"
+
+        avatarFrame.appendChild(avatarImage)
+        markerContent.append(pointerImage, avatarFrame)
+        el.appendChild(markerContent)
 
         el.addEventListener("click", () => {
           onMarkerClick(partner)

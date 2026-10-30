@@ -15,6 +15,7 @@ import {
     Globe,
 } from "lucide-react"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
+import { applyVendorUrgencyBadges } from "@/lib/marketplace/badges"
 import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
@@ -682,6 +683,8 @@ export function ExplorarPageClient({
     })
 
     const normalizedInitialResults = useMemo(() => {
+        const userId = userProfile?.userId || null
+        
         const normalizeItemType = (item: any) => {
             const rawType = String(item?.itemType || "").toLowerCase()
             if (rawType === "loja" || rawType === "vitrine" || rawType === "vitrines" || rawType === "partner" || rawType === "parceiro") {
@@ -695,7 +698,7 @@ export function ExplorarPageClient({
             return rawType
         }
 
-        return rawItems.map((item: any) => {
+        const normalized = rawItems.map((item: any) => {
             const itemType = normalizeItemType(item)
             if (itemType === "loja") {
                 // Vitrine sem categoria cadastrada chega do servidor com o rótulo
@@ -721,7 +724,10 @@ export function ExplorarPageClient({
                 partners: Array.isArray(item.partners) ? item.partners[0] : item.partners,
             }
         })
-    }, [rawItems])
+
+        // Apply urgency badges (Destaque, Últimos X) to products
+        return applyVendorUrgencyBadges(normalized, userId)
+    }, [rawItems, userProfile?.userId])
 
     const productCategories = useMemo(
         () => (dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES),
@@ -955,11 +961,16 @@ export function ExplorarPageClient({
         [applyBrowseFilters, dataToFilter]
     )
 
+    // Apply urgency badges to more distant items
+    const moreDistantItemsWithBadges = useMemo(() => {
+        return applyVendorUrgencyBadges(moreDistantItems, userProfile?.userId || null)
+    }, [moreDistantItems, userProfile?.userId])
+
     // Itens distantes: listados direto na página, respondendo aos mesmos filtros/ordenação.
     // A ordem de relevância (texto + marketplace_score + distância) vem do servidor e é preservada.
     const filteredDistant = useMemo(() => {
-        if (!query || moreDistantItems.length === 0) return []
-        const typeFiltered = moreDistantItems.filter((item: any) => {
+        if (!query || moreDistantItemsWithBadges.length === 0) return []
+        const typeFiltered = moreDistantItemsWithBadges.filter((item: any) => {
             if (currentType === "produtos") return item.itemType === "produto"
             if (currentType === "servicos") return item.itemType === "servico"
             if (currentType === "vitrines" || currentType === "negocios") return item.itemType === "loja"
@@ -967,7 +978,7 @@ export function ExplorarPageClient({
             return true
         })
         return applyBrowseFilters(typeFiltered, { preserveOrder: true })
-    }, [query, moreDistantItems, currentType, applyBrowseFilters])
+    }, [query, moreDistantItemsWithBadges, currentType, applyBrowseFilters])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0

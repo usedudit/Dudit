@@ -1083,13 +1083,13 @@ async function reverseSubscriptionCycleFinancials(params: {
     if (insertError) {
       console.error("[RECURRING] Erro ao criar transacao de estorno:", insertError.message)
     } else {
-      const { error: balanceError } = await supabase.rpc("apply_account_balance_delta", {
+      const { error: balanceError } = await getAdminClient().rpc("apply_account_balance_delta", {
         p_account_id: accountId,
         p_partner_id: params.partnerId,
         p_delta: -Math.abs(refundAmount),
       })
       if (balanceError) {
-        console.error("[RECURRING] Erro ao devolver saldo da conta:", balanceError.message)
+        throw new Error(`Falha ao devolver saldo da conta da recorrência: ${balanceError.message}`)
       }
     }
   }

@@ -295,6 +295,7 @@ export default async function ExplorarPage({
             city: sessionData.profile.city || null,
             state: sessionData.profile.state || null,
             avatar_url: sessionData.profile.avatar_url || null,
+            userId: user?.id || null,
         }
         : null
 

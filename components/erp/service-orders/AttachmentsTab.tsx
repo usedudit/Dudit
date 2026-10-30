@@ -169,7 +169,8 @@ export default function AttachmentsTab({
 
     const handleDownloadDoc = async (fileKey: string, fileName: string) => {
         try {
-            const res = await getServiceOrderAttachmentUrlAction(partnerId, fileKey)
+            if (!serviceOrderId) return
+            const res = await getServiceOrderAttachmentUrlAction(partnerId, serviceOrderId, fileKey)
             if (res.success) {
                 window.open(res.downloadUrl, "_blank")
             } else {

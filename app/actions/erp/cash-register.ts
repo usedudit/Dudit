@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -461,6 +461,7 @@ async function reverseCashMovementFallback(
 export async function getActiveCashSessionAction(partnerId: string, storeId?: string | null) {
   await requireUser()
   await requirePermission(partnerId, "pdv", "view")
+  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load session data.
   const supabase = createAdminClient()
   const session = await getActiveSessionForPartner(supabase, partnerId, storeId)
@@ -493,7 +494,7 @@ export async function openCashSessionAction(input: {
   const user = await requireUser()
   await requirePermission(input.partnerId, "pdv", "open_pdv")
   if (input.storeId) {
-    await requireStoreAccess(input.storeId, input.partnerId)
+    await requireStorePermission(input.storeId, input.partnerId, "pdv", "open_pdv")
   }
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -584,7 +585,10 @@ export async function createCashMovementAction(input: {
   cashFinanceAccountId?: string | null
 }) {
   const user = await requireUser()
-  await requirePermission(input.partnerId, "pdv", "view")
+  if (!["withdrawal", "deposit"].includes(input.type)) {
+    return { success: false as const, error: "Tipo de movimentação inválido." }
+  }
+  await requirePermission(input.partnerId, "pdv", input.type === "withdrawal" ? "sangria" : "reforco")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -595,19 +599,25 @@ export async function createCashMovementAction(input: {
   if (!sessionId) {
     const s = await getActiveSessionForPartner(supabase, input.partnerId, input.storeId)
     sessionId = s?.id || null
-  } else {
-    const { data: s } = await supabase
-      .from("cash_sessions")
-      .select("id, status, opened_by_user_id")
-      .eq("id", sessionId)
-      .eq("partner_id", input.partnerId)
-      .maybeSingle()
-    if (!s?.id || s.status !== "open") {
-      return { success: false as const, error: "Sessão inválida ou caixa fechado." }
-    }
   }
 
   if (!sessionId) return { success: false as const, error: "Não existe caixa aberto para esta operação." }
+
+  const { data: cashSession } = await supabase
+    .from("cash_sessions")
+    .select("store_id, status")
+    .eq("id", sessionId)
+    .eq("partner_id", input.partnerId)
+    .maybeSingle()
+  if (!cashSession || cashSession.status !== "open") {
+    return { success: false as const, error: "Sessão inválida ou caixa fechado." }
+  }
+  if (cashSession.store_id) {
+    await requireStorePermission(cashSession.store_id, input.partnerId, "pdv", input.type === "withdrawal" ? "sangria" : "reforco")
+  }
+  if (input.storeId && input.storeId !== cashSession.store_id) {
+    return { success: false as const, error: "A sessão não pertence à loja informada." }
+  }
 
   const rawAmount = Number(input.amount || 0)
   if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) {
@@ -626,6 +636,18 @@ export async function createCashMovementAction(input: {
     }
   }
 
+  const { data: cashAccount } = await supabase
+    .from("finance_accounts")
+    .select("id, store_id")
+    .eq("id", cashAccountId)
+    .eq("partner_id", input.partnerId)
+    .eq("type", "cash")
+    .eq("is_active", true)
+    .maybeSingle()
+  if (!cashAccount || (cashAccount.store_id && cashAccount.store_id !== cashSession.store_id)) {
+    return { success: false as const, error: "Conta de caixa inválida para esta loja." }
+  }
+
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
     p_partner_id: input.partnerId,
     p_cash_session_id: sessionId,
@@ -638,7 +660,7 @@ export async function createCashMovementAction(input: {
   if (rpcError) {
     const fallbackResult = await createCashMovementFallback(supabase, {
       partnerId: input.partnerId,
-      storeId: input.storeId || null,
+      storeId: cashSession.store_id || null,
       cashSessionId: sessionId,
       type: input.type,
       description: normalizedDescription,
@@ -719,13 +741,24 @@ export async function reverseCashMovementAction(input: {
   // Fetch movement first to know the type for permission check
   const { data: movementInfo, error: movementInfoError } = await supabase
     .from("cash_movements")
-    .select("type")
+    .select("type, cash_session_id")
     .eq("id", input.movementId)
     .eq("partner_id", input.partnerId)
     .maybeSingle()
 
   if (movementInfoError || !movementInfo) {
     return { success: false as const, error: movementInfoError?.message || "Movimentação não encontrada." }
+  }
+
+  const { data: session } = await supabase
+    .from("cash_sessions")
+    .select("store_id")
+    .eq("id", movementInfo.cash_session_id)
+    .eq("partner_id", input.partnerId)
+    .maybeSingle()
+  if (!session) return { success: false as const, error: "Sessão de caixa não encontrada." }
+  if (session.store_id) {
+    await requireStorePermission(session.store_id, input.partnerId, "pdv", movementInfo.type === "withdrawal" ? "sangria" : "reforco")
   }
 
   await requirePermission(input.partnerId, "pdv", movementInfo.type === "withdrawal" ? "sangria" : "reforco")
@@ -741,7 +774,7 @@ export async function reverseCashMovementAction(input: {
   if (rpcError) {
     const fallbackResult = await reverseCashMovementFallback(supabase, {
       partnerId: input.partnerId,
-      storeId: input.storeId || null,
+      storeId: session.store_id || null,
       movementId: input.movementId,
       userId: user.id,
     })
@@ -812,6 +845,7 @@ export async function getCashSessionCloseSummaryAction(partnerId: string, cashSe
     .eq("partner_id", partnerId)
     .single()
   if (sessionError || !session) return { success: false as const, error: sessionError?.message || "Caixa não encontrado." }
+  if (session.store_id) await requireStorePermission(session.store_id, partnerId, "pdv", "view")
 
   const movements = await loadMovementsForSession(supabase, partnerId, cashSessionId)
   const drawer = computeDrawerBalanceCents({
@@ -868,8 +902,10 @@ export async function closeCashSessionAction(input: {
   const openedBy = session.opened_by_user_id || session.user_id
   if (openedBy !== user.id) {
     await requirePermission(input.partnerId, "pdv", "close_pdv")
+    if (session.store_id) await requireStorePermission(session.store_id, input.partnerId, "pdv", "close_pdv")
   } else {
     await requirePermission(input.partnerId, "pdv", "view")
+    if (session.store_id) await requireStorePermission(session.store_id, input.partnerId, "pdv", "view")
   }
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1001,6 +1037,7 @@ export async function closeCashSessionAction(input: {
 
 export async function getCashSessionsHistoryAction(partnerId: string, storeId?: string | null) {
   await requirePermission(partnerId, "pdv", "view")
+  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
   let sessionsQuery = supabase
@@ -1112,6 +1149,7 @@ export async function getCashSessionsHistoryPageAction(
   const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CASH_SESSIONS_PAGE_SIZE))))
   const fetchLimit = limit + 1
   const storeId = options?.storeId
+  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
   const { data: sessions, error: sessionError } = await getCachedErpPage(
     ["erp-cash-sessions-page", partnerId, storeId || "all-stores", cursor ? `${cursor.openedAt}:${cursor.id}` : "first", String(limit)],
     [TAGS.cashSessions(partnerId)],
@@ -1231,6 +1269,7 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
     10,
   )
   if (sessionError || !session) return { success: false as const, error: sessionError?.message || "Caixa não encontrado." }
+  if (session.store_id) await requireStorePermission(session.store_id, partnerId, "pdv", "view")
 
   const movements = await getCachedErpPage(
     ["erp-cash-session-movements", partnerId, cashSessionId],

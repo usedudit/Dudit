@@ -1,5 +1,6 @@
 "use server"
 
+import { randomUUID } from "crypto"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
@@ -20,7 +21,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
@@ -32,6 +33,120 @@ async function requireFinancialCapability(partnerId: string, storeId?: string | 
     const capabilities = await getPartnerCapabilities(partnerId, { storeId })
     if (!capabilities.hasFinancial) {
         throw new Error("O módulo Financeiro requer o plano Crescer ou superior e deve estar ativo nas configurações.")
+    }
+}
+
+async function validateTransactionReferences(
+    supabase: ReturnType<typeof createAdminClient>,
+    partnerId: string,
+    storeId: string | null | undefined,
+    references: {
+        accountId?: string | null
+        paymentMethodId?: string | null
+        customerId?: string | null
+        contactId?: string | null
+        contactType?: string | null
+        categoryId?: string | null
+        subcategoryId?: string | null
+    },
+    permission: "create" | "edit",
+) {
+    if (storeId) {
+        const { data: store, error } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("id", storeId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (error || !store) throw new Error("Loja inválida para este parceiro.")
+        await requireStorePermission(storeId, partnerId, "financial", permission)
+    }
+
+    const accountId = sanitizeUUID(references.accountId)
+    if (references.accountId && !accountId) throw new Error("Conta financeira inválida.")
+    if (accountId) {
+        const { data: account } = await supabase
+            .from("finance_accounts")
+            .select("id, store_id")
+            .eq("id", accountId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!account || (account.store_id && account.store_id !== (storeId || null))) {
+            throw new Error("Conta financeira fora do parceiro ou da loja selecionada.")
+        }
+    }
+
+    const paymentMethodId = sanitizeUUID(references.paymentMethodId)
+    if (references.paymentMethodId && !paymentMethodId) throw new Error("Forma de pagamento inválida.")
+    if (paymentMethodId) {
+        const { data: method } = await supabase
+            .from("payment_methods")
+            .select("id, default_finance_account_id")
+            .eq("id", paymentMethodId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!method) throw new Error("Forma de pagamento não encontrada para este parceiro.")
+        if (method.default_finance_account_id && method.default_finance_account_id !== accountId) {
+            const { data: defaultAccount } = await supabase
+                .from("finance_accounts")
+                .select("id, store_id")
+                .eq("id", method.default_finance_account_id)
+                .eq("partner_id", partnerId)
+                .maybeSingle()
+            if (!defaultAccount || (defaultAccount.store_id && defaultAccount.store_id !== (storeId || null))) {
+                throw new Error("Conta padrão da forma de pagamento fora do parceiro ou da loja selecionada.")
+            }
+        }
+    }
+
+    const customerId = sanitizeUUID(references.customerId)
+    if (references.customerId && !customerId) throw new Error("Cliente inválido.")
+    if (customerId) {
+        const { data: customer } = await supabase
+            .from("customers")
+            .select("id, partner_id")
+            .eq("id", customerId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!customer) throw new Error("Cliente não encontrado para este parceiro.")
+    }
+
+    const contactId = sanitizeUUID(references.contactId)
+    if (references.contactId && !contactId) throw new Error("Contato inválido.")
+    if (contactId) {
+        const allowedTypes = ["customer", "supplier", "service", "employee", "partner", "other"]
+        if (!references.contactType || !allowedTypes.includes(references.contactType)) {
+            throw new Error("Tipo de contato inválido.")
+        }
+        const { data: contact } = await supabase
+            .from("transaction_contacts")
+            .select("id, store_id")
+            .eq("id", contactId)
+            .eq("partner_id", partnerId)
+            .eq("type", references.contactType)
+            .is("deleted_at", null)
+            .maybeSingle()
+        if (!contact || (contact.store_id && contact.store_id !== (storeId || null))) {
+            throw new Error("Contato fora do parceiro ou da loja selecionada.")
+        }
+    }
+
+    for (const [label, rawId] of [["Categoria", references.categoryId], ["Subcategoria", references.subcategoryId]] as const) {
+        const id = sanitizeUUID(rawId)
+        if (rawId && !id) throw new Error(`${label} inválida.`)
+        if (!id) continue
+        const { data: category } = await supabase
+            .from("financial_categories")
+            .select("id, parent_id")
+            .eq("id", id)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!category) throw new Error(`${label} não encontrada para este parceiro.`)
+        if (label === "Subcategoria") {
+            if (!category.parent_id || category.parent_id !== sanitizeUUID(references.categoryId)) {
+                throw new Error("A subcategoria não pertence à categoria selecionada.")
+            }
+        }
     }
 }
 
@@ -358,13 +473,17 @@ async function applyFinanceAccountBalanceDelta(
     if (delta === 0) return
 
     // Use atomic RPC with FOR UPDATE locking to prevent race conditions
-    const { error: rpcError } = await supabase.rpc("apply_account_balance_delta", {
+    const { data: balance, error: rpcError } = await createAdminClient().rpc("apply_account_balance_delta", {
         p_account_id: accountId,
         p_partner_id: partnerId,
         p_delta: delta,
     })
     if (rpcError) {
         console.error("[transactions] apply_account_balance_delta RPC error:", rpcError.message)
+        throw new Error(`Falha ao atualizar o saldo da conta financeira: ${rpcError.message}`)
+    }
+    if (balance == null) {
+        throw new Error("Conta financeira não encontrada para este parceiro.")
     }
 }
 
@@ -941,6 +1060,16 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
+        if (!["income", "expense", "adjustment", "refund"].includes(input.transactionType)) {
+            throw new Error("Tipo de transação inválido.")
+        }
+        if (input.status !== undefined && !["pending", "paid"].includes(input.status)) {
+            throw new Error("Status de transação inválido.")
+        }
+        if (input.id || input.installmentGroupId || input.installmentNumber !== undefined) {
+            throw new Error("IDs de transação/parcelamento não podem ser definidos nesta ação.")
+        }
+
         if (input.transactionType === "transfer") {
             throw new Error("Use a ação de transferência para movimentar entre contas.")
         }
@@ -971,6 +1100,12 @@ export async function createManualTransactionAction(input: CreateManualTransacti
 
         const absAmount = input.transactionType === "adjustment" ? Math.abs(amount) : amount
         const normalizedContactType = String(input.contactType || "").toLowerCase()
+        if (input.contactType && !["customer", "supplier", "service", "employee", "partner", "other"].includes(normalizedContactType)) {
+            throw new Error("Tipo de contato inválido.")
+        }
+        if (input.transactionType === "refund" && !["expense_refund", "revenue_refund"].includes(String(input.refundKind))) {
+            throw new Error("Tipo de reembolso inválido.")
+        }
         const customerId =
             input.customerId?.trim()
             || ((normalizedContactType === "customer" || normalizedContactType === "cliente") ? (input.contactId?.trim() || null) : null)
@@ -985,15 +1120,24 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
         const resolvedPaymentType = input.paymentType || (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null)
 
+        await validateTransactionReferences(supabase, input.partnerId, input.storeId, {
+            accountId: input.accountId,
+            paymentMethodId: validPaymentMethodId,
+            customerId,
+            contactId,
+            contactType: contactTypeResolved,
+            categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId,
+        }, "create")
+
         const payload: Record<string, unknown> = {
-            ...(input.id ? { id: input.id } : {}),
             partner_id: input.partnerId,
             store_id: input.storeId || null,
             description: description,
             category: normalizedCategory || null,
-            category_id: input.categoryId ?? null,
-            subcategory_id: input.subcategoryId ?? null,
-            account_id: input.accountId ?? null,
+            category_id: sanitizeUUID(input.categoryId) ?? null,
+            subcategory_id: sanitizeUUID(input.subcategoryId) ?? null,
+            account_id: sanitizeUUID(input.accountId) ?? null,
             contact_id: contactId,
             customer_id: customerId,
             contact_type: contactTypeResolved,
@@ -1012,11 +1156,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             interest_amount: null,
             fee_amount: 0,
             transaction_type: input.transactionType,
-            origin: input.origin || "manual",
+            origin: "manual",
             refund_kind: input.transactionType === "refund" ? input.refundKind ?? null : null,
             reference_note: sanitizeInput(String(input.referenceNote || ""), 150).trim() || null,
-            installment_group_id: input.installmentGroupId || null,
-            installment_number: input.installmentNumber ?? null,
             created_by_user_id: userId,
         }
 
@@ -1082,13 +1224,24 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const datePart = (input.transactionDate || new Date().toISOString()).slice(0, 10)
         const transactionTs = startOfDay(datePart).toISOString()
         const status = input.status || "paid"
+        if (!["pending", "paid"].includes(status)) throw new Error("Status de transferência inválido.")
         const baseDesc = sanitizeInput(String(input.description || ""), 150).trim() || "Transferência entre contas"
+        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
 
         const { data: accounts } = await supabase
             .from("finance_accounts")
-            .select("id, name")
+            .select("id, name, store_id")
             .eq("partner_id", input.partnerId)
             .in("id", [input.fromAccountId, input.toAccountId])
+
+        if (!accounts || accounts.length !== 2) throw new Error("As contas de transferência precisam pertencer a este parceiro.")
+        await validateTransactionReferences(supabase, input.partnerId, input.storeId, {
+            accountId: input.fromAccountId,
+            paymentMethodId: validPaymentMethodId,
+        }, "create")
+        await validateTransactionReferences(supabase, input.partnerId, input.storeId, {
+            accountId: input.toAccountId,
+        }, "create")
 
         const nameById = new Map((accounts || []).map((a: { id: string; name: string }) => [a.id, a.name]))
         const fromName = nameById.get(input.fromAccountId) || "Origem"
@@ -1096,7 +1249,6 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
 
         const storeIdValue = input.storeId || null
 
-        const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
         const resolvedPaymentType = (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null) || "Transferência"
 
         const outRow = {
@@ -1209,12 +1361,12 @@ export async function updateManualTransactionAction(
 
         const { data: current, error: currentError } = await supabase
             .from("transactions")
-            .select("id, partner_id, status, origin, recurring_id, installment_group_id, category, description, payment_method_id")
+            .select("id, partner_id, status, origin, recurring_id, installment_group_id, category, description, payment_method_id, account_id, customer_id, contact_id, contact_type, category_id, subcategory_id, store_id")
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
-        const isInstallmentTransaction = !!current.installment_group_id
         if (currentError || !current) throw new Error(currentError?.message || "Transação não encontrada.")
+        const isInstallmentTransaction = !!current.installment_group_id
 
         const paid = isStatusPaid(current.status)
         const systemGateway = isSystemOrGatewayOrigin(current.origin)
@@ -1343,6 +1495,24 @@ export async function updateManualTransactionAction(
         delete payload.origin
         delete payload.recurring_id
         delete payload.transaction_type
+
+        const nextReference = (field: string, currentValue: string | null | undefined) =>
+            Object.prototype.hasOwnProperty.call(payload, field) ? payload[field] as string | null : currentValue
+        await validateTransactionReferences(
+            supabase,
+            partnerId,
+            nextReference("store_id", current.store_id),
+            {
+                accountId: nextReference("account_id", current.account_id),
+                paymentMethodId: nextReference("payment_method_id", current.payment_method_id),
+                customerId: nextReference("customer_id", current.customer_id),
+                contactId: nextReference("contact_id", current.contact_id),
+                contactType: nextReference("contact_type", current.contact_type),
+                categoryId: nextReference("category_id", current.category_id),
+                subcategoryId: nextReference("subcategory_id", current.subcategory_id),
+            },
+            "edit",
+        )
 
         payload.updated_at = new Date().toISOString()
 
@@ -1766,6 +1936,7 @@ export async function recordInstallmentPaymentAction(input: {
     discountAmount?: number
     paymentMethodId?: string | null
     accountId?: string | null
+    idempotencyKey?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1783,7 +1954,7 @@ export async function recordInstallmentPaymentAction(input: {
             .single()
         if (txErr || !tx) throw new Error(txErr?.message || "Parcela não encontrada.")
         if (!tx.installment_group_id) throw new Error("Pagamento parcial é permitido apenas para parcelas.")
-        if (!isStatusPending(tx.status)) throw new Error("A parcela já está quitada.")
+        if (tx.store_id) await requireStorePermission(tx.store_id, input.partnerId, "financial", "create")
 
         // Parcelas de venda (ledger de vendas) já nascem com o método de pagamento
         // fixado pelo gateway (ex: cartão de crédito) - não pode ser alterado.
@@ -1798,6 +1969,9 @@ export async function recordInstallmentPaymentAction(input: {
         if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
             throw new Error("Valores de pagamento inválidos.")
         }
+        if (interestAmount < 0 || discountAmount < 0) {
+            throw new Error("Juros e descontos não podem ser negativos.")
+        }
 
         const { data: existingPayments, error: paymentsErr } = await supabase
             .from("transaction_payments")
@@ -1806,13 +1980,13 @@ export async function recordInstallmentPaymentAction(input: {
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
 
-        const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
-        const paidPrincipalSoFar = (existingPayments || []).reduce(
+        let originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        let paidPrincipalSoFar = (existingPayments || []).reduce(
             (acc: number, row: { amount: number | string | null; base_amount?: number | string | null }) =>
                 acc + Number(row.base_amount ?? row.amount ?? 0),
             0,
         )
-        const remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
+        let remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
 
         const baseRequest = Math.max(0, Math.round(paymentAmount * 100) / 100)
         let baseApplied = Math.min(remainingPrincipal, baseRequest)
@@ -1827,36 +2001,13 @@ export async function recordInstallmentPaymentAction(input: {
             throw new Error("Não é possível abater a parcela sem informar o valor de principal.")
         }
 
-        const fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
-        const paidAfter = paidPrincipalSoFar + baseApplied
+        let fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
+        let paidAfter = paidPrincipalSoFar + baseApplied
         const nowIso = new Date().toISOString()
-        const idempotencyKey = `installment:${input.transactionId}:${nowIso}:${finalPaid}`
-
-        const { error: insertPaymentErr } = await supabase
-            .from("transaction_payments")
-            .insert({
-                partner_id: input.partnerId,
-                transaction_id: input.transactionId,
-                store_id: tx.store_id || null,
-                amount: finalPaid,
-                base_amount: baseApplied,
-                interest_amount: interestAmount,
-                discount_amount: discountAmount,
-                payment_method_id: effectivePaymentMethodId,
-                created_by_user_id: userId,
-                created_at: nowIso,
-                idempotency_key: idempotencyKey,
-            })
-        if (insertPaymentErr) {
-            // Handle unique constraint violation (duplicate payment)
-            if ((insertPaymentErr as any).code === "23505") {
-                throw new Error("Este pagamento já foi registrado.")
-            }
-            throw insertPaymentErr
-        }
+        const requestId = sanitizeUUID(input.idempotencyKey) || randomUUID()
+        const idempotencyKey = `txpayment:${input.transactionId}:${requestId}`
 
         let resolvedAccountId = tx.account_id
-        // Prefer explicit accountId from user, then fallback to payment method default
         if (input.accountId) {
             resolvedAccountId = input.accountId
         } else if (effectivePaymentMethodId) {
@@ -1866,48 +2017,35 @@ export async function recordInstallmentPaymentAction(input: {
                 .eq("id", effectivePaymentMethodId)
                 .eq("partner_id", input.partnerId)
                 .maybeSingle()
-            if (pm?.default_finance_account_id) {
-                resolvedAccountId = pm.default_finance_account_id
-            }
+            if (pm?.default_finance_account_id) resolvedAccountId = pm.default_finance_account_id
+        }
+        const currentLabel = effectivePaymentMethodId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, effectivePaymentMethodId).catch(() => null)
+            : (rawMethodName || null)
+        const { data: paymentResult, error: paymentError } = await createAdminClient().rpc("record_transaction_payment_atomic", {
+            p_partner_id: input.partnerId,
+            p_transaction_id: input.transactionId,
+            p_user_id: userId,
+            p_payment_amount: paymentAmount,
+            p_interest_amount: interestAmount,
+            p_discount_amount: discountAmount,
+            p_payment_method_id: effectivePaymentMethodId,
+            p_payment_type: currentLabel,
+            p_account_id: resolvedAccountId,
+            p_idempotency_key: idempotencyKey,
+            p_require_installment: true,
+        })
+        if (paymentError || !paymentResult?.success) {
+            throw new Error(paymentError?.message || "Não foi possível registrar o pagamento da parcela.")
         }
 
-        if (!resolvedAccountId) {
-            throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
-        }
-
-        if (resolvedAccountId) {
-            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
-                transaction_type: tx.transaction_type,
-                amount: finalPaid,
-                refund_kind: tx.refund_kind,
-            })
-        }
-
-        const existingInterest = (existingPayments || []).reduce(
-            (acc: number, row: any) => acc + Number(row.interest_amount ?? 0), 0
-        )
-        const totalInterest = existingInterest + interestAmount
-
-        const existingDiscount = (existingPayments || []).reduce(
-            (acc: number, row: any) => acc + Number(row.discount_amount ?? 0), 0
-        )
-        const totalDiscount = existingDiscount + discountAmount
-
-        const existingTotalPaid = (existingPayments || []).reduce(
-            (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
-        )
-        const totalPaidAmount = existingTotalPaid + finalPaid
-
-        const updatePayload: Record<string, unknown> = {
-            updated_at: nowIso,
-            payment_date: nowIso,
-            interest_amount: totalInterest > 0 ? totalInterest : (tx.interest_amount || null),
-            discount_amount: totalDiscount > 0 ? totalDiscount : (tx.discount_amount || null),
-            paid_amount: totalPaidAmount > 0 ? totalPaidAmount : (tx.paid_amount || null),
-        }
-        if (resolvedAccountId) {
-            updatePayload.account_id = resolvedAccountId
-        }
+        originalAmount = Number(paymentResult.originalAmount || originalAmount)
+        paidPrincipalSoFar = Number(paymentResult.paidSoFar || 0)
+        remainingPrincipal = Number(paymentResult.remainingBefore || 0)
+        baseApplied = Number(paymentResult.principalApplied || 0)
+        finalPaid = Number(paymentResult.paidNow || 0)
+        fullyPaid = Boolean(paymentResult.fullyPaid)
+        paidAfter = paidPrincipalSoFar + baseApplied
 
         // Derive payment_type from ALL transaction_payments (not just the latest)
         // This ensures split payments (e.g. PIX + Dinheiro) show all methods used
@@ -1925,41 +2063,26 @@ export async function recordInstallmentPaymentAction(input: {
             if (pmLabel) allPaymentLabels.push(pmLabel)
         }
         // Add current payment if not yet in the list
-        const currentLabel = effectivePaymentMethodId
-            ? await paymentMethodDisplayLabel(supabase, input.partnerId, effectivePaymentMethodId).catch(() => null)
-            : (rawMethodName || null)
         if (currentLabel && !allPaymentLabels.includes(currentLabel)) {
             allPaymentLabels.push(currentLabel)
         }
 
-        if (input.paymentMethodId !== undefined) {
-            updatePayload.payment_method_id = effectivePaymentMethodId
-        }
-        // Use comma-separated list if multiple methods, otherwise single label
+        let paymentTypeDisplay = currentLabel || tx.payment_type || null
         if (allPaymentLabels.length > 1) {
-            updatePayload.payment_type = [...new Set(allPaymentLabels)].join(", ")
-        } else if (currentLabel) {
-            updatePayload.payment_type = currentLabel
+            paymentTypeDisplay = [...new Set(allPaymentLabels)].join(", ")
         }
-        if (fullyPaid) {
-            updatePayload.status = "paid"
-            const existingTotal = (existingPayments || []).reduce(
-                (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
-            )
-            const totalPaid = existingTotal + finalPaid
-            if (totalPaid > 0) {
-                updatePayload.amount = totalPaid
-            }
-        }
-        const { error: updateErr } = await supabase
+        const totalPaidAmount = (allPayments || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0)
+        const { error: labelUpdateError } = await supabase
             .from("transactions")
-            .update(updatePayload)
+            .update({ payment_type: paymentTypeDisplay })
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
-        if (updateErr) throw updateErr
+        if (labelUpdateError) {
+            console.error("[recordInstallmentPaymentAction] Payment committed; display label update failed", labelUpdateError)
+        }
 
         const installmentDir = tx.transaction_type === "income" ? "Recebido" : "Pago"
-        const methodLabel = updatePayload.payment_type || tx.payment_type || null
+        const methodLabel = paymentTypeDisplay
 
         const { total: groupTotal, paidPrincipal: groupPaidPrincipal } = await getInstallmentGroupPrincipal(
             supabase,
@@ -1980,41 +2103,43 @@ export async function recordInstallmentPaymentAction(input: {
             methodLabel,
         })
 
-        await logAuditEvent({
-            partnerId: input.partnerId,
-            actorUserId: userId,
-            entityType: "transaction",
-            entityId: input.transactionId,
-            actionType: fullyPaid ? "installment_paid" : "installment_partial_paid",
-            changeLines: [installmentHistoryLine],
-            metadata: fullyPaid
-                ? { oldStatus: "Pendente", newStatus: "Pago" }
-                : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
-            source: "manual",
-        })
-
-        // Histórico do pedido: o recebimento da parcela também aparece no pedido.
-        const orderIdForAudit = await resolveOrderIdForSaleTransaction(supabase, input.partnerId, tx)
-        if (orderIdForAudit) {
+        if (!paymentResult.alreadyProcessed) {
             await logAuditEvent({
                 partnerId: input.partnerId,
                 actorUserId: userId,
-                entityType: "order",
-                entityId: orderIdForAudit,
+                entityType: "transaction",
+                entityId: input.transactionId,
                 actionType: fullyPaid ? "installment_paid" : "installment_partial_paid",
                 changeLines: [installmentHistoryLine],
-                metadata: {
-                    oldStatus: "Pendente",
-                    newStatus: fullyPaid ? "Pago" : "Pago parcialmente",
-                    installmentNumber: tx.installment_number,
-                    totalInstallments: tx.total_installments,
-                    paidNow: finalPaid,
-                    interestAmount,
-                    discountAmount,
-                    remaining: remainingGroup,
-                },
+                metadata: fullyPaid
+                    ? { oldStatus: "Pendente", newStatus: "Pago" }
+                    : { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: Math.max(0, originalAmount - paidAfter) },
                 source: "manual",
             })
+
+            // Histórico do pedido: o recebimento da parcela também aparece no pedido.
+            const orderIdForAudit = await resolveOrderIdForSaleTransaction(supabase, input.partnerId, tx)
+            if (orderIdForAudit) {
+                await logAuditEvent({
+                    partnerId: input.partnerId,
+                    actorUserId: userId,
+                    entityType: "order",
+                    entityId: orderIdForAudit,
+                    actionType: fullyPaid ? "installment_paid" : "installment_partial_paid",
+                    changeLines: [installmentHistoryLine],
+                    metadata: {
+                        oldStatus: "Pendente",
+                        newStatus: fullyPaid ? "Pago" : "Pago parcialmente",
+                        installmentNumber: tx.installment_number,
+                        totalInstallments: tx.total_installments,
+                        paidNow: finalPaid,
+                        interestAmount,
+                        discountAmount,
+                        remaining: remainingGroup,
+                    },
+                    source: "manual",
+                })
+            }
         }
         await revalidateEntityTimeline("transaction", input.transactionId)
 
@@ -2044,6 +2169,7 @@ export async function recordRegularTransactionPaymentAction(input: {
     discountAmount?: number
     paymentMethodId?: string | null
     accountId?: string | null
+    idempotencyKey?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -2060,13 +2186,16 @@ export async function recordRegularTransactionPaymentAction(input: {
             .eq("partner_id", input.partnerId)
             .single()
         if (txErr || !tx) throw new Error(txErr?.message || "Transação não encontrada.")
-        if (!isStatusPending(tx.status)) throw new Error("A transação já está quitada.")
+        if (tx.store_id) await requireStorePermission(tx.store_id, input.partnerId, "financial", "create")
 
         const paymentAmount = Number(input.paymentAmount || 0)
         const interestAmount = Number(input.interestAmount || 0)
         const discountAmount = Number(input.discountAmount || 0)
         if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
             throw new Error("Valores de pagamento inválidos.")
+        }
+        if (interestAmount < 0 || discountAmount < 0) {
+            throw new Error("Juros e descontos não podem ser negativos.")
         }
 
         const { data: existingPayments, error: paymentsErr } = await supabase
@@ -2076,11 +2205,11 @@ export async function recordRegularTransactionPaymentAction(input: {
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
 
-        const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
-        const paidPrincipalSoFar = (existingPayments || []).reduce(
+        let originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        let paidPrincipalSoFar = (existingPayments || []).reduce(
             (acc: number, row: any) => acc + Number(row.base_amount ?? row.amount ?? 0), 0,
         )
-        const remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
+        let remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
 
         const baseRequest = Math.max(0, Math.round(paymentAmount * 100) / 100)
         let baseApplied = Math.min(remainingPrincipal, baseRequest)
@@ -2091,37 +2220,16 @@ export async function recordRegularTransactionPaymentAction(input: {
             throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
         }
 
-        const fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
-        const paidAfter = paidPrincipalSoFar + baseApplied
+        let fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
+        let paidAfter = paidPrincipalSoFar + baseApplied
         const nowIso = new Date().toISOString()
-        const idempotencyKey = `regular:${input.transactionId}:${nowIso}:${finalPaid}`
+        const requestId = sanitizeUUID(input.idempotencyKey) || randomUUID()
+        const idempotencyKey = `txpayment:${input.transactionId}:${requestId}`
 
         const validPaymentMethodId = sanitizeUUID(input.paymentMethodId)
         const rawMethodName = (typeof input.paymentMethodId === "string" && !validPaymentMethodId) ? input.paymentMethodId : null
 
-        const { error: insertPaymentErr } = await supabase
-            .from("transaction_payments")
-            .insert({
-                partner_id: input.partnerId,
-                transaction_id: input.transactionId,
-                store_id: tx.store_id || null,
-                amount: finalPaid,
-                base_amount: baseApplied,
-                interest_amount: interestAmount,
-                discount_amount: discountAmount,
-                payment_method_id: validPaymentMethodId,
-                created_by_user_id: userId,
-                created_at: nowIso,
-            })
-        if (insertPaymentErr) {
-            if ((insertPaymentErr as any).code === "23505") {
-                throw new Error("Este pagamento já foi registrado.")
-            }
-            throw insertPaymentErr
-        }
-
         let resolvedAccountId = tx.account_id
-        // Prefer explicit accountId from user, then fallback to payment method default
         if (input.accountId) {
             resolvedAccountId = input.accountId
         } else if (validPaymentMethodId) {
@@ -2131,31 +2239,43 @@ export async function recordRegularTransactionPaymentAction(input: {
                 .eq("id", validPaymentMethodId)
                 .eq("partner_id", input.partnerId)
                 .maybeSingle()
-            if (pm?.default_finance_account_id) {
-                resolvedAccountId = pm.default_finance_account_id
-            }
+            if (pm?.default_finance_account_id) resolvedAccountId = pm.default_finance_account_id
         }
-
-        if (!resolvedAccountId) {
-            throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
-        }
-
-        if (resolvedAccountId) {
-            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
-                transaction_type: tx.transaction_type,
-                amount: finalPaid,
-                refund_kind: tx.refund_kind,
-            })
-        }
-
         const pmTypeLabel = validPaymentMethodId
-            ? await paymentMethodDisplayLabel(supabase, input.partnerId, validPaymentMethodId)
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, validPaymentMethodId).catch(() => null)
             : (rawMethodName || tx.payment_type || null)
 
-        const existingTotalPaid = (existingPayments || []).reduce(
-            (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
-        )
-        const totalPaidAmount = existingTotalPaid + finalPaid
+        const { data: paymentResult, error: paymentError } = await createAdminClient().rpc("record_transaction_payment_atomic", {
+            p_partner_id: input.partnerId,
+            p_transaction_id: input.transactionId,
+            p_user_id: userId,
+            p_payment_amount: paymentAmount,
+            p_interest_amount: interestAmount,
+            p_discount_amount: discountAmount,
+            p_payment_method_id: validPaymentMethodId,
+            p_payment_type: pmTypeLabel,
+            p_account_id: resolvedAccountId,
+            p_idempotency_key: idempotencyKey,
+            p_require_installment: false,
+        })
+        if (paymentError || !paymentResult?.success) {
+            throw new Error(paymentError?.message || "Não foi possível registrar o pagamento.")
+        }
+
+        originalAmount = Number(paymentResult.originalAmount || originalAmount)
+        paidPrincipalSoFar = Number(paymentResult.paidSoFar || 0)
+        remainingPrincipal = Number(paymentResult.remainingBefore || 0)
+        baseApplied = Number(paymentResult.principalApplied || 0)
+        finalPaid = Number(paymentResult.paidNow || 0)
+        fullyPaid = Boolean(paymentResult.fullyPaid)
+        paidAfter = paidPrincipalSoFar + baseApplied
+        const { data: currentPayments } = await supabase
+            .from("transaction_payments")
+            .select("amount")
+            .eq("partner_id", input.partnerId)
+            .eq("transaction_id", input.transactionId)
+        const totalPaidAmount = (currentPayments || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0)
+        const settlementTransactionId = paymentResult.settlementTransactionId as string | null
 
         const dir = tx.transaction_type === "income" ? "recebido" : "pago"
         const pmLabel = pmTypeLabel || tx.payment_type || ""
@@ -2164,71 +2284,21 @@ export async function recordRegularTransactionPaymentAction(input: {
         if (interestAmount > 0) historyLine += ` (Juros: R$ ${interestAmount.toFixed(2)})`
         if (discountAmount > 0) historyLine += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
 
-        if (!fullyPaid) {
-            // Pagamento PARCIAL: cria uma transação PAGA separada para este pagamento e mantém a original pendente com o saldo restante.
+        if (!paymentResult.alreadyProcessed && !fullyPaid) {
             const remainingPrincipalAfter = Math.max(0, Math.round((originalAmount - paidAfter) * 100) / 100)
             historyLine += ` - saldo restante: R$ ${remainingPrincipalAfter.toFixed(2)}`
-
-            const { data: newPaidTx, error: newTxErr } = await supabase
-                .from("transactions")
-                .insert({
-                    partner_id: input.partnerId,
-                    store_id: tx.store_id || null,
-                    description: tx.description,
-                    category: tx.category,
-                    category_id: tx.category_id || null,
-                    subcategory_id: tx.subcategory_id || null,
-                    amount: finalPaid,
-                    original_amount: baseApplied,
-                    due_date: null,
-                    payment_date: nowIso,
-                    status: "paid",
-                    payment_type: pmTypeLabel,
-                    payment_method_id: validPaymentMethodId,
-                    account_id: resolvedAccountId,
-                    transaction_type: tx.transaction_type,
-                    contact_id: tx.contact_id || null,
-                    customer_id: tx.customer_id || null,
-                    contact_type: tx.contact_type || null,
-                    origin: tx.origin || "manual",
-                    kind: tx.kind || "settlement",
-                    interest_amount: interestAmount > 0 ? interestAmount : null,
-                    discount_amount: discountAmount > 0 ? discountAmount : null,
-                    paid_amount: finalPaid,
-                    notes: tx.notes || null,
-                    reference_note: tx.reference_note ? `${tx.reference_note}:part:${nowIso}` : `partial-tx:${tx.id}:${nowIso}`,
-                })
-                .select("id")
-                .single()
-
-            if (newTxErr) throw newTxErr
-
-            // Atualiza a transação original pendente para refletir o saldo restante
-            const { error: updateErr } = await supabase
-                .from("transactions")
-                .update({
-                    amount: remainingPrincipalAfter,
-                    original_amount: originalAmount,
-                    paid_amount: 0,
-                    updated_at: nowIso,
-                })
-                .eq("id", input.transactionId)
-                .eq("partner_id", input.partnerId)
-
-            if (updateErr) throw updateErr
-
-            if (newPaidTx?.id) {
+            if (settlementTransactionId) {
                 await logAuditEvent({
                     partnerId: input.partnerId,
                     actorUserId: userId,
                     entityType: "transaction",
-                    entityId: newPaidTx.id,
+                    entityId: settlementTransactionId,
                     actionType: "paid",
                     changeLines: [historyLine],
                     metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                     source: "manual",
                 })
-                await revalidateEntityTimeline("transaction", newPaidTx.id)
+                await revalidateEntityTimeline("transaction", settlementTransactionId)
             }
 
             await logAuditEvent({
@@ -2241,30 +2311,8 @@ export async function recordRegularTransactionPaymentAction(input: {
                 metadata: { oldStatus: "Pendente", paidSoFar: totalPaidAmount, remaining: remainingPrincipalAfter },
                 source: "manual",
             })
-        } else {
+        } else if (!paymentResult.alreadyProcessed) {
             // Pagamento TOTAL (Quitação)
-            const updatePayload: Record<string, unknown> = {
-                updated_at: nowIso,
-                payment_date: nowIso,
-                interest_amount: interestAmount > 0 ? interestAmount : (tx.interest_amount || null),
-                discount_amount: discountAmount > 0 ? discountAmount : (tx.discount_amount || null),
-                paid_amount: finalPaid,
-                amount: finalPaid,
-                original_amount: paidPrincipalSoFar > 0.0001 ? baseApplied : originalAmount,
-                status: "paid",
-                account_id: resolvedAccountId,
-                payment_method_id: validPaymentMethodId,
-                payment_type: pmTypeLabel,
-            }
-
-            const { error: updateErr } = await supabase
-                .from("transactions")
-                .update(updatePayload)
-                .eq("id", input.transactionId)
-                .eq("partner_id", input.partnerId)
-
-            if (updateErr) throw updateErr
-
             await logAuditEvent({
                 partnerId: input.partnerId,
                 actorUserId: userId,
@@ -2323,17 +2371,49 @@ export async function settleInstallmentGroupAction(input: {
         // Pre-fetch pending transactions to log audit events after successful settlement
         const { data: pendingTxs } = await supabase
             .from("transactions")
-            .select("id, payment_method_id, payment_type, installment_number, total_installments, transaction_type, description, payment_id, original_amount")
+            .select("id, status, store_id, account_id, payment_method_id, payment_type, installment_number, total_installments, transaction_type, description, payment_id, original_amount")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
             .neq("status", "paid")
+
+        if (!pendingTxs || pendingTxs.length === 0) {
+            return { success: false as const, error: "Nenhuma parcela pendente encontrada para este parceiro." }
+        }
+        if (pendingTxs.some((tx: any) => String(tx.status || "").toLowerCase() !== "pending")) {
+            throw new Error("O grupo contém parcelas que não estão pendentes e não pode ser quitado em lote.")
+        }
+        for (const payment of input.installmentPayments || []) {
+            const paymentAmount = Number(payment.paymentAmount)
+            const interestAmount = Number(payment.interestAmount || 0)
+            const discountAmount = Number(payment.discountAmount || 0)
+            if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
+                throw new Error("Valores de pagamento do parcelamento são inválidos.")
+            }
+            if (paymentAmount < 0 || interestAmount < 0 || discountAmount < 0) {
+                throw new Error("Pagamento, juros e descontos do parcelamento não podem ser negativos.")
+            }
+            if (!pendingTxs.some((tx: any) => tx.id === payment.transactionId)) {
+                throw new Error("O pagamento informado não pertence a uma parcela pendente deste grupo.")
+            }
+        }
+
+        const settleAccountId = input.settleAccountId ? sanitizeUUID(input.settleAccountId) : null
+        if (input.settleAccountId && !settleAccountId) throw new Error("Conta de liquidação inválida.")
+        for (const tx of pendingTxs as any[]) {
+            const custom = (input.installmentPayments || []).find((payment) => payment.transactionId === tx.id)
+            const requestedMethodId = sanitizeUUID(custom?.paymentMethodId)
+            const methodId = requestedMethodId || sanitizeUUID(tx.payment_method_id)
+            await validateTransactionReferences(supabase, input.partnerId, tx.store_id, {
+                accountId: settleAccountId || tx.account_id,
+                paymentMethodId: methodId,
+            }, "create")
+        }
 
         const txIdsToLog = pendingTxs?.map((t: any) => t.id) || []
 
         const sanitizedPayments = (input.installmentPayments || []).map((p) => {
             const validPmId = sanitizeUUID(p.paymentMethodId)
             const rawMethodName = (typeof p.paymentMethodId === "string" && !sanitizeUUID(p.paymentMethodId)) ? p.paymentMethodId : null
-            const settleAccountId = input.settleAccountId ? sanitizeUUID(input.settleAccountId) : null
             return {
                 ...p,
                 accountId: settleAccountId,
@@ -2524,6 +2604,9 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         const paymentAmount = input.paymentAmount !== undefined ? Number(input.paymentAmount) : Number(rec.amount || 0)
         const interestAmount = Number(input.interestAmount || 0)
         const discountAmount = Number(input.discountAmount || 0)
+        if (![paymentAmount, interestAmount, discountAmount].every(Number.isFinite) || interestAmount < 0 || discountAmount < 0) {
+            throw new Error("Valores de pagamento inválidos.")
+        }
         const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
         if (finalPaid <= 0) {
             throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
@@ -2560,6 +2643,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             throw new Error("É obrigatório selecionar uma conta bancária para registrar o pagamento.")
         }
 
+        await validateTransactionReferences(supabase, input.partnerId, rec.store_id, {
+            accountId,
+            paymentMethodId: validResolvedPmId,
+            customerId: rec.customer_id,
+            contactId: rec.contact_id,
+            contactType: rec.contact_type,
+            categoryId: rec.category_id,
+            subcategoryId: rec.subcategory_id,
+        }, "create")
+
         const nowIso = new Date().toISOString()
         const paymentTypeLabel = validResolvedPmId
             ? await paymentMethodDisplayLabel(supabase, input.partnerId, validResolvedPmId)
@@ -2570,6 +2663,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             .from("transactions")
             .select("id, status, account_id")
             .eq("recurring_id", input.recurringId)
+            .eq("partner_id", input.partnerId)
             .eq("due_date", dueDateValue)
             .eq("status", "pending")
             .limit(1)
@@ -2749,6 +2843,10 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
         await requireFinancialCapability(input.partnerId, input.storeId)
         await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
+
+        await validateTransactionReferences(supabase, input.partnerId, input.storeId, {
+            accountId: input.accountId,
+        }, "create")
 
         const { data: acc, error: accErr } = await supabase
             .from("finance_accounts")
@@ -3736,6 +3834,7 @@ export async function searchCustomersForTransaction(query?: string) {
 
 export async function getTransactionPresignedUploadUrlAction(
     partnerId: string,
+    transactionId: string,
     fileName: string,
     fileType: string,
     fileSize: number
@@ -3744,8 +3843,22 @@ export async function getTransactionPresignedUploadUrlAction(
     | { success: false; error: string }
 > {
     try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
         const user = await requireUser()
         await requirePermission(partnerId, "financial", "edit")
+
+        const supabase = await getSupabaseServerClient()
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("id, store_id")
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!transaction) return { success: false, error: "Transação não encontrada." }
+        if (transaction.store_id) {
+            await requireStorePermission(transaction.store_id, partnerId, "financial", "edit")
+        }
 
         const plan = await getPartnerPlan(partnerId)
         if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
@@ -3790,9 +3903,38 @@ export async function saveTransactionAttachmentAction(
     fileHash?: string
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
     try {
-        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
         await requirePermission(partnerId, "financial", "edit")
         const user = await requireUser()
+
+        const supabase = await getSupabaseServerClient()
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("id, partner_id, store_id")
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!transaction) return { success: false, error: "Transação não encontrada." }
+        if (transaction.store_id) {
+            await requireStorePermission(transaction.store_id, partnerId, "financial", "edit")
+        }
+
+        const { R2_PREFIXES } = await import("@/lib/r2/config")
+        const { validateKeyOwnership } = await import("@/lib/r2/server")
+        const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`
+        if (
+            typeof fileKey !== "string" ||
+            !validateKeyOwnership(fileKey, user.id) ||
+            !fileKey.startsWith(expectedPrefix) ||
+            fileKey.includes("..") ||
+            fileKey.startsWith("/")
+        ) {
+            return { success: false, error: "Chave de arquivo inválida para este usuário." }
+        }
+        const { validateUploadRequest } = await import("@/lib/security/file-validator")
+        const validation = validateUploadRequest(fileName, fileType, fileSize)
+        if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." }
 
         const plan = await getPartnerPlan(partnerId)
         if (plan.slug.toLowerCase() !== "crescer" && plan.slug.toLowerCase() !== "escalar") {
@@ -3816,8 +3958,36 @@ export async function saveTransactionAttachmentAction(
             }
         }
 
+        // The client-provided size is only a hint. Verify the object that
+        // actually landed in R2 before persisting an attachment record.
+        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+        const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3")
+        const serverConfig = getR2ServerConfig()
+        const s3 = new S3Client({
+            region: "auto",
+            credentials: {
+                accessKeyId: serverConfig.accessKeyId,
+                secretAccessKey: serverConfig.secretAccessKey,
+            },
+            endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+        })
+        let actualFileSize: number
+        try {
+            const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+            actualFileSize = Number(head.ContentLength)
+            if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType) {
+                return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
+            }
+            const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+            if (!actualValidation.success) {
+                return { success: false, error: actualValidation.error || "Arquivo enviado excede os limites permitidos." }
+            }
+        } finally {
+            s3.destroy()
+        }
+
         let finalHash = fileHash || ""
-        if (!finalHash && fileSize < 5 * 1024 * 1024) {
+        if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
             try {
                 const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
                 const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
@@ -3849,7 +4019,7 @@ export async function saveTransactionAttachmentAction(
                 file_key: fileKey,
                 file_name: fileName,
                 file_type: fileType,
-                file_size: fileSize,
+                file_size: actualFileSize,
                 uploaded_by: user.id,
                 file_hash: finalHash,
             })
@@ -3883,11 +4053,22 @@ export async function deleteTransactionAttachmentAction(
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         await requirePermission(partnerId, "financial", "edit")
         const user = await requireUser()
-        const admin = createAdminClient()
+        const supabase = await getSupabaseServerClient()
 
-        const { data: attachment } = await admin
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("id, partner_id, store_id")
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (!transaction) return { success: false, error: "Transação não encontrada." }
+        if (transaction.store_id) {
+            await requireStorePermission(transaction.store_id, partnerId, "financial", "edit")
+        }
+
+        const { data: attachment } = await supabase
             .from("transaction_attachments")
-            .select("file_key, file_name")
+            .select("id, file_key, file_name")
             .eq("id", attachmentId)
             .eq("transaction_id", transactionId)
             .maybeSingle()
@@ -3899,7 +4080,8 @@ export async function deleteTransactionAttachmentAction(
         const { deleteFileFromR2 } = await import("@/lib/r2/server")
         await deleteFileFromR2(attachment.file_key)
 
-        await admin.from("transaction_attachments").delete().eq("id", attachmentId)
+        const admin = createAdminClient()
+        await admin.from("transaction_attachments").delete().eq("id", attachmentId).eq("transaction_id", transactionId)
 
         await logAuditEvent({
             partnerId,
@@ -3918,11 +4100,23 @@ export async function deleteTransactionAttachmentAction(
 }
 
 export async function getTransactionAttachmentsAction(
-    transactionId: string
+    transactionId: string,
+    partnerId?: string,
 ): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
     try {
         await requireUser()
         const supabase = await getSupabaseServerClient()
+
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("id, partner_id, store_id")
+            .eq("id", transactionId)
+            .maybeSingle()
+        if (!transaction || (partnerId && transaction.partner_id !== partnerId)) {
+            return { success: false, error: "Transação não encontrada." }
+        }
+        if (transaction.store_id) await requireStorePermission(transaction.store_id, transaction.partner_id, "financial", "view")
+        else await requirePermission(transaction.partner_id, "financial", "view")
 
         const { data, error } = await supabase
             .from("transaction_attachments")
@@ -3945,9 +4139,26 @@ export async function getTransactionAttachmentUrlAction(
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
     try {
         await requireUser()
-        if (partnerId) {
-            await requirePermission(partnerId, "financial", "view")
+        const supabase = await getSupabaseServerClient()
+        const { data: transaction } = await supabase
+            .from("transactions")
+            .select("id, partner_id, store_id")
+            .eq("id", transactionId)
+            .maybeSingle()
+        if (!transaction || (partnerId && transaction.partner_id !== partnerId)) {
+            return { success: false, error: "Transação não encontrada." }
         }
+
+        const { data: attachment } = await supabase
+            .from("transaction_attachments")
+            .select("id")
+            .eq("transaction_id", transactionId)
+            .eq("file_key", fileKey)
+            .maybeSingle()
+        if (!attachment) return { success: false, error: "Anexo não encontrado nesta transação." }
+
+        if (transaction.store_id) await requireStorePermission(transaction.store_id, transaction.partner_id, "financial", "view")
+        else await requirePermission(transaction.partner_id, "financial", "view")
 
         const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
         const downloadUrl = await generateSignedDownloadUrl(fileKey)
@@ -4083,6 +4294,34 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
             }
         }
 
+        // A checagem de parceiro acima não representa o acesso de um membro a
+        // cada loja. Faça o preflight de todas as linhas antes de iniciar o lote,
+        // para que uma loja sem permissão não deixe um lote parcialmente aplicado.
+        const storeAction = input.actionType === "cancel"
+            ? "cancel"
+            : input.actionType === "settle"
+                ? "create"
+                : "edit"
+        for (const tx of eligibleRows as any[]) {
+            if (tx.store_id) {
+                await requireStorePermission(tx.store_id, input.partnerId, "financial", storeAction)
+            }
+        }
+
+        if (input.actionType === "category") {
+            const categoryId = sanitizeUUID(input.categoryId)
+            if (input.categoryId && !categoryId) throw new Error("Categoria inválida.")
+            if (categoryId) {
+                const { data: category } = await supabase
+                    .from("financial_categories")
+                    .select("id")
+                    .eq("id", categoryId)
+                    .eq("partner_id", input.partnerId)
+                    .maybeSingle()
+                if (!category) throw new Error("Categoria não encontrada para este parceiro.")
+            }
+        }
+
         // Concurrency pool (concurrency: 6)
         const CONCURRENCY = 6
         const now = new Date()
@@ -4156,6 +4395,10 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                     if (!resolvedAccountId) {
                         throw new Error(`Transação "${tx.description || tx.id}": conta bancária não informada.`)
                     }
+                    await validateTransactionReferences(supabase, input.partnerId, tx.store_id, {
+                        accountId: resolvedAccountId,
+                        paymentMethodId: validPmId,
+                    }, "edit")
                     const paymentAmount = Math.max(0, Number(tx.amount || 0) - Number(tx.paid_amount || 0)) || Number(tx.amount || 0)
                     if (paymentAmount <= 0) return
 

@@ -54,8 +54,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // --- Segment Pages (Niche Verticals) ---
     const segmentUrls: MetadataRoute.Sitemap = [
         { url: "https://dudit.com.br/segmentos/oficinas-e-tecnicos", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/segmentos/assistencia-tecnica-celulares", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
         { url: "https://dudit.com.br/segmentos/saloes-e-barbearias", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
         { url: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/segmentos/lojas-de-roupas-e-calcados", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
     ]
 
     // --- Help Center Categories & Articles (AEO / GEO) ---
@@ -107,25 +109,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     try {
         const [storesResponse, productsResponse, servicesResponse, citiesResponse] = await Promise.all([
-            // Top 1000 stores
+            // Active stores
             supabase
                 .from("stores")
                 .select("id, short_id, name, slug, updated_at, created_at, addresses(city, state)")
                 .eq("is_active", true)
-                .order("created_at", { ascending: false })
-                .limit(1000),
+                .order("updated_at", { ascending: false, nullsFirst: false })
+                .limit(5000),
 
-            // Top 500 most recent public products in marketplace
+            // Active public products in marketplace
             supabase
                 .rpc("get_marketplace_products_public", { p_product_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })
-                .limit(500),
+                .limit(2500),
 
-            // Top 500 active services in marketplace (using public RPC)
+            // Active services in marketplace
             supabase
                 .rpc("get_marketplace_services_public", { p_service_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })
-                .limit(500),
+                .limit(2500),
 
             // Distinct cities from active stores
             supabase
@@ -133,7 +135,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .select("addresses!store_id!left(city, state)")
                 .eq("is_active", true)
                 .not("addresses", "is", null)
-                .limit(200),
+                .limit(1000),
         ])
 
         if (storesResponse.error) console.error("Sitemap stores error:", storesResponse.error)
@@ -153,7 +155,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         // --- Services ---
         const services = servicesResponse.data || []
         const servicesSitemap: MetadataRoute.Sitemap = services.map((srv: any) => {
-            // Transform RPC response to match getServiceUrl expectations
             const serviceWithPartner = {
                 ...srv,
                 partners: [{

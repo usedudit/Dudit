@@ -197,6 +197,7 @@ export function buildMpApprovedPaymentUpdate(params: {
   }
 
   const mpLeg: Record<string, unknown> = {
+    mpPaymentId: params.mpPaymentId,
     method: params.paymentMethodName,
     amount: chargeAmount,
     effectiveAmount: chargeAmount,
@@ -217,6 +218,9 @@ export function buildMpApprovedPaymentUpdate(params: {
     paymentTypeId: params.mpPaymentTypeId ?? null,
     paymentStatus: params.mpPaymentStatus ?? null,
     paymentStatusDetail: params.mpPaymentStatusDetail ?? null,
+    ...(currentPaid + chargeAmount > totalAmount + AMOUNT_TOLERANCE
+      ? { overpaymentAmount: Math.round((currentPaid + chargeAmount - totalAmount) * 100) / 100 }
+      : {}),
   }
 
   if (params.mpFeeDetails && params.mpFeeDetails.length > 0) {

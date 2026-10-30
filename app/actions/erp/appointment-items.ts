@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireStorePermission, requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { createAdminClient } from "@/lib/supabase/server"
@@ -28,6 +28,17 @@ export async function getAppointmentItemsAction(appointmentId: string) {
 
         await requirePermission(ctx.partnerId, "appointments", "view")
         const supabase = createAdminClient()
+
+        const { data: appointment, error: appointmentError } = await supabase
+            .from("appointments")
+            .select("id, store_id")
+            .eq("id", appointmentId)
+            .eq("partner_id", ctx.partnerId)
+            .maybeSingle()
+        if (appointmentError || !appointment) return errorResponse("Agendamento não encontrado")
+        if (appointment.store_id) {
+            await requireStorePermission(appointment.store_id, ctx.partnerId, "appointments", "view")
+        }
 
         // Fetch appointment items with product and service details in a single query using joins
         const { data: itemsData, error: itemsError } = await supabase
@@ -100,6 +111,17 @@ export async function saveAppointmentItemsAction(
         await requirePermission(partnerId, "appointments", "edit")
         const supabase = createAdminClient()
 
+        const { data: appointment, error: appointmentError } = await supabase
+            .from("appointments")
+            .select("id, store_id")
+            .eq("id", appointmentId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        if (appointmentError || !appointment) return errorResponse("Agendamento não encontrado")
+        if (appointment.store_id) {
+            await requireStorePermission(appointment.store_id, partnerId, "appointments", "edit")
+        }
+
         // Get existing items to track changes for history
         const { data: existingItems } = await supabase
             .from("appointment_items")
@@ -120,6 +142,7 @@ export async function saveAppointmentItemsAction(
                 .from("appointment_items")
                 .delete()
                 .in("id", toDelete)
+                .eq("appointment_id", appointmentId)
 
             if (delError) {
                 console.error("saveAppointmentItemsAction delete error:", delError)
@@ -144,6 +167,7 @@ export async function saveAppointmentItemsAction(
                     .from("appointment_items")
                     .update(payload)
                     .eq("id", item.id)
+                    .eq("appointment_id", appointmentId)
 
                 if (updError) {
                     console.error("saveAppointmentItemsAction update error:", updError)
@@ -383,6 +407,7 @@ export async function fetchProductsByIdsAction(productIds: string[], partnerId?:
             resolvedPartnerId = ctx?.partnerId
         }
         if (!resolvedPartnerId) return []
+        await requirePermission(resolvedPartnerId, "appointments", "view")
         const supabase = createAdminClient()
         const { data } = await supabase
             .from("products")
@@ -455,6 +480,7 @@ export async function searchProductsForAppointmentItems(query: string, storeId?:
 
         const storeFilter = storeId || ctx.activeStoreId
         if (storeFilter) {
+            await requireStorePermission(storeFilter, ctx.partnerId, "stock_movements", "view")
             sb = sb.eq("store_id", storeFilter)
         }
 

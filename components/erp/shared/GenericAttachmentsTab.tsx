@@ -89,7 +89,7 @@ interface PendingFile {
 }
 
 const ACTIONS_MAP: Record<AttachmentEntityType, {
-    fetch: (id: string) => Promise<{ success: boolean; data?: any[]; error?: string }>
+    fetch: (id: string, partnerId?: string) => Promise<{ success: boolean; data?: any[]; error?: string }>
     presigned: (partnerId: string, entityId: string, name: string, type: string, size: number) => Promise<any>
     save: (partnerId: string, entityId: string, key: string, name: string, type: string, size: number, hash: string) => Promise<any>
     delete: (partnerId: string, id: string, entityId: string) => Promise<any>
@@ -107,7 +107,7 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
         presigned: (pid, eid, name, type, size) => getPresignedUploadUrlAction(pid, "service-orders", name, type, size),
         save: (pid, eid, key, name, type, size, hash) => saveAttachmentAction(pid, eid, key, name, type, size, "normal", hash),
         delete: deleteAttachmentAction,
-        url: getServiceOrderAttachmentUrlAction
+        url: (entityId, key, partnerId) => getServiceOrderAttachmentUrlAction(partnerId || "", entityId, key)
     },
     stock_movement: {
         fetch: getStockMovementAttachmentsAction,
@@ -118,7 +118,7 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
     },
     transaction: {
         fetch: getTransactionAttachmentsAction,
-        presigned: (pid, eid, name, type, size) => getTransactionPresignedUploadUrlAction(pid, name, type, size),
+        presigned: (pid, eid, name, type, size) => getTransactionPresignedUploadUrlAction(pid, eid, name, type, size),
         save: (pid, eid, key, name, type, size, hash) => saveTransactionAttachmentAction(pid, eid, key, name, type, size, hash),
         delete: deleteTransactionAttachmentAction,
         url: getTransactionAttachmentUrlAction
@@ -211,7 +211,7 @@ export function GenericAttachmentsTab({
         }
         setLoading(true)
         try {
-            const res = await actions.fetch(entityId)
+            const res = await actions.fetch(entityId, partnerId)
             if (res.success && res.data) {
                 setAttachments(res.data)
             } else {

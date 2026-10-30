@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePermission } from "@/lib/permissions/access"
+import { requireStorePermission } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -99,6 +100,7 @@ export async function resolveMarketplaceOrderFinanceAccountId(
 export async function getFinanceAccountsAction(partnerId: string, storeId?: string | null) {
   try {
     await requirePermission(partnerId, "financial", "view")
+    if (storeId) await requireStorePermission(storeId, partnerId, "financial", "view")
 
     // Use admin client after authz check so invited ERP users can read accounts.
     const { data, error } = await getCachedErpPage(
@@ -158,6 +160,17 @@ export async function createFinanceAccountAction(data: {
 
     await requirePermission(data.partnerId, "financial", "create")
     const supabase = createAdminClient()
+
+    if (data.storeId) {
+      const { data: store, error: storeError } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("id", data.storeId)
+        .eq("partner_id", data.partnerId)
+        .maybeSingle()
+      if (storeError || !store) throw new Error("Loja não encontrada para este parceiro.")
+      await requireStorePermission(data.storeId, data.partnerId, "financial", "create")
+    }
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
     if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")

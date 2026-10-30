@@ -9,7 +9,7 @@ import {
 } from "@/lib/types/service-order"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
+import { requireUser, requireStoreAccess, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission, checkPermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -1338,10 +1338,34 @@ export async function saveAttachmentAction(
 
 export async function getServiceOrderAttachmentUrlAction(
   partnerId: string,
+  serviceOrderId: string,
   fileKey: string
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
   try {
-    await requirePermission(partnerId, "service_orders", "view")
+    await requireUser()
+    const supabase = await getSupabaseServerClient()
+    const { data: serviceOrder } = await supabase
+      .from("service_orders")
+      .select("id, partner_id, store_id")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!serviceOrder) return { success: false, error: "Ordem de serviço não encontrada." }
+
+    const { data: attachment } = await supabase
+      .from("service_order_attachments")
+      .select("id")
+      .eq("service_order_id", serviceOrderId)
+      .eq("file_key", fileKey)
+      .maybeSingle()
+    if (!attachment) return { success: false, error: "Anexo não encontrado nesta ordem de serviço." }
+
+    if (serviceOrder.store_id) {
+      await requireStorePermission(serviceOrder.store_id, partnerId, "service_orders", "view")
+    } else {
+      await requirePermission(partnerId, "service_orders", "view")
+    }
+
     const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
     const downloadUrl = await generateSignedDownloadUrl(fileKey)
     return { success: true, downloadUrl }
@@ -1359,26 +1383,43 @@ export async function deleteAttachmentAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
-    const admin = getAdminClient()
+    const supabase = await getSupabaseServerClient()
 
-    const { data: attachment } = await admin
+    const { data: serviceOrder } = await supabase
+      .from("service_orders")
+      .select("id, partner_id, store_id")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!serviceOrder) return { success: false, error: "Ordem de serviço não encontrada." }
+    if (serviceOrder.store_id) {
+      await requireStorePermission(serviceOrder.store_id, partnerId, "service_orders", "edit")
+    }
+
+    const { data: attachment } = await supabase
       .from("service_order_attachments")
-      .select("file_key, file_name")
+      .select("id, file_key, file_name")
       .eq("id", attachmentId)
+      .eq("service_order_id", serviceOrderId)
       .single()
 
-    if (attachment?.file_key) {
+    if (!attachment) {
+      return { success: false, error: "Anexo não encontrado nesta ordem de serviço." }
+    }
+
+    if (attachment.file_key) {
       const { deleteFileFromR2 } = await import("@/lib/r2/server")
       try { await deleteFileFromR2(attachment.file_key) } catch { }
     }
 
-    await admin.from("service_order_attachments").delete().eq("id", attachmentId)
+    const admin = getAdminClient()
+    await admin.from("service_order_attachments").delete().eq("id", attachmentId).eq("service_order_id", serviceOrderId)
 
     await logAuditEvent({
       partnerId, actorUserId: user.id,
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "attachment_deleted", source: "manual",
-      changeLines: [`Anexo removido: ${attachment?.file_name || "Documento"}`],
+      changeLines: [`Anexo removido: ${attachment.file_name || "Documento"}`],
     })
 
     revalidatePath("/erp/ordens-de-servico")
@@ -2719,11 +2760,23 @@ export async function rejectPublicServiceOrderAction(
 }
 
 export async function getServiceOrderAttachmentsAction(
-  serviceOrderId: string
+  serviceOrderId: string,
+  partnerId?: string,
 ): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
   try {
     await requireUser()
     const supabase = await getSupabaseServerClient()
+
+    const { data: serviceOrder } = await supabase
+      .from("service_orders")
+      .select("id, partner_id, store_id")
+      .eq("id", serviceOrderId)
+      .maybeSingle()
+    if (!serviceOrder || (partnerId && serviceOrder.partner_id !== partnerId)) {
+      return { success: false, error: "Ordem de serviço não encontrada." }
+    }
+    if (serviceOrder.store_id) await requireStorePermission(serviceOrder.store_id, serviceOrder.partner_id, "service_orders", "view")
+    else await requirePermission(serviceOrder.partner_id, "service_orders", "view")
 
     const { data, error } = await supabase
       .from("service_order_attachments")

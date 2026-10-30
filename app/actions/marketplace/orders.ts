@@ -114,7 +114,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("id, situation, buyer_id, customer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
+    .select("id, situation, buyer_id, customer_id, mp_payment_id, partner_id, paid_amount, amount_paid, updated_at, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
     .eq("id", orderId)
     .single()
 
@@ -130,40 +130,76 @@ export async function cancelBuyerOrderAction(orderId: string) {
   if (!cancellableStates.includes(order.situation)) {
     return { error: "Apenas pedidos pendentes ou não pagos podem ser cancelados" }
   }
+  if (Number(order.paid_amount ?? order.amount_paid ?? 0) > 0.009) {
+    return { error: "Este pedido já recebeu um pagamento. Solicite o estorno antes de cancelar." }
+  }
+  if (!order.updated_at) {
+    return { error: "Não foi possível verificar a versão atual do pedido. Atualize e tente novamente." }
+  }
 
   if (order.mp_payment_id && order.partner_id) {
     try {
       const mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)
-      const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`, {
+      const paymentUrl = `https://api.mercadopago.com/v1/payments/${encodeURIComponent(String(order.mp_payment_id))}`
+      const mpResponse = await fetch(paymentUrl, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${mpAccessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: "cancelled" }),
+        signal: AbortSignal.timeout(10000),
       })
+      const cancelResult = await mpResponse.json().catch(() => null)
+      let providerStatus = typeof cancelResult?.status === "string" ? cancelResult.status : null
 
-      if (!mpResponse.ok) {
-        console.error(
-          `[ORDER CANCELLATION] Failed to cancel payment ${order.mp_payment_id} in Mercado Pago. Status:`,
-          mpResponse.status,
-        )
+      if (!mpResponse.ok || providerStatus !== "cancelled") {
+        const statusResponse = await fetch(paymentUrl, {
+          headers: { Authorization: `Bearer ${mpAccessToken}` },
+          signal: AbortSignal.timeout(10000),
+        })
+        const statusResult = await statusResponse.json().catch(() => null)
+        if (!statusResponse.ok || typeof statusResult?.status !== "string") {
+          console.error("[ORDER CANCELLATION] Could not confirm Mercado Pago status", {
+            partnerId: order.partner_id,
+            paymentId: order.mp_payment_id,
+            cancelStatus: mpResponse.status,
+            statusStatus: statusResponse.status,
+          })
+          return { error: "Não foi possível confirmar o cancelamento do pagamento. O pedido continua ativo." }
+        }
+        providerStatus = statusResult.status
+      }
+
+      if (providerStatus === "approved") {
+        return { error: "O pagamento já foi aprovado. Solicite o estorno antes de cancelar o pedido." }
+      }
+      if (!["cancelled", "rejected", "expired"].includes(String(providerStatus))) {
+        return { error: "O Mercado Pago não confirmou o cancelamento do pagamento. O pedido continua ativo." }
       }
     } catch (mpError) {
       console.error("[ORDER CANCELLATION] Error communicating with Mercado Pago for cancellation:", mpError)
+      return { error: "Não foi possível confirmar o cancelamento no Mercado Pago. O pedido continua ativo." }
     }
   }
 
-  const { error } = await supabase
+  const { data: cancelledOrder, error } = await supabase
     .from("orders")
     .update({
       situation: "cancelled",
       updated_at: new Date().toISOString(),
     })
     .eq("id", orderId)
+    .eq("situation", order.situation)
+    .eq("updated_at", order.updated_at)
+    .select("id")
+    .maybeSingle()
 
   if (error) {
     return { error: error.message }
+  }
+  if (!cancelledOrder) {
+    return { error: "O pedido foi atualizado durante o cancelamento. Atualize e tente novamente." }
   }
 
   // Etiqueta de transportadora (quando houver) é cancelada junto: evita

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireStorePermission, requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -49,12 +49,14 @@ async function verifyItemAccess(itemType: ItemType, itemId: string, user: any) {
   const admin = getAdminClient()
   const table = Object.entries(TABLE_BY_TYPE).find(([k]) => k === itemType)?.[1]
   if (!table) throw new Error("Erro ao validar propriedade do item")
-  const { data, error } = await admin.from(table).select("id, partner_id").eq("id", itemId).maybeSingle()
+  const { data, error } = await admin.from(table).select("id, partner_id, store_id").eq("id", itemId).maybeSingle()
 
   if (error) throw new Error("Erro ao validar propriedade do item")
-  if (!data) return
+  if (!data) throw new Error("Item não encontrado")
 
-  await requirePermission(data.partner_id, itemType === "product" ? "products" : "services", "edit", user)
+  const module = itemType === "product" ? "products" : "services"
+  await requirePermission(data.partner_id, module, "edit", user)
+  if (data.store_id) await requireStorePermission(data.store_id, data.partner_id, module, "edit")
 }
 
 export async function POST(req: NextRequest) {

@@ -254,13 +254,13 @@ async function createAppointmentSaleAndSyncGoals(params: {
     paymentTransactionId = tx?.id || null
 
     if (financeAccountId && paidAmount > 0) {
-      const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
+      const { error: balanceError } = await createAdminClient().rpc("apply_account_balance_delta", {
         p_account_id: financeAccountId,
         p_partner_id: params.partnerId,
         p_delta: Math.round(paidAmount * 100) / 100,
       })
       if (balanceError) {
-        console.error("[createAppointmentSaleAndSyncGoals] Erro ao atualizar saldo da conta:", balanceError.message)
+        throw new Error(`Falha ao atualizar saldo da conta financeira: ${balanceError.message}`)
       }
     }
   }

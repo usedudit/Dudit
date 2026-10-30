@@ -1693,7 +1693,7 @@ async function restoreCancelledOrderInventory(params: {
     quantity: Number(item.quantity || 0),
   }));
 
-  const { error } = await params.supabase.rpc("create_batch_stock_movement", {
+  const { error } = await createAdminClient().rpc("create_batch_stock_movement", {
     p_partner_id: params.partnerId,
     p_movement_type: "in",
     p_reason: "CANCEL",
@@ -1968,7 +1968,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
       };
     }
 
-    const { error: balanceError } = await params.supabase.rpc(
+    const { error: balanceError } = await createAdminClient().rpc(
       "apply_account_balance_delta",
       {
         p_account_id: financeAccountId,
@@ -1990,6 +1990,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
           error: balanceError,
         },
       );
+      return { success: false as const, error: "O reembolso foi registrado, mas o saldo da conta não foi atualizado. Requer reconciliação." }
     }
 
     createdCount += 1;
@@ -2035,7 +2036,7 @@ async function createOrderStockMovement(params: {
     return { success: true as const };
   }
 
-  const { data: movementRecord, error } = await params.supabase.rpc(
+  const { data: movementRecord, error } = await createAdminClient().rpc(
     "create_batch_stock_movement",
     {
       p_partner_id: params.partnerId,
@@ -3902,6 +3903,13 @@ export async function updateERPOrderAction(
   if (currentOrderError || !currentOrder)
     return { error: currentOrderError?.message || "Pedido não encontrado" };
 
+  if (!adminBypass && currentOrder.store_id) {
+    await requireStorePermission(currentOrder.store_id, data.partnerId, "orders", "edit");
+  }
+  if (!adminBypass && data.storeId && data.storeId !== currentOrder.store_id) {
+    await requireStorePermission(data.storeId, data.partnerId, "orders", "edit");
+  }
+
   if (currentOrder.situation === "cancelled" && !adminBypass) {
     return { error: "Pedidos cancelados não podem ser editados." };
   }
@@ -5096,6 +5104,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
   const overallWarnings: string[] = [];
   if (!currentOrders || currentOrders.length === 0) {
     return { error: "Nenhum pedido válido foi encontrado para processar." };
+  }
+
+  const storeAction = payload.actionType === "cancel" ? "cancel" : "edit";
+  for (const order of currentOrders as any[]) {
+    if (order.store_id) {
+      await requireStorePermission(order.store_id, payload.partnerId, "orders", storeAction);
+    }
   }
 
   if (payload.actionType === "cancel") {
@@ -7159,29 +7174,40 @@ export async function getOrderAttachmentUrlAction(
 > {
   try {
     const user = await requireUser();
-    const { getAdminClient } = await import("@/lib/supabase/admin");
-    const admin = getAdminClient();
+    const supabase = await getSupabaseServerClient();
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, buyer_id, partner_id, store_id")
+      .eq("id", orderId)
+      .maybeSingle();
 
-    let allowed = false;
-
-    if (partnerId) {
-      // ERP access: check permission
-      await requirePermission(partnerId, "orders", "view");
-      allowed = true;
-    } else {
-      // Buyer side (marketplace) access: verify if the logged-in user is the buyer of the order
-      const { data: order, error } = await admin
-        .from("orders")
-        .select("buyer_id")
-        .eq("id", orderId)
-        .maybeSingle();
-
-      if (order && order.buyer_id === user.id) {
-        allowed = true;
-      }
+    if (!order) {
+      return { success: false, error: "Pedido não encontrado." };
     }
 
-    if (!allowed) {
+    // Do not sign arbitrary keys supplied by the caller. First prove the key
+    // is registered as an attachment of this exact order.
+    const { data: attachment } = await supabase
+      .from("order_attachments")
+      .select("id")
+      .eq("order_id", orderId)
+      .eq("file_key", fileKey)
+      .maybeSingle();
+
+    if (!attachment) {
+      return { success: false, error: "Anexo não encontrado neste pedido." };
+    }
+
+    if (partnerId) {
+      if (order.partner_id !== partnerId) {
+        return { success: false, error: "Acesso negado ao anexo." };
+      }
+      if (order.store_id) {
+        await requireStorePermission(order.store_id, partnerId, "orders", "view");
+      } else {
+        await requirePermission(partnerId, "orders", "view");
+      }
+    } else if (order.buyer_id !== user.id) {
       return {
         success: false,
         error:
@@ -7209,12 +7235,22 @@ export async function deleteOrderAttachmentAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL);
     await requirePermission(partnerId, "orders", "edit");
     const user = await requireUser();
-    const { getAdminClient } = await import("@/lib/supabase/admin");
-    const admin = getAdminClient();
+    const supabase = await getSupabaseServerClient();
 
-    const { data: attachment } = await admin
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, partner_id, store_id")
+      .eq("id", orderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle();
+    if (!order) return { success: false, error: "Pedido não encontrado." };
+    if (order.store_id) {
+      await requireStorePermission(order.store_id, partnerId, "orders", "edit");
+    }
+
+    const { data: attachment } = await supabase
       .from("order_attachments")
-      .select("file_key, file_name")
+      .select("id, file_key, file_name")
       .eq("id", attachmentId)
       .eq("order_id", orderId)
       .maybeSingle();
@@ -7226,7 +7262,9 @@ export async function deleteOrderAttachmentAction(
     const { deleteFileFromR2 } = await import("@/lib/r2/server");
     await deleteFileFromR2(attachment.file_key);
 
-    await admin.from("order_attachments").delete().eq("id", attachmentId);
+    const { getAdminClient } = await import("@/lib/supabase/admin");
+    const admin = getAdminClient();
+    await admin.from("order_attachments").delete().eq("id", attachmentId).eq("order_id", orderId);
 
     // Audit Log
     const { auditLog } = await import("@/lib/security/audit-logger");
@@ -7264,10 +7302,26 @@ export async function deleteOrderAttachmentAction(
 
 export async function getOrderAttachmentsAction(
   orderId: string,
+  partnerId?: string,
 ): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
   try {
     const user = await requireUser();
     const supabase = await getSupabaseServerClient();
+
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, buyer_id, partner_id, store_id")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (!order || (partnerId && order.partner_id !== partnerId)) {
+      return { success: false, error: "Pedido não encontrado." };
+    }
+    if (partnerId) {
+      if (order.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view");
+      else await requirePermission(partnerId, "orders", "view");
+    } else if (order.buyer_id !== user.id) {
+      return { success: false, error: "Acesso negado aos anexos deste pedido." };
+    }
 
     const { data, error } = await supabase
       .from("order_attachments")

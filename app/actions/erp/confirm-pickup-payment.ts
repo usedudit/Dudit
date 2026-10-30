@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireStorePermission, requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -38,6 +38,10 @@ export async function confirmPickupPaymentAction(params: {
     return { error: "Pedido não encontrado" }
   }
 
+  if (order.store_id) {
+    await requireStorePermission(order.store_id, ctx.partnerId, "orders", "edit")
+  }
+
   if (order.situation !== "awaiting_pickup_payment") {
     return { error: "Este pedido não está aguardando pagamento na retirada" }
   }
@@ -49,8 +53,11 @@ export async function confirmPickupPaymentAction(params: {
     card: "Cartão",
     other: "Outro",
   }
+  if (!Object.prototype.hasOwnProperty.call(paymentMethodLabels, params.paymentMethod)) {
+    return { error: "Forma de pagamento inválida" }
+  }
 
-  const { error: updateError } = await adminClient
+  const { data: updatedOrder, error: updateError } = await adminClient
     .from("orders")
     .update({
       situation: "paid",
@@ -61,8 +68,11 @@ export async function confirmPickupPaymentAction(params: {
     })
     .eq("id", params.orderId)
     .eq("situation", "awaiting_pickup_payment")
+    .select("id")
+    .maybeSingle()
 
-  if (updateError) {
+  if (updateError || !updatedOrder) {
+    if (!updateError && !updatedOrder) return { error: "O pedido já foi atualizado por outra operação. Recarregue a tela." }
     return { error: `Erro ao confirmar pagamento: ${updateError.message}` }
   }
 

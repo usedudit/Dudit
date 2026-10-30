@@ -30,12 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title: `Dudit ${cityFormatted} - ${stateFormatted} | Serviços e Lojas Locais`,
         description: `Descubra as melhores lojas e profissionais em ${cityFormatted} (${stateFormatted}). Compare preços, agende serviços e compre direto sem taxas na Dudit.`,
         alternates: {
-            canonical: `https://dudit.com.br/${cidadeUf.toLowerCase()}`,
+            canonical: `https://dudit.com.br/explorar/${cidadeUf.toLowerCase()}`,
         },
         openGraph: {
             title: `Dudit ${cityFormatted} | Lojas e Serviços Locais`,
             description: `Compre e agende serviços locais de forma rápida e segura na cidade de ${cityFormatted}.`,
-            url: `https://dudit.com.br/${cidadeUf}`,
+            url: `https://dudit.com.br/explorar/${cidadeUf.toLowerCase()}`,
             type: 'website',
         }
     }
@@ -97,6 +97,5 @@ export default async function CityPage({ params }: Props) {
         permanentRedirect(`/${cidadeUf.toLowerCase()}`)
     }
 
-    redirect(`/explorar/${cidadeUf}`)
+    permanentRedirect(`/explorar/${cidadeUf.toLowerCase()}`)
 }
-

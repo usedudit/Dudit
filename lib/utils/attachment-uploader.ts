@@ -41,7 +41,7 @@ async function getPresignedUrl(
         case "stock_movement":
             return getStockMovementPresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
         case "transaction":
-            return getTransactionPresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
+            return getTransactionPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "return":
             return getReturnEvidencePresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
         default:

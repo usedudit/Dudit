@@ -2708,7 +2708,7 @@ export function ProductDetailsPageClient({
                                         <div key={i} onClick={() => goToImage(i)}
                                             className={`w-full aspect-square rounded-md border cursor-pointer overflow-hidden transition-all
                         ${activeImgIndex === i ? "border-brand-green ring-1 ring-brand-green" : "border-brand-border hover:border-brand-border"}`}>
-                                            <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${product.name} em ${partner.city}`} />
+                                            <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${product.name} em ${partner.city}`} loading="lazy" decoding="async" />
                                         </div>
                                     ))}
                                 </div>
@@ -2740,7 +2740,7 @@ export function ProductDetailsPageClient({
                                                     onClick={() => openLightbox(activeImgIndex)}>
                                                     <AnimatePresence mode="popLayout" custom={slideDirection}>
                                                         {galleryItems[activeImgIndex]?.type === "image" ? (
-                                                            <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
+                                                            <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src} fetchPriority="high" decoding="async"
                                                                 className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
                                                                 custom={slideDirection} variants={slideVariants}
                                                                 initial="enter" animate="center" exit="exit"

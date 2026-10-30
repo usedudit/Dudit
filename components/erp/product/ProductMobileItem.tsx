@@ -6,6 +6,7 @@ import { Badge, Tooltip, Checkbox } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStockStatus, formatCurrency } from "./product-utils"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
+import StockAvailabilityHint from "./StockAvailabilityHint"
 import type { Product } from "@/lib/types/product"
 
 interface ProductMobileItemProps {
@@ -23,6 +24,7 @@ const ProductMobileItem = React.memo(
         const hasVariants = variationsCount > 0
         const hasVariantData = hasVariants && product.variant_min_price !== undefined
         const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const reservedStock = hasVariantData ? (product.variant_total_reserved ?? 0) : (product.stock_reserved ?? 0)
         const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         return (
@@ -165,6 +167,13 @@ const ProductMobileItem = React.memo(
                                 </div>
                             )}
                         </div>
+
+                        {/* Estoque disponível / reservado */}
+                        {reservedStock > 0 && (
+                            <div className="mt-0.5">
+                                <StockAvailabilityHint total={effectiveStock} reserved={reservedStock} />
+                            </div>
+                        )}
 
                         {/* Variações */}
                         {variationsCount > 0 && (

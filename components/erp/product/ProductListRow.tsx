@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getStockStatus, formatCurrency } from "./product-utils"
+import StockAvailabilityHint from "./StockAvailabilityHint"
 import type { Product } from "@/lib/types/product"
 
 interface ColumnDef {
@@ -56,6 +57,7 @@ const ProductListItem = React.memo(
         const hasVariants = variationsCount > 0
         const hasVariantData = hasVariants && product.variant_min_price !== undefined
         const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const reservedStock = hasVariantData ? (product.variant_total_reserved ?? 0) : (product.stock_reserved ?? 0)
         const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         const renderCellContent = (colId: string) => {
@@ -113,6 +115,11 @@ const ProductListItem = React.memo(
                                     {status.label}
                                 </span>
                             </div>
+                            {reservedStock > 0 && (
+                                <div className={`mt-0.5 ${getAlignClass(columns.find(c => c.id === 'stock')?.align)}`}>
+                                    <StockAvailabilityHint total={effectiveStock} reserved={reservedStock} />
+                                </div>
+                            )}
                             {variationsCount > 0 && (
                                 <div className={`${getAlignClass(columns.find(c => c.id === 'stock')?.align)}`}>
                                     <span className="text-[11px] font-bold text-brand-green underline decoration-brand-green/30">

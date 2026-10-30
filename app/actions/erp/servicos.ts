@@ -8,6 +8,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
@@ -256,7 +257,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             partner_id: finalPartnerId,
             store_id: finalStoreId,
             name: sanitizeInput(data.name, 150),
-            description: data.description || null,
+            description: data.description ? sanitizeRichText(data.description) : null,
             sku,
             brand: data.brand || null,
             category_id: data.category_id || data.categoryId || null,
@@ -385,7 +386,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         }
 
         if (data.name !== undefined) payload.name = sanitizeInput(data.name, 150)
-        if (data.description !== undefined) payload.description = data.description
+        if (data.description !== undefined) payload.description = typeof data.description === "string" ? sanitizeRichText(data.description) : null
         if (data.sku !== undefined) payload.sku = data.sku
         if (data.brand !== undefined) payload.brand = data.brand
         if (data.category_id !== undefined) payload.category_id = data.category_id

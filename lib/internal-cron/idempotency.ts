@@ -1,5 +1,6 @@
 import "server-only"
 
+import { randomUUID } from "node:crypto"
 import { redis } from "@/lib/redis"
 import { cronLogger } from "./logger"
 
@@ -11,6 +12,8 @@ export interface ExecutionLockResult {
   acquired: boolean
   /** The Redis key used for the lock (use to release) */
   lockKey: string
+  /** Owner token required to safely release the lock */
+  lockToken?: string
   /** True when Redis was unavailable and fail-closed mode refused execution */
   unavailable?: boolean
 }
@@ -35,10 +38,11 @@ export async function acquireExecutionLock(
   options: { failClosed?: boolean } = {},
 ): Promise<ExecutionLockResult> {
   const lockKey = `cron:lock:${jobName}`
+  const lockToken = randomUUID()
 
   try {
     // SET NX EX - only sets if key doesn't exist, with expiry
-    const result = await redis.set(lockKey, Date.now().toString(), {
+    const result = await redis.set(lockKey, lockToken, {
       nx: true,
       ex: ttlSeconds,
     })
@@ -49,7 +53,7 @@ export async function acquireExecutionLock(
       cronLogger.warn(jobName, "Execution lock already active - skipping", { lockKey, ttlSeconds })
     }
 
-    return { acquired, lockKey }
+    return { acquired, lockKey, lockToken: acquired ? lockToken : undefined }
   } catch (err) {
     if (options.failClosed) {
       cronLogger.error(jobName, "Failed to acquire execution lock - refusing execution", {
@@ -65,6 +69,7 @@ export async function acquireExecutionLock(
       lockKey,
       error: err instanceof Error ? err.message : "unknown",
     })
+    // Redis was unavailable and fail-open mode ran without creating a lock.
     return { acquired: true, lockKey }
   }
 }
@@ -74,10 +79,19 @@ export async function acquireExecutionLock(
  * Call this in a finally block after job completion.
  *
  * @param lockKey - The lockKey returned from acquireExecutionLock
+ * @param lockToken - The owner token returned when the lock was acquired
  */
-export async function releaseExecutionLock(lockKey: string): Promise<void> {
+export async function releaseExecutionLock(lockKey: string, lockToken?: string): Promise<void> {
+  if (!lockToken) return
+
   try {
-    await redis.del(lockKey)
+    // Delete only if this execution still owns the lock. A plain DEL could
+    // remove a newer execution's lock after our TTL expires.
+    await redis.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      [lockKey],
+      [lockToken],
+    )
   } catch {
     // Non-critical - lock will auto-expire via TTL
   }

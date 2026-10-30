@@ -263,6 +263,8 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                                 <li><Link href="/segmentos/oficinas-e-tecnicos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Oficinas e Técnicos</Link></li>
                                 <li><Link href="/segmentos/saloes-e-barbearias" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Salões e Barbearias</Link></li>
                                 <li><Link href="/segmentos/confeitarias-e-alimentacao" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Confeitarias</Link></li>
+                                <li><Link href="/segmentos/assistencia-tecnica-celulares" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Assistência Técnica e Celulares</Link></li>
+                                <li><Link href="/segmentos/lojas-de-roupas-e-calcados" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Lojas de Roupas e Calçados</Link></li>
                             </ul>
                         </div>
 

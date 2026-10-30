@@ -18,6 +18,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import InsertImageModal from "./InsertImageModal"
 import { deleteImageFromR2Action } from "@/app/actions/shared/r2"
 import Input from "./Input"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 interface RichTextEditorProps {
   label: string
@@ -298,10 +299,28 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   }, [])
 
   useEffect(() => {
-    if (editorRef.current && value !== editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = value
+    const safeValue = sanitizeRichText(value)
+    if (editorRef.current && safeValue !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = safeValue
     }
   }, [value])
+
+  const insertSanitizedClipboardContent = (event: {
+    preventDefault: () => void
+    clipboardData?: DataTransfer | null
+    dataTransfer?: DataTransfer | null
+  }) => {
+    event.preventDefault()
+    const transfer = event.clipboardData || event.dataTransfer
+    const html = transfer?.getData("text/html") || ""
+    const plainText = transfer?.getData("text/plain") || ""
+    if (html) {
+      document.execCommand("insertHTML", false, sanitizeRichText(html))
+    } else if (plainText) {
+      document.execCommand("insertText", false, plainText)
+    }
+    if (editorRef.current) onChange(sanitizeRichText(editorRef.current.innerHTML))
+  }
 
   const handleInsertTable = () => {
     const tableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${Array(tableCols).fill("").map(() => '<th style="border:1px solid #ccc;padding:8px;background:#f5f5f5;font-weight:bold;text-align:left;">Título</th>').join("")}</tr></thead><tbody>${Array(tableRows).fill("").map(() => `<tr>${Array(tableCols).fill("").map(() => '<td style="border:1px solid #ccc;padding:8px;">&nbsp;</td>').join("")}</tr>`).join("")}</tbody></table><br>`
@@ -313,18 +332,39 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
 
   const handleImageInsert = (imgUrl: string, alt: string, width: string, height: string) => {
     editorRef.current?.focus()
-    const imgHtml = `<img src="${imgUrl}" alt="${alt}" width="${width}"${height ? ` height="${height}"` : ""} style="max-width:100%;height:auto;" />`
+    let safeImageUrl: string
+    try {
+      const parsedImageUrl = new URL(imgUrl, window.location.origin)
+      if (
+        (parsedImageUrl.protocol !== "https:" && parsedImageUrl.protocol !== "http:") ||
+        parsedImageUrl.username ||
+        parsedImageUrl.password
+      ) return
+      safeImageUrl = parsedImageUrl.href
+    } catch {
+      return
+    }
+
+    const image = document.createElement("img")
+    image.src = safeImageUrl
+    image.alt = alt
+    image.style.maxWidth = "100%"
+    image.style.height = "auto"
+    const parsedWidth = Number(width)
+    const parsedHeight = Number(height)
+    if (Number.isFinite(parsedWidth) && parsedWidth > 0) image.width = Math.min(MAX_IMG_SIZE, Math.max(MIN_IMG_SIZE, parsedWidth))
+    if (Number.isFinite(parsedHeight) && parsedHeight > 0) image.height = Math.min(MAX_IMG_SIZE, Math.max(MIN_IMG_SIZE, parsedHeight))
+
     const sel = window.getSelection()
     if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
       const range = sel.getRangeAt(0)
       range.deleteContents()
-      const fragment = range.createContextualFragment(imgHtml)
-      range.insertNode(fragment)
+      range.insertNode(image)
       range.collapse(false)
     } else {
-      exec("insertHTML", imgHtml)
+      editorRef.current?.appendChild(image)
     }
-    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    if (editorRef.current) onChange(sanitizeRichText(editorRef.current.innerHTML))
   }
 
   const handleEditImage = () => {
@@ -343,16 +383,31 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   const handleEditConfirm = (newUrl: string, alt: string, width: string, height: string) => {
     const img = selectedImgRef.current
     if (!img) return
+    let safeImageUrl: string
+    try {
+      const parsedImageUrl = new URL(newUrl, window.location.origin)
+      if (
+        (parsedImageUrl.protocol !== "https:" && parsedImageUrl.protocol !== "http:") ||
+        parsedImageUrl.username ||
+        parsedImageUrl.password
+      ) return
+      safeImageUrl = parsedImageUrl.href
+    } catch {
+      return
+    }
+
     const oldSrc = img.src
-    const isNewImage = newUrl !== oldSrc && newUrl !== editImageData?.url
+    const isNewImage = safeImageUrl !== oldSrc && safeImageUrl !== editImageData?.url
     if (isNewImage) {
       deleteImageFromR2Action(oldSrc)
     }
-    img.src = newUrl
+    img.src = safeImageUrl
     img.alt = alt
-    img.width = Number(width)
-    img.height = height ? Number(height) : 0
-    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    const parsedWidth = Number(width)
+    const parsedHeight = Number(height)
+    if (Number.isFinite(parsedWidth) && parsedWidth > 0) img.width = Math.min(MAX_IMG_SIZE, Math.max(MIN_IMG_SIZE, parsedWidth))
+    if (Number.isFinite(parsedHeight) && parsedHeight > 0) img.height = Math.min(MAX_IMG_SIZE, Math.max(MIN_IMG_SIZE, parsedHeight))
+    if (editorRef.current) onChange(sanitizeRichText(editorRef.current.innerHTML))
     requestAnimationFrame(() => {
       updateOverlayPos()
       selectImage(img)
@@ -552,6 +607,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           ref={editorRef}
           contentEditable={!disabled}
           onInput={(e) => onChange(e.currentTarget.innerHTML)}
+          onPaste={insertSanitizedClipboardContent}
+          onDrop={insertSanitizedClipboardContent}
           onMouseUp={updateActiveFormats}
           onKeyUp={updateActiveFormats}
           className="rich-text-editor w-full h-[200px] overflow-y-auto bg-white dark:bg-dark-surface rounded-b-lg py-2 px-4 text-sm focus:outline-none text-brand-dark dark:text-dark-heading disabled:bg-brand-gray dark:disabled:bg-dark-border/30 custom-scrollbar"

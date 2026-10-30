@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { after, type NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
@@ -15,8 +15,10 @@ import { isUuid } from "@/lib/utils/short-id"
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000  // 5 minutes
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [3000, 5000, 8000]
+export const maxDuration = 120
 
 // ─── Signature Verification (MANDATORY) ─────────────────────────────────────
 
@@ -28,6 +30,7 @@ function validateWebhookSignature(
   signature: string,
   requestId: string,
   resourceId: string,
+  allowExpired = false,
 ): boolean {
   try {
     const secrets = [
@@ -59,9 +62,10 @@ function validateWebhookSignature(
     }
 
     // Reject expired webhooks (replay attack protection)
-    const timestampMs = parseInt(timestamp, 10) * 1000
+    if (!/^\d+$/.test(timestamp)) return false
+    const timestampMs = Number(timestamp) * 1000
     const now = Date.now()
-    if (now - timestampMs > MAX_WEBHOOK_AGE_MS) {
+    if (!Number.isSafeInteger(timestampMs) || timestampMs > now + MAX_WEBHOOK_AGE_MS || (!allowExpired && now - timestampMs > MAX_WEBHOOK_AGE_MS)) {
       console.warn(`[WEBHOOK] Webhook expired (age: ${now - timestampMs}ms, max: ${MAX_WEBHOOK_AGE_MS}ms)`)
       return false
     }
@@ -101,6 +105,17 @@ function validateWebhookSignature(
   }
 }
 
+function isAuthorizedInternalReplay(request: Request): boolean {
+  const secret = process.env.INTERNAL_CRON_SECRET
+  const authorization = request.headers.get("authorization") || ""
+  if (!secret || !authorization) return false
+
+  const expected = `Bearer ${secret}`
+  const actualBytes = Buffer.from(authorization)
+  const expectedBytes = Buffer.from(expected)
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)
+}
+
 // ─── POST Handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -117,6 +132,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const internalReplay = isAuthorizedInternalReplay(request)
     // ── Step 1: Validate required headers (FAIL CLOSED) ──
     const signature = request.headers.get("x-signature")
     const requestId = request.headers.get("x-request-id")
@@ -131,9 +147,18 @@ export async function POST(request: NextRequest) {
     const queryDataId = searchParams.get("data.id") || searchParams.get("id")
     const queryType = searchParams.get("type") || searchParams.get("topic")
 
+    const declaredLength = Number(request.headers.get("content-length"))
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 })
+    }
+
     let body: any = {}
     try {
-      body = await request.json()
+      const rawBody = await request.text()
+      if (Buffer.byteLength(rawBody, "utf8") > MAX_WEBHOOK_BODY_BYTES) {
+        return NextResponse.json({ error: "Payload too large" }, { status: 413 })
+      }
+      body = rawBody ? JSON.parse(rawBody) : {}
     } catch {
       // Body may be empty on query-string only notifications
     }
@@ -162,6 +187,7 @@ export async function POST(request: NextRequest) {
       signature,
       requestId,
       paymentId.toString(),
+      internalReplay,
     )
 
     if (!isValid) {
@@ -175,8 +201,6 @@ export async function POST(request: NextRequest) {
     console.log("[WEBHOOK] Signature validated successfully")
 
     // ── Step 4: ACK immediately, process async ──
-    const response = NextResponse.json({ received: true }, { status: 200 })
-
     const normalizedBody = {
       ...body,
       type: eventType,
@@ -187,7 +211,23 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    processWebhookWithRetry(normalizedBody, requestId).catch((error) => {
+    if (internalReplay) {
+      try {
+        await processWebhookWithRetry(normalizedBody, requestId)
+        return NextResponse.json({ received: true, processed: true }, { status: 200 })
+      } catch (error: any) {
+        captureError(error, {
+          module: "payments",
+          action: "mercadopago_webhook_internal_replay",
+          route: "/api/mercadopago/webhook",
+          entityId: String(paymentId),
+        })
+        SecureLogger.error("[WEBHOOK] Internal replay failed", { error: error.message })
+        return NextResponse.json({ received: false, error: "Processing failed" }, { status: 503 })
+      }
+    }
+
+    after(() => processWebhookWithRetry(normalizedBody, requestId).catch((error) => {
       captureError(error, {
         module: "payments",
         action: "mercadopago_webhook_async",
@@ -195,9 +235,9 @@ export async function POST(request: NextRequest) {
         entityId: typeof paymentId === "string" || typeof paymentId === "number" ? String(paymentId) : undefined,
       })
       SecureLogger.error("[WEBHOOK] Async processing failed", { error: error.message })
-    })
+    }))
 
-    return response
+    return NextResponse.json({ received: true }, { status: 200 })
   } catch (error: any) {
     captureError(error, {
       module: "payments",
@@ -205,8 +245,7 @@ export async function POST(request: NextRequest) {
       route: "/api/mercadopago/webhook",
     })
     SecureLogger.error("[WEBHOOK] Handler error", { error: error.message })
-    // Return 200 to prevent MP from retrying on our parsing errors
-    return NextResponse.json({ received: true }, { status: 200 })
+    return NextResponse.json({ received: false, error: "Webhook processing unavailable" }, { status: 503 })
   }
 }
 
@@ -263,7 +302,10 @@ async function syncRecurringSubscriptionWithMp(
 
     const { data: sub, error } = await query.maybeSingle()
 
-    if (error || !sub?.id) return
+    if (error) {
+      throw new Error(`Falha ao consultar recurring_subscriptions: ${error.message}`)
+    }
+    if (!sub?.id) return
     if (sub.status === targetStatus) return
     // Cancelamento local e definitivo: um webhook atrasado nao pode reativar.
     if (sub.status === "cancelled" && targetStatus !== "cancelled") return
@@ -280,16 +322,15 @@ async function syncRecurringSubscriptionWithMp(
       .eq("id", sub.id)
 
     if (updateError) {
-      console.error("[WEBHOOK] Falha ao sincronizar recurring_subscriptions:", updateError.message)
-      return
+      throw new Error(`Falha ao sincronizar recurring_subscriptions: ${updateError.message}`)
     }
 
     console.log(
       `[WEBHOOK] recurring_subscriptions ${sub.id}: ${sub.status} -> ${targetStatus} (MP: ${mpStatus})`,
     )
   } catch (e) {
-    // Nunca pode impedir a sincronizacao do billing do ERP no mesmo evento.
     console.error("[WEBHOOK] Erro ao sincronizar recurring_subscriptions:", e)
+    throw e
   }
 }
 
@@ -323,6 +364,9 @@ async function processWebhookWithRetry(
         const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${paymentId}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         })
+        if (!mpRes.ok) {
+          throw new Error(`Mercado Pago preapproval lookup failed (${mpRes.status})`)
+        }
         if (mpRes.ok) {
           const preapprovalData = await mpRes.json()
 
@@ -367,6 +411,9 @@ async function processWebhookWithRetry(
         const mpRes = await fetch(`https://api.mercadopago.com/authorized_payments/${paymentId}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         })
+        if (!mpRes.ok) {
+          throw new Error(`Mercado Pago authorized payment lookup failed (${mpRes.status})`)
+        }
         if (mpRes.ok) {
           const authPayData = await mpRes.json()
           const preapprovalId = authPayData.preapproval_id
@@ -399,7 +446,7 @@ async function processWebhookWithRetry(
                     charge,
                     chargeCycleStart: cycleDate,
                     notify: false,
-                  }).catch(console.error)
+                  })
                 }
                 return
               }
@@ -433,7 +480,7 @@ async function processWebhookWithRetry(
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
-      .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id, checkout_fulfillment")
+      .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_expires_at, cancelled_at, payment_breakdown, finance_account_id, checkout_fulfillment, updated_at")
       .eq("mp_payment_id", paymentId.toString())
       .limit(1)
       .single()
@@ -547,7 +594,7 @@ async function processWebhookWithRetry(
       SecureLogger.error("[WEBHOOK] Failed after all retries to fetch payment data", {
         paymentId: paymentId.toString(),
       })
-      return
+      throw new Error(`Não foi possível consultar o pagamento ${paymentId} no Mercado Pago.`)
     }
 
     // Check if partner is undergoing account deletion
@@ -730,7 +777,7 @@ async function processWebhookWithRetry(
       SecureLogger.error("[WEBHOOK] Failed to resolve partner after all retries", {
         paymentId: paymentId.toString(),
       })
-      return
+      throw new Error(`Não foi possível resolver o parceiro do pagamento ${paymentId}.`)
     }
 
     // ── Find order in DB ──
@@ -738,7 +785,7 @@ async function processWebhookWithRetry(
     if (!orderData) {
       let { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment")
+        .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment, updated_at")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
         .maybeSingle()
@@ -747,7 +794,7 @@ async function processWebhookWithRetry(
       if (!order && paymentInfo?.external_reference) {
         const { data: orderExt } = await supabase
           .from("orders")
-          .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment")
+          .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment, updated_at")
           .eq("id", paymentInfo.external_reference)
           .limit(1)
           .maybeSingle()
@@ -764,7 +811,7 @@ async function processWebhookWithRetry(
           await new Promise((resolve) => setTimeout(resolve, 2000))
           return processWebhookWithRetry(body, requestId, attempt + 1)
         }
-        return
+        throw new Error(`Pedido do pagamento ${paymentId} não foi encontrado.`)
       }
       orderData = order
     }
@@ -783,6 +830,26 @@ async function processWebhookWithRetry(
         console.log(`[WEBHOOK] Payment ${paymentId} already recorded on order ${orderId}, skipping`)
         return
       }
+    }
+
+    // Cancelling a pending deposit payment in Mercado Pago also emits a
+    // cancelled-payment webhook. That event must not cancel the whole order.
+    // The intent covers the remote request window; history covers later retries.
+    const checkoutFulfillment = orderData.checkout_fulfillment as Record<string, any> | null
+    const depositCancelPaymentId = String(
+      checkoutFulfillment?.depositCancelRequest?.paymentId || "",
+    )
+    const cancelledDepositHistory = Array.isArray(checkoutFulfillment?.depositCheckoutHistory)
+      ? checkoutFulfillment.depositCheckoutHistory
+      : []
+    const isCancelledDepositPayment =
+      depositCancelPaymentId === String(paymentId) ||
+      cancelledDepositHistory.some((entry: any) =>
+        String(entry?.cancelledMpPaymentId || "") === String(paymentId),
+      )
+    if (isCancelledDepositPayment && ["cancelled", "rejected", "expired"].includes(String(paymentInfo.status))) {
+      console.log(`[WEBHOOK] Payment ${paymentId} is a cancelled deposit; preserving order ${orderId}`)
+      return
     }
 
     // ── Validate payment amount (fraud detection) ──
@@ -1028,22 +1095,66 @@ async function processWebhookWithRetry(
 
     console.log(`[WEBHOOK] Updating order ${orderId}: "${previousSituation}" → "${orderStatus}"`)
 
-    const { error: updateError } = await supabase
+    // Re-read immediately before mutation. In particular, cancellation intent
+    // may have been written after this webhook loaded the order snapshot.
+    const { data: latestOrder, error: latestOrderError } = await supabase
+      .from("orders")
+      .select("updated_at, checkout_fulfillment")
+      .eq("id", orderId)
+      .maybeSingle()
+
+    if (latestOrderError || !latestOrder) {
+      const message = latestOrderError?.message || "Pedido desapareceu antes da gravação do webhook."
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        return processWebhookWithRetry(body, requestId, attempt + 1)
+      }
+      throw new Error(message)
+    }
+
+    const latestFulfillment = latestOrder.checkout_fulfillment as Record<string, any> | null
+    const latestCancelRequestPaymentId = String(latestFulfillment?.depositCancelRequest?.paymentId || "")
+    const latestCancelledDepositHistory = Array.isArray(latestFulfillment?.depositCheckoutHistory)
+      ? latestFulfillment.depositCheckoutHistory
+      : []
+    const latestIsCancelledDepositPayment =
+      latestCancelRequestPaymentId === String(paymentId) ||
+      latestCancelledDepositHistory.some((entry: any) => String(entry?.cancelledMpPaymentId || "") === String(paymentId))
+    if (latestIsCancelledDepositPayment && ["cancelled", "rejected", "expired"].includes(String(paymentInfo.status))) {
+      console.log(`[WEBHOOK] Payment ${paymentId} is a cancelled deposit; preserving order ${orderId}`)
+      return
+    }
+
+    // If any write landed since the initial read, recompute from that snapshot
+    // instead of overwriting its financial state with stale totals.
+    if (String(latestOrder.updated_at || "") !== String(orderData.updated_at || "")) {
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        return processWebhookWithRetry(body, requestId, attempt + 1)
+      }
+      throw new Error(`Pedido ${orderId} mudou durante o processamento do pagamento.`)
+    }
+
+    const { data: updatedOrder, error: updateError } = await supabase
       .from("orders")
       .update(updateData)
       .eq("id", orderId)
+      .eq("updated_at", latestOrder.updated_at)
+      .select("id")
+      .maybeSingle()
 
-    if (updateError) {
-      console.error("[WEBHOOK] Error updating order:", updateError.message)
+    if (updateError || !updatedOrder) {
+      const updateMessage = updateError?.message || "O pedido mudou antes do compare-and-swap do webhook."
+      console.error("[WEBHOOK] Error updating order:", updateMessage)
       if (attempt < MAX_RETRIES - 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000))
         return processWebhookWithRetry(body, requestId, attempt + 1)
       }
       SecureLogger.error("[WEBHOOK] Failed to update order after retries", {
-        error: updateError.message,
+        error: updateMessage,
         orderId,
       })
-      return
+      throw new Error(`Falha ao atualizar o pedido ${orderId}: ${updateMessage}`)
     }
 
     console.log(`[WEBHOOK] Order ${orderId} updated to "${orderStatus}"`)
@@ -1293,5 +1404,6 @@ async function processWebhookWithRetry(
     }
 
     SecureLogger.error("[WEBHOOK] Failed after all retries", { error: error.message })
+    throw error
   }
 }

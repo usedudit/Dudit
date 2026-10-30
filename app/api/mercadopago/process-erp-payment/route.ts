@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { checkPartnerPermission, getCurrentUser, requireStorePermission } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { createHash } from "crypto"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
@@ -32,9 +32,14 @@ interface ProcessErpPaymentRequest {
 /**
  * Gera uma chave de idempotência determinística para pagamentos ERP.
  */
-function generateIdempotencyKey(partnerId: string, amount: number): string {
-  const timeWindow = Math.floor(Date.now() / 30000)
-  const payload = `erp_${partnerId}_${amount}_${timeWindow}`
+function generateIdempotencyKey(input: {
+  partnerId: string
+  userId: string
+  amount: number
+  paymentQuote: string
+  orderId?: string
+}): string {
+  const payload = `erp_${input.partnerId}_${input.userId}_${input.orderId || "no-order"}_${input.amount.toFixed(2)}_${input.paymentQuote}`
   return createHash("sha256").update(payload).digest("hex").substring(0, 48)
 }
 
@@ -64,12 +69,16 @@ async function handler(request: NextRequest) {
       }
     }
 
-    if (!partnerId) {
+    if (typeof partnerId !== "string" || !partnerId.trim()) {
       return NextResponse.json({ error: "Parceiro não informado" }, { status: 400 })
     }
 
-    if (!amount || amount <= 0 || amount > 999999) {
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0 || amount > 999999) {
       return NextResponse.json({ error: "Valor inválido" }, { status: 400 })
+    }
+
+    if (orderId !== undefined && (typeof orderId !== "string" || !orderId.trim())) {
+      return NextResponse.json({ error: "Pedido inválido" }, { status: 400 })
     }
 
     const user = await getCurrentUser()
@@ -77,29 +86,50 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
 
-    // Validar que o usuário tem acesso ao parceiro (é dono ou membro da equipe)
+    // A cobrança é uma mutação de pedido; exigir a permissão ERP atual no servidor.
+    // A tabela legada team_members só prova vínculo e não representa o RBAC ativo.
+    const { allowed: canEditOrders } = await checkPartnerPermission(partnerId, "orders", "edit")
+    if (!canEditOrders) {
+      SecureLogger.warn("Unauthorized ERP payment attempt", { userId: user.id, partnerId })
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+    }
+
+    // Usado para validar o pedido informado e resolver os dados do parceiro.
     const adminClient = createAdminClient()
 
     if (orderId) {
-      const { data: targetOrder } = await adminClient
+      const { data: targetOrder, error: targetOrderError } = await adminClient
         .from("orders")
-        .select("id, situation, total_amount, paid_amount")
+        .select("id, situation, total_amount, paid_amount, amount_paid, store_id")
         .eq("id", orderId)
         .eq("partner_id", partnerId)
         .maybeSingle()
 
-      if (targetOrder) {
-        const isOrderPaid =
-          targetOrder.situation === "paid" ||
-          (Number(targetOrder.paid_amount || 0) >= Number(targetOrder.total_amount || 0) - 0.009 && Number(targetOrder.total_amount || 0) > 0)
-        if (isOrderPaid) {
-          return NextResponse.json({ error: "Este pedido já está totalmente pago e não permite novas cobranças." }, { status: 400 })
-        }
+      if (targetOrderError || !targetOrder) {
+        return NextResponse.json({ error: "Pedido não encontrado para este parceiro." }, { status: 404 })
+      }
+
+      if (targetOrder.store_id) {
+        await requireStorePermission(targetOrder.store_id, partnerId, "orders", "edit")
+      }
+
+      const totalAmount = Number(targetOrder.total_amount || 0)
+      const paidAmount = Number(targetOrder.paid_amount ?? targetOrder.amount_paid ?? 0)
+      const remainingAmount = Math.max(0, totalAmount - paidAmount)
+      if (
+        targetOrder.situation === "paid" ||
+        totalAmount <= 0 ||
+        remainingAmount <= 0.009
+      ) {
+        return NextResponse.json({ error: "Este pedido já está totalmente pago e não permite novas cobranças." }, { status: 400 })
+      }
+      if (amount > remainingAmount + 0.01) {
+        return NextResponse.json({ error: "O valor da cobrança excede o saldo restante do pedido." }, { status: 400 })
       }
     }
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
-      .select("id, user_id")
+      .select("id")
       .eq("id", partnerId)
       .single()
 
@@ -135,24 +165,6 @@ async function handler(request: NextRequest) {
       }
     }
 
-    // Verificar se o usuário é dono do parceiro ou membro da equipe
-    let hasAccess = partner.user_id === user.id
-    if (!hasAccess) {
-      const { data: teamMember } = await adminClient
-        .from("team_members")
-        .select("id")
-        .eq("partner_id", partnerId)
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .single()
-      hasAccess = !!teamMember
-    }
-
-    if (!hasAccess) {
-      SecureLogger.warn("Unauthorized ERP payment attempt", { userId: user.id, partnerId })
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
-    }
-
     if (!paymentQuote) {
       return NextResponse.json({ error: "Cotação de pagamento ausente. Atualize a tela e tente novamente." }, { status: 400 })
     }
@@ -160,6 +172,7 @@ async function handler(request: NextRequest) {
       userId: user.id,
       partnerId,
       amount,
+      orderId,
     })
     if (!quoteValidation.valid) {
       SecureLogger.warn("ERP payment quote rejected", {
@@ -202,7 +215,7 @@ async function handler(request: NextRequest) {
     const customerEmail = (paymentFormData.payer?.email || "").trim();
     const hasCustomerEmail = customerEmail.length > 0;
 
-    const targetReference = `ERP-${partnerId.slice(0, 8)}-${Date.now()}`
+    const targetReference = orderId || `ERP-${partnerId.slice(0, 8)}-${Date.now()}`
 
     const rawPayerAddr = paymentFormData.payer?.address
     const payerZipCode = String(rawPayerAddr?.zipCode || rawPayerAddr?.zip_code || "").replace(/\D/g, "")
@@ -224,6 +237,11 @@ async function handler(request: NextRequest) {
       payment_method_id: paymentFormData.payment_method_id,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       external_reference: targetReference,
+      metadata: {
+        dudit_partner_id: partnerId,
+        ...(orderId ? { dudit_order_id: orderId } : {}),
+        dudit_authorized_amount: amount,
+      },
       statement_descriptor: "DUDIT",
       description: (description || `Venda ERP - ${partnerStoreName}`).slice(0, 250),
       payer: {
@@ -330,7 +348,13 @@ async function handler(request: NextRequest) {
     })
 
     // Idempotency key
-    const idempotencyKey = generateIdempotencyKey(partnerId, amount)
+    const idempotencyKey = generateIdempotencyKey({
+      partnerId,
+      userId: user.id,
+      amount,
+      paymentQuote,
+      orderId,
+    })
 
     // Processar pagamento via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
     const paymentResult = await createMercadoPagoPayment({

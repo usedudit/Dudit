@@ -59,6 +59,9 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [createdToken, setCreatedToken] = useState<string | null>(null)
     const docInputId = useId()
+    // O footer do DefaultModal é renderizado fora do <form>, por isso o botão de envio
+    // precisa referenciar o formulário pelo atributo `form`.
+    const formId = useId()
 
     useEffect(() => {
         if (!isOpen) {
@@ -274,16 +277,24 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             maxWidth="3xl"
             footer={
                 <div className="flex items-center justify-end gap-3">
-                    <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
-                        Cancelar
-                    </Button>
                     <Button
-                        type="submit"
+                        type="button"
+                        variant="outline"
+                        onClick={handleCloseModal}
                         disabled={isSubmitting}
-                        isLoading={isSubmitting}
                     >
-                        {isSubmitting ? (uploadStatus || "Enviando...") : "Enviar Solicitação"}
+                        {createdToken ? "Fechar" : "Cancelar"}
                     </Button>
+                    {!createdToken && (
+                        <Button
+                            type="submit"
+                            form={formId}
+                            disabled={isSubmitting}
+                            isLoading={isSubmitting}
+                        >
+                            {isSubmitting ? (uploadStatus || "Enviando...") : "Enviar Solicitação"}
+                        </Button>
+                    )}
                 </div>
             }
         >
@@ -301,7 +312,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                     }}
                 />
             ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col space-y-4 pt-1 pb-1">
+                <form id={formId} onSubmit={handleSubmit} className="flex flex-col space-y-4 pt-1 pb-1">
                     {/* Tabs de Navegação */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="w-full justify-start border-b border-brand-border dark:border-dark-border gap-6 bg-transparent p-0">

@@ -46,6 +46,7 @@ import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/p
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
 import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
 import { buildVendorLocationPopupHtml } from "@/lib/map/mapbox-popup"
+import { applyVendorUrgencyBadges } from "@/lib/marketplace/badges"
 
 type VendorContext = "produtos" | "servicos" | "planos"
 
@@ -127,29 +128,6 @@ const normalizeItemForCard = (item: any, partner: any) => {
 
 const normalizeCategory = (category?: string | null) => (category || "Outros").trim()
 const categoryId = (category: string) => category.toLowerCase()
-
-const vendorBadgeSeed = (userId?: string | null) => `dudit-${userId ?? "anon"}-${new Date().toDateString()}`
-
-const vendorBadgeHash = (seed: string, id: string) => {
-    let h = 0
-    const s = `${seed}-${id}`
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i)
-    return Math.abs(h)
-}
-
-const applyVendorUrgencyBadge = (item: any, userId?: string | null) => {
-    if (!item || item._badgeLabel) return item
-    if (item.itemType === "plano" || item.itemType === "servico" || item.duration_minutes !== undefined) return item
-    const stock = Number(item.stock_quantity ?? item.stock_available ?? 0)
-    const h = vendorBadgeHash(vendorBadgeSeed(userId), `${item.id}-launch-badge`) % 100
-    if (stock > 0 && stock <= 5 && h < 45) {
-        return { ...item, _badgeLabel: `Últimos ${stock}`, _badgeVariant: "red" }
-    }
-    if (h >= 75 && h < 90) {
-        return { ...item, _badgeLabel: "Destaque", _badgeVariant: "purple" }
-    }
-    return item
-}
 
 const formatCouponValue = (coupon: any) => {
     if (coupon.discount_type === "free_shipping") return "Entrega grátis"
@@ -960,7 +938,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
     const displayProducts = useMemo(() => {
         if (!isMounted) return products || []
-        return (products || []).map(item => applyVendorUrgencyBadge(item, user?.id ?? null))
+        return applyVendorUrgencyBadges(products, user?.id ?? null)
     }, [products, user?.id, isMounted])
 
     const [partnerPromotions, setPartnerPromotions] = useState<any[]>([])
@@ -980,8 +958,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return partnerPromotions.map(promo => {
             const promoItems: any[] = []
 
-            if (products) {
-                products.forEach(p => {
+            if (displayProducts) {
+                displayProducts.forEach(p => {
                     if (isItemInPromotion(p, promo, "produto")) {
                         promoItems.push({ ...p, _itemType: "produto" })
                     }
@@ -1001,7 +979,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 items: promoItems
             }
         }).filter(sec => sec.items.length > 0)
-    }, [partnerPromotions, products, services])
+    }, [partnerPromotions, displayProducts, services])
 
     const bestCampaignSection = useMemo(
         () => pickBestSection(campaignSections, partner?.id || "dudit"),
@@ -1380,8 +1358,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
         if (isCampaignView && activeCampaignPromo) {
             const promoItems: any[] = []
-            if (products) {
-                products.forEach(p => {
+            if (displayProducts) {
+                displayProducts.forEach(p => {
                     if (isItemInPromotion(p, activeCampaignPromo, "produto")) {
                         promoItems.push(normalizeVendorItem({ ...p, _itemType: "produto" }))
                     }
@@ -1399,7 +1377,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
         // groupedItems já vem filtrado pelos filtros da página
         return (groupedItems.find(group => group.id === categoryView)?.items || []).filter(matchesSearch)
-    }, [categoryView, isCampaignView, activeCampaignPromo, products, services, categorySearchValue, groupedItems, applyVendorFilters, normalizeVendorItem])
+    }, [categoryView, isCampaignView, activeCampaignPromo, displayProducts, services, categorySearchValue, groupedItems, applyVendorFilters, normalizeVendorItem])
 
     const categoryAvailableBrands = useMemo(() => {
         const brands = new Set<string>()

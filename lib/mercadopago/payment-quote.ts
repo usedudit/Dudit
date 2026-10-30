@@ -6,6 +6,7 @@ type PaymentQuote = {
   partnerId: string
   maxAmount: number
   expiresAt: number
+  orderId?: string
 }
 
 function getSecret() {
@@ -27,7 +28,7 @@ export function issuePaymentQuote(input: Omit<PaymentQuote, "expiresAt">, ttlSec
   return `${payload}.${sign(payload)}`
 }
 
-export function verifyPaymentQuote(token: string, expected: { userId: string; partnerId: string; amount: number }) {
+export function verifyPaymentQuote(token: string, expected: { userId: string; partnerId: string; amount: number; orderId?: string }) {
   try {
     const [payload, signature] = token.split(".")
     if (!payload || !signature) return { valid: false as const, error: "Cotação de pagamento inválida." }
@@ -38,6 +39,9 @@ export function verifyPaymentQuote(token: string, expected: { userId: string; pa
     const quote = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as PaymentQuote
     if (quote.userId !== expected.userId || quote.partnerId !== expected.partnerId) {
       return { valid: false as const, error: "Cotação de pagamento não pertence ao contexto atual." }
+    }
+    if ((quote.orderId || undefined) !== (expected.orderId || undefined)) {
+      return { valid: false as const, error: "Cotação de pagamento não pertence a este pedido." }
     }
     if (!Number.isFinite(quote.maxAmount) || quote.maxAmount <= 0 || quote.expiresAt < Math.floor(Date.now() / 1000)) {
       return { valid: false as const, error: "Cotação de pagamento expirada." }

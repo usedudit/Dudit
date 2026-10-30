@@ -8,7 +8,9 @@ import {
 } from "@/lib/internal-cron"
 
 const JOB_NAME = "process-pending-webhooks"
-const BATCH_SIZE = 50
+const BATCH_SIZE = 2
+const MAX_EVENT_ATTEMPTS = 5
+export const maxDuration = 300
 
 interface PendingWebhookEvent {
 	id: string
@@ -44,13 +46,23 @@ export async function POST(req: Request) {
 
 	cronLogger.start(JOB_NAME)
 	const startTime = Date.now()
+	const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL
+	const cronSecret = process.env.INTERNAL_CRON_SECRET
+	let webhookUrl: URL | null = null
+	try {
+		if (appUrl) webhookUrl = new URL(appUrl)
+	} catch {
+		webhookUrl = null
+	}
+	if (!webhookUrl || !["https:", ...(process.env.NODE_ENV !== "production" ? ["http:"] : [])].includes(webhookUrl.protocol) || !cronSecret) {
+		return NextResponse.json(
+			{ success: false, error: "Webhook worker configuration is incomplete." },
+			{ status: 503 },
+		)
+	}
 
 	try {
 		const admin = getAdminClient()
-		const appUrl =
-			process.env.NEXT_PUBLIC_APP_URL ||
-			process.env.NEXT_PUBLIC_SITE_URL ||
-			"http://localhost:3000"
 
 		// 2. Fast check: Claim a batch of pending events (FIFO)
 		const { data: events, error: fetchError } = await admin
@@ -83,8 +95,14 @@ export async function POST(req: Request) {
 		}
 
 		// 3. Concurrency lock ONLY when there are actual events to process
-		const lock = await acquireExecutionLock(JOB_NAME, 55)
+		const lock = await acquireExecutionLock(JOB_NAME, 360, { failClosed: true })
 		if (!lock.acquired) {
+			if (lock.unavailable) {
+				return NextResponse.json(
+					{ success: false, error: "Execution lock unavailable" },
+					{ status: 503 },
+				)
+			}
 			cronLogger.warn(JOB_NAME, "Execution skipped - lock held", {
 				lockKey: lock.lockKey,
 			})
@@ -103,30 +121,38 @@ export async function POST(req: Request) {
 					// Re-play to the existing Next.js webhook endpoint
 					// It will re-validate the signature and run full business logic
 					const webhookRes = await fetch(
-						`${appUrl}/api/mercadopago/webhook`,
+						new URL("/api/mercadopago/webhook", webhookUrl).toString(),
 						{
 							method: "POST",
 							headers: {
 								"Content-Type": "application/json",
 								"User-Agent": "Dudit-Webhook-Drain/1.0",
+								Authorization: `Bearer ${cronSecret}`,
 								"x-signature": event.signature || "",
 								"x-request-id": event.request_id,
-								"x-forwarded-from": "edge-function-drain",
 							},
 							body: JSON.stringify(event.payload),
-							signal: AbortSignal.timeout(25_000),
+							signal: AbortSignal.timeout(110_000),
 						},
 					)
 
 					if (webhookRes.ok) {
-						processed++
-						await admin
+						const { error: markError } = await admin
 							.from("pending_webhook_events")
 							.update({
 								status: "completed",
 								processed_at: new Date().toISOString(),
 							})
 							.eq("idempotency_key", event.idempotency_key)
+						if (markError) {
+							failed++
+							cronLogger.error(JOB_NAME, "Failed to mark webhook event completed", {
+								idempotencyKey: event.idempotency_key,
+								error: markError.message,
+							})
+						} else {
+							processed++
+						}
 					} else {
 						failed++
 						cronLogger.warn(JOB_NAME, "Webhook reprocessing returned non-200", {
@@ -136,7 +162,7 @@ export async function POST(req: Request) {
 						await admin
 							.from("pending_webhook_events")
 							.update({
-								status: "failed",
+								status: event.attempts + 1 >= MAX_EVENT_ATTEMPTS ? "failed" : "pending",
 								processing_error: `HTTP ${webhookRes.status}`,
 								attempts: event.attempts + 1,
 							})
@@ -152,8 +178,8 @@ export async function POST(req: Request) {
 					await admin
 						.from("pending_webhook_events")
 						.update({
-							status: "failed",
-							processing_error: message,
+							status: event.attempts + 1 >= MAX_EVENT_ATTEMPTS ? "failed" : "pending",
+							processing_error: message.slice(0, 300),
 							attempts: event.attempts + 1,
 						})
 						.eq("idempotency_key", event.idempotency_key)
@@ -171,7 +197,7 @@ export async function POST(req: Request) {
 				elapsedMs: elapsed,
 			})
 		} finally {
-			await releaseExecutionLock(lock.lockKey)
+			await releaseExecutionLock(lock.lockKey, lock.lockToken)
 		}
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : String(err)

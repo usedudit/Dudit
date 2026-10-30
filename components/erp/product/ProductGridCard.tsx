@@ -6,6 +6,7 @@ import { Checkbox, Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getStockStatus, formatCurrency } from "./product-utils"
+import StockAvailabilityHint from "./StockAvailabilityHint"
 import type { Product } from "@/lib/types/product"
 
 interface ProductGridCardProps {
@@ -48,6 +49,7 @@ const ProductGridCard = React.memo(
         const hasVariations = variationsCount > 0
         const hasVariantData = hasVariations && product.variant_min_price !== undefined
         const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const reservedStock = hasVariantData ? (product.variant_total_reserved ?? 0) : (product.stock_reserved ?? 0)
         const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         const imageUrl = getPrimaryProductDisplayImage(product)
@@ -194,6 +196,11 @@ const ProductGridCard = React.memo(
                                     <Badge variant={status.variant} className="whitespace-nowrap scale-90" />
                                 </Tooltip>
                             </div>
+                            {reservedStock > 0 && (
+                                <div className="mt-0.5">
+                                    <StockAvailabilityHint total={effectiveStock} reserved={reservedStock} />
+                                </div>
+                            )}
                             {hasVariations && (
                                 <span className="text-[10px] font-bold text-brand-green underline decoration-brand-green/30 mt-0.5">
                                     {variationsCount} {variationsCount === 1 ? 'variação' : 'variações'}

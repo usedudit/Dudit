@@ -1058,6 +1058,11 @@ async function handler(request: NextRequest) {
       payment_method_id: paymentFormData.payment_method_id,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       external_reference: targetOrderId,
+      metadata: {
+        dudit_partner_id: partnerId,
+        dudit_order_id: targetOrderId,
+        dudit_authorized_amount: chargeAmount,
+      },
       statement_descriptor: "DUDIT",
       description: `Pedido de ${customerName}`.slice(0, 250),
       payer: {

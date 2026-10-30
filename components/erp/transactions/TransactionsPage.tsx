@@ -213,6 +213,7 @@ export default function TransactionsPage({
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
     const [payingInstallment, setPayingInstallment] = useState(false)
     const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+    const [paymentAttemptId, setPaymentAttemptId] = useState<string | null>(null)
     const [selectedInstallmentForPayment, setSelectedInstallmentForPayment] = useState<any | null>(null)
     const [paymentAmount, setPaymentAmount] = useState("")
     const [interestAmount, setInterestAmount] = useState("0")
@@ -1193,6 +1194,7 @@ export default function TransactionsPage({
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
+        setPaymentAttemptId(crypto.randomUUID())
         setSelectedInstallmentForPayment(transaction as any)
         const remainingFromPartial = transaction.paidAmount ? transaction.amount - transaction.paidAmount : transaction.amount
         const initialAmount = Number(
@@ -1402,6 +1404,7 @@ export default function TransactionsPage({
                 return
             }
             const ledgerDirection = meta?.ledgerDirection ?? row.ledgerDirection ?? "in"
+            setPaymentAttemptId(crypto.randomUUID())
             setSelectedInstallmentForPayment({
                 ...row,
                 description: row.description || row.reference || row.headerTitle || "Parcela",
@@ -1499,6 +1502,7 @@ export default function TransactionsPage({
                 const res = await recordInstallmentPaymentAction({
                     partnerId,
                     transactionId: selectedInstallmentForPayment.id,
+                    idempotencyKey: paymentAttemptId,
                     paymentAmount: paid,
                     interestAmount: interest,
                     discountAmount: discount,
@@ -1515,6 +1519,7 @@ export default function TransactionsPage({
                 const res = await recordRegularTransactionPaymentAction({
                     partnerId,
                     transactionId: selectedInstallmentForPayment.id,
+                    idempotencyKey: paymentAttemptId,
                     paymentAmount: paid,
                     interestAmount: interest,
                     discountAmount: discount,
@@ -1533,6 +1538,7 @@ export default function TransactionsPage({
             }
             setPaymentModalOpen(false)
             setSelectedInstallmentForPayment(null)
+            setPaymentAttemptId(null)
             void refreshTransactionsNow()
         } finally {
             setPayingInstallment(false)
@@ -1540,6 +1546,7 @@ export default function TransactionsPage({
     }, [
         selectedInstallmentForPayment,
         payingInstallment,
+        paymentAttemptId,
         paymentAmount,
         interestAmount,
         discountAmount,

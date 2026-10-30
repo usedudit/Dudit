@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { createAdminClient } from "@/lib/supabase/server"
@@ -26,12 +26,15 @@ export async function searchProductsForMovement(query: string, storeId?: string 
         await requirePermission(ctx.partnerId, "stock_movements", "view")
         const supabase = createAdminClient()
         const searchTerm = `%${query}%`
+        const effectiveStoreId = storeId || ctx.activeStoreId
 
-        if (storeId) {
+        if (effectiveStoreId) {
+            await requireStorePermission(effectiveStoreId, ctx.partnerId, "stock_movements", "view")
             const { data, error } = await supabase
                 .from("products")
                 .select("id, name, sku, stock_quantity, images")
-                .eq("store_id", storeId)
+                .eq("store_id", effectiveStoreId)
+                .eq("partner_id", ctx.partnerId)
                 .eq("is_active", true)
                 .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
                 .limit(10)
@@ -94,6 +97,9 @@ export async function createStockMovementAction(data: {
         const partnerId = ctx.partnerId
         const userId = user.id
         await requirePermission(partnerId, "stock_movements", "create")
+        if (ctx.activeStoreId) {
+            await requireStorePermission(ctx.activeStoreId, partnerId, "stock_movements", "create")
+        }
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.type !== 'adjustment' && data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
@@ -150,6 +156,9 @@ export async function createBatchStockMovementAction(data: {
         const partnerId = ctx.partnerId
         const userId = user.id
         await requirePermission(partnerId, "stock_movements", "create")
+        if (ctx.activeStoreId) {
+            await requireStorePermission(ctx.activeStoreId, partnerId, "stock_movements", "create")
+        }
 
         if (!data.items || data.items.length === 0) return errorResponse("Adicione pelo menos um item")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
@@ -464,35 +473,9 @@ export async function getStockMovementDetails(id: string) {
 }
 
 export async function deleteStockMovementAction(id: string) {
-    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-
-    try {
-        const ctx = await getCurrentPartnerContext()
-        if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
-
-        await requirePermission(ctx.partnerId, "stock_movements", "undo")
-        const supabase = createAdminClient()
-
-        const { error } = await supabase
-            .from("stock_movements")
-            .delete()
-            .eq("id", id)
-            .eq("partner_id", ctx.partnerId)
-
-        if (error) {
-            console.error("deleteStockMovementAction error:", error)
-            return errorResponse(error.message)
-        }
-
-        await revalidateStockMovements(ctx.partnerId)
-        revalidatePath('/erp/movimentacao-estoque')
-        revalidatePath('/erp/produtos')
-
-        return successResponse({ id })
-    } catch (err: any) {
-        console.error("deleteStockMovementAction error:", err)
-        return errorResponse("Erro interno ao deletar movimentação")
-    }
+    // Preserve the inventory ledger: a movement must be reversed through the
+    // compensating movement flow, never deleted independently of stock changes.
+    return undoStockMovementAction(id)
 }
 
 export async function undoStockMovementAction(id: string, customReason?: string) {
@@ -510,7 +493,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         // 1. Fetch the original movement
         const { data: original, error: fetchError } = await supabase
             .from("stock_movements")
-            .select("id, movement_type, reversed_at, reversal_movement_id, reason, reference_name")
+            .select("id, movement_type, store_id, reversed_at, reversal_movement_id, reason, reference_name")
             .eq("id", id)
             .eq("partner_id", partnerId)
             .single()
@@ -518,6 +501,9 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         if (fetchError || !original) {
             console.error("undoStockMovementAction fetch error:", fetchError)
             return errorResponse("Movimentação original não encontrada")
+        }
+        if (original.store_id) {
+            await requireStorePermission(original.store_id, partnerId, "stock_movements", "undo")
         }
 
         // Validate double reversal
@@ -535,56 +521,25 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             return errorResponse("Itens da movimentação não encontrados")
         }
 
-        const shortId = id.split('-')[0].toUpperCase()
-        const isAdjustment = original.movement_type === 'adjustment'
-        const invertedType = isAdjustment ? 'adjustment' : (original.movement_type === 'in' ? 'out' : 'in')
-        const reason = customReason || `Estorno ${isAdjustment ? 'do ajuste' : 'da movimentação'} ${shortId}`
-        const notes = customReason ? `Motivo: ${customReason}` : `Estorno da movimentação ID: ${shortId}`
-
-        // Undo: for adjustment, restore previous_quantity; for in/out, reverse delta
-        const itemsPayload = childItems.map((item: any) => ({
-            product_id: item.product_id,
-            variant_id: item.variant_id || null,
-            quantity: isAdjustment ? Number(item.previous_quantity ?? 0) : Math.abs(item.quantity),
-        }))
-
-        const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
+        const reason = customReason?.trim().slice(0, 500)
+        const { data: movementRecord, error } = await supabase.rpc('undo_stock_movement_atomic', {
             p_partner_id: partnerId,
-            p_movement_type: invertedType,
-            p_reason: reason,
-            p_notes: notes,
-            p_created_by: userId,
-            p_items: itemsPayload,
-            p_store_id: ctx.activeStoreId || null,
-            p_reference_name: shortId,
-            p_reference_type: 'adjustment',
+            p_movement_id: id,
+            p_user_id: userId,
+            p_reason: reason || null,
         })
 
         if (error) {
-            console.error("undoStockMovementAction batch RPC error:", error)
+            console.error("undoStockMovementAction atomic RPC error:", error)
             return errorResponse(error.message)
-        }
-
-        const newMovementId = movementRecord?.id || movementRecord
-
-        // Mark original movement as reversed
-        if (newMovementId) {
-            await supabase
-                .from("stock_movements")
-                .update({
-                    reversed_at: new Date().toISOString(),
-                    reversed_by: userId,
-                    reversal_movement_id: newMovementId,
-                })
-                .eq("id", id)
         }
 
         await revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
 
-        for (const item of childItems) {
-            await invalidateProductCache(item.product_id, partnerId, 'update', { silent: true })
+        for (const productId of movementRecord?.product_ids || []) {
+            await invalidateProductCache(productId, partnerId, 'update', { silent: true })
         }
 
         return successResponse(movementRecord)
@@ -837,11 +792,22 @@ export async function deleteStockMovementAttachmentAction(
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "stock_movements", "create")
     const user = await requireUser()
-    const admin = createAdminClient()
+    const supabase = await getSupabaseServerClient()
 
-    const { data: attachment } = await admin
+    const { data: movement } = await supabase
+      .from("stock_movements")
+      .select("id, partner_id, store_id")
+      .eq("id", movementId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!movement) return { success: false, error: "Movimentação não encontrada." }
+    if (movement.store_id) {
+      await requireStorePermission(movement.store_id, partnerId, "stock_movements", "create")
+    }
+
+    const { data: attachment } = await supabase
       .from("stock_movement_attachments")
-      .select("file_key, file_name")
+      .select("id, file_key, file_name")
       .eq("id", attachmentId)
       .eq("stock_movement_id", movementId)
       .maybeSingle()
@@ -853,7 +819,8 @@ export async function deleteStockMovementAttachmentAction(
     const { deleteFileFromR2 } = await import("@/lib/r2/server")
     await deleteFileFromR2(attachment.file_key)
 
-    await admin.from("stock_movement_attachments").delete().eq("id", attachmentId)
+    const admin = createAdminClient()
+    await admin.from("stock_movement_attachments").delete().eq("id", attachmentId).eq("stock_movement_id", movementId)
 
     const { logAuditEvent } = await import("@/lib/services/timeline.service")
     await logAuditEvent({
@@ -873,11 +840,23 @@ export async function deleteStockMovementAttachmentAction(
 }
 
 export async function getStockMovementAttachmentsAction(
-  movementId: string
+  movementId: string,
+  partnerId?: string,
 ): Promise<{ success: true; data: any[] } | { success: false; error: string }> {
   try {
     await requireUser()
     const supabase = await getSupabaseServerClient()
+
+    const { data: movement } = await supabase
+      .from("stock_movements")
+      .select("id, partner_id, store_id")
+      .eq("id", movementId)
+      .maybeSingle()
+    if (!movement || (partnerId && movement.partner_id !== partnerId)) {
+      return { success: false, error: "Movimentação não encontrada." }
+    }
+    if (movement.store_id) await requireStorePermission(movement.store_id, movement.partner_id, "stock_movements", "view")
+    else await requirePermission(movement.partner_id, "stock_movements", "view")
 
     const { data, error } = await supabase
       .from("stock_movement_attachments")
@@ -900,8 +879,28 @@ export async function getStockMovementAttachmentUrlAction(
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
   try {
     await requireUser()
-    if (partnerId) {
-      await requirePermission(partnerId, "stock_movements", "view")
+    const supabase = await getSupabaseServerClient()
+    const { data: movement } = await supabase
+      .from("stock_movements")
+      .select("id, partner_id, store_id")
+      .eq("id", movementId)
+      .maybeSingle()
+    if (!movement || (partnerId && movement.partner_id !== partnerId)) {
+      return { success: false, error: "Movimentação não encontrada." }
+    }
+
+    const { data: attachment } = await supabase
+      .from("stock_movement_attachments")
+      .select("id")
+      .eq("stock_movement_id", movementId)
+      .eq("file_key", fileKey)
+      .maybeSingle()
+    if (!attachment) return { success: false, error: "Anexo não encontrado nesta movimentação." }
+
+    if (movement.store_id) {
+      await requireStorePermission(movement.store_id, movement.partner_id, "stock_movements", "view")
+    } else {
+      await requirePermission(movement.partner_id, "stock_movements", "view")
     }
 
     const { generateSignedDownloadUrl } = await import("@/lib/r2/server")

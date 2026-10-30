@@ -52,21 +52,23 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
 
                         {/* Coluna 1: Institucional & Segmentos */}
                         <div>
-                            <h4 className="text-sm font-medium text-white mb-6">Institucional</h4>
-                            <ul className="space-y-4">
+                            <h4 className="text-sm font-medium text-white mb-6">Institucional & Soluções</h4>
+                            <ul className="space-y-3">
                                 <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
                                 <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Nossos Planos</Link></li>
-                                <li><Link href="/segmentos/oficinas-e-tecnicos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Oficinas e Técnicos</Link></li>
+                                <li><Link href="/segmentos/oficinas-e-tecnicos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Oficinas e Auto Centers</Link></li>
+                                <li><Link href="/segmentos/assistencia-tecnica-celulares" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Assistência Técnica e Celulares</Link></li>
                                 <li><Link href="/segmentos/saloes-e-barbearias" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Salões e Barbearias</Link></li>
-                                <li><Link href="/segmentos/confeitarias-e-alimentacao" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Confeitarias</Link></li>
+                                <li><Link href="/segmentos/confeitarias-e-alimentacao" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Confeitarias e Marmitas</Link></li>
+                                <li><Link href="/segmentos/lojas-de-roupas-e-calcados" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Lojas de Roupas e Calçados</Link></li>
                             </ul>
                         </div>
 
                         {/* Coluna 2: Ferramentas Gratuitas (Tool SEO) */}
                         <div>
                             <h4 className="text-sm font-medium text-white mb-6">Ferramentas Grátis</h4>
-                            <ul className="space-y-4">
+                            <ul className="space-y-3">
                                 <li><Link href="/ferramentas" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Todas as Calculadoras</Link></li>
                                 <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
                                 <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
@@ -78,7 +80,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                         {/* Coluna 3: Plataforma & Suporte */}
                         <div>
                             <h4 className="text-sm font-medium text-white mb-6">Plataforma & Ajuda</h4>
-                            <ul className="space-y-4">
+                            <ul className="space-y-3">
                                 <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar Cidades</Link></li>
                                 <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Começar Grátis (Loja)</Link></li>
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>

@@ -5,6 +5,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 
 export async function StorePage({ storeData }: { storeData: any }) {
     const partner = storeData.partners
@@ -113,18 +114,21 @@ export async function generateStoreMetadata(store: any, cidadeUf?: string): Prom
     const city = store.city || store.addresses?.[0]?.city || ""
     const state = store.state || store.addresses?.[0]?.state || ""
     const baseUrl = `https://dudit.com.br`
-    const path = cidadeUf ? `/${cidadeUf}/${store.slug}` : `/${store.slug}`
+    const standardStoreUrl = getStoreUrl(store)
+    const canonicalUrl = standardStoreUrl && standardStoreUrl !== "/"
+        ? `${baseUrl}${standardStoreUrl}`
+        : `${baseUrl}${cidadeUf ? `/${cidadeUf}/${store.slug}` : `/${store.slug}`}`
 
     return {
         title: `${storeName} | Dudit`,
         description: storeDescription || `Conheça ${storeName} na Dudit. Veja produtos, serviços e avaliações.`,
         alternates: {
-            canonical: `${baseUrl}${path}`,
+            canonical: canonicalUrl,
         },
         openGraph: {
             title: `${storeName}${city ? ` - ${city}` : ""} | Dudit`,
             description: storeDescription || `Conheça ${storeName} na Dudit.`,
-            url: `${baseUrl}${path}`,
+            url: canonicalUrl,
             type: "website",
             ...(store.logo_url || partner?.store_image_url
                 ? { images: [{ url: store.logo_url || partner?.store_image_url }] }

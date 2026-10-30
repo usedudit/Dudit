@@ -67,6 +67,8 @@ export interface Product {
   variant_min_price?: number
   variant_max_price?: number
   variant_total_stock?: number
+  variant_total_reserved?: number
+  variant_total_available?: number
   technical_specs?: any
   addon_groups?: ProductAddonGroup[] | null
   accepts_offers?: boolean | null

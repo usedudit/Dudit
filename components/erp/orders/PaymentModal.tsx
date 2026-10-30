@@ -718,6 +718,7 @@ const PaymentModal = ({
                             quantity: item.quantity,
                         })),
                         partnerId,
+                        paymentOrderId: orderId,
                         quoteOnly: true,
                     },
                 });
@@ -808,6 +809,7 @@ const PaymentModal = ({
                             quantity: item.quantity,
                         })),
                         partnerId,
+                        paymentOrderId: orderId,
                         quoteOnly: true,
                     },
                 });
@@ -894,6 +896,7 @@ const PaymentModal = ({
                             quantity: item.quantity,
                         })),
                         partnerId,
+                        paymentOrderId: orderId,
                         quoteOnly: true,
                     },
                 });
@@ -1333,6 +1336,7 @@ const PaymentModal = ({
                             quantity: item.quantity,
                         })),
                         partnerId,
+                        paymentOrderId: orderId,
                     },
                 });
             } catch (err: any) {

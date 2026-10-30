@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       }
       return NextResponse.json({ success: true, ...outcome.result })
     } finally {
-      await releaseExecutionLock(lock.lockKey)
+      await releaseExecutionLock(lock.lockKey, lock.lockToken)
     }
   }
 
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     try {
       await executeBackup()
     } finally {
-      await releaseExecutionLock(lock.lockKey)
+      await releaseExecutionLock(lock.lockKey, lock.lockToken)
     }
   })
 

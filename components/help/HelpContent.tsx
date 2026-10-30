@@ -205,8 +205,6 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         );
                     })()}
 
-
-
                     <Button
                         variant="filled"
                         className="ml-auto text-xs h-9 px-4"
@@ -240,8 +238,28 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 {renderMarkdown(article.content)}
             </article>
 
+            {/* Bloco de Conversão & Links Internos para Lojistas */}
+            <div className="my-14 p-6 sm:p-8 rounded-2xl bg-brand-gray/60 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                <div className="space-y-1 max-w-xl">
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                        Pronto para organizar seu negócio na prática?
+                    </h3>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                        Crie sua vitrine online, controle estoque, gerencie pedidos no PDV e venda com 0% de comissão na Dudit.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
+                    <Button asChild variant="default" className="w-full sm:w-auto">
+                        <Link href="/auth/login?mode=partner">Começar grátis</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                        <Link href="/institucional/planos">Ver planos</Link>
+                    </Button>
+                </div>
+            </div>
+
             {/* Footer Navigation */}
-            <div className="mt-20 pt-10 border-t border-brand-border dark:border-dark-border flex justify-between items-center gap-4">
+            <div className="mt-14 pt-10 border-t border-brand-border dark:border-dark-border flex justify-between items-center gap-4">
                 {prevArticle ? (
                     <Link
                         href={`/ajuda/${prevArticle.category}/${prevArticle.slug}`}

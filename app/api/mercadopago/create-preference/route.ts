@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { checkPartnerPermission, getCurrentUser, requireStorePermission } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
@@ -44,6 +44,7 @@ interface PreferenceRequest {
   buyerId?: string
   existingOrderId?: string
   orderId?: string
+  paymentOrderId?: string
   couponCode?: string | null
   deliveryFee?: number
   deliveryType?: "delivery" | "pickup"
@@ -99,6 +100,12 @@ async function handler(request: NextRequest) {
 
     const rawExistingOrderId = body.existingOrderId || body.orderId
     const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
+    if (body.paymentOrderId !== undefined && (typeof body.paymentOrderId !== "string" || !body.paymentOrderId.trim())) {
+      return NextResponse.json({ error: "Pedido inválido" }, { status: 400 })
+    }
+    if (body.paymentOrderId && existingOrderId && body.paymentOrderId !== existingOrderId) {
+      return NextResponse.json({ error: "Pedidos divergentes" }, { status: 400 })
+    }
     let existingOrder: any = null
     if (existingOrderId) {
       const { data: fetchedOrder, error: fetchError } = await adminClient
@@ -632,10 +639,33 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
 
+    const paymentOrderId = body.paymentOrderId || existingOrderId
+    if (paymentOrderId && !existingOrder) {
+      const { data: paymentOrder, error: paymentOrderError } = await adminClient
+        .from("orders")
+        .select("id, partner_id, store_id")
+        .eq("id", paymentOrderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+      if (paymentOrderError || !paymentOrder) {
+        return NextResponse.json({ error: "Pedido não encontrado para este parceiro" }, { status: 404 })
+      }
+
+      const { allowed: canEditOrders } = await checkPartnerPermission(partnerId, "orders", "edit")
+      if (!canEditOrders) {
+        return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+      }
+      if (paymentOrder.store_id) {
+        await requireStorePermission(paymentOrder.store_id, partnerId, "orders", "edit")
+      }
+    }
+
     const paymentQuote = issuePaymentQuote({
       userId: user.id,
       partnerId,
       maxAmount: cleanTotalAmount,
+      orderId: paymentOrderId,
     })
 
     if (body.quoteOnly) {
@@ -680,11 +710,16 @@ async function handler(request: NextRequest) {
     // Criar preferência no Mercado Pago
     const preferencePayload: Record<string, any> = {
       items: finalPreferenceItems,
+      metadata: {
+        dudit_partner_id: partnerId,
+        ...(paymentOrderId ? { dudit_order_id: paymentOrderId } : {}),
+        dudit_authorized_amount: cleanTotalAmount,
+      },
       payer: {
         name: "Cliente",
         email: user.email,
       },
-      external_reference: existingOrderId || `${partnerId}-${Date.now()}`,
+      external_reference: paymentOrderId || `${partnerId}-${Date.now()}`,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       back_urls: {
         success: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,

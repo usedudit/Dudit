@@ -1,9 +1,8 @@
 "use server"
 
 import { revalidateTag } from "next/cache"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { calculateCommission } from "@/lib/services/commission.service"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { getPeriodDateRange, getCompareDateRange } from "@/lib/period-types"
@@ -92,7 +91,7 @@ export async function getProductivityOverviewAction(
   compareFrom?: string,
   compareTo?: string
 ): Promise<{ success: boolean } & Partial<ProductivityOverview>> {
-  await requireUser()
+  await requirePermission(partnerId, "financial", "view")
 
   const admin = getAdminClient()
   const today = new Date().toISOString().slice(0, 10)
@@ -229,7 +228,7 @@ export async function getProductivityRankingAction(
   partnerId: string,
   period?: { startDate?: string; endDate?: string },
 ): Promise<{ success: boolean; ranking: ProductivityRankingRow[] }> {
-  await requireUser()
+  await requirePermission(partnerId, "financial", "view")
 
   const admin = getAdminClient()
   const now = new Date()
@@ -301,9 +300,17 @@ export async function getProductivityRankingAction(
     sellerCommissions.set(sid, money((sellerCommissions.get(sid) || 0) + Number(tx.amount || 0)))
   }
 
-  const { data: progressData } = await admin
-    .from("sales_goal_progress")
-    .select("user_id, current_amount, goal_id")
+  const { data: partnerGoals } = await admin
+    .from("sales_goals")
+    .select("id")
+    .eq("partner_id", partnerId)
+  const goalIds = (partnerGoals || []).map((goal: any) => goal.id)
+  const { data: progressData } = goalIds.length > 0
+    ? await admin
+      .from("sales_goal_progress")
+      .select("user_id, current_amount, goal_id")
+      .in("goal_id", goalIds)
+    : { data: [] as any[] }
 
   const sellerGoalMap = new Map<string, number>()
   for (const p of progressData || []) {
@@ -360,7 +367,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
   success: boolean
   overview: CommissionOverview | null
 }> {
-  await requireUser()
+  await requirePermission(partnerId, "financial", "view")
 
   const admin = getAdminClient()
   const now = new Date()
@@ -509,7 +516,7 @@ export async function getSellerCommissionHistoryAction(
   partnerId: string,
   sellerPartnerUserId: string,
 ): Promise<{ success: boolean; history: CommissionHistoryRow[] }> {
-  await requireUser()
+  await requirePermission(partnerId, "financial", "view")
 
   const admin = getAdminClient()
 
@@ -551,9 +558,8 @@ export async function recordCommissionPaymentAction(
   accountId?: string | null,
   category?: string | null,
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-  await requireUser()
+  const { userId } = await requirePermission(partnerId, "financial", "create")
 
-  const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()
 
   const { data: seller } = await admin
@@ -565,7 +571,7 @@ export async function recordCommissionPaymentAction(
 
   if (!seller) return { success: false, error: "Vendedor não encontrado" }
 
-  if (amount <= 0) return { success: false, error: "Valor inválido" }
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: "Valor inválido" }
 
   let resolvedAccountId = accountId
   if (!resolvedAccountId) {
@@ -574,6 +580,8 @@ export async function recordCommissionPaymentAction(
       .select("id")
       .eq("partner_id", partnerId)
       .eq("type", "cash")
+      .eq("is_active", true)
+      .is("store_id", null)
       .limit(1)
 
     if (accounts && accounts.length > 0) {
@@ -581,53 +589,29 @@ export async function recordCommissionPaymentAction(
     }
   }
 
-  const isBonus = category === "Metas e Bônus"
-  const description = isBonus ? "Pagamento de bônus de meta" : "Pagamento de comissão"
-  const paymentType = isBonus ? "Bônus meta" : "Comissão"
-  const notes = isBonus ? "Pagamento manual de bônus de meta." : "Pagamento manual de comissão."
-
-  const { data: profileRow } = await admin
-    .from("user_profiles")
-    .select("full_name")
-    .eq("user_id", seller.user_id)
-    .maybeSingle()
-  const employeeName = profileRow?.full_name || "Vendedor"
-
-  const now = new Date().toISOString()
-  const { data: txData, error: txError } = await admin
-    .from("transactions")
-    .insert({
-      partner_id: partnerId,
-      description,
-      category: category || "Comissões",
-      amount: money(amount),
-      original_amount: money(amount),
-      fee_amount: 0,
-      status: "paid",
-      payment_date: now,
-      transaction_date: now,
-      payment_type: paymentType,
-      transaction_type: "expense",
-      origin: "manual",
-      notes: `${notes} (${employeeName})`,
-      account_id: resolvedAccountId,
-      seller_partner_user_id: sellerPartnerUserId,
-      contact_id: null,
-      contact_type: "employee",
-    })
+  if (!resolvedAccountId) return { success: false, error: "Nenhuma conta financeira global ativa disponível." }
+  const { data: account } = await admin
+    .from("finance_accounts")
     .select("id")
-    .single()
+    .eq("id", resolvedAccountId)
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .is("store_id", null)
+    .maybeSingle()
+  if (!account) return { success: false, error: "Conta financeira inválida para este parceiro." }
 
-  if (txError || !txData) {
+  const validCategory = category === "Metas e Bônus" ? "Metas e Bônus" : "Comissões"
+  const { data: txData, error: txError } = await admin.rpc("create_commission_payment_atomic", {
+    p_partner_id: partnerId,
+    p_seller_partner_user_id: sellerPartnerUserId,
+    p_amount: money(amount),
+    p_account_id: resolvedAccountId,
+    p_category: validCategory,
+    p_user_id: userId,
+  })
+  if (txError || !txData?.id) {
     return { success: false, error: txError?.message || "Erro ao registrar pagamento" }
   }
-
-  try {
-    await admin.rpc("apply_account_balance_delta", {
-      p_account_id: resolvedAccountId,
-      p_delta: -money(amount),
-    })
-  } catch { }
 
   revalidateTag(`productivity_${partnerId}`, "max")
   return { success: true, transactionId: txData.id }
@@ -639,7 +623,7 @@ export async function payPendingBonusAction(
   amount: number,
   accountId?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
-  await requireUser()
+  await requirePermission(partnerId, "financial", "create")
 
   const admin = getAdminClient()
 
@@ -651,45 +635,7 @@ export async function payPendingBonusAction(
     .single()
 
   if (!seller) return { success: false, error: "Vendedor não encontrado" }
-  if (amount <= 0) return { success: false, error: "Valor inválido" }
-
-  const { data: pendingBonuses } = await admin
-    .from("transactions")
-    .select("id, amount")
-    .eq("partner_id", partnerId)
-    .eq("seller_partner_user_id", sellerPartnerUserId)
-    .eq("category", "Metas e Bônus")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-
-  if (!pendingBonuses || pendingBonuses.length === 0) {
-    return { success: false, error: "Nenhum bônus pendente encontrado." }
-  }
-
-  let remaining = money(amount)
-  const toUpdate: string[] = []
-
-  for (const b of pendingBonuses) {
-    if (remaining <= 0) break
-    const bAmt = money(Number(b.amount || 0))
-    if (bAmt <= 0) continue
-    toUpdate.push(b.id)
-    remaining = money(remaining - bAmt)
-  }
-
-  if (toUpdate.length === 0) {
-    return { success: false, error: "Nenhum bônus pendente encontrado." }
-  }
-
-  const remainingPaid = money(amount - Math.max(0, remaining))
-  const now = new Date().toISOString()
-
-  const { error: updateError } = await admin
-    .from("transactions")
-    .update({ status: "paid", payment_date: now })
-    .in("id", toUpdate)
-
-  if (updateError) return { success: false, error: updateError.message }
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: "Valor inválido" }
 
   let resolvedAccountId = accountId
   if (!resolvedAccountId) {
@@ -698,18 +644,33 @@ export async function payPendingBonusAction(
       .select("id")
       .eq("partner_id", partnerId)
       .eq("type", "cash")
+      .eq("is_active", true)
+      .is("store_id", null)
       .limit(1)
     if (accounts && accounts.length > 0) {
       resolvedAccountId = accounts[0].id
     }
   }
 
-  try {
-    await admin.rpc("apply_account_balance_delta", {
-      p_account_id: resolvedAccountId,
-      p_delta: -remainingPaid,
-    })
-  } catch { }
+  if (!resolvedAccountId) return { success: false, error: "Nenhuma conta financeira global ativa disponível." }
+  const { data: payoutAccount } = await admin
+    .from("finance_accounts")
+    .select("id")
+    .eq("id", resolvedAccountId)
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .is("store_id", null)
+    .maybeSingle()
+  if (!payoutAccount) return { success: false, error: "Conta financeira inválida para este parceiro." }
+
+  const { data, error } = await admin.rpc("pay_seller_bonus_atomic", {
+    p_partner_id: partnerId,
+    p_seller_partner_user_id: sellerPartnerUserId,
+    p_requested_amount: money(amount),
+    p_account_id: resolvedAccountId,
+  })
+  if (error) return { success: false, error: error.message || "Erro ao pagar bônus." }
+  if (!data?.success) return { success: false, error: "Nenhum bônus integralmente coberto pelo valor informado." }
 
   revalidateTag(`productivity_${partnerId}`, "max")
   return { success: true }
