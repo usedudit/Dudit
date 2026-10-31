@@ -41,6 +41,8 @@ vi.mock("@/lib/billing/subscription-period", () => ({
 vi.mock("@/lib/services/mercadopago/subscriptions", () => ({
   createMpSubscription: vi.fn(),
   cancelMpSubscription: vi.fn(),
+  cancelPendingPlanChangeAttempts: vi.fn(),
+  ensurePendingInvoiceForCheckout: vi.fn().mockResolvedValue(undefined),
   updateMpSubscription: vi.fn(),
   getMpSubscriptionStatus: vi.fn(),
 }))
@@ -170,6 +172,107 @@ describe("getSubscriptionStatusAction — pending subscription", () => {
   })
 })
 
+describe("getSubscriptionStatusAction — pending plan change", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    // Effective plan stays the current paid one until the change is paid.
+    vi.mocked(getPartnerPlan).mockResolvedValue({
+      id: "plan-crescer",
+      name: "Crescer",
+      slug: "crescer",
+      price: 19.9,
+      limits_json: {},
+      features_json: ["mercado_pago_checkout"],
+      is_active: true,
+      sort_order: 1,
+    } as any)
+
+    vi.mocked(getPartnerSubscription).mockResolvedValue({
+      id: "sub-active",
+      status: "active",
+      billing_email: "partner@example.com",
+      current_period_start: "2026-10-30T03:00:00.000Z",
+      current_period_end: "2026-11-30T03:00:00.000Z",
+      cancel_at_period_end: false,
+      pending_plan_id: null,
+      trial_end: null,
+      payment_provider: "mercado_pago",
+      mercado_pago_subscription_id: null,
+      plan: { id: "plan-crescer", name: "Crescer", slug: "crescer", price: 19.9 },
+    } as any)
+
+    vi.mocked(getUsageCounters).mockResolvedValue({} as any)
+    vi.mocked(computeSubscriptionPeriods).mockReturnValue({
+      periodStart: new Date("2026-10-30T03:00:00.000Z"),
+      periodEnd: new Date("2026-11-30T03:00:00.000Z"),
+      nextStart: new Date("2026-11-30T03:00:00.000Z"),
+      nextEnd: new Date("2026-12-30T03:00:00.000Z"),
+    })
+  })
+
+  it("surfaces the latest unfinished upgrade as pending_change without touching the active plan", async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: "sub-pending",
+          plan_id: "plan-escalar",
+          status: "pending",
+          created_at: "2026-10-31T12:00:00.000Z",
+          billing_email: "partner@example.com",
+          mercado_pago_subscription_id: null,
+          plan: { id: "plan-escalar", name: "Escalar", slug: "escalar", price: 49.9 },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "purchase-pending",
+          status: "pending",
+          billing_period_start: "2026-10-31T03:00:00.000Z",
+          billing_period_end: "2026-11-30T03:00:00.000Z",
+          total_amount: 49.9,
+          invoice_id: "invoice-pending",
+          billing_invoices: [
+            { id: "invoice-pending", invoice_number: "INV-2026-000042", status: "issued" },
+          ],
+        },
+        error: null,
+      })
+
+    const res: any = await getSubscriptionStatusAction()
+
+    expect(res.success).toBe(true)
+    expect(res.data.subscription.status).toBe("active")
+    expect(res.data.pending_change).not.toBeNull()
+    expect(res.data.pending_change.plan_name).toBe("Escalar")
+    expect(res.data.pending_change.amount).toBe(49.9)
+    expect(res.data.pending_change.status).toBe("pending")
+    expect(res.data.pending_change.invoice.invoice_number).toBe("INV-2026-000042")
+    expect(res.data.pending_change.invoice.amount).toBe(49.9)
+  })
+
+  it("never reports a free plan as a pending payment", async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "sub-pending-free",
+        plan_id: "plan-free",
+        status: "pending",
+        created_at: "2026-10-31T12:00:00.000Z",
+        billing_email: "partner@example.com",
+        mercado_pago_subscription_id: null,
+        plan: { id: "plan-free", name: "Começar", slug: "free", price: 0 },
+      },
+      error: null,
+    })
+
+    const res: any = await getSubscriptionStatusAction()
+
+    expect(res.success).toBe(true)
+    expect(res.data.pending_change).toBeNull()
+  })
+})
+
 describe("getSubscriptionPaymentUrlAction", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -227,6 +330,24 @@ describe("getSubscriptionPaymentUrlAction", () => {
         id: "sub-1",
         status: "active",
         cancel_at_period_end: true,
+        mercado_pago_subscription_id: "preapproval-123",
+      },
+      error: null,
+    })
+
+    const res: any = await getSubscriptionPaymentUrlAction("sub-1")
+
+    expect(res.success).toBe(true)
+    expect(res.data.payment_url).toBeNull()
+  })
+
+  it("returns null payment_url for a cancelled plan-change attempt", async () => {
+    vi.mocked(getMpSubscriptionStatus).mockResolvedValue({ status: "cancelled", init_point: "https://mp.test/x" } as any)
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        id: "sub-1",
+        status: "cancelled",
+        cancel_at_period_end: false,
         mercado_pago_subscription_id: "preapproval-123",
       },
       error: null,

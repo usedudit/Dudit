@@ -149,52 +149,33 @@ export async function createMpSubscription(
 ): Promise<CreateSubscriptionResult> {
   const admin = getAdminClient()
 
-  // ── Race condition guard ──
-  // Skip the existing-subscription check when called from the upgrade flow
-  // (updateMpSubscription), since the old subscription was just canceled.
-  const existing = options?.skipExistingCheck ? null : await getPartnerSubscription(partnerId)
-  if (existing) {
-    if (["active", "trialing", "past_due"].includes(existing.status)) {
-      return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
-    }
-
-    // If there's a stale "pending" subscription (checkout never completed),
-    // cancel it so the user can start a fresh checkout.
-    if (existing.status === "pending") {
-      SecureLogger.info("Cancelling stale pending subscription to allow new checkout", {
-        partnerId,
-        oldSubscriptionId: existing.id,
-        oldMpId: existing.mercado_pago_subscription_id,
-      })
-
-      const { error: cancelError } = await admin
-        .from("subscriptions")
-        .update({
-          status: "cancelled",
-          cancelled_at: new Date().toISOString(),
-          ended_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id)
-
-      if (cancelError) {
-        SecureLogger.error("Failed to cancel stale pending subscription", {
-          error: cancelError.message,
-          subscriptionId: existing.id,
-        })
-        return { success: false, error: "Erro ao limpar assinatura pendente. Tente novamente." }
-      }
-
-      await logBillingEvent(admin, partnerId, "stale_pending_replaced", null, {
-        cancelled_subscription_id: existing.id,
-        reason: "User initiated new checkout",
-      })
-    }
-  }
-
   // ── Get plan ──
   const plan = await getPlanById(planId)
   if (!plan || !plan.is_active) {
     return { success: false, error: "Plano não encontrado ou inativo" }
+  }
+
+  // ── Supersede previous unfinished plan-change attempts ──
+  // A new checkout replaces the old pending attempt so the partner never
+  // accumulates pending subscriptions/invoices. The currently paid plan is
+  // never touched here.
+  await cancelPendingPlanChangeAttempts(partnerId)
+
+  // ── Race condition guard ──
+  // Skip the existing-subscription check when called from the upgrade flow
+  // (updateMpSubscription), since the current subscription must stay active
+  // until the new preapproval is paid.
+  const existing = options?.skipExistingCheck ? null : await getPartnerSubscription(partnerId)
+  if (existing) {
+    const existingPrice = Number((existing as any).plan?.price || 0)
+    // A free subscription is just the fallback plan: it must not block a new
+    // paid checkout. Only an already-paid contract blocks another one.
+    if (
+      ["active", "trialing", "past_due"].includes(existing.status) &&
+      existingPrice > 0
+    ) {
+      return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
+    }
   }
 
   // Free plan doesn't need MP subscription
@@ -232,7 +213,10 @@ export async function createMpSubscription(
 
     // Sync free plan to billing
     try {
-      const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+      const { syncSubscriptionToBilling, supersedeOtherSubscriptions } = await import("@/lib/billing/sync-subscription")
+      // A free row inserted while another live row exists would leave the
+      // partner with two plans; the new one is the effective contract.
+      await supersedeOtherSubscriptions(partnerId, sub.id)
       await syncSubscriptionToBilling(sub.id, "webhook")
       console.log(`[Subscriptions] Billing synced for free subscription ${sub.id}`)
     } catch (syncErr: any) {
@@ -323,6 +307,11 @@ export async function createMpSubscription(
         mp_subscription_id: mpData.id,
       },
     })
+
+    // Always materialize the invoice of this checkout attempt, even while it
+    // is still pending. This is what makes an abandoned plan change visible
+    // (and payable) in the billing history instead of disappearing.
+    await ensurePendingInvoiceForCheckout(sub.id, mpData.init_point)
 
     return {
       success: true,
@@ -586,12 +575,11 @@ export async function updateMpSubscription(
   const isUpgrade = planTierIndex(newPlan.slug) > planTierIndex(currentPlan.slug)
 
   if (isUpgrade) {
-    // ── UPGRADE: Cancel current + create new immediately ──
-    const cancelResult = await cancelMpSubscription(currentSub.id, actorUserId, undefined, { immediate: true })
-    if (!cancelResult.success) {
-      return { success: false, type: "upgrade", error: cancelResult.error }
-    }
-
+    // ── UPGRADE: keep the current contract until the new plan is paid ──
+    // Cancelling the old subscription here was the bug: abandoning the MP
+    // checkout left the partner with no plan at all. The new preapproval is
+    // created as a pending attempt; a paid webhook promotes it and only then
+    // the previous subscription is superseded.
     const billingEmail = currentSub.billing_email || ""
     const createResult = await createMpSubscription(partnerId, newPlanId, billingEmail, actorUserId, { skipExistingCheck: true })
 
@@ -606,6 +594,7 @@ export async function updateMpSubscription(
       metadata: {
         from_plan: currentPlan.slug,
         to_plan: newPlan.slug,
+        status: "pending_payment",
       },
     })
 
@@ -613,10 +602,13 @@ export async function updateMpSubscription(
       success: true,
       type: "upgrade",
       initPoint: createResult.initPoint,
-      message: "Plano atualizado com sucesso",
+      message: "Conclua o pagamento para ativar o novo plano. Seu plano atual continua ativo até lá.",
     }
   } else {
     // ── DOWNGRADE: Schedule for next billing cycle ──
+    // Choosing a new plan supersedes any unfinished plan-change checkout.
+    await cancelPendingPlanChangeAttempts(partnerId)
+
     const { error } = await admin
       .from("subscriptions")
       .update({
@@ -686,6 +678,116 @@ export async function getMpSubscriptionStatus(
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Cancel unfinished plan-change checkouts (status "pending") for a partner.
+ *
+ * Only the latest attempt should be visible as pending. When the partner starts
+ * a new checkout, older attempts are cancelled together with their open
+ * purchases/invoices — the paid subscription is never touched.
+ */
+export async function cancelPendingPlanChangeAttempts(partnerId: string): Promise<void> {
+  const admin = getAdminClient()
+
+  const { data: pendingSubs } = await admin
+    .from("subscriptions")
+    .select("id, status, mercado_pago_subscription_id")
+    .eq("partner_id", partnerId)
+    .eq("status", "pending")
+
+  if (!pendingSubs || pendingSubs.length === 0) return
+
+  const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+
+  for (const pending of pendingSubs as any[]) {
+    // Never discard an attempt the partner already paid: a webhook may be in
+    // flight and the normal activation path must settle it.
+    if (await hasApprovedPaymentForSubscription(pending.id)) {
+      SecureLogger.info("Keeping paid plan-change attempt instead of cancelling", {
+        subscriptionId: pending.id,
+        partnerId,
+      })
+      continue
+    }
+
+    // Stop the abandoned preapproval so it can never charge later.
+    if (pending.mercado_pago_subscription_id) {
+      try {
+        await cancelMpPreapproval(pending.mercado_pago_subscription_id)
+      } catch (err: any) {
+        SecureLogger.warn("Failed to cancel stale pending preapproval", {
+          subscriptionId: pending.id,
+          error: err?.message,
+        })
+      }
+    }
+
+    await syncSubscriptionToBilling(pending.id, "manual", {
+      status: "cancelled",
+      previousStatus: "pending",
+      cancellationReason: "user",
+      notify: false,
+    })
+  }
+}
+
+/**
+ * Whether a subscription already has an approved payment on any of its cycles.
+ * Used to avoid cancelling a checkout attempt that was paid a moment ago.
+ */
+async function hasApprovedPaymentForSubscription(subscriptionId: string): Promise<boolean> {
+  const admin = getAdminClient()
+
+  const { data: purchases } = await admin
+    .from("billing_purchases")
+    .select("id")
+    .eq("subscription_id", subscriptionId)
+
+  const purchaseIds = (purchases || []).map((p: any) => p.id).filter(Boolean)
+  if (purchaseIds.length === 0) return false
+
+  const { data: approved } = await admin
+    .from("billing_payments")
+    .select("id")
+    .in("purchase_id", purchaseIds)
+    .eq("status", "approved")
+    .limit(1)
+
+  return Boolean(approved && approved.length > 0)
+}
+
+/**
+ * Create the pending purchase + payment + invoice for a checkout attempt.
+ *
+ * The invoice exists before the money moves so the billing history and the
+ * subscription page can show the attempt as pending and offer a pay action.
+ * When Mercado Pago confirms the charge, the normal billing sync reuses this
+ * same purchase (same cycle) and flips it to completed.
+ */
+export async function ensurePendingInvoiceForCheckout(
+  subscriptionId: string,
+  initPoint?: string | null,
+): Promise<void> {
+  try {
+    const { recordSubscriptionCharge } = await import("@/lib/billing/record-charge")
+    await recordSubscriptionCharge({
+      subscriptionId,
+      context: "manual",
+      charge: {
+        status: "pending",
+        gatewayStatus: "pending_checkout",
+        method: null,
+        checkoutUrl: initPoint || null,
+        details: { source: "plan_change_checkout" },
+      },
+    })
+  } catch (err: any) {
+    SecureLogger.error("Failed to create pending invoice for checkout", {
+      subscriptionId,
+      error: err?.message,
+    })
+  }
+}
 
 async function logBillingEvent(
   admin: any,

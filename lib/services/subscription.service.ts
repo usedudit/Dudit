@@ -279,25 +279,64 @@ export const getPartnerSubscriptionBannerInfo = cache(
     const admin = getAdminClient()
     const { data, error } = await admin
       .from("subscriptions")
-      .select("status, past_due_at, trial_end, plan_snapshot, plan:plans!plan_id(name)")
+      .select("status, past_due_at, trial_end, plan_snapshot, created_at, plan:plans!plan_id(name)")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .limit(20)
 
-    if (error || !data) return null
+    if (error) return null
+
+    const rows = (data || []) as any[]
+    if (rows.length === 0) return null
+
+    // Prefer the subscription that actually grants access. A newer "pending"
+    // row is usually an unfinished plan-change checkout and must not hide the
+    // paid plan the partner still has (nor make the UI claim the free plan is
+    // awaiting payment).
+    const selected =
+      [...rows].sort(
+        (a, b) =>
+          subscriptionStatusPriority(a.status) - subscriptionStatusPriority(b.status) ||
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0] || null
+
+    if (!selected) return null
 
     return {
-      status: String(data.status),
-      past_due_at: (data as any).past_due_at || null,
-      trial_end: (data as any).trial_end || null,
+      status: String(selected.status),
+      past_due_at: selected.past_due_at || null,
+      trial_end: selected.trial_end || null,
       plan_name:
-        (data as any).plan?.name ||
-        ((data as any).plan_snapshot as any)?.name ||
+        selected.plan?.name ||
+        (selected.plan_snapshot as any)?.name ||
         null,
     }
   },
 )
+
+/**
+ * Order used when a partner has more than one live subscription row.
+ * Lower is more authoritative: the paid contract wins over an unfinished
+ * checkout, and a cancelled row is only used when nothing else exists.
+ */
+function subscriptionStatusPriority(status: string | null | undefined): number {
+  switch (status) {
+    case "active":
+    case "trialing":
+      return 0
+    case "past_due":
+      return 1
+    case "pending":
+      return 2
+    case "paused":
+      return 3
+    case "cancelled":
+    case "refunded":
+      return 4
+    default:
+      return 5
+  }
+}
 
 /**
  * Get the non-cancelled subscription for a partner, or null.
@@ -314,21 +353,32 @@ export const getPartnerSubscription = cache(async (partnerId: string): Promise<S
     .eq("partner_id", partnerId)
     .in("status", ["active", "trialing", "past_due", "pending"])
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (error) {
     console.error("[SUBSCRIPTION] Error fetching subscription:", error.message)
     return null
   }
 
-  if (!data) return null
+  const rows = (data || []) as any[]
+  if (rows.length === 0) return null
+
+  // A plan-change checkout creates a new "pending" row while the current paid
+  // subscription stays active. Always resolve the row that actually grants
+  // access, otherwise the pending attempt would shadow the paid plan.
+  const selected =
+    [...rows].sort(
+      (a, b) =>
+        subscriptionStatusPriority(a.status) - subscriptionStatusPriority(b.status) ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )[0] || null
+
+  if (!selected) return null
 
   // Check if active subscription scheduled to cancel has already expired:
   if (
-    data.cancel_at_period_end &&
-    data.current_period_end &&
-    new Date(data.current_period_end).getTime() <= Date.now()
+    selected.cancel_at_period_end &&
+    selected.current_period_end &&
+    new Date(selected.current_period_end).getTime() <= Date.now()
   ) {
     const nowIso = new Date().toISOString()
     await admin
@@ -339,7 +389,7 @@ export const getPartnerSubscription = cache(async (partnerId: string): Promise<S
         cancel_at_period_end: false,
         updated_at: nowIso,
       })
-      .eq("id", data.id)
+      .eq("id", selected.id)
 
     try {
       const { enforcePlanLimitsAndArchiveExcess } = await import(
@@ -355,8 +405,8 @@ export const getPartnerSubscription = cache(async (partnerId: string): Promise<S
   }
 
   return {
-    ...data,
-    plan: data.plan as Plan,
+    ...selected,
+    plan: selected.plan as Plan,
   } as SubscriptionWithPlan
 })
 

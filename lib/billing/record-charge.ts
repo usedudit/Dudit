@@ -409,10 +409,27 @@ export async function recordSubscriptionCharge(input: RecordChargeInput): Promis
     existingPaymentQuery = existingPaymentQuery.eq("gateway_payment_id", input.charge.gatewayPaymentId)
   }
 
-  const { data: existingPayment } = await existingPaymentQuery
+  const { data: foundPayment } = await existingPaymentQuery
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  // A checkout attempt creates a placeholder payment (no gateway id yet). When
+  // the real charge arrives, reuse that row instead of leaving a duplicate
+  // "pending" payment next to the settled one.
+  let existingPayment = foundPayment
+  if (!existingPayment && input.charge.gatewayPaymentId) {
+    const { data: placeholder } = await admin
+      .from("billing_payments")
+      .select("*")
+      .eq("purchase_id", purchase.id)
+      .is("gateway_payment_id", null)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    existingPayment = placeholder || null
+  }
 
   // Never "unpay" an approved payment because an older/duplicated event arrived
   // out of order. Only refunds, chargebacks and cancellations may override it.

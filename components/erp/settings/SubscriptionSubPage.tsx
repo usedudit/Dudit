@@ -319,6 +319,26 @@ interface SubscriptionData {
         amount: number
         status: string | null
     } | null
+    pending_change?: {
+        subscription_id: string
+        plan_id: string
+        plan_name: string
+        plan_slug: string
+        amount: number
+        status: string
+        payment_url: string | null
+        created_at: string | null
+        invoice: {
+            purchase_id: string | null
+            invoice_id: string | null
+            invoice_number: string | null
+            due_date: string | null
+            period_start: string | null
+            period_end: string | null
+            amount: number
+            status: string | null
+        } | null
+    } | null
     usage: Record<string, number>
     partner_id?: string
 }
@@ -698,9 +718,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         }
     }, [stopPaymentPolling])
 
-    const handleGenerateManualPayment = async () => {
-        if (!subData?.subscription?.id) return
-
+    const generateManualPayment = async (targetSubscriptionId: string) => {
         setManualPaymentModal((prev) => ({
             ...prev,
             loading: true,
@@ -708,7 +726,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         }))
 
         try {
-            const response = await fetch(`/api/billing/subscriptions/${subData.subscription.id}/manual-payment`, {
+            const response = await fetch(`/api/billing/subscriptions/${targetSubscriptionId}/manual-payment`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
             })
@@ -745,6 +763,21 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         }
     }
 
+    // Past-due / active plan flows: pay the subscription the partner has today.
+    const handleGenerateManualPayment = async () => {
+        const targetSubscriptionId = subData?.subscription?.id
+        if (!targetSubscriptionId) return
+        await generateManualPayment(targetSubscriptionId)
+    }
+
+    // Pending plan-change flows: pay the attempt's own subscription row.
+    const handleGeneratePendingManualPayment = async () => {
+        const targetSubscriptionId =
+            subData?.pending_change?.subscription_id || subData?.subscription?.id
+        if (!targetSubscriptionId) return
+        await generateManualPayment(targetSubscriptionId)
+    }
+
     const handleVerifyManualPayment = async () => {
         if (!manualPaymentModal.paymentId) return
         setIsVerifyingManualPayment(true)
@@ -770,15 +803,17 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     }
 
     const handlePayPending = () => {
-        // Prefer resuming the Mercado Pago preapproval checkout when we have a
-        // link; otherwise fall back to a manual PIX charge.
-        const paymentUrl = subData?.subscription?.payment_url
+        // Prefer resuming the Mercado Pago preapproval checkout of the pending
+        // plan change; fall back to the current subscription link, then to a
+        // manual PIX charge.
+        const paymentUrl = subData?.pending_change?.payment_url
+            || subData?.subscription?.payment_url
         if (paymentUrl) {
             toast.info("Redirecionando para o pagamento...")
             window.location.href = paymentUrl
             return
         }
-        handleGenerateManualPayment()
+        handleGeneratePendingManualPayment()
     }
 
     // ─── Render ────────────────────────────────────────────────────────────
@@ -806,17 +841,36 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     )
 
     const nextInvoice = subData?.next_invoice ?? null
-    const isPendingPayment = subData?.subscription?.status === "pending"
-    const hasPendingInvoice = isPendingPayment && !!nextInvoice
-    // The "next invoice" card should also render for a pending subscription
-    // that already has an open invoice (waiting for payment).
-    const hasBillingInfo = hasActivePaidSub || hasPendingInvoice
+    // A pending plan-change attempt is always a *paid* plan waiting for
+    // payment (the free plan never creates one). Never derive this from the
+    // effective subscription status, otherwise the free fallback would be
+    // shown as "pagamento pendente".
+    const pendingChange = subData?.pending_change ?? null
+    const pendingInvoice = pendingChange?.invoice ?? null
+    const isPendingPayment = Boolean(pendingChange)
+    const hasBillingInfo = hasActivePaidSub || isPendingPayment
     const nextInvoiceDate = (!isScheduledToCancel && !isPeriodExpired)
         ? (nextInvoice?.due_date
             ?? subData?.subscription?.next_payment_date
             ?? subData?.subscription?.current_period_end
             ?? (subData?.subscription?.status === "trialing" ? subData.subscription.trial_end : null))
         : null
+    const pendingInvoiceDate = pendingInvoice?.due_date
+        ?? pendingChange?.created_at
+        ?? null
+    const shownInvoiceStatus = isPendingPayment
+        ? (pendingInvoice?.status ?? "pending")
+        : nextInvoice?.status
+    const shownInvoiceNumber = isPendingPayment
+        ? (pendingInvoice?.invoice_number || "A gerar")
+        : (nextInvoice?.invoice_number || "A gerar")
+    const shownPlanName = isPendingPayment && pendingChange
+        ? pendingChange.plan_name
+        : (subData?.plan?.name ?? "")
+    const shownDueDate = isPendingPayment ? pendingInvoiceDate : nextInvoiceDate
+    const shownAmount = isPendingPayment
+        ? (pendingInvoice?.amount ?? pendingChange?.amount ?? 0)
+        : (nextInvoice?.amount ?? currentPlanPrice)
 
     const accessUntilDate = (isScheduledToCancel || isPeriodExpired)
         ? subData?.subscription?.current_period_end
@@ -907,9 +961,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-bold">Assinatura aguardando pagamento</p>
                                     <p className="text-xs opacity-90">
-                                        {nextInvoice
-                                            ? `Fatura ${nextInvoice.invoice_number ?? ""} de ${formatCurrency(nextInvoice.amount)}${nextInvoice.due_date ? ` com vencimento em ${formatDate(nextInvoice.due_date)}` : ""}. O acesso é liberado após a confirmação do pagamento.`
-                                            : `O pagamento do plano ${subData?.plan?.name ?? ""} ainda não foi confirmado.`}
+                                        {pendingChange
+                                            ? `Plano ${pendingChange.plan_name}${pendingChange.amount > 0 ? ` — ${formatCurrency(pendingChange.amount)}` : ""}${pendingInvoiceDate ? `, vencimento em ${formatDate(pendingInvoiceDate)}` : ""}. Seu plano atual continua ativo até a confirmação do pagamento.`
+                                            : "O pagamento da troca de plano ainda não foi confirmado."}
                                     </p>
                                 </div>
                                 <Button
@@ -1046,9 +1100,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <Badge variant="gray">
                                                 Sem cobranças
                                             </Badge>
-                                        ) : nextInvoiceStatusLabel(nextInvoice?.status) ? (
-                                            <Badge variant={nextInvoiceStatusVariant(nextInvoice?.status)}>
-                                                {nextInvoiceStatusLabel(nextInvoice?.status)}
+                                        ) : nextInvoiceStatusLabel(shownInvoiceStatus) ? (
+                                            <Badge variant={nextInvoiceStatusVariant(shownInvoiceStatus)}>
+                                                {nextInvoiceStatusLabel(shownInvoiceStatus)}
                                             </Badge>
                                         ) : null}
                                     </div>
@@ -1057,7 +1111,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         {subData ? (
                                             (!hasBillingInfo || isScheduledToCancel)
                                                 ? "R$ 0,00"
-                                                : formatCurrency(nextInvoice?.amount ?? currentPlanPrice)
+                                                : formatCurrency(shownAmount)
                                         ) : "..."}
                                     </h2>
                                 </div>
@@ -1114,25 +1168,25 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {nextInvoice?.invoice_number || "A gerar"}
+                                                    {shownInvoiceNumber}
                                                 </span>
                                             </div>
 
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {subData ? `Plano ${getHardcodedPlan(subData.plan.slug).name}` : "-"}
+                                                    {subData ? `Plano ${shownPlanName}` : "-"}
                                                 </span>
                                             </div>
 
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {nextInvoiceDate ? formatDate(nextInvoiceDate) : "-"}
+                                                    {shownDueDate ? formatDate(shownDueDate) : "-"}
                                                 </span>
                                             </div>
 
-                                            {isPendingPayment && nextInvoice && (
+                                            {isPendingPayment && (
                                                 <div className="pt-3">
                                                     <Button
                                                         variant="link"

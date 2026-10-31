@@ -130,6 +130,67 @@ async function notifyTransition(params: {
 }
 
 /**
+ * Cancel every other live subscription of a partner after `keepSubscriptionId`
+ * becomes active.
+ *
+ * A plan-change upgrade creates a pending subscription while the current paid
+ * one stays active. When Mercado Pago confirms the new plan, the old contract
+ * must end — otherwise two preapprovals could keep charging and the partner
+ * would see two plans. The keep row is never touched.
+ */
+export async function supersedeOtherSubscriptions(
+  partnerId: string,
+  keepSubscriptionId: string,
+): Promise<void> {
+  const supabase = getAdminClient()
+
+  const { data: others, error } = await supabase
+    .from("subscriptions")
+    .select("id, status, mercado_pago_subscription_id")
+    .eq("partner_id", partnerId)
+    .neq("id", keepSubscriptionId)
+    .in("status", ["active", "trialing", "past_due", "pending"])
+
+  if (error || !others || others.length === 0) return
+
+  const { cancelMpPreapproval } = await import("@/lib/services/mercadopago/subscriptions")
+
+  for (const other of others as any[]) {
+    // Stop the old recurring charge first; the local row is closed right after.
+    if (other.mercado_pago_subscription_id) {
+      try {
+        await cancelMpPreapproval(other.mercado_pago_subscription_id)
+      } catch (err: any) {
+        console.error(
+          `[BillingSync] Failed to cancel superseded preapproval ${other.mercado_pago_subscription_id}:`,
+          err?.message,
+        )
+      }
+    }
+
+    const nowIso = new Date().toISOString()
+    await supabase
+      .from("subscriptions")
+      .update({
+        status: "cancelled",
+        cancelled_at: nowIso,
+        ended_at: nowIso,
+        cancel_at_period_end: false,
+        pending_plan_id: null,
+        updated_at: nowIso,
+      })
+      .eq("id", other.id)
+
+    await syncSubscriptionToBilling(other.id, "reconciliation", {
+      status: "cancelled",
+      previousStatus: other.status,
+      cancellationReason: "user",
+      notify: false,
+    })
+  }
+}
+
+/**
  * Apply a subscription status change and sync its billing state.
  *
  * `options.charge` records a new charge for a cycle (creating the purchase,
@@ -233,6 +294,16 @@ export async function syncSubscriptionToBilling(
   if (subError || !sub) {
     console.error(`[BillingSync] Subscription ${subscriptionId} not found after update:`, subError?.message)
     return { purchaseId: null, created: false }
+  }
+
+  // A freshly paid subscription replaces any other live contract for the same
+  // partner (plan-change upgrade). Without this the previous preapproval would
+  // keep charging and two plans would remain active.
+  if (
+    ["active", "trialing"].includes(String(sub.status)) &&
+    !["active", "trialing"].includes(String(previousStatus))
+  ) {
+    await supersedeOtherSubscriptions(sub.partner_id, sub.id)
   }
 
   const periods = computeSubscriptionPeriods(sub)

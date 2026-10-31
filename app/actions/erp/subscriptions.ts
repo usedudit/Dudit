@@ -16,8 +16,10 @@ import {
 import {
   createMpSubscription,
   cancelMpSubscription,
+  cancelPendingPlanChangeAttempts,
   updateMpSubscription,
   getMpSubscriptionStatus,
+  ensurePendingInvoiceForCheckout,
 } from "@/lib/services/mercadopago/subscriptions"
 import { computeSubscriptionPeriods } from "@/lib/billing/subscription-period"
 import { SUBSCRIPTION_MESSAGES } from "@/lib/constants/messages"
@@ -80,9 +82,12 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       try {
         const mpStatus = await getMpSubscriptionStatus(subscription.mercado_pago_subscription_id)
         subscriptionPayload.mp_status = mpStatus?.status ?? null
-        // Expose the preapproval checkout link so an abandoned pending
-        // subscription can be paid again from the subscription page.
-        const initPoint = typeof mpStatus?.init_point === "string" ? mpStatus.init_point : null
+        // Expose the preapproval checkout link only for an unfinished checkout;
+        // an active contract has nothing left to pay on that link.
+        const initPoint =
+          subscription.status === "pending" && typeof mpStatus?.init_point === "string"
+            ? mpStatus.init_point
+            : null
         subscriptionPayload.payment_url = initPoint
       } catch {
         // Non-critical: fall back to the local state.
@@ -160,6 +165,95 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       }
     }
 
+    // ── Pending plan-change attempt ──
+    // An upgrade/downgrade checkout creates a pending subscription while the
+    // current paid one stays active. Surface the latest attempt separately so
+    // the UI can show "aguardando pagamento" without pretending the current
+    // plan (or the free plan) is the one that wasn't paid.
+    let pendingChange: any = null
+    try {
+      const admin = getAdminClient()
+      const { data: pendingSub } = await admin
+        .from("subscriptions")
+        .select(
+          "id, plan_id, status, created_at, billing_email, mercado_pago_subscription_id, plan:plans!plan_id(id, name, slug, price)",
+        )
+        .eq("partner_id", partner.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const pendingPlan = (pendingSub as any)?.plan
+      const pendingPrice = Number(pendingPlan?.price || 0)
+
+      if (pendingSub && pendingPrice > 0 && pendingPlan?.slug !== "free") {
+        const loadPendingPurchase = () =>
+          admin
+            .from("billing_purchases")
+            .select("*, billing_invoices(*)")
+            .eq("subscription_id", pendingSub.id)
+            .in("status", ["pending", "failed"])
+            .order("billing_period_start", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        let { data: pendingPurchase } = await loadPendingPurchase()
+
+        // Legacy attempts created before the invoice invariant may have no
+        // purchase. Materialize it lazily so the latest unfinished plan change
+        // is always visible and payable in the billing history.
+        if (!pendingPurchase) {
+          await ensurePendingInvoiceForCheckout(pendingSub.id, null)
+          const retry = await loadPendingPurchase()
+          pendingPurchase = retry.data
+        }
+
+        const pendingInvoice = (pendingPurchase as any)?.billing_invoices?.[0] || null
+        const dueDate =
+          pendingPurchase?.billing_period_start || (pendingSub as any).created_at || null
+
+        let pendingPaymentUrl: string | null = null
+        if (pendingSub.mercado_pago_subscription_id) {
+          try {
+            const mpStatus = await getMpSubscriptionStatus(
+              pendingSub.mercado_pago_subscription_id,
+            )
+            if (typeof mpStatus?.init_point === "string") {
+              pendingPaymentUrl = mpStatus.init_point
+            }
+          } catch {
+            // Non-critical: the UI falls back to the manual PIX flow.
+          }
+        }
+
+        pendingChange = {
+          subscription_id: pendingSub.id,
+          plan_id: pendingSub.plan_id,
+          plan_name: pendingPlan.name,
+          plan_slug: pendingPlan.slug,
+          amount: Number(pendingPurchase?.total_amount ?? pendingPrice),
+          status: pendingPurchase?.status ?? "pending",
+          payment_url: pendingPaymentUrl,
+          created_at: (pendingSub as any).created_at ?? null,
+          invoice: pendingPurchase
+            ? {
+                purchase_id: pendingPurchase.id,
+                invoice_id: pendingInvoice?.id || pendingPurchase.invoice_id || null,
+                invoice_number: pendingInvoice?.invoice_number || null,
+                due_date: dueDate,
+                period_start: pendingPurchase.billing_period_start || null,
+                period_end: pendingPurchase.billing_period_end || null,
+                amount: Number(pendingPurchase.total_amount || pendingPrice),
+                status: pendingPurchase.status,
+              }
+            : null,
+        }
+      }
+    } catch (err: any) {
+      console.error("[Subscriptions] Error fetching pending plan change:", err?.message)
+    }
+
     return successResponse({
       partner_id: partner.id,
       plan: {
@@ -172,6 +266,7 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       },
       subscription: subscriptionPayload,
       next_invoice: nextInvoice,
+      pending_change: pendingChange,
       usage: counters || {
         products_count: 0,
         users_count: 0,
@@ -205,7 +300,9 @@ export async function getSubscriptionPaymentUrlAction(
       .eq("id", subscriptionId)
       .maybeSingle()
 
-    if (!sub?.mercado_pago_subscription_id || sub.cancel_at_period_end) {
+    // Only an unfinished checkout can be resumed. Cancelled subscriptions must
+    // never expose a pay link (the preapproval was cancelled on purpose).
+    if (!sub?.mercado_pago_subscription_id || sub.status !== "pending" || sub.cancel_at_period_end) {
       return successResponse({ payment_url: null })
     }
 
@@ -283,6 +380,10 @@ export async function cancelSubscriptionAction(input?: {
     }
 
     const reasonText = input?.reason || (input?.feedback ? `Motivo: ${input.feedback}` : undefined)
+
+    // Cancelling the plan also discards any unfinished upgrade checkout, so a
+    // later payment cannot resurrect a plan the partner just cancelled.
+    await cancelPendingPlanChangeAttempts(partner.id)
 
     const result = await cancelMpSubscription(subscription.id, user.id, reasonText)
 
