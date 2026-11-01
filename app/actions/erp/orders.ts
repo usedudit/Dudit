@@ -907,7 +907,12 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
 }
 
 function sanitizeERPItems(items: ERPItemPayload[]) {
-  const sanitizedItems = items.map((item) => {
+  if (!Array.isArray(items) || items.length === 0 || items.length > 500) {
+    return { error: "O pedido deve conter de 1 a 500 itens." as const };
+  }
+
+  const normalizedItems = items.map((item) => {
+    if (!item || typeof item !== "object") return null;
     const isServiceItem = Boolean(
       item.serviceId ||
       item.lineType === "service_booking" ||
@@ -921,24 +926,51 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
       lineType:
         item.lineType || (isServiceItem ? "service_booking" : "product"),
       variantId: item.variantId || null,
-      customName: item.customName?.trim().substring(0, 150) || undefined,
+      customName:
+        typeof item.customName === "string"
+          ? item.customName.trim().substring(0, 150) || undefined
+          : undefined,
       quantity: Number(item.quantity || 0),
       unitPrice: Number(item.unitPrice || 0),
+      sortOrder: Number(item.sortOrder),
     };
   });
 
-  for (const item of sanitizedItems) {
+  if (normalizedItems.some((item) => !item)) {
+    return { error: "Um dos itens do pedido é inválido." as const };
+  }
+  const sanitizedItems = normalizedItems.filter((item): item is NonNullable<typeof item> => item !== null);
+
+  for (let index = 0; index < sanitizedItems.length; index++) {
+    const item = sanitizedItems[index]!;
+    if (
+      item.lineType &&
+      !["product", "service_booking", "service"].includes(item.lineType)
+    ) {
+      return { error: "Tipo de item inválido." as const };
+    }
+    if (
+      !Number.isFinite(item.quantity) ||
+      item.quantity <= 0 ||
+      !Number.isFinite(item.unitPrice) ||
+      item.unitPrice < 0
+    ) {
+      return { error: "Quantidade ou preço inválido no pedido." as const };
+    }
+    if (item.variantId && !item.productId) {
+      return { error: "Uma variação precisa estar vinculada a um produto." as const };
+    }
+    if (item.productId && item.serviceId) {
+      return { error: "O item não pode referenciar produto e serviço ao mesmo tempo." as const };
+    }
+    item.sortOrder =
+      Number.isSafeInteger(item.sortOrder) && item.sortOrder >= 0
+        ? item.sortOrder
+        : index;
     if (!item.productId && !item.serviceId && !item.customName) {
       return {
         error:
           "Preencha o nome dos itens adicionados manualmente antes de salvar o pedido." as const,
-      };
-    }
-
-    if (item.quantity <= 0) {
-      return {
-        error:
-          "A quantidade de todos os itens deve ser maior que zero." as const,
       };
     }
 
@@ -951,6 +983,85 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
   }
 
   return { items: sanitizedItems };
+}
+
+async function validateERPItemReferences(params: {
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>;
+  partnerId: string;
+  storeId?: string | null;
+  items: ERPItemPayload[];
+}): Promise<string | null> {
+  const productIds = Array.from(
+    new Set(params.items.map((item) => item.productId).filter(Boolean)),
+  ) as string[];
+  const variantIds = Array.from(
+    new Set(params.items.map((item) => item.variantId).filter(Boolean)),
+  ) as string[];
+  const serviceIds = Array.from(
+    new Set(params.items.map((item) => item.serviceId).filter(Boolean)),
+  ) as string[];
+
+  const [productsResult, variantsResult, servicesResult] = await Promise.all([
+    productIds.length
+      ? params.supabase
+        .from("products")
+        .select("id, store_id")
+        .eq("partner_id", params.partnerId)
+        .in("id", productIds)
+      : Promise.resolve({ data: [], error: null }),
+    variantIds.length
+      ? params.supabase
+        .from("product_variants")
+        .select("id, product_id")
+        .in("id", variantIds)
+      : Promise.resolve({ data: [], error: null }),
+    serviceIds.length
+      ? params.supabase
+        .from("services")
+        .select("id, store_id")
+        .eq("partner_id", params.partnerId)
+        .in("id", serviceIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (productsResult.error || variantsResult.error || servicesResult.error) {
+    return "Não foi possível validar os itens do pedido.";
+  }
+
+  const productsById = new Map((productsResult.data || []).map((row: any) => [String(row.id), row]));
+  const variantsById = new Map((variantsResult.data || []).map((row: any) => [String(row.id), row]));
+  const servicesById = new Map((servicesResult.data || []).map((row: any) => [String(row.id), row]));
+  if (
+    productsById.size !== productIds.length ||
+    variantsById.size !== variantIds.length ||
+    servicesById.size !== serviceIds.length
+  ) {
+    return "Um produto, serviço ou variação não pertence a este parceiro.";
+  }
+
+  for (const item of params.items) {
+    const product = item.productId ? productsById.get(String(item.productId)) : null;
+    const variant = item.variantId ? variantsById.get(String(item.variantId)) : null;
+    const service = item.serviceId ? servicesById.get(String(item.serviceId)) : null;
+    if (
+      item.variantId &&
+      (!product ||
+        !variant ||
+        String(variant.product_id) !== String(item.productId))
+    ) {
+      return "A variação não pertence ao produto informado.";
+    }
+    for (const resource of [product, service]) {
+      if (
+        resource?.store_id &&
+        resource.store_id !== (params.storeId || null)
+      ) {
+        return "Um item do pedido pertence a outra loja.";
+      }
+    }
+  }
+
+  return null;
 }
 
 async function validateERPItemsStock(params: {
@@ -2198,6 +2309,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
   // Validate discount permission if a discount is being applied
   if (data.discountValue > 0 || data.couponCode) {
     await requirePermission(partnerId, "orders", "can_apply_discount");
+    if (data.storeId) {
+      await requireStorePermission(
+        data.storeId,
+        partnerId,
+        "orders",
+        "can_apply_discount",
+      );
+    }
   }
 
   if (!data.skipCSRF) {
@@ -2222,6 +2341,24 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       : null;
 
   const supabase = createAdminClient();
+  const itemReferenceError = await validateERPItemReferences({
+    supabase,
+    partnerId,
+    storeId: data.storeId,
+    items: sanitizedItems,
+  });
+  if (itemReferenceError) return { error: itemReferenceError };
+  if (data.sourceQuoteId) {
+    const { data: sourceQuote, error: sourceQuoteError } = await supabase
+      .from("quotes")
+      .select("id")
+      .eq("id", data.sourceQuoteId)
+      .eq("partner_id", partnerId)
+      .maybeSingle();
+    if (sourceQuoteError || !sourceQuote) {
+      return { error: "Orçamento não encontrado neste parceiro." };
+    }
+  }
 
   // ── Consolidate all independent pre-order reads into parallel execution ──
   const limitCheckPromise = checkLimit(partnerId, "monthly_orders");
@@ -3378,6 +3515,7 @@ export async function getOrderDetailsAction(
           .from("quotes")
           .select("id, quote_number, status")
           .eq("id", (data as any).source_quote_id)
+          .eq("partner_id", data.partner_id)
           .maybeSingle();
         if (quote) return quote;
       }
@@ -3385,6 +3523,7 @@ export async function getOrderDetailsAction(
         .from("quotes")
         .select("id, quote_number, status")
         .eq("converted_order_id", data.id)
+        .eq("partner_id", data.partner_id)
         .limit(1)
         .maybeSingle();
       if (quoteByOrder) return quoteByOrder;
@@ -3396,6 +3535,7 @@ export async function getOrderDetailsAction(
             .from("quotes")
             .select("id, quote_number, status")
             .eq("quote_number", match[1])
+            .eq("partner_id", data.partner_id)
             .maybeSingle();
           if (quoteByNum) return quoteByNum;
         }
@@ -3935,6 +4075,31 @@ export async function updateERPOrderAction(
   if (!adminBypass && data.storeId && data.storeId !== currentOrder.store_id) {
     await requireStorePermission(data.storeId, data.partnerId, "orders", "edit");
   }
+  if (!adminBypass && (data.discountValue > 0 || data.couponCode)) {
+    if (currentOrder.store_id) {
+      await requireStorePermission(
+        currentOrder.store_id,
+        data.partnerId,
+        "orders",
+        "can_apply_discount",
+      );
+    }
+    if (data.storeId && data.storeId !== currentOrder.store_id) {
+      await requireStorePermission(
+        data.storeId,
+        data.partnerId,
+        "orders",
+        "can_apply_discount",
+      );
+    }
+  }
+  const itemReferenceError = await validateERPItemReferences({
+    supabase,
+    partnerId: data.partnerId,
+    storeId: data.storeId || currentOrder.store_id,
+    items: sanitizedItems,
+  });
+  if (itemReferenceError) return { error: itemReferenceError };
 
   const requestedPaymentSituation = normalizePaymentSituation(data.paymentStatus);
   const hasPaymentStateChange =
@@ -5151,6 +5316,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
   paymentBreakdown?: any[];
   mpPaymentId?: string;
   manualBalanceOverride?: boolean;
+  expectedUpdatedAt?: string;
 }) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
@@ -5185,13 +5351,26 @@ export async function updateOrdersStatusInBatchAction(payload: {
   const { data: currentOrders } = await supabase
     .from("orders")
     .select(
-      "id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, checkout_fulfillment, payment_expires_at, payment_method_discount_amount, payment_method_extra_amount, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_source, exchange_return_request_id, order_items(product_id, variant_id, quantity)",
+      "id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, checkout_fulfillment, payment_expires_at, payment_method_discount_amount, payment_method_extra_amount, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_source, exchange_return_request_id, updated_at, order_items(product_id, variant_id, quantity)",
     )
     .in("id", payload.orderIds)
     .eq("partner_id", payload.partnerId);
   const overallWarnings: string[] = [];
   if (!currentOrders || currentOrders.length !== payload.orderIds.length) {
     return { error: "Nenhum pedido válido foi encontrado para processar." };
+  }
+  if (payload.actionType === "payment_status" && payload.paidAmount !== undefined) {
+    const order = currentOrders[0] as any;
+    if (
+      payload.orderIds.length !== 1 ||
+      !payload.expectedUpdatedAt ||
+      payload.expectedUpdatedAt !== order.updated_at
+    ) {
+      return {
+        error:
+          "O pedido mudou desde que o pagamento foi aberto. Atualize o pedido e tente novamente.",
+      };
+    }
   }
 
   const storeAction = payload.actionType === "cancel" ? "cancel" : "edit";
@@ -5691,6 +5870,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
   };
 
   const overrideOrderIds = new Set<string>();
+  const successfullyUpdatedOrderIds = new Set<string>();
+  const paymentConcurrencyConflicts: string[] = [];
 
   if (payload.actionType === "payment_status") {
     const requestedStatus = paymentStatusMap[payload.statusValue || ""];
@@ -5876,24 +6057,41 @@ export async function updateOrdersStatusInBatchAction(payload: {
         ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
       };
 
-      let { error } = await supabase
-        .from("orders")
-        .update(updateFields)
-        .eq("id", order.id)
-        .eq("partner_id", payload.partnerId);
-
-      if (error && isMissingOrdersPaymentMethodDeltaColumnsError(error)) {
-        delete updateFields.payment_method_discount_amount;
-        delete updateFields.payment_method_extra_amount;
-        const fallbackRes = await supabase
+      const updatePaymentState = () => {
+        let query = supabase
           .from("orders")
           .update(updateFields)
           .eq("id", order.id)
           .eq("partner_id", payload.partnerId);
-        error = fallbackRes.error;
+        if (order.updated_at) {
+          query = query.eq("updated_at", order.updated_at);
+        } else {
+          query = query.eq("situation", order.situation);
+          query = order.paid_amount === null
+            ? query.is("paid_amount", null)
+            : query.eq("paid_amount", order.paid_amount);
+        }
+        return query.select("id").maybeSingle();
+      };
+
+      let paymentWrite = await updatePaymentState();
+
+      if (
+        paymentWrite.error &&
+        isMissingOrdersPaymentMethodDeltaColumnsError(paymentWrite.error)
+      ) {
+        delete updateFields.payment_method_discount_amount;
+        delete updateFields.payment_method_extra_amount;
+        paymentWrite = await updatePaymentState();
       }
 
-      if (error) return { error: error.message };
+      if (paymentWrite.error) return { error: paymentWrite.error.message };
+      if (!paymentWrite.data) {
+        paymentConcurrencyConflicts.push(order.order_number || order.id);
+        continue;
+      }
+
+      successfullyUpdatedOrderIds.add(String(order.id));
       paymentProcessedCount += 1;
 
       if (
@@ -5973,6 +6171,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
       }
     }
     if (paymentProcessedCount === 0) {
+      if (paymentConcurrencyConflicts.length > 0) {
+        return {
+          error:
+            "Os pedidos mudaram durante a atualização. Atualize a lista e tente novamente.",
+        };
+      }
       return { error: "Nenhum pedido elegível para alteração de pagamento." };
     }
   }
@@ -6048,6 +6252,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .eq("partner_id", payload.partnerId);
 
       if (error) return { error: error.message };
+      successfullyUpdatedOrderIds.add(String(order.id));
       deliveryProcessedCount += 1;
     }
 
@@ -6063,6 +6268,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .eq("partner_id", payload.partnerId);
 
       if (error) return { error: error.message };
+      simpleDeliveryOrders.forEach((order) =>
+        successfullyUpdatedOrderIds.add(String(order.id)),
+      );
       deliveryProcessedCount += simpleDeliveryOrders.length;
     }
 
@@ -6085,7 +6293,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
   try {
     await Promise.all(
-      (currentOrders || []).map((order: any) => {
+      (currentOrders || [])
+        .filter((order: any) => successfullyUpdatedOrderIds.has(String(order.id)))
+        .map((order: any) => {
         const lines: string[] = [];
 
         if (payload.actionType === "payment_status") {
@@ -6246,13 +6456,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
   await invalidateInventoryItems(
     payload.partnerId,
-    (currentOrders || []).flatMap((order: any) => order.order_items || []),
+    (currentOrders || [])
+      .filter((order: any) => successfullyUpdatedOrderIds.has(String(order.id)))
+      .flatMap((order: any) => order.order_items || []),
   );
   await revalidateOrders(payload.partnerId);
 
   const dispatchOrderStatusSideEffects = async () => {
-    const firstOrder = currentOrders?.[0];
+    const processedOrders = (currentOrders || []).filter((order: any) =>
+      successfullyUpdatedOrderIds.has(String(order.id)),
+    );
+    const firstOrder = processedOrders[0];
     if (!firstOrder) return;
+    const processedOrderIds = processedOrders
+      .map((order: any) => String(order.id))
+      .sort()
+      .join(",");
 
     const { buildNotificationContent } =
       await import("@/lib/notifications/templates");
@@ -6275,7 +6494,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
       const situation =
         paymentStatusMap[payload.statusValue] || payload.statusValue;
 
-      const orderCount = currentOrders?.length || 0;
+      const orderCount = processedOrders.length;
       const isBatch = orderCount > 1;
       const customerNotifType = (
         situation === "paid" ? "order_paid" : "order_created"
@@ -6324,7 +6543,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 order_number: firstOrder.order_number,
                 customer_id: firstOrder.customer_id || undefined,
               },
-              idempotencyKey: `bulk_payment:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
+              idempotencyKey: `bulk_payment:customer:${payload.partnerId}:${processedOrderIds}`,
               origin: "manual",
             });
           }
@@ -6346,7 +6565,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 batchCount: orderCount,
                 order_number: firstOrder.order_number,
               },
-              idempotencyKey: `bulk_payment:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
+              idempotencyKey: `bulk_payment:seller:${payload.partnerId}:${userId}:${processedOrderIds}`,
               origin: "manual",
             });
           }
@@ -6356,7 +6575,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     if (payload.actionType === "delivery_status" && payload.statusValue) {
       const deliveryStatus = payload.statusValue;
-      const orderCount = currentOrders?.length || 0;
+      const orderCount = processedOrders.length;
       const isBatch = orderCount > 1;
 
       const notifType = (
@@ -6410,7 +6629,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 order_number: firstOrder.order_number,
                 customer_id: firstOrder.customer_id || undefined,
               },
-              idempotencyKey: `bulk_delivery:customer:${payload.partnerId}:${payload.orderIds.sort().join(",")}`,
+              idempotencyKey: `bulk_delivery:customer:${payload.partnerId}:${processedOrderIds}`,
               origin: "manual",
             });
           }
@@ -6433,7 +6652,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 batchCount: orderCount,
                 order_number: firstOrder.order_number,
               },
-              idempotencyKey: `bulk_delivery:seller:${payload.partnerId}:${userId}:${payload.orderIds.sort().join(",")}`,
+              idempotencyKey: `bulk_delivery:seller:${payload.partnerId}:${userId}:${processedOrderIds}`,
               origin: "manual",
             });
           }
@@ -6444,6 +6663,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
   dispatchOrderStatusSideEffects().catch(console.error);
 
+  if (paymentConcurrencyConflicts.length > 0) {
+    overallWarnings.push(
+      `Alguns pedidos foram alterados por outra operação e foram ignorados: ${paymentConcurrencyConflicts.join(", ")}. Atualize a lista para ver o estado atual.`,
+    );
+  }
   if (overallWarnings.length > 0) {
     return { success: true, warning: overallWarnings.join(" | ") };
   }
@@ -6514,7 +6738,7 @@ export async function getERPOrdersPageAction(
         const baseSelect = `
                         id, order_number, mp_payment_id, customer_name, buyer_id, customer_id,
                         total_amount, paid_amount, situation, previous_situation_before_cancel,
-                        delivery_status, delivery_type, order_source, created_at, store_id,
+                        delivery_status, delivery_type, order_source, created_at, updated_at, store_id,
                         stores(name),
                         customers(id, name, email, phone),
                         order_shipments(id, status, tracking_number, tracking_url, provider_slug, kind, created_at, carrier),

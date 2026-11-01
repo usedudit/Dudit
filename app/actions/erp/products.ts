@@ -43,14 +43,24 @@ import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
 import { headers } from "next/headers"
 
-const _deleteFromR2 = async (url: string) => {
+const _deleteOwnedProductMediaFromR2 = async (url: string, userId: string) => {
     if (!url || !url.trim()) return;
     try {
-        const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server");
-        const key = url.startsWith('http') ? extractKeyFromR2Url(url) : url;
-        if (key) await deleteFileFromR2(key);
+        const [{ extractKeyFromR2Url, deleteFileFromR2, validateKeyOwnership }, { getR2PublicUrl }] = await Promise.all([
+            import("@/lib/r2/server"),
+            import("@/lib/r2/r2-server-config"),
+        ])
+        let key = url
+        if (/^https?:\/\//i.test(url)) {
+            const assetUrl = new URL(url)
+            const publicUrl = new URL(getR2PublicUrl())
+            if (assetUrl.origin !== publicUrl.origin) return
+            key = extractKeyFromR2Url(url)
+        }
+        if (!validateKeyOwnership(key, userId) || !key.startsWith(`users/${userId}/products/`)) return
+        await deleteFileFromR2(key)
     } catch (e) {
-        console.error("Failed to delete image: ", url, e);
+        console.error("Failed to delete owned product media from R2", e)
     }
 };
 
@@ -124,6 +134,18 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
     }
 
     return product
+}
+
+const requireProductReadContext = async (partnerId: string, requestedStoreId?: string | null) => {
+    const user = await requireUser()
+    const context = await getCurrentPartnerContext(user)
+    if (!context?.partnerId || context.partnerId !== partnerId) {
+        throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    }
+    await requirePermission(partnerId, "products", "view", user)
+    const storeId = requestedStoreId || context.activeStoreId || null
+    if (storeId) await requireStorePermission(storeId, partnerId, "products", "view")
+    return { user, partnerId, storeId }
 }
 
 const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) => {
@@ -1020,9 +1042,30 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // 2. CSRF + ownership em paralelo (independentes)
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail"),
+            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, store_id, stock_quantity, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail"),
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
+        const cleanupUser = await requireUser()
+
+        for (const field of ["price", "costPrice", "minStock", "maxStock", "stockQuantity"] as const) {
+            const value = data[field]
+            if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+                return errorResponse(`Valor inválido para ${field}`)
+            }
+        }
+        if (data.promotionalPrice != null && (!Number.isFinite(Number(data.promotionalPrice)) || Number(data.promotionalPrice) < 0)) {
+            return errorResponse("Preço promocional inválido")
+        }
+        if (data.images !== undefined && (!Array.isArray(data.images) || data.images.length > 50 || data.images.some((image) => typeof image !== "string" || image.length > 2048))) {
+            return errorResponse("Lista de imagens inválida")
+        }
+
+        if (data.stockQuantity !== undefined && Number(data.stockQuantity) !== Number(product.stock_quantity || 0)) {
+            if (!Number.isFinite(Number(data.stockQuantity))) return errorResponse("Estoque inválido")
+            const user = await requireUser()
+            await requirePermission(product.partner_id, "stock_movements", "create", user)
+            if (product.store_id) await requireStorePermission(product.store_id, product.partner_id, "stock_movements", "create")
+        }
 
         // Moderação apenas dos campos de texto que realmente mudaram.
         // O formulário envia nome/descrição em toda edição, então comparar com o
@@ -1212,20 +1255,20 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         }
 
         // Fire-and-forget: R2 image cleanup para imagens removidas
-        if (product.images && Array.isArray(product.images)) {
+        if (payload.images !== undefined && product.images && Array.isArray(product.images)) {
             const oldImages = product.images.filter((img: any) => typeof img === 'string' && img.trim());
-            const newImages = payload.images || [];
+            const newImages = payload.images;
             const deletedImages = oldImages.filter((img: string) => !newImages.includes(img));
             const addedImages = newImages.filter((img: string) => !oldImages.includes(img));
 
             if (deletedImages.length > 0) {
-                Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
+                Promise.all(deletedImages.map((img: string) => _deleteOwnedProductMediaFromR2(img, cleanupUser.id))).catch(console.error)
                 await decrement_usage_counter(product.partner_id, "images_count", deletedImages.length)
             }
             if (addedImages.length > 0) {
                 await increment_usage_counter(product.partner_id, "images_count", addedImages.length)
             }
-        } else if (payload.images && payload.images.length > 0) {
+        } else if (payload.images && Array.isArray(payload.images) && payload.images.length > 0) {
             await increment_usage_counter(product.partner_id, "images_count", payload.images.length)
         }
 
@@ -1236,8 +1279,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             product.video_url !== payload.video_url
         ) {
             Promise.all([
-                _deleteFromR2(product.video_url),
-                product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
+                _deleteOwnedProductMediaFromR2(product.video_url, cleanupUser.id),
+                product.video_thumbnail ? _deleteOwnedProductMediaFromR2(product.video_thumbnail, cleanupUser.id) : Promise.resolve(),
             ]).catch(console.error)
         }
 
@@ -1283,6 +1326,12 @@ export async function createProductVariantAction(data: {
     // SECURITY FIX (MED-02): Add rate limiting
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
     try {
+        if (!Number.isFinite(Number(data.priceAdjustment)) || !Number.isFinite(Number(data.stockQuantity))) {
+            return { error: "Preço ou estoque de variante inválido" }
+        }
+        if (String(data.variantType || "").length > 100 || String(data.variantName || "").length > 100) {
+            return { error: "Dados da variante excedem o limite permitido" }
+        }
         const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
         if (Number(data.stockQuantity || 0) !== 0) {
             const user = await requireUser()
@@ -1380,6 +1429,7 @@ export async function createProductVariantsBatchAction(data: {
             fetchProductAndVerifyOwnership(data.productId, "edit", "id, partner_id, images, sku, name, promotional_price")
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
+        const cleanupUser = await requireUser()
 
         if (data.variants.some((variant) => Number(variant.stockQuantity || 0) !== 0)) {
             const user = await requireUser()
@@ -1475,7 +1525,7 @@ export async function createProductVariantsBatchAction(data: {
         const newImagesCount = uniqueNewImages.size
 
         if (imagesToCleanup.size > 0) {
-            Promise.all(Array.from(imagesToCleanup).map(img => _deleteFromR2(img))).catch(console.error)
+            Promise.all(Array.from(imagesToCleanup).map(img => _deleteOwnedProductMediaFromR2(img, cleanupUser.id))).catch(console.error)
             await decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.size)
         }
 
@@ -1532,7 +1582,7 @@ export async function getProductVariantsAction(productId: string): Promise<Actio
 
 export async function deleteProductVariantAction(variantId: string): Promise<ActionResponse<any>> {
     try {
-        await verifyAuth()
+        const user = await verifyAuth()
         const supabase = await getSupabaseServerClient()
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
         if (!variant) return errorResponse("Variante não encontrada")
@@ -1553,7 +1603,7 @@ export async function deleteProductVariantAction(variantId: string): Promise<Act
                 (Array.isArray(product.images) && product.images.includes(variantImage))
 
             if (!isImageStillInUse) {
-                Promise.resolve().then(() => _deleteFromR2(variantImage)).catch(console.error)
+                Promise.resolve().then(() => _deleteOwnedProductMediaFromR2(variantImage, user.id)).catch(console.error)
             }
         }
 
@@ -1571,7 +1621,13 @@ export async function updateProductVariantAction(variantId: string, data: {
     variantName?: string; sku?: string; price?: number; stockQuantity?: number; isActive?: boolean; image?: string | null
 }): Promise<ActionResponse<any>> {
     try {
-        await verifyAuth()
+        const user = await verifyAuth()
+        if (data.price !== undefined && (!Number.isFinite(Number(data.price)) || Number(data.price) < 0)) return errorResponse("Preço de variante inválido")
+        if (data.stockQuantity !== undefined && !Number.isFinite(Number(data.stockQuantity))) return errorResponse("Estoque de variante inválido")
+        if (data.variantName !== undefined && (typeof data.variantName !== "string" || data.variantName.length > 100)) return errorResponse("Nome de variante inválido")
+        if (data.sku !== undefined && (typeof data.sku !== "string" || data.sku.length > 100)) return errorResponse("SKU de variante inválido")
+        if (data.isActive !== undefined && typeof data.isActive !== "boolean") return errorResponse("Status de variante inválido")
+        if (data.image !== undefined && data.image !== null && (typeof data.image !== "string" || data.image.length > 2048)) return errorResponse("Imagem de variante inválida")
         const supabase = await getSupabaseServerClient()
 
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
@@ -1603,7 +1659,7 @@ export async function updateProductVariantAction(variantId: string, data: {
                     (Array.isArray(product.images) && product.images.includes(oldImage))
 
                 if (!isOldImageStillInUse) {
-                    await _deleteFromR2(oldImage).catch(console.error)
+                    await _deleteOwnedProductMediaFromR2(oldImage, user.id).catch(console.error)
                 }
             }
             payload.variant_options = { ...(variant.variant_options || {}), image: data.image }
@@ -1663,7 +1719,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
 
             const imagesToDelete = Array.from(new Set(candidateImages)).filter(img => !remainingImages.has(img))
             if (imagesToDelete.length > 0) {
-                Promise.all(imagesToDelete.map((img: string) => _deleteFromR2(img))).catch(() => null)
+                Promise.all(imagesToDelete.map((img: string) => _deleteOwnedProductMediaFromR2(img, user.id))).catch(() => null)
             }
         }
 
@@ -2286,11 +2342,8 @@ export async function getProductCostHistoryAction(productId: string, limit = 10)
 
 export async function getReplenishmentSuggestionsAction(partnerId: string, storeId?: string) {
     try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "products", "view")
-        if (storeId) {
-            await requireStorePermission(storeId, partnerId, "products", "view")
-        }
+        const context = await requireProductReadContext(partnerId, storeId)
+        await requirePermission(partnerId, "suppliers", "view", context.user)
         const admin = getAdminClient()
 
         let query = admin
@@ -2306,7 +2359,7 @@ export async function getReplenishmentSuggestionsAction(partnerId: string, store
             .order("name")
             .limit(200)
 
-        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+        if (context.storeId) query = query.or(`store_id.eq.${context.storeId},store_id.is.null`)
 
         const { data, error } = await query
 
@@ -2368,14 +2421,11 @@ export async function getReplenishmentSuggestionsAction(partnerId: string, store
 
 export async function getStagnantProductsAction(partnerId: string, days: number = 90, storeId?: string) {
     try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "products", "view")
-        if (storeId) {
-            await requireStorePermission(storeId, partnerId, "products", "view")
-        }
+        const context = await requireProductReadContext(partnerId, storeId)
         const admin = getAdminClient()
 
-        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+        const safeDays = Math.max(1, Math.min(3650, Math.floor(Number(days) || 90)))
+        const cutoff = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000).toISOString()
 
         let query = admin
             .from("products")
@@ -2387,7 +2437,7 @@ export async function getStagnantProductsAction(partnerId: string, days: number 
             .order("created_at", { ascending: true })
             .limit(200)
 
-        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+        if (context.storeId) query = query.or(`store_id.eq.${context.storeId},store_id.is.null`)
 
         const { data, error } = await query
 
@@ -2403,7 +2453,7 @@ export async function getStagnantProductsAction(partnerId: string, days: number 
         const now = Date.now()
         const products = (data || []).map((p: any) => {
             const createdAtTime = new Date(p.created_at).getTime()
-            const daysStagnant = Math.max(days, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
+            const daysStagnant = Math.max(safeDays, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
             const agg = variantAggregates[p.id]
             return {
                 id: p.id,
@@ -2435,6 +2485,9 @@ export async function updateProductPromotionalPriceAction(params: {
     promotionalPrice: number | null
 }) {
     try {
+        if (params.promotionalPrice !== null && (!Number.isFinite(Number(params.promotionalPrice)) || Number(params.promotionalPrice) < 0)) {
+            return { error: "Preço promocional inválido" }
+        }
         const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id")
         if (product.partner_id !== params.partnerId) return { error: "Produto não encontrado" }
         await requirePermission(params.partnerId, "products", "edit")
@@ -2495,11 +2548,7 @@ export async function getPricingAlertsAction(
     storeId?: string
 ): Promise<{ error: string } | PricingAlertsResult> {
     try {
-        await requireUser()
-        await requirePermission(partnerId, "products", "view")
-        if (storeId) {
-            await requireStorePermission(storeId, partnerId, "products", "view")
-        }
+        const context = await requireProductReadContext(partnerId, storeId)
         const admin = getAdminClient()
 
         let query = admin
@@ -2513,7 +2562,7 @@ export async function getPricingAlertsAction(
             .order("name")
             .limit(200)
 
-        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+        if (context.storeId) query = query.or(`store_id.eq.${context.storeId},store_id.is.null`)
 
         const [{ data, error }, { data: partnerData }] = await Promise.all([
             query,
@@ -2602,6 +2651,9 @@ export async function updateProductSalePriceAction(params: {
     clearPromotion?: boolean
 }) {
     try {
+        if (params.price !== undefined && (!Number.isFinite(Number(params.price)) || Number(params.price) < 0)) {
+            return { error: "Preço de venda inválido" }
+        }
         const product = await fetchProductAndVerifyOwnership(params.productId, "edit", "id, partner_id, store_id")
         if (product.partner_id !== params.partnerId) return { error: "Produto não encontrado" }
         await requirePermission(params.partnerId, "products", "edit")
@@ -2944,14 +2996,16 @@ const fetchVariantAggregates = async (productIds: string[]) => {
 }
 
 const fetchProductsStatic = unstable_cache(
-    async (partnerId: string) => {
+    async (partnerId: string, storeId: string) => {
         const supabase = getAdminClient()
-        const { data, error } = await supabase
+        let query = supabase
             .from("products")
             .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
             .eq("partner_id", partnerId)
             .limit(100)
             .order("created_at", { ascending: false })
+        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+        const { data, error } = await query
         if (error) throw error
         const rows = (data || []).map((p: any) => ({
             ...p,
@@ -2982,7 +3036,10 @@ const fetchProductsStatic = unstable_cache(
     { tags: ["products"], revalidate: 300 }
 )
 
-export const getCachedProducts = async (partnerId: string) => fetchProductsStatic(partnerId)
+export const getCachedProducts = async (partnerId: string) => {
+    const { storeId } = await requireProductReadContext(partnerId)
+    return fetchProductsStatic(partnerId, storeId || "")
+}
 
 const fetchProductByIdStatic = unstable_cache(
     async (productId: string) => {
@@ -3008,7 +3065,10 @@ const fetchProductByIdStatic = unstable_cache(
     { tags: ["products"], revalidate: 300 }
 )
 
-export const getCachedProductById = async (productId: string) => fetchProductByIdStatic(productId)
+export const getCachedProductById = async (productId: string) => {
+    await fetchProductAndVerifyOwnership(productId, "view")
+    return fetchProductByIdStatic(productId)
+}
 
 
 export async function getProductWithDetailsAction(productId: string) {
@@ -3023,12 +3083,11 @@ export async function getProductWithDetailsAction(productId: string) {
 
 export async function getProducts(partnerId: string, storeId?: string) {
     try {
-        const user = await requireUser()
-        await requirePermission(partnerId, "products", "view")
+        const context = await requireProductReadContext(partnerId, storeId)
         const supabase = await getSupabaseServerClient()
 
         let q = supabase.from("products").select("*").eq("partner_id", partnerId)
-        if (storeId) q = q.eq("store_id", storeId)
+        if (context.storeId) q = q.or(`store_id.eq.${context.storeId},store_id.is.null`)
 
         const { data } = await scopeActiveOnly(q).order("created_at", { ascending: false }).limit(100)
         return data || []
@@ -3240,10 +3299,13 @@ export async function searchProductByBarcodeAction(
             resolvedStoreId = context.activeStoreId
         } else {
             const context = await getCurrentPartnerContext()
-            if (context) resolvedStoreId = context.activeStoreId
+            if (!context || context.partnerId !== resolvedPartnerId) {
+                return errorResponse("O parceiro informado não corresponde ao contexto ativo")
+            }
+            resolvedStoreId = context.activeStoreId
         }
 
-        await requirePermission(resolvedPartnerId, "products", "view")
+        await requireProductReadContext(resolvedPartnerId, resolvedStoreId)
         const supabase = getAdminClient()
 
         const cleanCode = code.trim()

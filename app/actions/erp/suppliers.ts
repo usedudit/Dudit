@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { redirect } from 'next/navigation'
-import { requireUser, requirePartnerAccessWithPermission, requireSupplierOwnership } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -17,6 +17,20 @@ import { enrichAddressData } from "@/lib/services/location.service"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+
+async function requireSupplierModuleAccess(supplierId: string, action: "view" | "create" | "edit" | "delete") {
+  const user = await requireUser()
+  const supabase = await getSupabaseServerClient()
+  const { data: supplier, error } = await supabase
+    .from("suppliers")
+    .select("partner_id")
+    .eq("id", supplierId)
+    .maybeSingle()
+
+  if (error || !supplier?.partner_id) throw new Error("Fornecedor não encontrado.")
+  await requirePermission(supplier.partner_id, "suppliers", action, user)
+  return { user, supabase, partnerId: supplier.partner_id }
+}
 
 export async function createComprehensiveSupplierAction(data: {
   partnerId: string
@@ -60,7 +74,7 @@ export async function createComprehensiveSupplierAction(data: {
 
   const user = await requireUser()
 
-  await requirePartnerAccessWithPermission(data.partnerId, "products", "create")
+  await requirePartnerAccessWithPermission(data.partnerId, "suppliers", "create")
 
   // Check subscription feature
   if (!await canUseFeature(data.partnerId, "supplier_management")) {
@@ -159,7 +173,7 @@ export async function createSupplierAction(data: {
 
   const user = await requireUser()
 
-  await requirePartnerAccessWithPermission(data.partnerId, "products", "create")
+  await requirePartnerAccessWithPermission(data.partnerId, "suppliers", "create")
 
   // Check subscription feature
   if (!await canUseFeature(data.partnerId, "supplier_management")) {
@@ -208,12 +222,7 @@ export async function updateSupplierAction(
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const user = await requireUser()
-
-  await requireSupplierOwnership(supplierId)
-
-
-  const supabase = await getSupabaseServerClient()
+  const { supabase, partnerId } = await requireSupplierModuleAccess(supplierId, "edit")
 
   const { error } = await supabase
     .from("suppliers")
@@ -225,6 +234,7 @@ export async function updateSupplierAction(
       updated_at: new Date().toISOString(),
     })
     .eq("id", supplierId)
+    .eq("partner_id", partnerId)
 
   if (error) {
     return { error: error.message }
@@ -243,14 +253,9 @@ export async function deleteSupplierAction(supplierId: string, csrf_token?: stri
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const user = await requireUser()
+  const { supabase, partnerId } = await requireSupplierModuleAccess(supplierId, "delete")
 
-  await requireSupplierOwnership(supplierId)
-
-
-  const supabase = await getSupabaseServerClient()
-
-  const { error } = await supabase.from("suppliers").delete().eq("id", supplierId)
+  const { error } = await supabase.from("suppliers").delete().eq("id", supplierId).eq("partner_id", partnerId)
 
   if (error) {
     return { error: error.message }
@@ -300,9 +305,7 @@ export async function updateComprehensiveSupplierAction(data: {
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const user = await requireUser()
-
-  await requireSupplierOwnership(data.supplierId)
+  const { supabase, partnerId } = await requireSupplierModuleAccess(data.supplierId, "edit")
 
   if (data.personType !== "foreign" && data.phone && !validateBrazilMobile(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
@@ -316,8 +319,6 @@ export async function updateComprehensiveSupplierAction(data: {
     return { error: "CNPJ inválido" }
   }
 
-
-  const supabase = await getSupabaseServerClient()
 
   // SECURITY: partner_id is intentionally excluded from the update payload.
   // A supplier's tenant ownership must NEVER be changeable via update.
@@ -343,7 +344,7 @@ export async function updateComprehensiveSupplierAction(data: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", data.supplierId)
-    .eq("partner_id", data.partnerId) // Defense in depth
+    .eq("partner_id", partnerId) // Defense in depth; derive tenant from the stored row.
 
   if (error) {
     return { error: error.message }
@@ -388,17 +389,13 @@ export async function updateComprehensiveSupplierAction(data: {
 }
 
 export async function duplicateSupplierAction(supplierId: string) {
-  const user = await requireUser()
-
-  await requireSupplierOwnership(supplierId)
-
-
-  const supabase = await getSupabaseServerClient()
+  const { supabase, partnerId } = await requireSupplierModuleAccess(supplierId, "create")
 
   const { data: originalSupplier, error: fetchError } = await supabase
     .from("suppliers")
     .select("*")
     .eq("id", supplierId)
+    .eq("partner_id", partnerId)
     .single()
 
   if (fetchError || !originalSupplier) {
@@ -579,15 +576,13 @@ export async function getERPSuppliersPageAction(
 }
 
 export async function getSupplierByIdAction(supplierId: string) {
-  const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
-
-  const supabase = await getSupabaseServerClient()
+  const { supabase, partnerId } = await requireSupplierModuleAccess(supplierId, "view")
 
   const { data: supplier } = await supabase
     .from("suppliers")
     .select("*")
     .eq("id", supplierId)
+    .eq("partner_id", partnerId)
     .maybeSingle()
 
   if (!supplier) return { error: "Fornecedor não encontrado" }
@@ -772,12 +767,15 @@ export async function createSupplierQuickAction(input: {
 }
 
 export async function getSupplierXmlImportsAction(supplierId: string) {
-  const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
+  const { supabase, partnerId } = await requireSupplierModuleAccess(supplierId, "view")
 
-  const supabase = await getSupabaseServerClient()
-
-  await requireSupplierOwnership(supplierId)
+  const { data: supplier } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("id", supplierId)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+  if (!supplier) return { error: "Fornecedor não encontrado" }
 
   const { data: xmlImports, error } = await supabase
     .from("xml_imports")

@@ -10,7 +10,8 @@ import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { generateCpfLookupHash } from "@/lib/services/cpf-hash"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
-import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
+import { requireUser, requireCustomerOwnership, requireStorePermission } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
@@ -768,12 +769,27 @@ export async function getCustomerByIdAction(customerId: string) {
     orParts.push(`buyer_id.eq.${id}`)
   }
   const adminDbForStats = createAdminClient()
-  const { data: orderAgg } = await adminDbForStats
-    .from("orders")
-    .select("total_amount, created_at")
-    .eq("partner_id", authorizedPartner.partnerId)
-    .or(orParts.join(","))
-    .neq("situation", "cancelled")
+  const canViewOrders = can(customerAccess as RbacUserLike, "orders.view")
+  let orderAgg: Array<{ total_amount: number | null; created_at: string | null }> | null = null
+  if (canViewOrders) {
+    const context = await getCurrentPartnerContext(customerAccess.user)
+    const storeId = context?.activeStoreId || null
+    if (storeId) await requireStorePermission(storeId, authorizedPartner.partnerId, "orders", "view")
+    const orderStatsFilter = storeId
+      ? orParts.flatMap((part) => [
+          `and(${part},store_id.eq.${storeId})`,
+          `and(${part},store_id.is.null)`,
+        ]).join(",")
+      : orParts.join(",")
+    let orderStatsQuery = adminDbForStats
+      .from("orders")
+      .select("total_amount, created_at")
+      .eq("partner_id", authorizedPartner.partnerId)
+      .or(orderStatsFilter)
+      .neq("situation", "cancelled")
+    const result = await orderStatsQuery
+    orderAgg = result.data
+  }
 
   if (orderAgg) {
     const totalOrders = orderAgg.length
@@ -815,6 +831,12 @@ export async function getCustomerByIdAction(customerId: string) {
     }
   }
 
+  if (!can(customerAccess as RbacUserLike, "customers.view_personal_data")) {
+    delete (customer as any).birth_date
+    delete (customer as any).user_id
+    delete (customer as any).marketplace_user_id
+  }
+
   return { customer }
 }
 
@@ -841,6 +863,10 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   const partnerId = authorizedPartner.partnerId
+  await requirePermission(partnerId, "orders", "view", customerAccess.user)
+  const partnerContext = await getCurrentPartnerContext(customerAccess.user)
+  const activeStoreId = partnerContext?.activeStoreId || null
+  if (activeStoreId) await requireStorePermission(activeStoreId, partnerId, "orders", "view")
   // The service-role client is created only after authentication, partner
   // permission and the RLS-bound customer lookup have all succeeded.
   const adminDb = customerAccess.admin
@@ -863,8 +889,14 @@ export async function getCustomerOrdersAction(customerId: string) {
     orParts.push(`buyer_id.eq.${id}`)
   }
   const filter = orParts.join(",")
+  const scopedOrderFilter = activeStoreId
+    ? orParts.flatMap((part) => [
+        `and(${part},store_id.eq.${activeStoreId})`,
+        `and(${part},store_id.is.null)`,
+      ]).join(",")
+    : filter
 
-  const { data: orders, error } = await adminDb
+  let ordersQuery = adminDb
     .from("orders")
     .select(`
       id,
@@ -884,7 +916,8 @@ export async function getCustomerOrdersAction(customerId: string) {
       order_items ( id, quantity, service_id, line_type )
     `)
     .eq("partner_id", partnerId)
-    .or(filter)
+    .or(scopedOrderFilter)
+  const { data: orders, error } = await ordersQuery
     .order("created_at", { ascending: false })
     .limit(50)
 
@@ -893,12 +926,13 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   // Aggregate stats across ALL orders (no limit) for accurate KPIs
-  const { data: statsRaw } = await adminDb
+  let statsQuery = adminDb
     .from("orders")
     .select("total_amount, created_at, situation")
     .eq("partner_id", partnerId)
-    .or(filter)
+    .or(scopedOrderFilter)
     .neq("situation", "cancelled")
+  const { data: statsRaw } = await statsQuery
 
   let stats = null
   if (statsRaw) {
@@ -1156,6 +1190,13 @@ export async function getERPCustomersPageAction(
     }
     partnerId = customerAccess.partnerId
     const canViewPersonalData = can(customerAccess as RbacUserLike, "customers.view_personal_data")
+    const canViewOrders = can(customerAccess as RbacUserLike, "orders.view")
+    const partnerContext = await getCurrentPartnerContext(customerAccess.user)
+    const effectiveStoreId = options?.storeId || partnerContext?.activeStoreId || null
+    if (effectiveStoreId) {
+      await requireStorePermission(effectiveStoreId, partnerId, "customers", "view")
+      if (canViewOrders) await requireStorePermission(effectiveStoreId, partnerId, "orders", "view")
+    }
 
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CUSTOMERS_PAGE_SIZE))))
@@ -1166,7 +1207,7 @@ export async function getERPCustomersPageAction(
       [
         "erp-customers-page",
         partnerId,
-        options?.storeId || "all-stores",
+        effectiveStoreId || "all-stores",
         cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
         String(limit),
         String(filterKey),
@@ -1204,17 +1245,28 @@ export async function getERPCustomersPageAction(
 
         if (customerIds.length > 0) {
           // Fetch address info (city, state) for all customers on this page
+          const customerIdFilter = customerIds.join(",")
+          const orderFilter = effectiveStoreId
+            ? [
+                `and(buyer_id.in.(${customerIdFilter}),store_id.eq.${effectiveStoreId})`,
+                `and(customer_id.in.(${customerIdFilter}),store_id.eq.${effectiveStoreId})`,
+                `and(buyer_id.in.(${customerIdFilter}),store_id.is.null)`,
+                `and(customer_id.in.(${customerIdFilter}),store_id.is.null)`,
+              ].join(",")
+            : `buyer_id.in.(${customerIdFilter}),customer_id.in.(${customerIdFilter})`
           const [addressResult, orderResult] = await Promise.all([
             supabase
               .from("addresses")
               .select("customer_id, city, state")
               .in("customer_id", customerIds),
-            supabase
-              .from("orders")
-              .select("buyer_id, customer_id, total_amount, created_at")
-              .eq("partner_id", partnerId)
-              .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
-              .neq("situation", "cancelled"),
+            canViewOrders
+              ? supabase
+                  .from("orders")
+                  .select("buyer_id, customer_id, total_amount, created_at")
+                  .eq("partner_id", partnerId)
+                  .or(orderFilter)
+                  .neq("situation", "cancelled")
+              : Promise.resolve({ data: [], error: null }),
           ])
 
           const addrRows = addressResult.data
@@ -1264,12 +1316,19 @@ export async function getERPCustomersPageAction(
     const hasMore = page.hasMore
     const items: any[] = page.items
 
-    const visibleItems = canViewPersonalData
-      ? items
-      : items.map((item) => {
-          const { birth_date: _birthDate, user_id: _userId, ...safeItem } = item
-          return safeItem
-        })
+    const visibleItems = items.map((item) => {
+      const safeItem = { ...item }
+      if (!canViewPersonalData) {
+        delete safeItem.birth_date
+        delete safeItem.user_id
+      }
+      if (!canViewOrders) {
+        delete safeItem.orders_count
+        delete safeItem.total_spent
+        delete safeItem.last_order_at
+      }
+      return safeItem
+    })
 
     const last = visibleItems[visibleItems.length - 1]
     const nextCursor: ERPCustomerListCursor | null =
@@ -1284,6 +1343,10 @@ export async function getERPCustomersPageAction(
 export async function getCustomerStoreCreditsAction(customerId: string) {
   const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
   const authorizedPartner = { partnerId: customerAccess.partnerId }
+  await requirePermission(authorizedPartner.partnerId, "financial", "view", customerAccess.user)
+  const partnerContext = await getCurrentPartnerContext(customerAccess.user)
+  const activeStoreId = partnerContext?.activeStoreId || null
+  if (activeStoreId) await requireStorePermission(activeStoreId, authorizedPartner.partnerId, "financial", "view")
   const supabase = customerAccess.admin
 
   const { data: customer, error: customerError } = await supabase
@@ -1313,6 +1376,12 @@ export async function getCustomerStoreCreditsAction(customerId: string) {
     creditOrParts.push(`customer_id.eq.${id}`)
     creditOrParts.push(`customer_user_id.eq.${id}`)
   }
+  const creditFilter = activeStoreId
+    ? creditOrParts.flatMap((part) => [
+        `and(${part},store_id.eq.${activeStoreId})`,
+        `and(${part},store_id.is.null)`,
+      ]).join(",")
+    : creditOrParts.join(",")
 
   let creditQuery = supabase
     .from("store_credits")
@@ -1320,7 +1389,7 @@ export async function getCustomerStoreCreditsAction(customerId: string) {
     .eq("partner_id", authorizedPartner.partnerId)
 
   if (creditOrParts.length > 0) {
-    creditQuery = creditQuery.or(creditOrParts.join(","))
+    creditQuery = creditQuery.or(creditFilter)
   }
 
   const { data, error } = await creditQuery.order("created_at", { ascending: false })

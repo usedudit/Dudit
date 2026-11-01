@@ -10,7 +10,7 @@
 - Foi corrigida a revalidação de cache de permissões após mudanças de acesso.
 - Durante a validação de build foi encontrada uma incompatibilidade com Next.js 16: um módulo `"use server"` exportava uma função síncrona. A função pura foi movida para um módulo comum.
 - Os testes focados das correções passaram. A suíte completa ainda teve duas falhas nos testes de exclusão de conta por falta de configuração de `TRIGGER_SECRET_KEY`; os fixtures foram ajustados e os testes focados passaram depois disso. A suíte completa não foi repetida.
-- `npm audit` não reportou vulnerabilidades em dependências (incluindo a auditoria de produção). `npx tsc --noEmit` foi repetido em 30/10/2026 após as alterações de pedidos e passou.
+- `npm audit` não reportou vulnerabilidades em dependências (incluindo a auditoria de produção). `npx tsc --noEmit` passou novamente em 31/10/2026 após as correções financeiras e de devoluções.
 - O build ainda precisa ser repetido. O usuário pediu para executar build e TypeScript depois por conta própria. Lint não estava disponível: não há script no `package.json` nem executável ESLint em `node_modules/.bin`.
 - No registro original, a migration não havia sido aplicada. A checagem em 30/10 encontrou `store_members` e a função `can_manage_store_member` no schema exposto pelo Supabase configurado, indicando que a migration está aplicada nesse projeto. O ambiente exato e as policies efetivas ainda não foram confirmados.
 
@@ -281,6 +281,82 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 **Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram. Revisão estática; não foram exercitados R2, banco, Mercado Pago ou notificações externas. Permanecem pendentes testes de integração de reembolso, retry, anexos e transições concorrentes.
 
+### RPC de processamento de devolução — 31/10/2026
+
+**Achados confirmados na revisão estática:** as três sobrecargas `SECURITY DEFINER` de `process_return_request` mantinham `EXECUTE` para `authenticated`. O wrapper apenas exigia vínculo ativo com um papel permitido e conferia o ator; não exigia `orders.can_refund` nem a permissão da loja. Um membro autenticado poderia chamar o RPC diretamente e contornar as verificações mais restritas das Server Actions. Além disso, `20260901_fix_return_events_to_audit_logs.sql` recriou `create_return_request` como `SECURITY DEFINER` sem wrapper de contexto nem revogação dos grants padrão, permitindo execução direta via `PUBLIC` e, portanto, potencialmente `anon`; a função validava vínculo entre pedido e parceiro, mas não autenticava o ator. Os locais legítimos encontrados chamam esses RPCs por Server Actions com cliente `service_role`.
+
+**Correção aplicada (informado pelo usuário):** `migrations/20261031100000_restrict_process_return_request_rpc.sql` revoga execução de `PUBLIC`, `anon` e `authenticated` em `create_return_request` e nas sobrecargas existentes de `process_return_request`, concedendo-a somente a `service_role`. A primeira versão usava uma assinatura legada de 12 argumentos e falhou; depois a migration foi corrigida para descobrir as assinaturas instaladas em `pg_proc`, teve o cast do `oidvector` ajustado e o usuário confirmou que aplicou a versão corrigida. Não consultei o catálogo para confirmar os grants. As permissões de comprador, moderador e ERP continuam verificadas pelas Server Actions que executam os RPCs com cliente de serviço.
+
+**Achado adicional:** `create_product_transaction` também aceitava chamadas autenticadas. Seu guard de parceiro/loja aceitava `OPERATOR`, embora o preset padrão desse papel não tenha `products.create`. A migration `20261031110000_restrict_create_product_transaction_roles.sql` ajusta o helper para permitir os papéis padrão `owner`, `admin` e `manager`, mantendo o contrato autenticado e a validação de loja. O usuário confirmou que aplicou esta migration; os grants efetivos e chamadas autenticadas não foram testados no banco.
+
+**Validação:** revisão estática das definições/grants e dos locais de chamada. O usuário informou em 31/10/2026 que aplicou as duas migrations; não houve consulta ao catálogo do banco nem teste direto com papel `authenticated`.
+
+**Compatibilidade dos fluxos existentes — revisão de 31/10/2026:** rastreadas as chamadas aos RPCs financeiros, de estoque e devolução restringidos nas migrations desta auditoria. Os caminhos encontrados passam por Server Actions que fazem autorização/escopo e usam `createAdminClient()`/`getAdminClient()` para executar os RPCs; `create_product_transaction` permanece autenticada porque a ação de cadastro usa cliente de sessão, com o guard de papel atualizado. Não foi identificada quebra estática nesses pontos. Os testes focados `lib/payments/returns-refunds.test.ts`, `lib/permissions/partner-roles.security.test.ts` e `lib/payments/order-financial-state.test.ts` passaram (29/29). Na primeira tentativa, `npx tsc --noEmit` não terminou em mais de dois minutos e foi interrompido sem resultado; uma execução posterior nesta retomada foi concluída sem saída de erro. O usuário informou que aplicou as migrations `20261031100000` e `20261031110000`; grants efetivos ainda não foram consultados. Validar os fluxos em homologação antes de depender plenamente dessas alterações.
+
+### Portal de ordem de serviço — emissão de token público — 31/10/2026
+
+**Achado confirmado:** `ensurePublicTokenAction` era uma Server Action exportada sem autenticação, autorização ou rate limit. Com `partnerId` e `serviceOrderId` conhecidos, qualquer pessoa podia recuperar um token público existente ou criar um novo e receber acesso ao portal da OS, que contém dados do cliente e detalhes comerciais. O token aleatório tem 128 bits, mas a própria ação pública permitia emiti-lo, anulando essa proteção.
+
+**Correção local:** a ação agora exige usuário autenticado, `service_orders.edit`, permissão de edição da loja quando aplicável, plano mínimo Crescer e rate limit. A leitura e gravação são limitadas por OS e parceiro. A emissão usa update condicional para lidar com concorrência e não retornar um token que perdeu a corrida. As respostas de lista e detalhe não expõem mais o token bearer; os três componentes de compartilhamento sempre solicitam o token pela ação autorizada.
+
+**Achado adicional:** a listagem e os detalhes de OS usavam cliente administrativo após verificar apenas a permissão de parceiro. A listagem podia omitir o filtro de loja ou aceitar uma loja arbitrária; detalhes não verificavam acesso à loja da OS. Isso permitia a membro com acesso a uma loja consultar OS de outra loja do mesmo parceiro. Agora a listagem deriva a loja ativa do contexto autenticado, rejeita discrepância com o filtro fornecido e aplica a permissão da loja; detalhes consultam primeiro o `store_id` escopado por parceiro e autorizam a loja antes de ler dados cacheados.
+
+**Validação:** revisão estática dos chamadores e do portal público; `git diff --check` passou; `lib/types/service-order.test.ts` passou (17 testes); `npx tsc --noEmit` encerrou com código 0. Não foram testados login, permissões reais de loja nem o fluxo do link em ambiente integrado.
+
+### Permissões de fornecedores — 31/10/2026
+
+**Achado confirmado:** as duas ações de criação abrangente/legada verificavam `products.create` em vez de `suppliers.create`. Edição, exclusão, duplicação, leitura individual e histórico de importação XML usavam apenas verificação de vínculo ao parceiro (`requireSupplierOwnership`), sem conferir a permissão correspondente no módulo `suppliers`. Isso permitia que membros com acesso ao parceiro, mas sem a permissão específica do módulo, executassem essas operações.
+
+**Correção local:** as ações de criação agora exigem `suppliers.create`. Adicionei um guard que resolve o parceiro a partir do fornecedor armazenado e exige a permissão específica de leitura, edição, exclusão ou criação antes de prosseguir; gravações usam o parceiro resolvido no servidor como escopo adicional. Operações em lote já conferiam a permissão específica e continuam assim.
+
+**Validação:** revisão estática; `git diff --check` e `npx tsc --noEmit` passaram. Não há testes de ação de fornecedor identificados.
+
+### Isolamento e liquidação de agendamentos — 31/10/2026
+
+**Achados confirmados:** consultas de agenda, disponibilidade, alertas de faltas e serviços sem retorno aceitavam loja opcional ou ID enviado pelo cliente sem verificar permissão de loja; algumas consultas administrativas podiam cobrir todas as lojas do parceiro. Histórico, pedidos vinculados e detalhes podiam ser carregados sem confirmar a loja do agendamento/pedido. A leitura de detalhes usava cliente administrativo e recebia IDs de agendamento e pedido sem comprovar que pertenciam ao parceiro. Na criação, os IDs de produto, serviço, variação, item de pedido e pedido não eram todos validados quanto ao parceiro, relação entre si e loja. Na edição, era possível enviar IDs de serviço/cliente de outro parceiro e alterar campos de pagamento que geram lançamentos sem a permissão específica de liquidação financeira.
+
+**Correções locais:** as leituras de agenda derivam a loja do contexto autenticado ou verificam permissão na loja solicitada e limitam o escopo; datas são validadas como ISO antes de compor filtros PostgREST. Detalhes e histórico confirmam parceiro e loja antes de carregar conteúdo; pedidos vinculados exigem permissão e correspondência de parceiro/loja. A criação valida limites do lote, quantidade e tipo de uso dos itens, escopo de produto/serviço, relação variante-produto, além de validar que itens de pedido e pedidos pertencem ao parceiro e à mesma loja. Na edição, serviço e cliente são resolvidos no parceiro, serviço e pedido precisam corresponder à loja, alterar pedido vinculado exige `orders.edit`, e campos/estados que registram liquidação exigem `financial.can_settle` no parceiro e nas lojas envolvidas. Valores pagos precisam ser finitos e não podem exceder o preço; estados de pagamento são aceitos por lista permitida. `syncAppointmentReceivable`, helper interno, deixou de ser exportado pelo módulo `"use server"`.
+
+**Validação:** `lib/erp/appointment-insights.test.ts` e `lib/erp/appointment-customer-resolution.test.ts` passaram (23/23); `git diff --check` passou. `npx tsc --noEmit` foi executado e falhou em alterações paralelas do workspace: `components/BottomSheet.tsx` usa `closeGuard` não declarado, e `components/erp/settings/SubscriptionSubPage.tsx` lê `hasScheduledChange` e `scheduledPlan` antes da declaração. Esses arquivos não foram editados nesta revisão. Sem testes de integração de ações, permissões por loja ou gravações financeiras.
+
+### Leituras de produtos, permissões de estoque e limpeza de mídia — 31/10/2026
+
+**Achados confirmados:** `getCachedProducts` e `getCachedProductById` eram exports de um módulo `"use server"` e consultavam o banco com cliente administrativo sem autenticação/autorização própria; o segundo retornava `SELECT *`. `getProducts` e três relatórios de produto permitiam omitir a loja e ler os registros de todas as lojas do parceiro sem checar a loja ativa. A edição abrangente de produto também aceitava alteração direta de `stock_quantity` com apenas `products.edit`, sem exigir permissão de movimento de estoque. Na limpeza de imagens e variantes, qualquer URL/string de imagem persistida ou enviada por `deletedImages` podia ser convertida em chave e removida do bucket R2, sem validar host nem titularidade da chave. A rotina de edição também tratava imagens omitidas como lista vazia e podia apagar mídias ao salvar outro campo.
+
+**Correções locais:** leituras cacheadas agora validam usuário, parceiro, módulo e loja; o cache estático de produtos recebe filtro de loja. Listagem, reposição, produtos estagnados, alertas de preço e busca por código de barras respeitam o contexto ativo e a permissão de loja; a reposição também exige leitura de fornecedores, pois retorna nome e custo do fornecedor. Alteração de estoque na edição abrangente exige `stock_movements.create` no parceiro/loja, e preços/estoques de produto e variante passam por validação numérica. Limpeza de mídia só ocorre quando a lista de imagens foi realmente enviada e remove apenas chaves do host público R2 configurado sob `users/{usuário atual}/products/`, bloqueando URLs externas e arquivos de outros usuários.
+
+**Validação:** revisão estática e `git diff --check`; ainda sem testes específicos de ações, matriz de permissões, uploads ou exclusões R2. Na última execução, `npx tsc --noEmit` falhou em testes paralelos do workspace (`lib/billing/plan-change.test.ts` e `lib/services/mercadopago/subscriptions.test.ts`) por `await` no topo sem configuração de módulo compatível e referências `putCall` possivelmente indefinidas; não houve erro apontado nos arquivos de produtos/clientes desta rodada.
+
+### Histórico e créditos de clientes — 31/10/2026
+
+**Achados confirmados:** `getCustomerOrdersAction` retornava pedidos, valores, status e itens só com `customers.view`, ignorando a permissão própria `orders.view`. As consultas de pedidos e créditos no detalhe de cliente e os totais da listagem não aplicavam a loja ativa, permitindo que um membro com acesso a uma loja consultasse histórico/valores de outras lojas do mesmo parceiro. O detalhe devolvia `birth_date` mesmo quando a permissão `customers.view_personal_data` era negada; a listagem já removia esse campo.
+
+**Correções locais:** o histórico exige `orders.view` e limita pedidos/totais à loja ativa (incluindo registros sem loja). Totais de pedidos só são consultados e devolvidos para quem tem permissão de leitura de pedidos; a página de clientes aplica redaction também após cache. Créditos exigem `financial.view` e respeitam a loja ativa. O detalhe agora oculta data de nascimento e IDs de usuário sem `customers.view_personal_data`. A tabela `customers` deixou de ter `store_id` numa migration de rollback existente, então os registros do cliente continuam intencionalmente no escopo do parceiro; o filtro por loja aplica-se aos pedidos e créditos associados.
+
+**Validação:** revisão estática e `git diff --check` passaram; `npx tsc --noEmit` não reportou erros nos arquivos de produtos/clientes desta rodada, mas segue falhando nos testes paralelos citados acima. Ainda sem teste integrado de papéis, loja ativa, histórico ou crédito.
+
+### Criação e edição de pedidos ERP — 01/11/2026
+
+**Achado confirmado:** criação e edição de pedidos usavam cliente administrativo para gravar `order_items`, mas não validavam de forma independente a propriedade dos IDs de produtos, serviços e variações. A validação de estoque não era suficiente porque podia ser ignorada por configuração e não verificava titularidade. Um pedido poderia, portanto, receber referência a item de outro parceiro/loja ou a variação de outro produto. A criação também aceitava um `sourceQuoteId` sem confirmar o parceiro. A leitura do orçamento de origem tentava localizar por ID/número sem escopo de parceiro.
+
+**Correções locais:** itens agora têm limites e validação de formato/quantidade/preço; produtos e serviços são resolvidos dentro do parceiro e loja do pedido; cada variação precisa existir e pertencer ao produto informado. A checagem ocorre tanto na criação quanto na edição e não depende da política de estoque negativo. Descontos exigem também a permissão efetiva na loja. A cotação de origem é validada por parceiro antes da criação, e todas as buscas da cotação no detalhe do pedido filtram pelo parceiro. A atualização de pagamento em lote compara `updated_at` lido no snapshot na própria escrita; se outra operação alterou o pedido, pula esse pedido, retorna aviso e não cria lançamentos, auditoria ou notificações para a gravação que perdeu a disputa. O modal também envia a versão do pedido que carregou; valores absolutos recebidos com uma versão antiga são recusados antes da alteração. A verificação de concorrência também vale para o caminho de compatibilidade de schema sem as colunas de delta.
+
+**Validação:** revisão estática, `git diff --check` e `npx tsc --noEmit` passaram. Não houve consulta ao banco nem teste de integração de criação/edição com recursos de outro parceiro ou loja. Também não foram simuladas duas gravações concorrentes na atualização em lote.
+
+**Limite residual:** a proteção evita sobrescrever uma versão concorrente, mas a gravação do pedido e a criação posterior de transações financeiras ainda não compartilham uma única transação PostgreSQL. Falhas entre essas etapas precisam de teste/reconciliação em homologação.
+
+### Leitura financeira por loja e fechamento de caixa — 01/11/2026
+
+**Achados confirmados:** `getFinanceAccountsAction` retornava contas e saldos de todas as lojas quando os chamadores omitiam `storeId`, embora isso ocorra no uso normal e o contexto ERP tenha uma loja ativa. As ações de caixa ativo e histórico tinham o mesmo comportamento sem `storeId`. O fechamento de caixa calculava saldo e contagens a partir de uma leitura anterior e depois atualizava a sessão; uma movimentação concorrente podia ser gravada no intervalo e ficar fora do fechamento. O saldo esperado também não subtraía reembolsos em dinheiro, embora a verificação de sangria já os subtraísse.
+
+**Correções locais:** a listagem de contas valida o parceiro ativo e, sem loja explícita, usa a loja ativa e inclui contas globais; a permissão da loja é checada antes da leitura. As leituras de sessão ativa e histórico também derivam a loja ativa, validam parceiro/loja e falham fechado se não houver loja resolvida. O saldo esperado e o fechamento subtraem reembolsos em dinheiro. O fechamento chama `erp_close_cash_session_atomic`, que bloqueia a sessão, recalcula o saldo e grava o fechamento enquanto mantém o lock usado pela RPC de movimentação; valida métodos de pagamento e valores de contagem e só pode ser executada por `service_role`. As RPCs existentes de sangria/reforço e estorno agora são chamadas com o cliente autenticado, necessário para `auth.uid()` nas funções `SECURITY INVOKER`; em erro, a ação falha fechado em vez de gravar por um caminho de fallback sem lock. O resumo é recarregado após o fechamento.
+
+**Migration pendente de aplicação:** `20261101130000_atomic_close_cash_session.sql`. Esta proteção só entra em vigor no ambiente quando a migration for aplicada. A integração e a sincronização de grants ainda precisam ser confirmadas.
+
+**Teste em homologação pendente:** abrir uma sessão de caixa descartável, fechar enquanto uma movimentação é enviada em paralelo e confirmar que ou a movimentação entra antes do fechamento e nos totais, ou é recusada porque a sessão fechou. Também conferir que erros nas RPCs de movimentação não geram gravação parcial.
+
+**Validação:** revisão estática, `git diff --check` e `npx tsc --noEmit`; não foram feitas gravações no banco nem testes concorrentes em homologação.
+
 ### RPC de movimentação de estoque — 30/10/2026
 
 **Achado confirmado:** `create_batch_stock_movement` é `SECURITY DEFINER` e sua ramificação de variantes validava o par variante/produto, mas não validava o `partner_id` do produto. A Server Action também não confirmava que todos os produtos e variantes enviados pertenciam ao parceiro ativo. Um usuário de um parceiro podia, portanto, fornecer um produto e uma variante de outro parceiro, provocando alteração de estoque via RPC de serviço.
@@ -301,8 +377,12 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 - [ ] Concluir a análise de Mercado Pago: validar em homologação a concorrência e os eventos de reversão; definir prevenção de intenções simultâneas e processo de estorno/reconciliação de excedentes; conferir os papéis legítimos que podem cobrar.
 - [ ] Revisar todas as Server Actions e Route Handlers de ERP para autorização em cada mutação e escopo por parceiro/loja, priorizando pedidos, clientes, produtos, estoque, agendamentos e financeiro.
+- [x] Revisão focada das leituras/criação/edição/exclusão de agendamentos: escopo de parceiro/loja e IDs relacionados ajustados; ainda falta validação integrada por papéis e lojas.
+- [x] Revisão focada de leituras, estoque e limpeza R2 no módulo de produtos; ainda falta validação integrada por papéis, lojas e armazenamento.
 - [ ] Revisar ações de lote, IDs relacionados e casos de mass assignment; confirmar que o escopo também é aplicado nas gravações e exclusões.
 - [ ] Confirmar no ledger/grants a aplicação de `20261030170000_restrict_financial_balance_delta.sql` e `20261030180000_atomic_transaction_payment.sql`; testar concorrência/idempotência de pagamentos em homologação.
+- [ ] Aplicar e confirmar `20261101130000_atomic_close_cash_session.sql`; exercitar fechamento concorrente com venda, sangria e reembolso em homologação.
+- [ ] Confirmar no catálogo os grants após `20261031100000_restrict_process_return_request_rpc.sql` e `20261031110000_restrict_create_product_transaction_roles.sql`; o usuário informou que ambas foram aplicadas.
 - [ ] Confirmar no ledger/schema a aplicação da migration `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql` antes de depender da preservação do histórico de estoque e da restrição de exclusão com anexos. O usuário informou que aplicou.
 - [ ] Reconciliar fluxos de estorno/cancelamento para alinhar efeito no gateway, ledger e saldo local.
 - [ ] Revisar as demais regras de papéis e permissões por módulo, incluindo operações administrativas e convites.
@@ -324,7 +404,8 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 ### Validação final
 
-- [ ] O usuário executará TypeScript e build depois das alterações finais; registrar os resultados reais quando forem fornecidos.
+- [x] `npx tsc --noEmit` passou em 31/10/2026.
+- [ ] Repetir o build depois das alterações finais; o usuário havia solicitado executar o build por conta própria.
 - [ ] Repetir suíte completa depois dos ajustes dos fixtures, caso faça sentido no ambiente disponível; guardar separadamente resultados focados e completos.
 - [ ] Definir/rodar lint quando houver ferramenta/configuração disponível; por ora não há script nem binário detectado.
 - [ ] Fazer revisão final de migration, policies, diff, secrets acidentais e fluxos legítimos impactados.
@@ -332,7 +413,7 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 ## Arquivos tocados nesta etapa conhecida
 
-O diff inclui ainda alterações paralelas no workspace em `components/erp/payments/shared/MoneyPaymentView.tsx` e `components/erp/settings/SubscriptionSubPage.tsx`; elas não foram editadas nem atribuídas à auditoria nesta retomada.
+O diff inclui ainda alterações paralelas no workspace em `app/actions/erp/subscriptions.ts`, `components/erp/settings/SubscriptionSubPage.tsx`, `lib/billing/record-charge.ts`, `lib/billing/sync-subscription.ts`, `lib/services/mercadopago/subscriptions.ts` e `lib/services/subscription.service.ts`; elas não foram editadas nem atribuídas à auditoria nesta retomada.
 
 - `app/actions/erp/team.ts`
 - `app/actions/erp/store-members.ts`
@@ -350,6 +431,8 @@ O diff inclui ainda alterações paralelas no workspace em `components/erp/payme
 - `migrations/20261030160000_restrict_settle_installment_rpc.sql`
 - `migrations/20261030170000_restrict_financial_balance_delta.sql`
 - `migrations/20261030180000_atomic_transaction_payment.sql`
+- `migrations/20261031100000_restrict_process_return_request_rpc.sql`
+- `migrations/20261031110000_restrict_create_product_transaction_roles.sql`
 - `app/actions/erp/produtividade.ts`
 - `app/actions/erp/appointments.ts`
 - `lib/services/transaction.service.ts`
@@ -358,6 +441,9 @@ O diff inclui ainda alterações paralelas no workspace em `components/erp/payme
 - `lib/services/recurring-execution.service.ts`
 - `app/actions/erp/returns.ts`
 - `app/actions/erp/service-orders.ts`
+- `app/actions/erp/suppliers.ts`
+- `components/erp/service-orders/ServiceOrderDetail.tsx`
+- `components/erp/service-orders/ServiceOrdersPage.tsx`
 - `app/actions/erp/products.ts`
 - `app/actions/erp/servicos.ts`
 - `app/api/mercadopago/create-preference/route.ts`

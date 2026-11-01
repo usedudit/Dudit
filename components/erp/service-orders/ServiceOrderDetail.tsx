@@ -411,16 +411,14 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     openPlanUpgrade("crescer");
                                                     return
                                                 }
-                                                if (order.public_token) {
-                                                    setShowShareModal(true);
-                                                    return
-                                                }
                                                 setShareLoading(true);
                                                 setShowShareModal(true);
                                                 const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                                 const token = await ensurePublicTokenAction(partnerId, order.id)
                                                 if (token) {
                                                     setOrder((prev: any) => ({ ...prev, public_token: token }))
+                                                } else {
+                                                    setShowShareModal(false)
                                                 }
                                                 setShareLoading(false);
                                             }}

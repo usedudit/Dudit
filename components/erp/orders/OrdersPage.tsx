@@ -96,6 +96,7 @@ interface Order {
     order_source: string;
     items_count: number;
     created_at_time: number;
+    updated_at?: string | null;
     situation: string;
     delivery_status?: string;
     delivery_type?: string;
@@ -1249,6 +1250,7 @@ export default function OrdersPage({
                                             returnCount: Number(order.return_count || order.order_requests?.length || 0),
                                             canEdit: order.situation !== "cancelled",
                                             paidAmount: Number(order.paid_amount || 0),
+                                            updated_at: order.updated_at,
                                             payment_method: order.payment_method || "",
                                             payment_breakdown: order.payment_breakdown || [],
                                             payment_provider: order.payment_provider || "",
@@ -1289,6 +1291,7 @@ export default function OrdersPage({
                                     returnCount: Number(order.return_count || order.order_requests?.length || 0),
                                     canEdit: order.situation !== "cancelled",
                                     paidAmount: Number(order.paid_amount || 0),
+                                    updated_at: order.updated_at,
                                     payment_method: order.payment_method || "",
                                     payment_breakdown: order.payment_breakdown || [],
                                     payment_provider: order.payment_provider || "",

@@ -838,10 +838,6 @@ export default function ServiceOrdersPage({
                                   onEdit={() => openEntity("edit", o.id)}
                                   onStatus={() => handleOpenStatusModal(o.id)}
                                   onShare={async () => {
-                                    if (o.public_token) {
-                                      setShowShareModal({ id: o.id, token: o.public_token })
-                                      return
-                                    }
                                     setShowShareModal({ id: o.id, token: "", loading: true })
                                     const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                     const token = await ensurePublicTokenAction(partnerId, o.id)
@@ -930,10 +926,6 @@ export default function ServiceOrdersPage({
                                         onEdit={() => openEntity("edit", o.id)}
                                         onStatus={() => handleOpenStatusModal(o.id)}
                                         onShare={async () => {
-                                          if (o.public_token) {
-                                            setShowShareModal({ id: o.id, token: o.public_token })
-                                            return
-                                          }
                                           setShowShareModal({ id: o.id, token: "", loading: true })
                                           const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                           const token = await ensurePublicTokenAction(partnerId, o.id)

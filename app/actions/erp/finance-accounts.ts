@@ -2,6 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { requireUser } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireStorePermission } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
@@ -99,23 +101,53 @@ export async function resolveMarketplaceOrderFinanceAccountId(
 
 export async function getFinanceAccountsAction(partnerId: string, storeId?: string | null) {
   try {
-    await requirePermission(partnerId, "financial", "view")
-    if (storeId) await requireStorePermission(storeId, partnerId, "financial", "view")
+    const user = await requireUser()
+    const context = await getCurrentPartnerContext(user)
+    if (!context?.partnerId || context.partnerId !== partnerId) {
+      throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    }
+    await requirePermission(partnerId, "financial", "view", user)
+    const effectiveStoreId = storeId === undefined ? context.activeStoreId : storeId
+    if (effectiveStoreId) {
+      await requireStorePermission(effectiveStoreId, partnerId, "financial", "view")
+    }
 
     // Use admin client after authz check so invited ERP users can read accounts.
     const { data, error } = await getCachedErpPage(
-      ["erp-finance-accounts", partnerId, storeId === undefined ? "all" : storeId || "none"],
+      ["erp-finance-accounts", partnerId, effectiveStoreId || "none"],
       [TAGS.financeAccounts(partnerId)],
       async () => {
         const supabase = createAdminClient()
-        let query = supabase
-          .from("finance_accounts")
-          .select("id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source")
-          .eq("partner_id", partnerId)
-        if (storeId !== undefined) {
-          query = storeId === null ? query.is("store_id", null) : query.eq("store_id", storeId)
+        const select = "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source"
+        if (!effectiveStoreId) {
+          return supabase
+            .from("finance_accounts")
+            .select(select)
+            .eq("partner_id", partnerId)
+            .is("store_id", null)
+            .order("name")
         }
-        return query.order("name")
+        const [storeAccounts, sharedAccounts] = await Promise.all([
+          supabase
+            .from("finance_accounts")
+            .select(select)
+            .eq("partner_id", partnerId)
+            .eq("store_id", effectiveStoreId)
+            .order("name"),
+          supabase
+            .from("finance_accounts")
+            .select(select)
+            .eq("partner_id", partnerId)
+            .is("store_id", null)
+            .order("name"),
+        ])
+        if (storeAccounts.error) return { data: null, error: storeAccounts.error }
+        if (sharedAccounts.error) return { data: null, error: sharedAccounts.error }
+        return {
+          data: [...(sharedAccounts.data || []), ...(storeAccounts.data || [])]
+            .sort((a, b) => a.name.localeCompare(b.name)),
+          error: null,
+        }
       },
       30,
     )

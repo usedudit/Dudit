@@ -11,13 +11,19 @@ interface BottomSheetProps {
     isOpen: boolean;
     onClose: () => void;
     title?: string;
+    /** Optional guard function - if returns false, close is prevented (e.g., during entrance animation) */
+    closeGuard?: () => boolean;
+    /** Time in ms to wait after opening before allowing swipe-to-dismiss/backdrop-close. Default 500ms. */
+    settleMs?: number;
 }
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
     children,
     isOpen,
     onClose,
-    title
+    title,
+    closeGuard,
+    settleMs = 500
 }) => {
 
     const sheetRef = useRef<HTMLDivElement>(null);
@@ -42,8 +48,13 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         setWindowHeight(window.innerHeight);
     }, []);
 
+    const handleClose = () => {
+        if (closeGuard && !closeGuard()) return;
+        onClose();
+    };
+
     // Arrastar pelo handle para fechar (gesto nativo de bottom sheet).
-    const swipe = useSwipeToDismiss({ y, onDismiss: onClose, armKey: isOpen });
+    const swipe = useSwipeToDismiss({ y, onDismiss: handleClose, armKey: isOpen, settleMs });
 
     return (
         <Portal>
@@ -66,7 +77,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                             animate={{ opacity: 0.6 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            onClick={onClose}
+                            onClick={handleClose}
                         />
 
                         {/* Sheet */}

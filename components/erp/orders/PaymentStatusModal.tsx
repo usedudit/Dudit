@@ -822,6 +822,7 @@ export default function PaymentStatusModal({
         paidAmount: nextPaidAmount,
         paymentBreakdown: finalBreakdown,
         manualBalanceOverride: isManualBalanceOverride || undefined,
+        expectedUpdatedAt: targetOrder.updated_at,
       });
 
       if (res.success) {

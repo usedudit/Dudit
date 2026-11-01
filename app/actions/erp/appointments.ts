@@ -120,6 +120,12 @@ function addMinutesToDateTime(date: string, time: string, durationMinutes: numbe
   }
 }
 
+function isIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
 function toDbPayload(input: AppointmentInput, partnerId: string, defaultStoreId?: string | null) {
   const durationMinutes = Math.max(1, Number(input.duration || 0))
   const derivedEnd = addMinutesToDateTime(input.date, input.time, durationMinutes)
@@ -158,6 +164,20 @@ async function getPartnerContextWithPermission(permission: "view" | "create" | "
   if (!context) throw new Error("Contexto ERP não encontrado")
   await requirePermission(context.partnerId, "appointments", permission, user)
   return { user, partnerId: context.partnerId, storeId: context.activeStoreId || null }
+}
+
+async function requireAppointmentOrderView(orderId: string, partnerId: string) {
+  await requirePermission(partnerId, "orders", "view")
+  const admin = createAdminClient()
+  const { data: order, error } = await admin
+    .from("orders")
+    .select("id, store_id")
+    .eq("id", orderId)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+  if (error || !order) throw new Error("Pedido não encontrado.")
+  if (order.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view")
+  return order
 }
 
 function isPaidStatus(status: string | null | undefined) {
@@ -282,7 +302,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
   return { saleId: params.appointment.marketplace_order_id || null, paymentTransactionId }
 }
 
-export async function syncAppointmentReceivable(params: {
+async function syncAppointmentReceivable(params: {
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
   partnerId: string
   userId: string
@@ -418,12 +438,15 @@ export async function syncAppointmentReceivable(params: {
 /** @deprecated Use getAppointmentsByDateRangeAction instead - this fetches ALL appointments with select(*) */
 export async function getAppointmentsAction() {
   try {
-    const { partnerId } = await getPartnerContextWithPermission("view")
+    const { partnerId, storeId } = await getPartnerContextWithPermission("view")
+    if (!storeId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(storeId, partnerId, "appointments", "view")
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
       .eq("partner_id", partnerId)
+      .or(`store_id.eq.${storeId},store_id.is.null`)
       .order("start_date", { ascending: true })
       .order("start_time", { ascending: true })
 
@@ -458,8 +481,13 @@ export async function getAppointmentsByDateRangeAction(
   storeIdParam?: string | null
 ) {
   try {
+    if (!isIsoDate(startDate) || !isIsoDate(endDate) || startDate > endDate) {
+      throw new Error("Período de agendamento inválido")
+    }
     const { partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("view")
-    const activeStoreId = storeIdParam ?? contextStoreId
+    const activeStoreId = storeIdParam || contextStoreId
+    if (!activeStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(activeStoreId, partnerId, "appointments", "view")
     const supabase = await getSupabaseServerClient()
 
     let query = supabase
@@ -500,11 +528,11 @@ export async function getNoShowAlertsAction(
   storeId?: string
 ): Promise<{ error: string } | NoShowAlertsResult> {
   try {
-    await requireUser()
-    await requirePermission(partnerId, "appointments", "view")
-    if (storeId) {
-      await requireStorePermission(storeId, partnerId, "appointments", "view")
-    }
+    const context = await getPartnerContextWithPermission("view")
+    if (context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    const effectiveStoreId = storeId || context.storeId
+    if (!effectiveStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(effectiveStoreId, partnerId, "appointments", "view")
     const admin = createAdminClient()
 
     const days = Math.max(1, Math.min(365, Number(periodDays) || 90))
@@ -525,10 +553,8 @@ export async function getNoShowAlertsAction(
       .eq("partner_id", partnerId)
       .gt("start_date", today)
 
-    if (storeId) {
-      pastQuery = pastQuery.or(`store_id.eq.${storeId},store_id.is.null`)
-      futureQuery = futureQuery.or(`store_id.eq.${storeId},store_id.is.null`)
-    }
+    pastQuery = pastQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+    futureQuery = futureQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
 
     const [{ data: past, error }, { data: future, error: futureError }] = await Promise.all([
       pastQuery.order("start_date", { ascending: false }).limit(2000),
@@ -553,12 +579,13 @@ export async function getStagnantServicesAction(
   storeId?: string
 ): Promise<{ error: string } | StagnantServicesResult> {
   try {
-    await requireUser()
-    await requirePermission(partnerId, "appointments", "view")
+    const context = await getPartnerContextWithPermission("view")
+    if (context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
     await requirePermission(partnerId, "services", "view")
-    if (storeId) {
-      await requireStorePermission(storeId, partnerId, "services", "view")
-    }
+    const effectiveStoreId = storeId || context.storeId
+    if (!effectiveStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(effectiveStoreId, partnerId, "appointments", "view")
+    await requireStorePermission(effectiveStoreId, partnerId, "services", "view")
     const admin = createAdminClient()
 
     const days = Math.max(1, Math.min(365, Number(periodDays) || 90))
@@ -579,10 +606,8 @@ export async function getStagnantServicesAction(
       .eq("partner_id", partnerId)
       .gte("start_date", cutoff)
 
-    if (storeId) {
-      servicesQuery = servicesQuery.or(`store_id.eq.${storeId},store_id.is.null`)
-      usageQuery = usageQuery.or(`store_id.eq.${storeId},store_id.is.null`)
-    }
+    servicesQuery = servicesQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+    usageQuery = usageQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
 
     const [{ data: services, error }, { data: usage, error: usageError }] = await Promise.all([
       servicesQuery.order("created_at", { ascending: true }).limit(200),
@@ -629,7 +654,11 @@ export async function getAvailableTimeSlotsAction(
   excludeAppointmentId?: string | null
 ) {
   try {
-    const { partnerId } = await getPartnerContextWithPermission("view")
+    if (!isIsoDate(date)) throw new Error("Data inválida")
+    const { partnerId, storeId: contextStoreId } = await getPartnerContextWithPermission("view")
+    const targetStoreId = storeId || contextStoreId
+    if (!targetStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(targetStoreId, partnerId, "appointments", "view")
     const supabase = await getSupabaseServerClient()
 
     // Fetch existing appointments for this staff on this date
@@ -641,9 +670,7 @@ export async function getAvailableTimeSlotsAction(
       .lte("start_date", date)
       .or(`end_date.gte.${date},end_date.is.null`)
 
-    if (storeId) {
-      query = query.eq("store_id", storeId)
-    }
+    query = query.eq("store_id", targetStoreId)
 
     const { data: existingAppts, error } = await query.order("start_time", { ascending: true })
 
@@ -674,8 +701,8 @@ export async function getAvailableTimeSlotsAction(
 
     // Fetch store opening hours
     let storeQuery = supabase.from("stores").select("opening_hours")
-    if (storeId) {
-      storeQuery = storeQuery.eq("id", storeId)
+    if (targetStoreId) {
+      storeQuery = storeQuery.eq("id", targetStoreId)
     } else {
       storeQuery = storeQuery.eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1)
     }
@@ -741,23 +768,109 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     await Promise.all(targetStoreIds.map((targetStoreId) =>
       requireStorePermission(targetStoreId, partnerId, "appointments", "create"),
     ))
+
+    // Resolve every referenced product, variant and service before inserting
+    // appointments. Client-supplied IDs must belong to this partner and to
+    // the appointment's store (or be partner-wide resources).
+    const requestedItems = payload.flatMap((appointment, appointmentIndex) =>
+      (appointment.items || []).map((item) => ({ item, appointmentIndex })),
+    )
+    if (payload.length > 100 || requestedItems.length > 1000) {
+      throw new Error("O lote de agendamentos excede o limite permitido")
+    }
+    const productIds = Array.from(new Set(requestedItems.map(({ item }) => item.product_id).filter(Boolean))) as string[]
+    const variantIds = Array.from(new Set(requestedItems.map(({ item }) => item.variant_id).filter(Boolean))) as string[]
+    const serviceIds = Array.from(new Set(requestedItems.map(({ item }) => item.service_id).filter(Boolean))) as string[]
+    const [productsResult, variantsResult, servicesResult] = await Promise.all([
+      productIds.length
+        ? supabase.from("products").select("id, store_id").eq("partner_id", partnerId).in("id", productIds)
+        : Promise.resolve({ data: [], error: null }),
+      variantIds.length
+        ? supabase.from("product_variants").select("id, product_id").in("id", variantIds)
+        : Promise.resolve({ data: [], error: null }),
+      serviceIds.length
+        ? supabase.from("services").select("id, store_id").eq("partner_id", partnerId).in("id", serviceIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+    if (productsResult.error || variantsResult.error || servicesResult.error) {
+      throw new Error("Não foi possível validar os itens do agendamento")
+    }
+    const productsById = new Map((productsResult.data || []).map((row: any) => [String(row.id), row]))
+    const variantsById = new Map((variantsResult.data || []).map((row: any) => [String(row.id), row]))
+    const servicesById = new Map((servicesResult.data || []).map((row: any) => [String(row.id), row]))
+    if (productsById.size !== productIds.length || variantsById.size !== variantIds.length || servicesById.size !== serviceIds.length) {
+      throw new Error("Um produto, variação ou serviço não pertence a este parceiro")
+    }
+    for (const { item, appointmentIndex } of requestedItems) {
+      if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
+        throw new Error("Quantidade inválida para item do agendamento")
+      }
+      if (!["consumed", "returnable", "reference"].includes(item.usage_type)) {
+        throw new Error("Tipo de uso inválido para item do agendamento")
+      }
+      const product = item.product_id ? productsById.get(String(item.product_id)) : null
+      const variant = item.variant_id ? variantsById.get(String(item.variant_id)) : null
+      const service = item.service_id ? servicesById.get(String(item.service_id)) : null
+      if (item.variant_id && (!product || !variant || String(variant.product_id) !== String(item.product_id))) {
+        throw new Error("A variação não pertence ao produto informado")
+      }
+      const appointmentStoreId = rows[appointmentIndex]?.store_id || null
+      for (const resource of [product, service]) {
+        if (resource?.store_id && resource.store_id !== appointmentStoreId) {
+          throw new Error("Um item do agendamento pertence a outra loja")
+        }
+      }
+    }
     const customerIds = await resolveAppointmentCustomerIds(
       supabase,
       partnerId,
       rows.map((row) => row.customer_id),
     )
 
-    // Orders are also resolved in one partner-scoped read instead of one read
-    // per appointment. The value is only a fallback when no customer matched.
-    const fallbackOrderIds = Array.from(new Set(rows
-      .filter((row) => !customerIds.get(String(row.customer_id || "").trim()) && row.marketplace_order_id)
-      .map((row) => row.marketplace_order_id as string)))
-    const { data: fallbackOrders } = fallbackOrderIds.length > 0
-      ? await supabase.from("orders").select("id, customer_id").eq("partner_id", partnerId).in("id", fallbackOrderIds)
-      : { data: [] as Array<{ id: string; customer_id: string | null }> }
-    const customerIdByOrderId = new Map((fallbackOrders || []).map((order) => [String(order.id), order.customer_id as string | null]))
+    // Resolve both explicit order links and order_item_id references before
+    // inserting. Never persist a foreign partner's order/item association.
+    const requestedOrderItemIds = Array.from(new Set(rows.map((row) => row.order_item_id).filter(Boolean))) as string[]
+    const { data: orderItems, error: orderItemsError } = requestedOrderItemIds.length > 0
+      ? await supabase.from("order_items").select("id, order_id").in("id", requestedOrderItemIds)
+      : { data: [] as Array<{ id: string; order_id: string | null }>, error: null }
+    if (orderItemsError) throw orderItemsError
+    const orderItemsById = new Map((orderItems || []).map((item) => [String(item.id), item]))
+    if (orderItemsById.size !== requestedOrderItemIds.length) {
+      throw new Error("Um item de pedido não foi encontrado")
+    }
 
-    for (const row of rows) {
+    const requestedOrderIds = Array.from(new Set([
+      ...rows.map((row) => row.marketplace_order_id),
+      ...(orderItems || []).map((item) => item.order_id),
+    ].filter(Boolean))) as string[]
+    const { data: linkedOrders, error: linkedOrdersError } = requestedOrderIds.length > 0
+      ? await supabase.from("orders").select("id, customer_id, store_id").eq("partner_id", partnerId).in("id", requestedOrderIds)
+      : { data: [] as Array<{ id: string; customer_id: string | null; store_id: string | null }>, error: null }
+    if (linkedOrdersError) throw linkedOrdersError
+    const ordersById = new Map((linkedOrders || []).map((order) => [String(order.id), order]))
+    if (ordersById.size !== requestedOrderIds.length) {
+      throw new Error("Um pedido não pertence a este parceiro")
+    }
+    const customerIdByOrderId = new Map((linkedOrders || []).map((order) => [String(order.id), order.customer_id as string | null]))
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index]
+      const orderItemId = row.order_item_id
+      const itemOrderId = orderItemId ? orderItemsById.get(String(orderItemId))?.order_id || null : null
+      if (orderItemId && !itemOrderId) throw new Error("O item do pedido não está vinculado a um pedido")
+      if (row.marketplace_order_id && itemOrderId && row.marketplace_order_id !== itemOrderId) {
+        throw new Error("O item e o pedido informados não correspondem")
+      }
+      const resolvedOrderId = row.marketplace_order_id || itemOrderId
+      if (resolvedOrderId) {
+        const order = ordersById.get(String(resolvedOrderId))
+        if (!order) throw new Error("Pedido não encontrado neste parceiro")
+        if (order.store_id && order.store_id !== rows[index].store_id) {
+          throw new Error("O pedido pertence a outra loja")
+        }
+        row.marketplace_order_id = String(order.id)
+      }
+
       const rawCustomerId = String(row.customer_id || "").trim()
       // Never trust a client-provided customer ID: marketplace orders may pass
       // an auth user ID, which must be resolved to this partner's customer row.
@@ -848,6 +961,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       ? await supabase
         .from("orders")
         .select("id, situation")
+        .eq("partner_id", partnerId)
         .in("id", Array.from(linkedOrderIds))
       : { data: [] as Array<{ id: string; situation: string | null }> }
     const situationByOrderId = new Map((linkedOrdersResult.data || []).map((order) => [String(order.id), order.situation as string | null]))
@@ -1101,7 +1215,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             product_id: item.product_id || null,
             variant_id: item.variant_id || null,
             service_id: item.service_id || null,
-            name: item.name,
+            name: String(item.name || "").trim().slice(0, 150),
             quantity: item.quantity,
             usage_type: item.usage_type,
           })
@@ -1210,23 +1324,79 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       await requireStorePermission(targetStoreId, partnerId, "appointments", "edit")
     }
 
+    const requestedServiceIds = Array.from(new Set([
+      payload.serviceId,
+      ...((payload.services || []).map((service) => service.id)),
+    ].filter(Boolean))) as string[]
+    if (requestedServiceIds.length > 0) {
+      const { data: services, error: servicesError } = await supabase
+        .from("services")
+        .select("id, store_id")
+        .eq("partner_id", partnerId)
+        .in("id", requestedServiceIds)
+      if (servicesError) throw servicesError
+      if ((services || []).length !== requestedServiceIds.length) {
+        throw new Error("Um serviço não pertence a este parceiro")
+      }
+      if ((services || []).some((service) => service.store_id && service.store_id !== targetStoreId)) {
+        throw new Error("Um serviço pertence a outra loja")
+      }
+    }
+
+    const requestedCustomerId = payload.customerId
+    if (requestedCustomerId) {
+      const resolvedCustomers = await resolveAppointmentCustomerIds(supabase, partnerId, [requestedCustomerId])
+      const resolvedCustomerId = resolvedCustomers.get(String(requestedCustomerId).trim())
+      if (!resolvedCustomerId) throw new Error("Cliente não pertence a este parceiro")
+      payload = { ...payload, customerId: resolvedCustomerId }
+    }
+
     const paymentStatusValue = (payload as any)?.paymentStatus ?? current.payment_status
     const paidAmountValue = Math.max(0, Number((payload as any)?.paidAmount ?? current.paid_amount ?? 0))
 
+    const requestsSettlement =
+      isPaidStatus(String(payload.status ?? current.status ?? "")) ||
+      isPartialStatus(String(payload.status ?? current.status ?? "")) ||
+      isPaidStatus(String(paymentStatusValue || "")) ||
+      isPartialStatus(String(paymentStatusValue || "")) ||
+      (payload as any)?.paidAmount !== undefined
+    if (requestsSettlement) {
+      await requirePermission(partnerId, "financial", "can_settle", user)
+      const financialStoreIds = Array.from(new Set([current.store_id, targetStoreId].filter(Boolean))) as string[]
+      await Promise.all(financialStoreIds.map((financialStoreId) =>
+        requireStorePermission(financialStoreId, partnerId, "financial", "can_settle"),
+      ))
+    }
+
     const linkedOrderId = current.marketplace_order_id || null
-    let linkedOrder: { situation?: string | null; payment_method_discount_amount?: number | null; payment_method_extra_amount?: number | null } | null = null
+    let linkedOrder: { situation?: string | null; store_id?: string | null; payment_method_discount_amount?: number | null; payment_method_extra_amount?: number | null } | null = null
     if (linkedOrderId) {
+      await requirePermission(partnerId, "orders", "edit", user)
+      if (current.store_id) await requireStorePermission(current.store_id, partnerId, "orders", "edit")
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
-        .select("situation, payment_method_discount_amount, payment_method_extra_amount")
+        .select("situation, store_id, payment_method_discount_amount, payment_method_extra_amount")
         .eq("id", linkedOrderId)
         .eq("partner_id", partnerId)
         .maybeSingle()
       if (orderError) throw orderError
       linkedOrder = orderData
+      if (orderData?.store_id && orderData.store_id !== targetStoreId) {
+        throw new Error("O pedido vinculado pertence a outra loja")
+      }
     }
 
     const requestedPrice = payload.price === undefined ? Number(current.price || 0) : Number(payload.price || 0)
+    if (!Number.isFinite(requestedPrice) || requestedPrice < 0) {
+      throw new Error("Valor do agendamento inválido")
+    }
+    const requestedPaidAmount = Number((payload as any)?.paidAmount ?? current.paid_amount ?? 0)
+    if (!Number.isFinite(requestedPaidAmount) || requestedPaidAmount < 0 || requestedPaidAmount > requestedPrice + 0.009) {
+      throw new Error("Valor pago inválido para este agendamento")
+    }
+    if ((payload as any)?.paymentStatus !== undefined && !["paid", "partially_paid", "unpaid", "pending"].includes(String((payload as any).paymentStatus))) {
+      throw new Error("Situação de pagamento inválida")
+    }
     if (linkedOrder && isOrderPriceLocked(linkedOrder.situation) && Math.abs(requestedPrice - Number(current.price || 0)) > 0.009) {
       return { success: false, error: "O valor do serviço não pode ser alterado porque esta venda já foi paga ou parcialmente paga." }
     }
@@ -1667,6 +1837,15 @@ export async function getAppointmentHistoryAction(appointmentId: string) {
   try {
     if (!appointmentId) return { success: false, history: [], error: "Agendamento inválido" }
     const { partnerId } = await getPartnerContextWithPermission("view")
+    const admin = createAdminClient()
+    const { data: appointment, error } = await admin
+      .from("appointments")
+      .select("store_id")
+      .eq("id", appointmentId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (error || !appointment) throw new Error("Agendamento não encontrado")
+    if (appointment.store_id) await requireStorePermission(appointment.store_id, partnerId, "appointments", "view")
     const timeline = await getAdminTimeline("appointment", appointmentId, partnerId, 50)
     const history = timeline.map((entry, idx) => ({
       id: entry.id || `${idx}`,
@@ -1685,7 +1864,7 @@ export async function getMarketplaceOrderDetailsAction(orderId: string, partnerI
   try {
     const user = await requireUser()
     if (!user) return null
-    await requirePermission(partnerId, "orders", "view")
+    await requireAppointmentOrderView(orderId, partnerId)
     const supabase = await getSupabaseServerClient()
     const { data } = await supabase
       .from("orders")
@@ -1710,7 +1889,7 @@ export async function getAppointmentOrderItemsAction(orderId: string, partnerId:
   try {
     const user = await requireUser()
     if (!user) return null
-    await requirePermission(partnerId, "orders", "view")
+    await requireAppointmentOrderView(orderId, partnerId)
     const supabase = await getSupabaseServerClient()
     const [orderRes, itemsRes] = await Promise.all([
       supabase
@@ -1751,7 +1930,7 @@ export async function getAppointmentOrderDataAction(orderId: string, partnerId: 
   try {
     const user = await requireUser()
     if (!user) return null
-    await requirePermission(partnerId, "orders", "view")
+    await requireAppointmentOrderView(orderId, partnerId)
     const supabase = await getSupabaseServerClient()
     const [orderRes, itemsRes] = await Promise.all([
       supabase
@@ -1808,6 +1987,24 @@ export async function getAppointmentDetailsDataAction(params: {
     await requirePermission(partnerId, "appointments", "view")
 
     const supabase = createAdminClient()
+    let appointmentScope: { store_id: string | null; marketplace_order_id: string | null; service_name: string | null } | null = null
+    if (appointmentId) {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("store_id, marketplace_order_id, service_name")
+        .eq("id", appointmentId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+      if (error || !data) throw new Error("Agendamento não encontrado")
+      appointmentScope = data
+      if (data.store_id) await requireStorePermission(data.store_id, partnerId, "appointments", "view")
+    }
+    if (linkedOrderId) {
+      await requireAppointmentOrderView(linkedOrderId, partnerId)
+      if (appointmentScope?.marketplace_order_id && appointmentScope.marketplace_order_id !== linkedOrderId) {
+        throw new Error("Pedido não corresponde ao agendamento")
+      }
+    }
 
     // Run all database fetches in parallel on the server
     const [partnerPlanRes, appointmentItemsRes, orderDataRes, appointmentRowRes] = await Promise.all([
@@ -1848,11 +2045,7 @@ export async function getAppointmentDetailsDataAction(params: {
       ]) : Promise.resolve([null, null]),
 
       // 5. Appointment row (to identify marketplace appointments)
-      appointmentId ? supabase
-        .from("appointments")
-        .select("id, marketplace_order_id, service_name")
-        .eq("id", appointmentId)
-        .maybeSingle() : Promise.resolve({ data: null, error: null })
+      Promise.resolve({ data: appointmentScope, error: null })
     ])
 
     // Process Partner Plan
@@ -1876,10 +2069,10 @@ export async function getAppointmentDetailsDataAction(params: {
       const serviceIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.service_id).filter(Boolean))]
       const [productsRes, servicesRes] = await Promise.all([
         productIds.length > 0
-          ? supabase.from("products").select("id, name, sku, stock_available, images").in("id", productIds)
+          ? supabase.from("products").select("id, name, sku, stock_available, images").eq("partner_id", partnerId).or(appointmentScope?.store_id ? `store_id.eq.${appointmentScope.store_id},store_id.is.null` : "store_id.is.null").in("id", productIds)
           : Promise.resolve({ data: [] }),
         serviceIds.length > 0
-          ? supabase.from("services").select("id, name, resources").in("id", serviceIds)
+          ? supabase.from("services").select("id, name, resources").eq("partner_id", partnerId).or(appointmentScope?.store_id ? `store_id.eq.${appointmentScope.store_id},store_id.is.null` : "store_id.is.null").in("id", serviceIds)
           : Promise.resolve({ data: [] }),
       ])
       const productsMap = new Map<string, any>((productsRes.data || []).map((product: any) => [String(product.id), product]))

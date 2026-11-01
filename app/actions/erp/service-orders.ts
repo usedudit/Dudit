@@ -12,6 +12,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, requireStoreAccess, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission, checkPermission } from "@/lib/permissions/access"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
@@ -28,6 +29,7 @@ import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { generateShortId, isUuid } from "@/lib/utils/short-id"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
@@ -187,6 +189,16 @@ export async function getERPServiceOrdersPageAction(
 > {
   try {
     await requirePermission(partnerId, "service_orders", "view")
+    const context = await getCurrentPartnerContext()
+    if (!context || context.partnerId !== partnerId || !context.activeStoreId) {
+      throw new Error("Loja ativa inválida para carregar as ordens de serviço.")
+    }
+    const storeId = context.activeStoreId
+    if (options?.storeId && options.storeId !== storeId) {
+      throw new Error("A loja solicitada não corresponde à loja ativa.")
+    }
+    await requireStorePermission(storeId, partnerId, "service_orders", "view")
+
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || PAGE_SIZE))))
     const fetchLimit = limit + 1
@@ -196,7 +208,7 @@ export async function getERPServiceOrdersPageAction(
       [
         "erp-service-orders-page",
         partnerId,
-        options?.storeId || "all-stores",
+        storeId,
         statuses.length > 0 ? statuses.join("+") : (options?.status || "all"),
         search || "no-search",
         cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
@@ -207,14 +219,14 @@ export async function getERPServiceOrdersPageAction(
         const supabase = getAdminClient()
         let q = supabase
           .from("service_orders")
-          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at, public_token")
+          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
           .eq("partner_id", partnerId)
         if (statuses.length > 0) q = q.in("status", statuses)
         else if (options?.status && options.status !== "all") q = q.eq("status", options.status)
         if (search) {
           q = q.or(`order_number.ilike.%${search}%,title.ilike.%${search}%,customer_snapshot->>name.ilike.%${search}%`)
         }
-        if (options?.storeId) q = q.eq("store_id", options.storeId)
+        q = q.eq("store_id", storeId)
         if (cursor) q = q.or(buildKeysetOrFilter(cursor))
         const { data, error } = await q
           .order("created_at", { ascending: false })
@@ -246,12 +258,15 @@ export async function getERPServiceOrdersPageAction(
     )
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
-    const last = items[items.length - 1]
+    // Public tokens are bearer credentials; keep them out of the general
+    // read DTO. Authorized editors obtain them through ensurePublicTokenAction.
+    const safeItems = items.map(({ public_token: _publicToken, ...item }: any) => item)
+    const last = safeItems[safeItems.length - 1]
     const nextCursor = hasMore && last?.created_at && last?.id
       ? { createdAt: String(last.created_at), id: String(last.id) }
       : null
 
-    return { success: true, items, nextCursor, hasMore }
+    return { success: true, items: safeItems, nextCursor, hasMore }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao carregar ordens de serviço" }
   }
@@ -263,6 +278,18 @@ export async function getServiceOrderDetailsAction(
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requirePermission(partnerId, "service_orders", "view")
+    const admin = getAdminClient()
+    const { data: scope, error: scopeError } = await admin
+      .from("service_orders")
+      .select("store_id")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (scopeError || !scope) throw new Error("Ordem de serviço não encontrada.")
+    if (scope.store_id) {
+      await requireStorePermission(scope.store_id, partnerId, "service_orders", "view")
+    }
+
     const detail = await getCachedErpPage(
       ["erp-service-order-detail", partnerId, serviceOrderId],
       [
@@ -273,7 +300,6 @@ export async function getServiceOrderDetailsAction(
       async () => {
         // Authorization is performed above. The cached loader is tenant-scoped
         // and read-only, so it can use the admin client safely.
-        const admin = getAdminClient()
         const { data: order, error } = await admin
           .from("service_orders")
           .select("*")
@@ -370,10 +396,14 @@ export async function getServiceOrderDetailsAction(
       }
     }
 
+    // Public tokens are bearer credentials, so only the explicit share action
+    // may return them after checking edit and store permissions.
+    const { public_token: _publicToken, ...safeOrder } = order
+
     return {
       success: true,
       data: {
-        ...order,
+        ...safeOrder,
         specifications,
         services: detail.services,
         products: detail.products,
@@ -1595,17 +1625,49 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
 
 export async function ensurePublicTokenAction(partnerId: string, serviceOrderId: string): Promise<string | null> {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return null
+
+    const user = await requireUser()
+    await requirePermission(partnerId, "service_orders", "edit", user)
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(partnerId)
+    if (!hasMinimumPlan(plan?.slug || "free", "crescer")) return null
+
     const admin = getAdminClient()
-    const { data } = await admin
+    const { data, error } = await admin
+      .from("service_orders")
+      .select("public_token, store_id")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (error || !data) return null
+    if (data.store_id) {
+      await requireStorePermission(data.store_id, partnerId, "service_orders", "edit")
+    }
+    if (data?.public_token) return data.public_token
+
+    const newToken = generateShortId()
+    const { data: updated, error: updateError } = await admin
+      .from("service_orders")
+      .update({ public_token: newToken })
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .is("public_token", null)
+      .select("public_token")
+      .maybeSingle()
+    if (updateError) return null
+    if (updated?.public_token) return updated.public_token
+
+    // Concurrent requests can both observe a missing token. Return the token
+    // that won the conditional update instead of publishing an unused value.
+    const { data: raced } = await admin
       .from("service_orders")
       .select("public_token")
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
-      .single()
-    if (data?.public_token) return data.public_token
-    const newToken = generateShortId()
-    await admin.from("service_orders").update({ public_token: newToken }).eq("id", serviceOrderId)
-    return newToken
+      .maybeSingle()
+    return raced?.public_token || null
   } catch {
     return null
   }

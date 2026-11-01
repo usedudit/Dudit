@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { XIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
@@ -16,8 +16,6 @@ interface NotificationsSheetProps {
   onClose: () => void
   notifications: NotificationsController
 }
-
-const OPEN_SETTLE_MS = 600
 
 export function NotificationsSheet({ isOpen, onClose, notifications }: NotificationsSheetProps) {
   const {
@@ -40,39 +38,6 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
   // z-index dinâmico: abre acima de tudo que já estava aberto.
   const zIndex = useModalLayer(isOpen)
 
-  // Enter-settle guard: a sheet aberta ainda está executando a animação de
-  // slide-in (spring ~300-400ms). Um toque/drag nesse janela vence o backdrop
-  // ou o drag-to-close e a sheet some em menos de 1s. Ignoramos qualquer
-  // tentativa de fechamento - inclusive via backdrop/overlay - até que a
-  // animação de entrada tenha finalizado, deixando o foco no conteúdo.
-  const settledRef = useRef(false)
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (isOpen) {
-      settledRef.current = false
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
-      settleTimerRef.current = setTimeout(() => {
-        settledRef.current = true
-      }, OPEN_SETTLE_MS)
-    } else {
-      settledRef.current = false
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
-    }
-    return () => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
-    }
-  }, [isOpen])
-
-  const guardedClose = useCallback(() => {
-    if (!settledRef.current) return
-    onClose()
-  }, [onClose])
-
-  const handleNavigate = useCallback(() => {
-    onClose()
-  }, [onClose])
-
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white px-6 py-4 dark:border-dark-border dark:bg-dark-surface">
@@ -92,7 +57,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
           hasMore={hasMore}
           onLoadMore={() => fetchMore()}
           onVisible={registerVisible}
-          onNavigate={handleNavigate}
+          onNavigate={onClose}
           onMarkAllAsRead={markAllAsRead}
           onDeleteAll={deleteAll}
           unreadCount={unreadCount}
@@ -105,8 +70,9 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
   )
 
   if (isMobile) {
+    // Use BottomSheet's built-in settleMs (600ms) to prevent immediate close during entrance animation
     return (
-      <BottomSheet isOpen={isOpen} onClose={guardedClose}>
+      <BottomSheet isOpen={isOpen} onClose={onClose} settleMs={600}>
         {content}
       </BottomSheet>
     )
@@ -123,7 +89,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={guardedClose}
+            onClick={onClose}
           >
             <motion.div
               className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"

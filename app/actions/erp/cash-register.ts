@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requirePermission } from "@/lib/permissions/access"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -33,6 +34,19 @@ type CashMovementFallbackInput = {
 function money(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.round(value * 100) / 100
+}
+
+async function resolveCashReadStoreId(partnerId: string, requestedStoreId?: string | null) {
+  const user = await requireUser()
+  const context = await getCurrentPartnerContext(user)
+  if (!context?.partnerId || context.partnerId !== partnerId) {
+    throw new Error("O parceiro informado não corresponde ao contexto ativo")
+  }
+  await requirePermission(partnerId, "pdv", "view", user)
+  const storeId = requestedStoreId || context.activeStoreId
+  if (!storeId) throw new Error("Nenhuma loja ativa foi resolvida para este parceiro")
+  await requireStorePermission(storeId, partnerId, "pdv", "view")
+  return storeId
 }
 
 function normalizeCashMovementDescription(type: "withdrawal" | "deposit", description?: string | null) {
@@ -90,7 +104,7 @@ function isMovementActive(row: { reversed_at?: string | null }) {
   return row.reversed_at == null
 }
 
-/** Cash drawer balance: initial + cash sales + deposits − withdrawals (active movements only). */
+/** Cash drawer balance: initial + cash sales + deposits − withdrawals − refunds (active movements only). */
 function computeDrawerBalanceCents(params: {
   initialAmount: number
   movements: Array<{
@@ -105,6 +119,7 @@ function computeDrawerBalanceCents(params: {
   let cashSales = 0
   let deposits = 0
   let withdrawals = 0
+  let refunds = 0
 
   for (const m of params.movements || []) {
     if (!isMovementActive(m)) continue
@@ -112,6 +127,7 @@ function computeDrawerBalanceCents(params: {
     if (!(amt > 0)) continue
     if (m.type === "deposit") deposits += amt
     else if (m.type === "withdrawal") withdrawals += amt
+    else if (m.type === "refund") refunds += amt
     else if (m.type === "sale") {
       const pmType = m.payment_method_type
       const isCash = !m.payment_method_id || pmType === "cash"
@@ -119,12 +135,13 @@ function computeDrawerBalanceCents(params: {
     }
   }
 
-  const total = money(initial + cashSales + deposits - withdrawals)
+  const total = money(initial + cashSales + deposits - withdrawals - refunds)
   return {
     initial,
     cashSales,
     deposits,
     withdrawals,
+    refunds,
     total,
   }
 }
@@ -459,12 +476,10 @@ async function reverseCashMovementFallback(
 }
 
 export async function getActiveCashSessionAction(partnerId: string, storeId?: string | null) {
-  await requireUser()
-  await requirePermission(partnerId, "pdv", "view")
-  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
+  const effectiveStoreId = await resolveCashReadStoreId(partnerId, storeId)
   // Read with admin client after authz so invited users can load session data.
   const supabase = createAdminClient()
-  const session = await getActiveSessionForPartner(supabase, partnerId, storeId)
+  const session = await getActiveSessionForPartner(supabase, partnerId, effectiveStoreId)
 
   // Enrich with opener name when a session exists
   if (session) {
@@ -648,7 +663,8 @@ export async function createCashMovementAction(input: {
     return { success: false as const, error: "Conta de caixa inválida para esta loja." }
   }
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
+  const requestClient = await getSupabaseServerClient()
+  const { data: rpcData, error: rpcError } = await requestClient.rpc("erp_create_cash_manual_movement", {
     p_partner_id: input.partnerId,
     p_cash_session_id: sessionId,
     p_movement_type: input.type,
@@ -658,43 +674,11 @@ export async function createCashMovementAction(input: {
   })
 
   if (rpcError) {
-    const fallbackResult = await createCashMovementFallback(supabase, {
-      partnerId: input.partnerId,
-      storeId: cashSession.store_id || null,
-      cashSessionId: sessionId,
-      type: input.type,
-      description: normalizedDescription,
-      amount: money(rawAmount),
-      cashFinanceAccountId: cashAccountId,
-      userId: user.id,
-    })
-
-    if (!fallbackResult.success) return fallbackResult
-
-    const fallbackMovementId = (fallbackResult.data as any)?.id as string | undefined
-    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
-    await logAuditEvent({
-      partnerId: input.partnerId,
-      actorUserId: user.id,
-      entityType: "cash_session",
-      entityId: sessionId,
-      actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
-      changeLines: [`registrou ${fallbackTypeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} - ${normalizedDescription}`],
-      metadata: fallbackMovementId ? { movement_id: fallbackMovementId } : null,
-      source: "manual",
-    })
-    await revalidateEntityTimeline("cash_session", sessionId)
-    revalidatePath("/erp/caixa")
-    revalidatePath("/erp/transacoes")
-
-    console.log("[cash-register] createCashMovementAction OK (fallback path)", {
-      partnerId: input.partnerId,
-      sessionId,
-      movementId: fallbackMovementId,
-      financial_transaction_id: (fallbackResult.data as any)?.financial_transaction_id ?? null,
-    })
-
-    return fallbackResult
+    console.error("[cash-register] atomic movement RPC failed:", rpcError)
+    return {
+      success: false as const,
+      error: "Não foi possível registrar a movimentação de forma segura. Tente novamente ou contate o suporte.",
+    }
   }
 
   const movementId = (rpcData as any)?.movement_id as string | undefined
@@ -766,45 +750,18 @@ export async function reverseCashMovementAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc("erp_reverse_cash_manual_movement", {
+  const requestClient = await getSupabaseServerClient()
+  const { data: rpcData, error: rpcError } = await requestClient.rpc("erp_reverse_cash_manual_movement", {
     p_partner_id: input.partnerId,
     p_movement_id: input.movementId,
   })
 
   if (rpcError) {
-    const fallbackResult = await reverseCashMovementFallback(supabase, {
-      partnerId: input.partnerId,
-      storeId: session.store_id || null,
-      movementId: input.movementId,
-      userId: user.id,
-    })
-    if (!fallbackResult.success) return fallbackResult
-
-    const { data: fallbackMovement } = await supabase
-      .from("cash_movements")
-      .select("cash_session_id, description, amount, type")
-      .eq("id", input.movementId)
-      .maybeSingle()
-
-    if (fallbackMovement?.cash_session_id) {
-      await logAuditEvent({
-        partnerId: input.partnerId,
-        actorUserId: user.id,
-        entityType: "cash_session",
-        entityId: fallbackMovement.cash_session_id,
-        actionType: "movement_reversed",
-        changeLines: [
-          `estornou ${fallbackMovement.type === "withdrawal" ? "sangria" : "reforço"} de R$ ${money(Number(fallbackMovement.amount || 0)).toFixed(2)} - ${String(fallbackMovement.description || "").slice(0, 120)}`,
-        ],
-        source: "manual",
-      })
-      await revalidateEntityTimeline("cash_session", fallbackMovement.cash_session_id)
+    console.error("[cash-register] atomic reversal RPC failed:", rpcError)
+    return {
+      success: false as const,
+      error: "Não foi possível estornar a movimentação de forma segura. Tente novamente ou contate o suporte.",
     }
-
-    revalidatePath("/erp/caixa")
-    revalidatePath("/erp/transacoes")
-
-    return fallbackResult
   }
 
   const { data: movement } = await supabase
@@ -911,63 +868,49 @@ export async function closeCashSessionAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const countedRows = (input.countedByMethod || []).map((row) => ({
-    paymentMethodId: row.paymentMethodId ?? null,
-    amount: money(Math.max(0, Number(row.amount || 0))),
-  }))
-
-  const calculated = summary.data.expectedDrawerTotal
-  if (!Number.isFinite(calculated)) {
-    return { success: false as const, error: "Não foi possível calcular o saldo esperado do caixa." }
+  const rawCounts = input.countedByMethod || []
+  if (!Array.isArray(rawCounts) || rawCounts.length > 100) {
+    return { success: false as const, error: "A contagem deve conter no máximo 100 formas de pagamento." }
+  }
+  const countedRows: CountedPaymentMethodEntry[] = []
+  for (const row of rawCounts) {
+    const amount = Number(row?.amount)
+    const paymentMethodId = row?.paymentMethodId ?? null
+    if (!Number.isFinite(amount) || amount < 0) {
+      return { success: false as const, error: "Os valores contados precisam ser números não negativos." }
+    }
+    if (
+      paymentMethodId !== null &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethodId)
+    ) {
+      return { success: false as const, error: "Método de pagamento inválido." }
+    }
+    countedRows.push({ paymentMethodId, amount: money(amount) })
   }
 
-  const methodTypeById = new Map<string, string>()
-  for (const row of summary.data.groupedByMethod || []) {
-    const key = row.paymentMethodId || "__cash__"
-    methodTypeById.set(key, row.paymentMethodType || (row.paymentMethodId ? "other" : "cash"))
-  }
-
-  const countedCashSales = money(
-    countedRows.reduce((acc, row) => {
-      const key = row.paymentMethodId || "__cash__"
-      const pmType = methodTypeById.get(key) || (row.paymentMethodId ? "other" : "cash")
-      return pmType === "cash" ? acc + row.amount : acc
-    }, 0),
+  const { data: closeResult, error: closeError } = await supabase.rpc(
+    "erp_close_cash_session_atomic",
+    {
+      p_partner_id: input.partnerId,
+      p_cash_session_id: input.cashSessionId,
+      p_actor_user_id: user.id,
+      p_counted_by_method: countedRows.length > 0 ? countedRows : null,
+      p_notes: sanitizeNotes(input.notes) || null,
+    },
   )
+  if (closeError) return { success: false as const, error: closeError.message }
 
-  const hasExplicitCounts = (input.countedByMethod || []).length > 0
-  const informedTotal = hasExplicitCounts
-    ? money(
-      Number(summary.data.drawer?.initial || 0) +
-      countedCashSales +
-      Number(summary.data.drawer?.deposits || 0) -
-      Number(summary.data.drawer?.withdrawals || 0),
-    )
-    : calculated
-  const difference = money(informedTotal - calculated)
-
-  const closingPayload = {
-    closing_amount: informedTotal,
-    calculated_amount: calculated,
-    difference_amount: difference,
-    closed_at: new Date().toISOString(),
-    closed_by_user_id: user.id,
-    status: "closed",
-    notes: input.notes?.trim() || session.notes || null,
-    updated_at: new Date().toISOString(),
-    closing_method_counts: countedRows.length > 0 ? countedRows : null,
+  const closeData = closeResult as any
+  const data = closeData?.session
+  if (!data?.id) {
+    return { success: false as const, error: "O fechamento do caixa não retornou uma sessão válida." }
   }
+  const calculated = money(Number(closeData.calculated_amount))
+  const informedTotal = money(Number(closeData.closing_amount))
+  const difference = money(Number(closeData.difference_amount))
 
-  const { data, error } = await supabase
-    .from("cash_sessions")
-    .update(closingPayload)
-    .eq("id", input.cashSessionId)
-    .eq("partner_id", input.partnerId)
-    .eq("status", "open")
-    .select("*")
-    .single()
-
-  if (error) return { success: false as const, error: error.message }
+  const reloadedSummary = await getCashSessionCloseSummaryAction(input.partnerId, input.cashSessionId)
+  const finalSummary = reloadedSummary.success ? reloadedSummary.data : summary.data
 
   await logAuditEvent({
     partnerId: input.partnerId,
@@ -991,7 +934,7 @@ export async function closeCashSessionAction(input: {
   // Build operator-grouped summary for the close response
   const opGroups = new Map<string, { operatorName: string; byMethod: Map<string, { label: string; amount: number }> }>()
   const nameById = new Map<string, string>()
-  const allUserIds = new Set((summary.data.movements || []).map((m: any) => m.created_by_user_id).filter(Boolean))
+  const allUserIds = new Set((finalSummary.movements || []).map((m: any) => m.created_by_user_id).filter(Boolean))
   if (allUserIds.size > 0) {
     const { data: profiles } = await supabase
       .from("user_profiles")
@@ -999,7 +942,7 @@ export async function closeCashSessionAction(input: {
       .in("user_id", Array.from(allUserIds))
     for (const p of profiles || []) nameById.set(p.user_id, p.full_name || "Usuário")
   }
-  for (const m of summary.data.movements || []) {
+  for (const m of finalSummary.movements || []) {
     if (m.reversed_at || m.type !== "sale") continue
     const opUserId = m.created_by_user_id || "unknown"
     if (!opGroups.has(opUserId)) {
@@ -1029,38 +972,33 @@ export async function closeCashSessionAction(input: {
       calculated_amount: calculated,
       closing_amount: informedTotal,
       difference_amount: difference,
-      groupedByMethod: summary.data.groupedByMethod,
+      groupedByMethod: finalSummary.groupedByMethod,
       groupedByOperator,
     },
   }
 }
 
 export async function getCashSessionsHistoryAction(partnerId: string, storeId?: string | null) {
-  await requirePermission(partnerId, "pdv", "view")
-  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
+  const effectiveStoreId = await resolveCashReadStoreId(partnerId, storeId)
   const supabase = createAdminClient()
 
   let sessionsQuery = supabase
     .from("cash_sessions")
     .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
     .eq("partner_id", partnerId)
-  if (storeId) {
-    sessionsQuery = sessionsQuery.eq("store_id", storeId)
-  }
+  sessionsQuery = sessionsQuery.eq("store_id", effectiveStoreId)
   const { data: sessions, error: sessionError } = await sessionsQuery
     .order("opened_at", { ascending: false })
     .limit(400)
   if (sessionError) return { success: false as const, error: sessionError.message }
 
   const sessionIds = (sessions || []).map((s: { id: string }) => s.id)
-  const movementQuery = supabase
+  let movementQuery = supabase
     .from("cash_movements")
     .select("cash_session_id, type, amount, reversed_at, payment_method_id")
     .eq("partner_id", partnerId)
     .in("cash_session_id", sessionIds)
-  if (storeId) {
-    movementQuery.eq("store_id", storeId)
-  }
+  movementQuery = movementQuery.eq("store_id", effectiveStoreId)
   const { data: movementRows } = sessionIds.length > 0
     ? await movementQuery
     : { data: [] as any[] }
@@ -1143,13 +1081,12 @@ export async function getCashSessionsHistoryPageAction(
   partnerId: string,
   options?: { cursor?: ERPCashSessionListCursor | null; limit?: number; storeId?: string | null },
 ) {
-  await requirePermission(partnerId, "pdv", "view")
+  const requestedStoreId = options?.storeId
+  const storeId = await resolveCashReadStoreId(partnerId, requestedStoreId)
   // Read with admin client after authz so invited users can load history.
   const cursor = options?.cursor ?? null
   const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CASH_SESSIONS_PAGE_SIZE))))
   const fetchLimit = limit + 1
-  const storeId = options?.storeId
-  if (storeId) await requireStorePermission(storeId, partnerId, "pdv", "view")
   const { data: sessions, error: sessionError } = await getCachedErpPage(
     ["erp-cash-sessions-page", partnerId, storeId || "all-stores", cursor ? `${cursor.openedAt}:${cursor.id}` : "first", String(limit)],
     [TAGS.cashSessions(partnerId)],
