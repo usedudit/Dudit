@@ -15,7 +15,7 @@ import {
   getPlanById,
   invalidatePartnerPlanCache,
 } from "@/lib/services/subscription.service"
-import type { Plan } from "@/lib/services/subscription.service"
+import type { Plan, Subscription } from "@/lib/services/subscription.service"
 import { planTierIndex } from "@/lib/subscription/plan-tier"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -169,10 +169,12 @@ export async function createMpSubscription(
   if (existing) {
     const existingPrice = Number((existing as any).plan?.price || 0)
     // A free subscription is just the fallback plan: it must not block a new
-    // paid checkout. Only an already-paid contract blocks another one.
+    // paid checkout. Only a live paid contract blocks another one — a contract
+    // already scheduled to end does not, since the partner is leaving it.
     if (
       ["active", "trialing", "past_due"].includes(existing.status) &&
-      existingPrice > 0
+      existingPrice > 0 &&
+      !existing.cancel_at_period_end
     ) {
       return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
     }
@@ -427,6 +429,8 @@ export async function cancelMpSubscription(
       .update({
         cancel_at_period_end: true,
         cancelled_at: now,
+        // A cancellation always wins over a scheduled downgrade.
+        pending_plan_id: null,
       })
       .eq("id", subscriptionId)
 
@@ -482,6 +486,7 @@ export async function cancelMpSubscription(
       cancelled_at: now,
       ended_at: now,
       cancel_at_period_end: false,
+      pending_plan_id: null,
     })
     .eq("id", subscriptionId)
 
@@ -551,8 +556,10 @@ export async function cancelMpSubscription(
 
 /**
  * Handle plan changes:
- * - Upgrade: cancel old + create new immediately
- * - Downgrade: schedule switch at next billing cycle (cancel_at_period_end + pending_plan_id)
+ * - Upgrade: open a new preapproval and keep the current contract until it is paid.
+ * - Downgrade: keep the same preapproval/row and rotate the plan at the end of
+ *   the paid cycle (`pending_plan_id`). A paid target gets the new amount on the
+ *   preapproval right away; a free target stops the preapproval now.
  */
 export async function updateMpSubscription(
   partnerId: string,
@@ -580,6 +587,11 @@ export async function updateMpSubscription(
     // checkout left the partner with no plan at all. The new preapproval is
     // created as a pending attempt; a paid webhook promotes it and only then
     // the previous subscription is superseded.
+    //
+    // A downgrade scheduled earlier must not survive: while this checkout is
+    // open the current contract goes back to its own price.
+    await clearScheduledPlanChange(currentSub, currentPlan)
+
     const billingEmail = currentSub.billing_email || ""
     const createResult = await createMpSubscription(partnerId, newPlanId, billingEmail, actorUserId, { skipExistingCheck: true })
 
@@ -605,15 +617,122 @@ export async function updateMpSubscription(
       message: "Conclua o pagamento para ativar o novo plano. Seu plano atual continua ativo até lá.",
     }
   } else {
-    // ── DOWNGRADE: Schedule for next billing cycle ──
-    // Choosing a new plan supersedes any unfinished plan-change checkout.
+    // ── DOWNGRADE: change the plan at the end of the paid cycle ──
+    // The preapproval is never recreated: the same contract rotates to the new
+    // plan, so the webhook keeps resolving to this subscription and the billing
+    // history stays on one row.
     await cancelPendingPlanChangeAttempts(partnerId)
+
+    const now = new Date()
+    const periodEnd = currentSub.current_period_end
+      ? new Date(currentSub.current_period_end)
+      : null
+    const hasFuturePeriod =
+      !!periodEnd && !isNaN(periodEnd.getTime()) && periodEnd.getTime() > now.getTime()
+    const nextIsFree = Number(newPlan.price || 0) <= 0
+
+    // ── No paid time left: apply the switch right away ──
+    if (!hasFuturePeriod) {
+      if (currentSub.mercado_pago_subscription_id) {
+        if (nextIsFree) {
+          await cancelMpPreapproval(currentSub.mercado_pago_subscription_id)
+        } else {
+          const synced = await syncMpPreapprovalForPlan(
+            currentSub.mercado_pago_subscription_id,
+            newPlan,
+          )
+          if (!synced) {
+            return {
+              success: false,
+              type: "downgrade",
+              error: "Não foi possível atualizar o valor no Mercado Pago. Tente novamente.",
+            }
+          }
+        }
+      }
+
+      const { error: scheduleError } = await admin
+        .from("subscriptions")
+        .update({ pending_plan_id: newPlanId })
+        .eq("id", currentSub.id)
+
+      if (scheduleError) {
+        return { success: false, type: "downgrade", error: scheduleError.message }
+      }
+
+      const { applyScheduledPlanChange } = await import("@/lib/billing/plan-change")
+      const applied = await applyScheduledPlanChange(currentSub.id)
+
+      if (!applied.applied) {
+        return {
+          success: false,
+          type: "downgrade",
+          error: "Não foi possível alterar o plano agora. Tente novamente.",
+        }
+      }
+
+      await logBillingEvent(admin, partnerId, "downgrade_applied", null, {
+        from_plan: currentPlan.slug,
+        to_plan: newPlan.slug,
+      })
+
+      await auditLog({
+        action: "subscription.downgraded",
+        actorUserId,
+        partnerId,
+        metadata: {
+          from_plan: currentPlan.slug,
+          to_plan: newPlan.slug,
+          effective_at: now.toISOString(),
+        },
+      })
+
+      return {
+        success: true,
+        type: "downgrade",
+        message: `Plano alterado para ${newPlan.name}.`,
+      }
+    }
+
+    // ── Paid cycle still running: schedule the rotation ──
+    if (nextIsFree) {
+      // Stop the recurring charge now; access remains until the period end.
+      const cancelResult = await cancelMpSubscription(currentSub.id, actorUserId, undefined, {
+        immediate: false,
+      })
+      if (!cancelResult.success) {
+        return { success: false, type: "downgrade", error: cancelResult.error }
+      }
+    } else {
+      if (!currentSub.mercado_pago_subscription_id) {
+        return {
+          success: false,
+          type: "downgrade",
+          error: "Assinatura sem cobrança recorrente no Mercado Pago.",
+        }
+      }
+
+      const synced = await syncMpPreapprovalForPlan(
+        currentSub.mercado_pago_subscription_id,
+        newPlan,
+      )
+      if (!synced) {
+        return {
+          success: false,
+          type: "downgrade",
+          error: "Não foi possível atualizar o valor no Mercado Pago. Tente novamente.",
+        }
+      }
+    }
 
     const { error } = await admin
       .from("subscriptions")
       .update({
-        cancel_at_period_end: true,
+        // A free target also ends the contract (`cancel_at_period_end`); a paid
+        // rotation keeps the current cycle running normally.
+        cancel_at_period_end: nextIsFree,
         pending_plan_id: newPlanId,
+        ...(nextIsFree ? {} : { cancelled_at: null }),
       })
       .eq("id", currentSub.id)
 
@@ -645,7 +764,9 @@ export async function updateMpSubscription(
     return {
       success: true,
       type: "downgrade",
-      message: "Downgrade agendado para o próximo ciclo de faturamento",
+      message: nextIsFree
+        ? `Plano Começar agendado para ${new Date(currentSub.current_period_end!).toLocaleDateString("pt-BR")}.`
+        : `Downgrade agendado para o próximo ciclo de faturamento (${newPlan.name}).`,
     }
   }
 }
@@ -678,6 +799,102 @@ export async function getMpSubscriptionStatus(
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Update the amount Mercado Pago will charge on the next cycle of an existing
+ * preapproval.
+ *
+ * A downgrade keeps the same contract (same preapproval) and only changes the
+ * price; Mercado Pago charges `auto_recurring.transaction_amount`, so the next
+ * automatic payment already uses the new plan. The preapproval is never
+ * recreated — a new one would require the payer to authorize it again.
+ */
+export async function syncMpPreapprovalForPlan(
+  mpSubscriptionId: string,
+  plan: Pick<Plan, "name" | "price">,
+): Promise<boolean> {
+  const amount = Number(plan?.price || 0)
+  if (!mpSubscriptionId || !Number.isFinite(amount) || amount <= 0) return false
+
+  try {
+    const accessToken = await getMpPlatformAccessToken()
+
+    const response = await fetch(`https://api.mercadopago.com/preapproval/${mpSubscriptionId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        reason: `Dudit ${plan.name} - Assinatura mensal`,
+        auto_recurring: {
+          transaction_amount: amount,
+          currency_id: "BRL",
+        },
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      SecureLogger.error("Failed to update MP preapproval amount", {
+        mpSubscriptionId,
+        status: response.status,
+        providerMessage:
+          typeof errorData?.message === "string" ? errorData.message.slice(0, 160) : null,
+      })
+      return false
+    }
+
+    return true
+  } catch (err: any) {
+    SecureLogger.error("Failed to update MP preapproval amount", {
+      mpSubscriptionId,
+      error: err instanceof Error ? err.message : "Unknown",
+    })
+    return false
+  }
+}
+
+/**
+ * Drop a scheduled plan change from the current contract, restoring the amount
+ * of the plan the partner is actually on.
+ *
+ * Used when the partner starts an upgrade: while the new checkout is open, the
+ * current subscription must bill its own price again (otherwise an abandoned
+ * checkout would leave the old contract with the downgraded amount).
+ */
+async function clearScheduledPlanChange(
+  sub: Pick<
+    Subscription,
+    "id" | "pending_plan_id" | "cancel_at_period_end" | "mercado_pago_subscription_id"
+  >,
+  currentPlan: Plan,
+): Promise<void> {
+  if (!sub.pending_plan_id && !sub.cancel_at_period_end) return
+
+  const admin = getAdminClient()
+  const update: Record<string, any> = { pending_plan_id: null }
+
+  // A hard cancellation (`cancel_at_period_end`) is never undone by an upgrade:
+  // the partner asked the current contract to end, and the new plan will
+  // supersede it once paid.
+  if (!sub.cancel_at_period_end) {
+    update.cancel_at_period_end = false
+  }
+
+  const { error } = await admin.from("subscriptions").update(update).eq("id", sub.id)
+  if (error) {
+    SecureLogger.error("Failed to clear scheduled plan change", {
+      subscriptionId: sub.id,
+      error: error.message,
+    })
+    return
+  }
+
+  if (!sub.cancel_at_period_end && sub.mercado_pago_subscription_id) {
+    await syncMpPreapprovalForPlan(sub.mercado_pago_subscription_id, currentPlan)
+  }
+}
 
 /**
  * Cancel unfinished plan-change checkouts (status "pending") for a partner.

@@ -19,6 +19,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { logBillingAudit } from "./audit"
 import { refreshInvoiceForPurchase } from "./invoice-generation"
 import { computeSubscriptionPeriods, cycleKey, resolveBillingCycle } from "./subscription-period"
+import { shouldKeepScheduledAccess } from "./plan-change"
 import {
   recordSubscriptionCharge,
   type RecordChargeResult,
@@ -203,19 +204,28 @@ export async function syncSubscriptionToBilling(
 ): Promise<SubscriptionSyncResult> {
   const supabase = getAdminClient()
   const nowIso = new Date().toISOString()
-  const targetStatus = normalizeStatus(options.status)
   const notify = options.notify !== false
 
   // ── 0. Load current subscription (previous status is needed for transitions) ──
   const { data: before, error: beforeError } = await supabase
     .from("subscriptions")
-    .select("id, status, past_due_at, created_at, current_period_start, current_period_end, billing_anchor_day")
+    .select("id, status, past_due_at, created_at, current_period_start, current_period_end, billing_anchor_day, cancel_at_period_end, pending_plan_id")
     .eq("id", subscriptionId)
     .maybeSingle()
 
   if (beforeError || !before) {
     console.error(`[BillingSync] Subscription ${subscriptionId} not found:`, beforeError?.message)
     return { purchaseId: null, created: false }
+  }
+
+  let targetStatus = normalizeStatus(options.status)
+
+  // Mercado Pago cancels the preapproval as soon as a downgrade/cancellation is
+  // scheduled and echoes a `cancelled` event right away. Honouring it would cut
+  // a paid cycle short, so the row keeps its status until `current_period_end`,
+  // when the scheduled change is applied.
+  if (shouldKeepScheduledAccess(before as any, targetStatus)) {
+    targetStatus = null
   }
 
   const previousStatus = normalizeStatus(options.previousStatus) ?? (before.status as string)

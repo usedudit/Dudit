@@ -25,6 +25,7 @@ import {
   expirePastDueSubscription,
   PAST_DUE_GRACE_PERIOD_DAYS,
 } from "@/lib/services/subscription.service"
+import { applyDueScheduledPlanChanges } from "./plan-change"
 
 const DELAY_BETWEEN_BATCHES_MS = 1000
 const MP_API_TIMEOUT_MS = 10_000
@@ -36,6 +37,8 @@ interface ReconcileResult {
   synced: number
   errors: number
   cancelledForNonPayment: number
+  scheduledChangesApplied: number
+  scheduledChangesFailed: number
   details: Array<{
     subscriptionId: string
     mpId: string
@@ -93,7 +96,22 @@ export async function reconcileSubscriptions(): Promise<ReconcileResult> {
     synced: 0,
     errors: 0,
     cancelledForNonPayment: 0,
+    scheduledChangesApplied: 0,
+    scheduledChangesFailed: 0,
     details: [],
+  }
+
+  // Apply scheduled downgrades/cancellations whose cycle already ended. This
+  // runs before the per-preapproval pass so a rotation is reflected in the same
+  // run even when the partner never opened the app.
+  try {
+    const scheduled = await applyDueScheduledPlanChanges()
+    result.scheduledChangesApplied = scheduled.applied
+    result.scheduledChangesFailed = scheduled.failed
+    result.updated += scheduled.applied
+  } catch (err: any) {
+    console.error("[ReconcileSubs] Scheduled plan changes failed:", err?.message)
+    result.errors++
   }
 
   let accessToken: string
@@ -304,7 +322,7 @@ export async function reconcileSubscriptions(): Promise<ReconcileResult> {
   }
 
   console.log(
-    `[ReconcileSubs] Done: ${result.totalProcessed} processed, ${result.updated} updated, ${result.errors} errors, ${result.cancelledForNonPayment} cancelled for non-payment`,
+    `[ReconcileSubs] Done: ${result.totalProcessed} processed, ${result.updated} updated, ${result.errors} errors, ${result.cancelledForNonPayment} cancelled for non-payment, ${result.scheduledChangesApplied} scheduled changes applied (${result.scheduledChangesFailed} failed)`,
   )
 
   return result

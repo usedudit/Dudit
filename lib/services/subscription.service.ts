@@ -176,7 +176,7 @@ function getCached<T>(cache: CacheEntry<T> | undefined | null): T | null {
 
 let freePlanCache: CacheEntry<Plan> | null = null
 
-async function getFreePlan(): Promise<Plan> {
+export async function getFreePlan(): Promise<Plan> {
   const cached = getCached(freePlanCache)
   if (cached) return cached
 
@@ -374,34 +374,43 @@ export const getPartnerSubscription = cache(async (partnerId: string): Promise<S
 
   if (!selected) return null
 
-  // Check if active subscription scheduled to cancel has already expired:
-  if (
-    selected.cancel_at_period_end &&
+  // A scheduled change (downgrade or cancellation) whose cycle already ended is
+  // applied by the same routine used by getPartnerPlan, so both paths agree.
+  const scheduledChangeDue =
+    (Boolean(selected.pending_plan_id) || Boolean(selected.cancel_at_period_end)) &&
     selected.current_period_end &&
     new Date(selected.current_period_end).getTime() <= Date.now()
-  ) {
-    const nowIso = new Date().toISOString()
-    await admin
-      .from("subscriptions")
-      .update({
-        status: "cancelled",
-        ended_at: nowIso,
-        cancel_at_period_end: false,
-        updated_at: nowIso,
-      })
-      .eq("id", selected.id)
 
-    try {
-      const { enforcePlanLimitsAndArchiveExcess } = await import(
-        "@/lib/services/subscription-archiver.service"
-      )
-      await enforcePlanLimitsAndArchiveExcess(partnerId)
-    } catch (archErr: any) {
-      console.error("[SUBSCRIPTION] Error archiving on expiry in getPartnerSubscription:", archErr.message)
+  if (scheduledChangeDue) {
+    const { applyScheduledPlanChange } = await import("@/lib/billing/plan-change")
+    const change = await applyScheduledPlanChange(selected.id)
+
+    if (change.applied && change.kind === "cancellation") {
+      return null
     }
 
-    partnerPlanCache.delete(partnerId)
-    return null
+    if (change.applied) {
+      // Plan rotated in place: reload so callers see the new plan/period.
+      const { data: refreshed } = await admin
+        .from("subscriptions")
+        .select("*, plan:plans!plan_id(*)")
+        .eq("id", selected.id)
+        .maybeSingle()
+
+      if (refreshed) {
+        return {
+          ...refreshed,
+          plan: refreshed.plan as Plan,
+        } as SubscriptionWithPlan
+      }
+    }
+
+    // Could not apply (e.g. scheduled plan deleted): keep the current row
+    // instead of revoking access.
+    return {
+      ...selected,
+      plan: selected.plan as Plan,
+    } as SubscriptionWithPlan
   }
 
   return {
@@ -464,70 +473,30 @@ export const getPartnerPlan = cache(async (partnerId: string): Promise<Plan> => 
     )
 
     if (activeSub?.plan) {
-      // If the subscription is scheduled to cancel/downgrade at period end,
-      // check if the current paid period has expired:
+      // A paid cycle can end with a scheduled plan change (downgrade) or with a
+      // plain cancellation. Both are applied by `applyScheduledPlanChange`, on
+      // the SAME subscription row (never cancel + insert: that orphaned the MP
+      // preapproval).
+      const hasScheduledChange =
+        Boolean(activeSub.pending_plan_id) || Boolean(activeSub.cancel_at_period_end)
       const isPeriodExpired =
-        activeSub.cancel_at_period_end &&
+        hasScheduledChange &&
         activeSub.current_period_end &&
         new Date(activeSub.current_period_end).getTime() <= Date.now()
 
       if (isPeriodExpired) {
-        // The paid cycle has ended. Transition this subscription to cancelled/downgraded.
-        const nowIso = new Date().toISOString()
-        const pendingPlanId = activeSub.pending_plan_id
+        const { applyScheduledPlanChange } = await import("@/lib/billing/plan-change")
+        const change = await applyScheduledPlanChange(activeSub.id)
 
-        if (pendingPlanId) {
-          // Downgrade flow: transition old to cancelled and activate pending plan
-          await admin
-            .from("subscriptions")
-            .update({
-              status: "cancelled",
-              ended_at: nowIso,
-              cancel_at_period_end: false,
-            })
-            .eq("id", activeSub.id)
-
-          const pendingPlan = await getPlanById(pendingPlanId)
-          if (pendingPlan && pendingPlan.is_active) {
-            await admin.from("subscriptions").insert({
-              partner_id: partnerId,
-              plan_id: pendingPlanId,
-              plan_snapshot: pendingPlan,
-              status: "active",
-              current_period_start: nowIso,
-            })
-            plan = pendingPlan
-          }
-
-          try {
-            const { enforcePlanLimitsAndArchiveExcess } = await import(
-              "@/lib/services/subscription-archiver.service"
-            )
-            await enforcePlanLimitsAndArchiveExcess(partnerId, plan?.limits_json)
-          } catch (archErr: any) {
-            console.error("[SUBSCRIPTION] Error archiving on downgrade:", archErr.message)
-          }
+        if (change.applied) {
+          plan =
+            change.kind === "plan_change" && change.nextPlanId
+              ? (await getPlanById(change.nextPlanId)) ?? (await getFreePlan())
+              : await getFreePlan()
         } else {
-          // Cancellation to Free flow
-          await admin
-            .from("subscriptions")
-            .update({
-              status: "cancelled",
-              ended_at: nowIso,
-              cancel_at_period_end: false,
-            })
-            .eq("id", activeSub.id)
-
-          try {
-            const { enforcePlanLimitsAndArchiveExcess } = await import(
-              "@/lib/services/subscription-archiver.service"
-            )
-            await enforcePlanLimitsAndArchiveExcess(partnerId)
-          } catch (archErr: any) {
-            console.error("[SUBSCRIPTION] Error archiving on period expiry:", archErr.message)
-          }
-
-          plan = await getFreePlan()
+          // The scheduled change could not be applied (e.g. the plan was
+          // deleted). Keep the current plan instead of revoking access.
+          plan = activeSub.plan as Plan
         }
       } else {
         // Subscription is still actively valid!
