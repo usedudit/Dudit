@@ -21,6 +21,7 @@ import {
     ReturnIcon,
     GiftIcon,
     ClockIcon,
+    InfoIcon,
 } from "@/lib/icons"
 
 const CANCELLATION_REASONS = [
@@ -539,8 +540,21 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
         if (isCurrentPlan) return
 
+        // A downgrade scheduled to take effect at period end (or a cancellation)
+        // already counts as an "in-progress" change: don't let a second downgrade
+        // overwrite it, and never offer a new checkout while it is ending.
+        const isEnding = Boolean(subData.subscription?.cancel_at_period_end)
+
         const hasActiveSub = subData.subscription &&
-            ["active", "trialing", "past_due"].includes(subData.subscription.status)
+            ["active", "trialing", "past_due"].includes(subData.subscription.status) &&
+            !isEnding
+
+        // Cancelling down to the free plan while already scheduled to end is a no-op
+        // — the access simply keeps its current plan until the cycle ends.
+        if (isEnding && Number(plan.price ?? 0) <= 0) {
+            toast.info("Seu plano já está programado para ser encerrado ao final do ciclo atual.")
+            return
+        }
 
         if (!hasActiveSub || currentPlan.slug === "free") {
             // No active paid subscription: new subscription flow
@@ -571,7 +585,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         try {
             const hasActiveSub = subData?.subscription &&
                 ["active", "trialing", "past_due"].includes(subData.subscription.status) &&
-                subData.plan.slug !== "free"
+                subData.plan.slug !== "free" &&
+                !subData.subscription.cancel_at_period_end
 
             let result
 
@@ -858,19 +873,33 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const pendingInvoiceDate = pendingInvoice?.due_date
         ?? pendingChange?.created_at
         ?? null
+
+    // A scheduled plan change (downgrade) keeps the current cycle running and
+    // rotates at `current_period_end`. The free plan never shows as pending
+    // payment, so this is independent of `isPendingPayment`.
+    const scheduledPlan = plans.find(
+        (p) => p.id === subData?.subscription?.pending_plan_id,
+    ) ?? null
+    const hasScheduledChange = Boolean(scheduledPlan) && !isPendingPayment
+    const scheduledPlanIsFree = Number(scheduledPlan?.price ?? 0) <= 0
+
     const shownInvoiceStatus = isPendingPayment
         ? (pendingInvoice?.status ?? "pending")
         : nextInvoice?.status
     const shownInvoiceNumber = isPendingPayment
         ? (pendingInvoice?.invoice_number || "A gerar")
         : (nextInvoice?.invoice_number || "A gerar")
-    const shownPlanName = isPendingPayment && pendingChange
-        ? pendingChange.plan_name
-        : (subData?.plan?.name ?? "")
+    const shownPlanName = hasScheduledChange
+        ? (scheduledPlan!.name)
+        : isPendingPayment && pendingChange
+            ? pendingChange.plan_name
+            : (subData?.plan?.name ?? "")
     const shownDueDate = isPendingPayment ? pendingInvoiceDate : nextInvoiceDate
-    const shownAmount = isPendingPayment
-        ? (pendingInvoice?.amount ?? pendingChange?.amount ?? 0)
-        : (nextInvoice?.amount ?? currentPlanPrice)
+    const shownAmount = hasScheduledChange
+        ? Number(scheduledPlan!.price || 0)
+        : isPendingPayment
+            ? (pendingInvoice?.amount ?? pendingChange?.amount ?? 0)
+            : (nextInvoice?.amount ?? currentPlanPrice)
 
     const accessUntilDate = (isScheduledToCancel || isPeriodExpired)
         ? subData?.subscription?.current_period_end
@@ -975,6 +1004,20 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 >
                                     Pagar agora
                                 </Button>
+                            </div>
+                        )}
+
+                        {hasScheduledChange && (
+                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">
+                                <InfoIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold">Troca de plano agendada</p>
+                                    <p className="text-xs opacity-90">
+                                        {scheduledPlanIsFree
+                                            ? `Seu acesso ao plano ${getHardcodedPlan(scheduledPlan!.slug).name} (gratuito) começa em ${formatDate(subData!.subscription!.current_period_end!)}. Após essa data, não será mais cobrado.`
+                                            : `Seu plano passa para ${scheduledPlan!.name} (${formatCurrency(Number(scheduledPlan!.price))}/mês) a partir de ${formatDate(subData!.subscription!.current_period_end!)}.`}
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -1096,6 +1139,10 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <Badge variant="gray">
                                                 Cancelada
                                             </Badge>
+                                        ) : hasScheduledChange ? (
+                                            <Badge variant="blue">
+                                                Troca agendada
+                                            </Badge>
                                         ) : !hasBillingInfo ? (
                                             <Badge variant="gray">
                                                 Sem cobranças
@@ -1122,14 +1169,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <div className="flex items-center justify-between text-xs md:text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Nenhuma fatura a gerar
+                                                    {scheduledPlan ? "A gerar" : "Nenhuma fatura a gerar"}
                                                 </span>
                                             </div>
 
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Renovação</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Próximo plano</span>
                                                 <span className="font-bold text-amber-600 dark:text-amber-400">
-                                                    Cancelada
+                                                    {scheduledPlan
+                                                        ? getHardcodedPlan(scheduledPlan.slug).name
+                                                        : "Cancelada"}
                                                 </span>
                                             </div>
 
