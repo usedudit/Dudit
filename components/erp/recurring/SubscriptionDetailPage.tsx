@@ -543,7 +543,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   if (!detail) {
     if (loadError) {
       return (
-        <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-65px)] bg-white dark:bg-dark-background">
+        <div className="flex flex-col items-center justify-center gap-4 h-full min-h-[200px] bg-white dark:bg-dark-background">
           <IconPlaceholder
             placeholderType="image"
             imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -652,8 +652,8 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
   )
 
   return (
-    <FadeIn>
-      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+    <FadeIn className="h-full">
+      <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as DetailTab)}

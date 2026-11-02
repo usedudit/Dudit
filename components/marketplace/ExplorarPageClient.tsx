@@ -72,6 +72,31 @@ const CATEGORY_GROUPS = [
     { name: "Lojas", groupType: "vitrines", icon_url: null },
 ]
 
+/**
+ * Extrai cidade e categoria do caminho vivo da URL (/explorar/[cidade]/[categoria]).
+ *
+ * O `useParams`/`usePathname` do App Router podem ficar defasados depois de um
+ * pushState (eles refletem a árvore/RSC anterior). A URL do browser é sempre a
+ * fonte mais atual, então a sincronia de estado usa ela como base.
+ */
+function getLocationPartsFromPath(pathname: string): { city: string | null; category: string | null } {
+    const parts = (pathname || "").split("/").filter(Boolean)
+    if (parts[0] !== "explorar") return { city: null, category: null }
+    return {
+        city: parts[1] || null,
+        category: parts[2] || null,
+    }
+}
+
+/** UF (estado) de um slug de cidade ("sao-paulo-sp" -> "sp") ou "brasil". */
+function getStateFromCitySlug(citySlug: string | null | undefined): string {
+    if (!citySlug || citySlug === "brasil") return "brasil"
+    if (citySlug.startsWith("estado-")) return citySlug.replace("estado-", "").toLowerCase()
+    const parts = citySlug.split("-")
+    const uf = parts.pop()?.toLowerCase() || ""
+    return uf.length === 2 ? uf : "brasil"
+}
+
 interface ExplorarPageClientProps {
     initialResults?: any[]
     initialMoreDistantSellers?: any[]
@@ -251,7 +276,7 @@ export function ExplorarPageClient({
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
     const [showStateList, setShowStateList] = useState(false)
     const [showStateDropdown, setShowStateDropdown] = useState(false)
-    const [selectedStateFilter, setSelectedStateFilter] = useState<string>("brasil")
+    const [selectedStateFilter, setSelectedStateFilter] = useState<string>(() => getStateFromCitySlug(cidade || pathCity || null))
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
     const stateDropdownRef = useRef<HTMLDivElement>(null)
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
@@ -413,9 +438,24 @@ export function ExplorarPageClient({
 
         if (typeof window !== "undefined") {
             const currentRel = `${window.location.pathname}${window.location.search}`
-            if (targetUrl !== currentRel) {
-                pushUrl(targetUrl)
+            if (targetUrl === currentRel) return
+
+            // Trocar a LOCALIDADE troca o segmento da rota (/explorar/[cidade]).
+            // Isso não pode ser feito com history.pushState: o App Router mantém
+            // a árvore/RSC da rota anterior (params e props velhos), e a
+            // sincronia de URL devolvia o componente para a cidade antiga
+            // (a listagem "carregava" na cidade nova e voltava sozinho).
+            // Para rota, usamos router.push, que re-renderiza o servidor
+            // com a nova cidade (dados, title e canonical corretos).
+            const cityChanged = (city || null) !== (selectedCitySlug || null)
+            if (cityChanged) {
+                router.push(targetUrl)
+                return
             }
+
+            // Mudança só de query string (filtros/ordenação): pushState evita
+            // uma ida e volta ao servidor a cada clique.
+            pushUrl(targetUrl)
         }
     }
 
@@ -444,7 +484,13 @@ export function ExplorarPageClient({
         const urlType = searchParams.get("type") || "tudo"
         setCurrentType(urlType as any)
 
-        const pathCity = slug[0] || null
+        // URL viva > params do router: os params podem estar defasados depois
+        // de um pushState (o App Router mantém a árvore da rota anterior).
+        const live = typeof window !== "undefined"
+            ? getLocationPartsFromPath(window.location.pathname)
+            : { city: null, category: null }
+
+        const pathCity = live.city || slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade") || null
         if (urlCity) {
             if (urlCity !== selectedCitySlug) {
@@ -457,7 +503,7 @@ export function ExplorarPageClient({
         const urlSection = searchParams.get("section")
         setSelectedSection(urlSection || null)
 
-        const pathCategorySlug = slug[1] || null
+        const pathCategorySlug = live.category || slug[1] || null
         const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
 
         let nextCats: string[] = []
@@ -1077,11 +1123,12 @@ export function ExplorarPageClient({
 
     const toggleCategory = (catName: string) => {
         triggerFilterLoading()
-        setSelectedCategories((prev) => {
-            const next = prev.includes(catName) ? [] : [catName]
-            updateUrl(selectedCitySlug, next, query, currentType)
-            return next
-        })
+        // Calcula fora do updater: updateUrl pode disparar navegação
+        // (router.push) e chamar isso dentro do updater rodaria a navegação
+        // durante o render do React.
+        const next = selectedCategories.includes(catName) ? [] : [catName]
+        setSelectedCategories(next)
+        updateUrl(selectedCitySlug, next, query, currentType)
     }
 
     const handleSelectCity = (citySlug: string | null) => {
@@ -1102,6 +1149,8 @@ export function ExplorarPageClient({
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
+        // O seletor de estado do modal acompanha a localidade atual
+        setSelectedStateFilter(getStateFromCitySlug(citySlug))
         updateUrl(citySlug, selectedCategories, query, currentType, selectedSection)
     }
 

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable";
+import { ActionsDropdown, Badge, Checkbox, Tooltip } from "@/components/reusable";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import {
     ClockIcon,
@@ -118,6 +118,7 @@ export const AppointmentListRow = React.memo(
                     return (
                         <div className="flex items-center gap-3 text-left">
                             <UserProfileImage
+                                imageUrl={appointment.customerAvatar}
                                 fullName={appointment.customer}
                                 className="w-10 h-10 text-[14px]"
                             />
@@ -127,14 +128,22 @@ export const AppointmentListRow = React.memo(
                                         {appointment.customer}
                                     </span>
                                     {hasCollision && (
-                                        <span title="Conflito de horário detectado">
-                                            <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                                        </span>
+                                        <Tooltip text="Conflito de horário detectado">
+                                            <Badge
+                                                variant="red"
+                                                icon={<AlertTriangle size={12} />}
+                                                className="whitespace-nowrap scale-90 shrink-0"
+                                            />
+                                        </Tooltip>
                                     )}
                                     {isOutsideHours && (
-                                        <span title="Fora do horário de expediente">
-                                            <AlertTriangle size={14} className="text-orange-500 shrink-0" />
-                                        </span>
+                                        <Tooltip text="Fora do horário de expediente">
+                                            <Badge
+                                                variant="orange"
+                                                icon={<AlertTriangle size={12} />}
+                                                className="whitespace-nowrap scale-90 shrink-0"
+                                            />
+                                        </Tooltip>
                                     )}
                                 </div>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">

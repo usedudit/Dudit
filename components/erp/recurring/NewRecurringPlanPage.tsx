@@ -576,8 +576,8 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     )
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
@@ -641,7 +641,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                         {/* Content Body */}
                         <div className={`px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px] relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}>
                             {isEditLoadingLocked && (
-                                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                                     <ThreeDotsLoader />
                                 </div>
                             )}

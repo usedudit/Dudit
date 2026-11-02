@@ -1156,7 +1156,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     }
 
     if (loading) {
-        return <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full"><ThreeDotsLoader /></div>
+        return <div className="flex items-center justify-center h-full min-h-[200px] w-full"><ThreeDotsLoader /></div>
     }
 
     if (!preview) {
@@ -1209,8 +1209,8 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
     const actionDecision = actionItem ? getDecision(actionItem.id) : null
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={detailTab} onValueChange={setDetailTab} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 

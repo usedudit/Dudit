@@ -125,23 +125,6 @@ async function resolveDefaultSalesAccountId(
     return (accounts[0] as any)?.id || null
 }
 
-async function applyAccountBalanceDelta(
-    partnerId: string,
-    accountId: string | null,
-    amount: number,
-) {
-    if (!accountId || !(Math.abs(amount) > 0.0001)) return
-    const { error } = await getAdminClient().rpc("apply_account_balance_delta", {
-        p_account_id: accountId,
-        p_partner_id: partnerId,
-        p_delta: Math.round(amount * 100) / 100,
-    })
-    if (error) {
-        console.error("[TRANSACTION] Erro ao atualizar saldo da conta:", error.message)
-        throw new Error(`Falha ao atualizar saldo da conta financeira: ${error.message}`)
-    }
-}
-
 /**
  * Descrição exibida no financeiro. Pedidos de assinatura ganham o prefixo
  * "Assinatura · " para o lojista identificar a origem sem abrir o pedido.
@@ -376,6 +359,69 @@ async function createInstallmentGroupForSale(
     }
 }
 
+async function upsertOrderInstallmentLedger(
+    orderData: OrderDataForTransaction,
+    entry: LedgerEntry,
+    accountId: string | null,
+    paymentRowId: string | null,
+    startDate: string,
+    settlementReference: string,
+): Promise<void> {
+    const parts = splitNetAmount(entry.net, entry.installmentNumber)
+    const rows = Array.from({ length: entry.installmentNumber }, (_, index) => {
+        const installmentNumber = index + 1
+        return {
+            partner_id: orderData.partner_id,
+            store_id: orderData.store_id || null,
+            description: describeOrderTransaction(orderData),
+            category: "Vendas",
+            contact_id: null,
+            contact_type: "customer",
+            customer_id: orderData.customer_id || null,
+            amount: parts[index],
+            due_date: addMonthsIso(startDate, installmentNumber),
+            payment_date: null,
+            transaction_date: null,
+            status: "pending",
+            notes: null,
+            installment_number: installmentNumber,
+            total_installments: entry.installmentNumber,
+            interest_amount: 0,
+            fee_amount: 0,
+            discount_amount: 0,
+            payment_type: entry.method,
+            payment_method_id: entry.paymentMethodId,
+            transaction_type: "income",
+            origin: normalizeOrigin(orderData.order_source),
+            account_id: accountId,
+            kind: "settlement",
+            payment_id: paymentRowId,
+            reference_note: `${settlementReference}:${installmentNumber}`,
+        }
+    })
+    const { data, error } = await getAdminClient().rpc("upsert_order_installment_ledger_atomic", {
+        p_partner_id: orderData.partner_id,
+        p_settlement_reference: settlementReference,
+        p_group: {
+            store_id: orderData.store_id || null,
+            description: describeOrderTransaction(orderData),
+            total_amount: entry.net,
+            frequency: "monthly",
+            start_date: startDate,
+            account_id: accountId,
+            payment_method_id: entry.paymentMethodId,
+            order_id: orderData.order_id || null,
+            payment_id: paymentRowId,
+            customer_id: orderData.customer_id || null,
+        },
+        p_rows: rows,
+    })
+    if (error) throw new Error(`Erro ao criar parcelas do pedido ${orderData.order_number}: ${error.message}`)
+    if (Number(data?.createdCount || 0) !== entry.installmentNumber) {
+        throw new Error(`RPC não confirmou todas as parcelas do pedido ${orderData.order_number}.`)
+    }
+}
+
 /**
  * Upgrade do ledger quando o webhook chega DEPOIS do checkout com dados de
  * taxa/líquido (aprovação instantânea: pix/crédito aprova no checkout com
@@ -397,9 +443,9 @@ async function refineLedgerEntry(
         recognitionTx: any
     },
 ): Promise<void> {
-    if (!(saleEntry.cost > 0.009)) return
+    const hasCost = saleEntry.cost > 0.009
 
-    if (ctx.recognitionTx) {
+    if (hasCost && ctx.recognitionTx) {
         const recognitionUpdate: Record<string, unknown> = {
             fee_amount: round2(saleEntry.feeAmount + saleEntry.fixedFeeAmount),
             interest_amount: saleEntry.interestAmount,
@@ -410,7 +456,7 @@ async function refineLedgerEntry(
         await supabase.from("transactions").update(recognitionUpdate).eq("id", ctx.recognitionTx.id)
     }
 
-    if (!ctx.existingByNote.has(ctx.feeRef)) {
+    if (hasCost && !ctx.existingByNote.has(ctx.feeRef)) {
         await supabase.from("transactions").insert({
             partner_id: orderData.partner_id,
             store_id: orderData.store_id || null,
@@ -442,31 +488,25 @@ async function refineLedgerEntry(
     }
 
     if (ctx.installments > 1) {
-        const parts = splitNetAmount(saleEntry.net, ctx.installments)
-        for (let n = 1; n <= ctx.installments; n++) {
-            const settlementTx = ctx.existingByNote.get(`${ctx.settlementRef}:${n}`)
-            if (!settlementTx) continue
-            const target = parts[n - 1]
-            const current = round2(Number(settlementTx.amount || 0))
-            if (Math.abs(current - target) > 0.005) {
-                await supabase
-                    .from("transactions")
-                    .update({ amount: target, original_amount: target })
-                    .eq("id", settlementTx.id)
-            }
-        }
+        await upsertOrderInstallmentLedger(
+            orderData,
+            saleEntry,
+            ctx.accountId,
+            ctx.paymentRowId,
+            orderData.payment_date || new Date().toISOString(),
+            ctx.settlementRef,
+        )
     } else {
         const settlementTx = ctx.existingByNote.get(ctx.settlementRef)
-        if (settlementTx) {
-            const current = round2(Number(settlementTx.amount || 0))
-            const stillGross = Math.abs(current - saleEntry.gross) <= 0.005
-            if (Math.abs(current - saleEntry.net) > 0.005 && stillGross) {
-                await supabase
-                    .from("transactions")
-                    .update({ amount: saleEntry.net, original_amount: saleEntry.net })
-                    .eq("id", settlementTx.id)
-                await applyAccountBalanceDelta(orderData.partner_id, ctx.accountId, -saleEntry.cost)
-            }
+        if (hasCost && settlementTx) {
+            const { error } = await getAdminClient().rpc("refine_order_settlement_atomic", {
+                p_partner_id: orderData.partner_id,
+                p_reference_note: ctx.settlementRef,
+                p_expected_gross: saleEntry.gross,
+                p_target_net: saleEntry.net,
+                p_balance_delta: -saleEntry.cost,
+            })
+            if (error) throw new Error(`Falha ao refinar liquidação do pedido: ${error.message}`)
         }
     }
 }
@@ -546,14 +586,29 @@ export async function createTransactionFromOrder(
             // Fluxo antigo (legado) já processou esta entrada → não misturar modelos
             if (existingByNote.has(baseRef)) continue
 
-            // Idempotência do ledger: se qualquer linha desta entrada já existe
-            // (fee/settlement), a entrada já foi totalmente processada → não duplicar.
-            // (Recognition sozinho ainda pode estar no caminho de refine.)
+            const recognitionTx = existingByNote.get(recognitionRef)
+
+            // Parcelas podem ter sido criadas só parcialmente por uma versão
+            // anterior. O RPC abaixo completa/ajusta o grupo e todas as linhas.
+            if (installments > 1) {
+                if (recognitionTx) {
+                    await refineLedgerEntry(supabase, orderData, entry, {
+                        recognitionRef, feeRef, settlementRef, installments,
+                        existingByNote, accountId, paymentRowId, recognitionTx,
+                    })
+                } else {
+                    await upsertOrderInstallmentLedger(
+                        orderData, entry, accountId, paymentRowId, paymentDate, settlementRef,
+                    )
+                }
+                continue
+            }
+
+            // Idempotência da liquidação à vista, cuja transação e saldo agora
+            // são gravados juntos no RPC.
             const hasLedgerEntry = [feeRef, settlementRef, ...Array.from({ length: installments }, (_, i) => `${settlementRef}:${i + 1}`)]
                 .some((ref) => existingByNote.has(ref))
             if (hasLedgerEntry) continue
-
-            const recognitionTx = existingByNote.get(recognitionRef)
 
             if (recognitionTx) {
                 // Ledger já criado (ex: aprovação no checkout) → refinar com fees/líquido
@@ -572,18 +627,12 @@ export async function createTransactionFromOrder(
 
             // 1) Registro único de liquidação da venda (Fase 2 simplificada)
             // Cria apenas 1 transação por pagamento. Sem vencimento (due_date = null) para vendas pagas à vista.
-            if (installments > 1) {
-                const groupId = await createInstallmentGroupForSale(
-                    supabase,
-                    orderData,
-                    entry,
-                    accountId,
-                    paymentRowId,
-                    paymentDate,
-                )
-                const parts = splitNetAmount(entry.net, installments)
-                for (let n = 1; n <= installments; n++) {
-                    const { error: settleError } = await supabase.from("transactions").insert({
+            if (installments <= 1) {
+                const { error: settleError } = await getAdminClient().rpc("create_order_settlement_atomic", {
+                    p_partner_id: orderData.partner_id,
+                    p_reference_note: settlementRef,
+                    p_balance_delta: accountId ? entry.net : 0,
+                    p_row: {
                         partner_id: orderData.partner_id,
                         store_id: orderData.store_id || null,
                         description: describeOrderTransaction(orderData),
@@ -591,64 +640,29 @@ export async function createTransactionFromOrder(
                         contact_id: null,
                         contact_type: "customer",
                         customer_id: orderData.customer_id || null,
-                        amount: parts[n - 1],
-                        original_amount: parts[n - 1],
-                        due_date: addMonthsIso(paymentDate, n),
-                        payment_date: null,
-                        status: "pending",
+                        amount: entry.gross,
+                        original_amount: entry.gross,
+                        due_date: null,
+                        payment_date: paymentDate,
+                        status: "paid",
                         notes: null,
-                        installment_number: n,
-                        total_installments: installments,
-                        interest_amount: 0,
-                        fee_amount: 0,
-                        discount_amount: 0,
+                        installment_number: null,
+                        total_installments: null,
+                        interest_amount: entry.interestAmount,
+                        fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
+                        discount_amount: entry.discountAmount,
                         payment_type: entry.method,
                         payment_method_id: entry.paymentMethodId,
-                        transaction_type: "income" as const,
+                        transaction_type: "income",
                         origin: normalizeOrigin(orderData.order_source),
                         account_id: accountId,
-                        kind: "settlement" as const,
+                        kind: "settlement",
                         payment_id: paymentRowId,
-                        installment_group_id: groupId,
-                        reference_note: `${settlementRef}:${n}`,
-                    })
-                    if (settleError) {
-                        console.error(`[TRANSACTION] Erro ao criar parcela ${n} do pedido ${orderData.order_number}:`, settleError.message)
-                    }
-                }
-            } else {
-                const { error: settleError } = await supabase.from("transactions").insert({
-                    partner_id: orderData.partner_id,
-                    store_id: orderData.store_id || null,
-                    description: describeOrderTransaction(orderData),
-                    category: "Vendas",
-                    contact_id: null,
-                    contact_type: "customer",
-                    customer_id: orderData.customer_id || null,
-                    amount: entry.gross,
-                    original_amount: entry.gross,
-                    due_date: null,
-                    payment_date: paymentDate,
-                    status: "paid",
-                    notes: null,
-                    installment_number: null,
-                    total_installments: null,
-                    interest_amount: entry.interestAmount,
-                    fee_amount: round2(entry.feeAmount + entry.fixedFeeAmount),
-                    discount_amount: entry.discountAmount,
-                    payment_type: entry.method,
-                    payment_method_id: entry.paymentMethodId,
-                    transaction_type: "income" as const,
-                    origin: normalizeOrigin(orderData.order_source),
-                    account_id: accountId,
-                    kind: "settlement" as const,
-                    payment_id: paymentRowId,
-                    reference_note: settlementRef,
+                        reference_note: settlementRef,
+                    },
                 })
                 if (settleError) {
                     console.error(`[TRANSACTION] Erro ao criar liquidação do pedido ${orderData.order_number}:`, settleError.message)
-                } else {
-                    await applyAccountBalanceDelta(orderData.partner_id, accountId, entry.net)
                 }
             }
         }

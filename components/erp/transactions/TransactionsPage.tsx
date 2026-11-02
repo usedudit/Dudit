@@ -1884,7 +1884,7 @@ export default function TransactionsPage({
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId && !entityState.entityType) {
         if (isLoadingDetail || !currentEntity) {
             return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                     <ThreeDotsLoader />
                 </div>
             )
@@ -1928,8 +1928,8 @@ export default function TransactionsPage({
         )
 
         return (
-            <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <FadeIn className="h-full">
+                <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
@@ -2268,7 +2268,7 @@ export default function TransactionsPage({
     if (isFormOpen) {
         if (entityState.action === "edit" && isLoadingDetail && entityState.entityType !== "recurring" && !editingTx) {
             return (
-                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                     <ThreeDotsLoader />
                 </div>
             )

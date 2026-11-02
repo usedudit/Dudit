@@ -19,7 +19,7 @@ export function ERPDetailLoading({ className, loaderClassName }: ERPDetailLoadin
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             className={cn(
-                "flex items-center justify-center h-[calc(100vh-65px)] min-h-[400px] w-full bg-white dark:bg-dark-background transition-colors duration-300",
+                "flex items-center justify-center h-full min-h-[400px] w-full bg-white dark:bg-dark-background transition-colors duration-300",
                 className
             )}
         >

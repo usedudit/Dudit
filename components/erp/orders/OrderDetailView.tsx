@@ -465,7 +465,7 @@ export default function OrderDetailView({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+      <div className="flex items-center justify-center h-full min-h-[200px] w-full">
         <ThreeDotsLoader />
       </div>
     );
@@ -1579,8 +1579,8 @@ export default function OrderDetailView({
 
   return (
     <>
-      <FadeIn>
-        <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+      <FadeIn className="h-full">
+        <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}

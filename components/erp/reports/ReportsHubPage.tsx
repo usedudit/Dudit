@@ -342,6 +342,10 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   const reports = useMemo(() => createReports(props), [props])
   const availableCategories = useMemo(() => CATEGORIES.filter((category) => reports.some((report) => report.category === category.id)), [reports])
   const [activeReportId, setActiveReportId] = useState<string | null>(() => searchParams.get("tab"))
+  const tabFromUrl = searchParams.get("tab")
+  useEffect(() => {
+    setActiveReportId(tabFromUrl)
+  }, [tabFromUrl])
   const selectedReport = reports.find((report) => report.id === activeReportId) || null
   const compare = searchParams.get("compare") || "none"
   const visibleColumns = selectedReport?.columns.filter((column) => !(column.id === "previous" && compare === "none")) || []
@@ -361,7 +365,7 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
     if (selectedReport) setActiveCategory(selectedReport.category)
   }, [selectedReport])
 
-  useEffect(() => setPage(1), [selectedReport?.id])
+  useEffect(() => setPage(1), [selectedReport?.id, props.period])
 
   const exportSelected = useCallback(async (format: "csv" | "xlsx") => {
     if (!selectedReport || !hasMinimumPlan(props.planSlug, selectedReport.minimumPlan)) return

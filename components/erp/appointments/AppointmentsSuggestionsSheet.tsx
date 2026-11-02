@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { XIcon, SearchIcon, CheckCircleIcon, ClockIcon, TrendingUpIcon } from "@/lib/icons"
+import { XIcon, SearchIcon, CheckCircleIcon, ClockIcon, UserIcon } from "@/lib/icons"
+import { AlertTriangle, CalendarCheck, CalendarSync, RotateCcw } from "lucide-react"
 import {
     Button,
     IconPlaceholder,
@@ -14,19 +15,26 @@ import {
     Input,
     PeriodDropdown,
 } from "@/components/reusable"
-import AlertModal from "@/components/reusable/AlertModal"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useModalLayer } from "@/lib/modal-stack"
-import { getNoShowAlertsAction, getStagnantServicesAction } from "@/app/actions/erp/appointments"
 import {
-    getServicesPricingAlertsAction,
-    updateServiceSalePriceAction,
-    type ServicePricingAlert,
-} from "@/app/actions/erp/servicos"
-import type { NoShowAlert, NoShowCounts, StagnantService } from "@/lib/erp/appointment-insights"
+    getNoShowAlertsAction,
+    getPendingConfirmationsAction,
+    getRescheduleAlertsAction,
+    getRetentionOpportunitiesAction,
+    confirmAppointmentQuickAction,
+} from "@/app/actions/erp/appointments"
+import type {
+    NoShowAlert,
+    NoShowCounts,
+    PendingConfirmationAlert,
+    RescheduleOpportunity,
+    RetentionOpportunity,
+} from "@/lib/erp/appointment-insights"
 import { formatCurrency } from "@/lib/utils"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useRouter } from "next/navigation"
 import { useNotification } from "@/hooks/use-notification"
 
@@ -35,22 +43,23 @@ interface AppointmentsSuggestionsSheetProps {
     onClose: () => void
     partnerId: string
     storeId?: string
+    onSelectAppointment?: (appointmentId: string) => void
 }
 
-const PERIOD_OPTIONS = [
+const NO_SHOW_PERIOD_OPTIONS = [
     { value: "15", label: "15 dias" },
     { value: "30", label: "30 dias" },
     { value: "60", label: "60 dias" },
     { value: "90", label: "90 dias" },
 ]
 
-const getInitials = (name: string) =>
-    name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w[0]?.toUpperCase() || "")
-        .join("") || "?"
+const RETENTION_PERIOD_OPTIONS = [
+    { value: "15", label: "15+ dias" },
+    { value: "30", label: "30+ dias" },
+    { value: "45", label: "45+ dias" },
+    { value: "60", label: "60+ dias" },
+    { value: "90", label: "90+ dias" },
+]
 
 const formatDateBr = (iso: string) => {
     const [y, m, d] = String(iso || "").split("-").map(Number)
@@ -58,38 +67,41 @@ const formatDateBr = (iso: string) => {
     return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`
 }
 
-export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, storeId }: AppointmentsSuggestionsSheetProps) {
+export function AppointmentsSuggestionsSheet({
+    isOpen,
+    onClose,
+    partnerId,
+    storeId,
+    onSelectAppointment,
+}: AppointmentsSuggestionsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
 
-    const [activeTab, setActiveTab] = useState<"faltas" | "parados" | "precificacao">("faltas")
+    const [activeTab, setActiveTab] = useState<"faltas" | "confirmacoes" | "reagendamentos" | "retencao">("faltas")
 
-    // Filtros fixos por aba
+    // Filtros e busca
+    const [search, setSearch] = useState("")
     const [noShowPeriod, setNoShowPeriod] = useState<number>(90)
-    const [stagnantPeriod, setStagnantPeriod] = useState<number>(90)
-    const [noShowSearch, setNoShowSearch] = useState("")
-    const [stagnantSearch, setStagnantSearch] = useState("")
+    const [retentionPeriod, setRetentionPeriod] = useState<number>(30)
 
     // Faltas (no-show)
     const [noShowAlerts, setNoShowAlerts] = useState<NoShowAlert[]>([])
     const [noShowCounts, setNoShowCounts] = useState<NoShowCounts | null>(null)
     const [loadingNoShow, setLoadingNoShow] = useState(false)
 
-    // Serviços parados
-    const [stagnantServices, setStagnantServices] = useState<StagnantService[]>([])
-    const [loadingStagnant, setLoadingStagnant] = useState(false)
+    // Confirmações pendentes
+    const [pendingConfirmations, setPendingConfirmations] = useState<PendingConfirmationAlert[]>([])
+    const [loadingConfirmations, setLoadingConfirmations] = useState(false)
+    const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
-    // Precificação de serviços
-    const [pricingAlerts, setPricingAlerts] = useState<ServicePricingAlert[]>([])
-    const [pricingMeta, setPricingMeta] = useState<{
-        counts: { loss: number; thin: number }
-        thresholdPercent: number
-        defaultMarginPercent: number
-    } | null>(null)
-    const [loadingPricing, setLoadingPricing] = useState(false)
-    const [applyTarget, setApplyTarget] = useState<ServicePricingAlert | null>(null)
-    const [isApplying, setIsApplying] = useState(false)
+    // Reagendamentos pendentes
+    const [rescheduleAlerts, setRescheduleAlerts] = useState<RescheduleOpportunity[]>([])
+    const [loadingReschedule, setLoadingReschedule] = useState(false)
+
+    // Oportunidades de Retorno / Retenção
+    const [retentionOpportunities, setRetentionOpportunities] = useState<RetentionOpportunity[]>([])
+    const [loadingRetention, setLoadingRetention] = useState(false)
 
     const zIndex = useModalLayer(isOpen)
 
@@ -106,107 +118,133 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         })
     }, [partnerId, noShowPeriod, storeId, notifyError])
 
-    const fetchStagnant = useCallback(() => {
-        setLoadingStagnant(true)
-        getStagnantServicesAction(partnerId, stagnantPeriod, storeId).then((res) => {
+    const fetchConfirmations = useCallback(() => {
+        setLoadingConfirmations(true)
+        getPendingConfirmationsAction(partnerId, storeId, 7).then((res) => {
             if ("error" in res && res.error) {
                 notifyError(res.error)
-            } else if ("services" in res) {
-                setStagnantServices(res.services)
+            } else if ("items" in res) {
+                setPendingConfirmations(res.items)
             }
-            setLoadingStagnant(false)
-        })
-    }, [partnerId, stagnantPeriod, storeId, notifyError])
-
-    const fetchPricing = useCallback(() => {
-        setLoadingPricing(true)
-        getServicesPricingAlertsAction(partnerId, storeId).then((res) => {
-            if ("error" in res && res.error) {
-                notifyError(res.error)
-            } else if ("alerts" in res) {
-                setPricingAlerts(res.alerts)
-                setPricingMeta({
-                    counts: res.counts,
-                    thresholdPercent: res.thresholdPercent,
-                    defaultMarginPercent: res.defaultMarginPercent,
-                })
-            }
-            setLoadingPricing(false)
+            setLoadingConfirmations(false)
         })
     }, [partnerId, storeId, notifyError])
 
+    const fetchReschedule = useCallback(() => {
+        setLoadingReschedule(true)
+        getRescheduleAlertsAction(partnerId, storeId, 30).then((res) => {
+            if ("error" in res && res.error) {
+                notifyError(res.error)
+            } else if ("items" in res) {
+                setRescheduleAlerts(res.items)
+            }
+            setLoadingReschedule(false)
+        })
+    }, [partnerId, storeId, notifyError])
+
+    const fetchRetention = useCallback(() => {
+        setLoadingRetention(true)
+        getRetentionOpportunitiesAction(partnerId, retentionPeriod, storeId).then((res) => {
+            if ("error" in res && res.error) {
+                notifyError(res.error)
+            } else if ("items" in res) {
+                setRetentionOpportunities(res.items)
+            }
+            setLoadingRetention(false)
+        })
+    }, [partnerId, retentionPeriod, storeId, notifyError])
+
     useEffect(() => {
         if (!isOpen) {
-            setNoShowAlerts([])
-            setNoShowCounts(null)
-            setStagnantServices([])
-            setPricingAlerts([])
-            setPricingMeta(null)
-            setNoShowSearch("")
-            setStagnantSearch("")
-            setApplyTarget(null)
-            setActiveTab("faltas")
+            setSearch("")
             return
         }
         fetchNoShows()
-        fetchStagnant()
-        fetchPricing()
-    }, [isOpen, fetchNoShows, fetchStagnant, fetchPricing])
+        fetchConfirmations()
+        fetchReschedule()
+        fetchRetention()
+    }, [isOpen, fetchNoShows, fetchConfirmations, fetchReschedule, fetchRetention])
 
     useEffect(() => {
         if (isOpen) fetchNoShows()
     }, [noShowPeriod, isOpen, fetchNoShows])
 
     useEffect(() => {
-        if (isOpen) fetchStagnant()
-    }, [stagnantPeriod, isOpen, fetchStagnant])
+        if (isOpen) fetchRetention()
+    }, [retentionPeriod, isOpen, fetchRetention])
 
+    // Filtros de busca por aba
     const filteredNoShows = useMemo(() => {
-        if (!noShowSearch.trim()) return noShowAlerts
-        const term = noShowSearch.toLowerCase().trim()
+        if (!search.trim()) return noShowAlerts
+        const term = search.toLowerCase().trim()
         return noShowAlerts.filter((a) => a.customer_name.toLowerCase().includes(term))
-    }, [noShowAlerts, noShowSearch])
+    }, [noShowAlerts, search])
 
-    const filteredStagnant = useMemo(() => {
-        if (!stagnantSearch.trim()) return stagnantServices
-        const term = stagnantSearch.toLowerCase().trim()
-        return stagnantServices.filter(
-            (s) => s.name.toLowerCase().includes(term) || (s.category || "").toLowerCase().includes(term)
+    const filteredConfirmations = useMemo(() => {
+        if (!search.trim()) return pendingConfirmations
+        const term = search.toLowerCase().trim()
+        return pendingConfirmations.filter(
+            (c) =>
+                c.customer_name.toLowerCase().includes(term) ||
+                c.service_name.toLowerCase().includes(term) ||
+                c.staff_name.toLowerCase().includes(term)
         )
-    }, [stagnantServices, stagnantSearch])
+    }, [pendingConfirmations, search])
 
-    const handleApplyPricing = async () => {
-        if (!applyTarget) return
-        const target = applyTarget
-        const removePromo = target.cause === "promo"
-        setIsApplying(true)
+    const filteredReschedule = useMemo(() => {
+        if (!search.trim()) return rescheduleAlerts
+        const term = search.toLowerCase().trim()
+        return rescheduleAlerts.filter(
+            (r) =>
+                r.customer_name.toLowerCase().includes(term) ||
+                r.service_name.toLowerCase().includes(term) ||
+                r.staff_name.toLowerCase().includes(term)
+        )
+    }, [rescheduleAlerts, search])
 
-        const res = removePromo
-            ? await updateServiceSalePriceAction({ serviceId: target.id, partnerId, clearPromotion: true })
-            : await updateServiceSalePriceAction({ serviceId: target.id, partnerId, price: target.suggested_price })
+    const filteredRetention = useMemo(() => {
+        if (!search.trim()) return retentionOpportunities
+        const term = search.toLowerCase().trim()
+        return retentionOpportunities.filter(
+            (r) =>
+                r.customer_name.toLowerCase().includes(term) ||
+                r.last_service_name.toLowerCase().includes(term) ||
+                r.last_staff_name.toLowerCase().includes(term)
+        )
+    }, [retentionOpportunities, search])
 
-        setIsApplying(false)
-        setApplyTarget(null)
-
-        if (res.error) {
-            notifyError(res.error)
-            return
+    const handleConfirmAppointment = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setConfirmingId(id)
+        try {
+            const res = await confirmAppointmentQuickAction(id)
+            if (res.success) {
+                notifySuccess("Agendamento confirmado!")
+                setPendingConfirmations((prev) => prev.filter((item) => item.id !== id))
+                router.refresh()
+            } else {
+                notifyError(res.error || "Erro ao confirmar agendamento")
+            }
+        } catch (err: any) {
+            notifyError(err?.message || "Erro ao confirmar agendamento")
+        } finally {
+            setConfirmingId(null)
         }
-
-        notifySuccess(removePromo ? "Promoção removida!" : "Preço atualizado com sucesso!")
-        fetchPricing()
-        router.refresh()
     }
 
-    const goToCustomer = (alert: NoShowAlert) => {
-        if (!alert.customer_id) return
+    const goToCustomer = (customerId: string | null) => {
+        if (!customerId) return
         onClose()
-        router.push(`/erp/clientes/${alert.customer_id}`)
+        router.push(`/erp/clientes/${customerId}`)
     }
 
-    const goToService = (serviceId: string) => {
-        onClose()
-        router.push(`/erp/servicos?view=${serviceId}`)
+    const handleSelectAppointment = (appointmentId: string, customerId?: string | null) => {
+        if (onSelectAppointment) {
+            onClose()
+            onSelectAppointment(appointmentId)
+        } else if (customerId) {
+            goToCustomer(customerId)
+        }
     }
 
     // --- CONTEÚDO DA ABA FALTAS ---
@@ -220,14 +258,14 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
                 <Input
                     name="search-no-show"
                     placeholder="Buscar cliente..."
-                    value={noShowSearch}
-                    onChange={(e) => setNoShowSearch(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     variant="full-rounded"
                     prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                     label=""
                 />
                 <PeriodDropdown
-                    options={PERIOD_OPTIONS}
+                    options={NO_SHOW_PERIOD_OPTIONS}
                     value={String(noShowPeriod)}
                     setValue={(v) => setNoShowPeriod(Number(v))}
                     placeholder="Período"
@@ -259,16 +297,17 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
                         return (
                             <div
                                 key={a.key}
-                                onClick={canNavigate ? () => goToCustomer(a) : undefined}
+                                onClick={canNavigate ? () => goToCustomer(a.customer_id) : undefined}
                                 className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-all ${canNavigate
                                     ? "hover:border-brand-green cursor-pointer"
                                     : ""
                                     }`}
                             >
                                 <div className="flex items-start gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center text-sm font-bold text-brand-inactive-text">
-                                        {getInitials(a.customer_name)}
-                                    </div>
+                                    <UserProfileImage
+                                        fullName={a.customer_name}
+                                        className="w-11 h-11 text-sm shrink-0"
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                             {a.customer_name}
@@ -305,8 +344,8 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         </div>
     )
 
-    // --- CONTEÚDO DA ABA PARADOS ---
-    const stagnantContent = loadingStagnant ? (
+    // --- CONTEÚDO DA ABA CONFIRMAÇÕES ---
+    const confirmationsContent = loadingConfirmations ? (
         <div className="flex items-center justify-center py-16">
             <ThreeDotsLoader />
         </div>
@@ -314,85 +353,181 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         <div className="space-y-3">
             <div className="mb-3 flex items-center gap-2">
                 <Input
-                    name="search-stagnant"
-                    placeholder="Buscar..."
-                    value={stagnantSearch}
-                    onChange={(e) => setStagnantSearch(e.target.value)}
+                    name="search-confirmations"
+                    placeholder="Buscar agendamento ou cliente..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     variant="full-rounded"
                     prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                     label=""
                 />
-                <PeriodDropdown
-                    options={PERIOD_OPTIONS}
-                    value={String(stagnantPeriod)}
-                    setValue={(v) => setStagnantPeriod(Number(v))}
-                    placeholder="Período"
-                />
             </div>
 
-            {stagnantServices.length === 0 ? (
+            {pendingConfirmations.length === 0 ? (
                 <div className="py-12">
                     <IconPlaceholder
-                        icon={ClockIcon}
-                        title="Nenhum serviço parado!"
-                        subtitle={`Todos os seus serviços possuem agendamentos ou foram cadastrados há menos de ${stagnantPeriod} dias.`}
+                        icon={CheckCircleIcon}
+                        title="Tudo confirmado!"
+                        subtitle="Nenhum agendamento pendente de confirmação para os próximos 7 dias."
                     />
                 </div>
             ) : (
                 <>
+                    <InfoCard
+                        title="Aguardando Confirmação"
+                        color="orange"
+                        message={`${pendingConfirmations.length} agendamento(s) nos próximos 7 dias ainda não confirmados. Confirme com o cliente com antecedência para evitar faltas e buracos na agenda.`}
+                    />
                     <p className="text-xs font-semibold text-brand-inactive-text px-1">
-                        {filteredStagnant.length} serviço(s) sem agendamento há mais de {stagnantPeriod} dias
+                        {filteredConfirmations.length} agendamento(s) a confirmar
                     </p>
-                    {filteredStagnant.map((s) => (
+                    {filteredConfirmations.map((item) => (
                         <div
-                            key={s.id}
-                            onClick={() => goToService(s.id)}
-                            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-green transition-all cursor-pointer"
+                            key={item.id}
+                            onClick={() => handleSelectAppointment(item.id, item.customer_id)}
+                            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-all hover:border-brand-green cursor-pointer"
                         >
                             <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                    {s.images && s.images[0] ? (
-                                        <img src={s.images[0]} alt={s.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="text-sm font-bold text-brand-inactive-text">
-                                            {getInitials(s.name)}
-                                        </span>
-                                    )}
-                                </div>
+                                <UserProfileImage
+                                    imageUrl={item.customer_avatar}
+                                    fullName={item.customer_name}
+                                    className="w-11 h-11 text-sm shrink-0"
+                                />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                        {s.name}
+                                        {item.customer_name}
                                     </p>
-                                    <p className="text-xs text-brand-inactive-text mt-0.5">
-                                        {s.category || "Sem categoria"}
-                                        {s.duration_minutes ? ` • ${s.duration_minutes} min` : ""}
+                                    <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
+                                        {item.service_name} • <span className="font-medium text-brand-dark dark:text-dark-heading">{item.staff_name}</span>
                                     </p>
-                                </div>
-                                <Badge variant="blue">Parado há {s.days_stagnant}d</Badge>
-                            </div>
-
-                            <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
-                                <div>
-                                    <span className="text-xs text-brand-inactive-text block">Preço de Venda</span>
-                                    <div className="flex items-center gap-2">
-                                        {s.promotional_price && s.promotional_price > 0 && s.promotional_price < s.price ? (
+                                    <div className="flex items-center gap-2 mt-1.5 text-xs text-brand-inactive-text">
+                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                            {formatDateBr(item.start_date)} às {item.start_time}
+                                        </span>
+                                        {item.price > 0 && (
                                             <>
-                                                <span className="text-sm font-bold line-through text-brand-inactive-text">
-                                                    {formatCurrency(s.price)}
-                                                </span>
-                                                <span className="text-sm font-bold text-brand-green">
-                                                    {formatCurrency(s.promotional_price)}
+                                                <span>•</span>
+                                                <span className="font-semibold text-brand-green">
+                                                    {formatCurrency(item.price)}
                                                 </span>
                                             </>
-                                        ) : (
-                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(s.price)}
-                                            </span>
                                         )}
                                     </div>
                                 </div>
-                                <span className="text-xs text-brand-inactive-text">
-                                    Cadastrado em {formatDateBr(String(s.created_at).slice(0, 10))}
+                                <div className="flex flex-col items-end gap-2 shrink-0">
+                                    <Badge variant="orange">{item.status}</Badge>
+                                    <Button
+                                        size="sm"
+                                        variant="filled"
+                                        className="h-8 text-xs gap-1.5 bg-brand-green hover:bg-emerald-600 text-white"
+                                        disabled={confirmingId === item.id}
+                                        onClick={(e) => handleConfirmAppointment(item.id, e)}
+                                    >
+                                        {confirmingId === item.id ? (
+                                            <ThreeDotsLoader />
+                                        ) : (
+                                            <>
+                                                <CalendarCheck size={14} />
+                                                <span>Confirmar</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </>
+            )}
+        </div>
+    )
+
+    // --- CONTEÚDO DA ABA REAGENDAMENTO ---
+    const rescheduleContent = loadingReschedule ? (
+        <div className="flex items-center justify-center py-16">
+            <ThreeDotsLoader />
+        </div>
+    ) : (
+        <div className="space-y-3">
+            <div className="mb-3 flex items-center gap-2">
+                <Input
+                    name="search-reschedule"
+                    placeholder="Buscar agendamento ou cliente..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    variant="full-rounded"
+                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                    label=""
+                />
+            </div>
+
+            {rescheduleAlerts.length === 0 ? (
+                <div className="py-12">
+                    <IconPlaceholder
+                        icon={CheckCircleIcon}
+                        title="Sem remarcações pendentes!"
+                        subtitle="Nenhum agendamento com solicitação de remarcação ou cancelamento sem novo horário."
+                    />
+                </div>
+            ) : (
+                <>
+                    <InfoCard
+                        title="Oportunidade de Remarcação"
+                        color="blue"
+                        message={`${rescheduleAlerts.length} agendamento(s) que precisam de remarcação. Entre em contato com esses clientes para não perder o faturamento.`}
+                    />
+                    <p className="text-xs font-semibold text-brand-inactive-text px-1">
+                        {filteredReschedule.length} agendamento(s) necessitando novo horário
+                    </p>
+                    {filteredReschedule.map((r) => (
+                        <div
+                            key={r.id}
+                            onClick={() => handleSelectAppointment(r.id, r.customer_id)}
+                            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-all hover:border-brand-green cursor-pointer"
+                        >
+                            <div className="flex items-start gap-3">
+                                <UserProfileImage
+                                    imageUrl={r.customer_avatar}
+                                    fullName={r.customer_name}
+                                    className="w-11 h-11 text-sm shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                        {r.customer_name}
+                                    </p>
+                                    <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
+                                        {r.service_name} • <span className="font-medium text-brand-dark dark:text-dark-heading">{r.staff_name}</span>
+                                    </p>
+                                    <p className="text-xs text-brand-inactive-text mt-1">
+                                        Data original: {formatDateBr(r.date)} {r.time ? `às ${r.time}` : ""}
+                                    </p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                    <Badge variant={r.reason === "needs_reschedule" ? "orange" : "red"}>
+                                        {r.reason === "needs_reschedule" ? "Remarcação Solicitada" : "Cancelado"}
+                                    </Badge>
+                                    {r.has_future_appointment && (
+                                        <Badge variant="green" className="text-[10px]">
+                                            Já tem futuro
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+
+                            {r.notes && (
+                                <p className="mt-2.5 text-xs text-brand-inactive-text bg-brand-gray/50 dark:bg-dark-border/40 rounded-xl px-3 py-2 italic line-clamp-2">
+                                    &ldquo;{r.notes}&rdquo;
+                                </p>
+                            )}
+
+                            <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-brand-border/60 dark:border-dark-border/60">
+                                <div>
+                                    <span className="text-brand-inactive-text">Valor: </span>
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(r.price)}
+                                    </span>
+                                </div>
+                                <span className="font-semibold text-brand-green">
+                                    Ver cliente →
                                 </span>
                             </div>
                         </div>
@@ -402,132 +537,109 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         </div>
     )
 
-    // --- CONTEÚDO DA ABA PRECIFICAÇÃO ---
-    const pricingContent = loadingPricing ? (
+    // --- CONTEÚDO DA ABA RETORNO / RETENÇÃO ---
+    const retentionContent = loadingRetention ? (
         <div className="flex items-center justify-center py-16">
             <ThreeDotsLoader />
         </div>
-    ) : pricingAlerts.length === 0 ? (
-        <div className="py-12">
-            <IconPlaceholder
-                icon={CheckCircleIcon}
-                title="Preços em dia!"
-                subtitle="Nenhum serviço está sendo vendido abaixo do custo ou com margem apertada."
-            />
-        </div>
     ) : (
         <div className="space-y-3">
-            {pricingMeta && (
-                <InfoCard
-                    title="Saúde dos Preços"
-                    color={pricingMeta.counts.loss > 0 ? "red" : "orange"}
-                    message={`${pricingMeta.counts.loss} serviço(s) abaixo do custo e ${pricingMeta.counts.thin} com margem apertada (limite de ${pricingMeta.thresholdPercent}% - metade da sua margem padrão de ${pricingMeta.defaultMarginPercent}%). Comece pelos de maior impacto.`}
+            <div className="mb-3 flex items-center gap-2">
+                <Input
+                    name="search-retention"
+                    placeholder="Buscar cliente..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    variant="full-rounded"
+                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                    label=""
                 />
-            )}
-            {pricingAlerts.map((a) => {
-                const isLoss = a.status === "loss"
-                const isPromoFix = a.cause === "promo"
-                return (
-                    <div
-                        key={a.id}
-                        onClick={() => goToService(a.id)}
-                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-green transition-all cursor-pointer"
-                    >
-                        <div className="flex items-start gap-3">
-                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                {a.images && a.images[0] ? (
-                                    <img src={a.images[0]} alt={a.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="text-sm font-bold text-brand-inactive-text">
-                                        {getInitials(a.name)}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    {a.name}
-                                </p>
-                                <p className="text-xs text-brand-inactive-text mt-0.5">
-                                    {a.category || "Sem categoria"}
-                                    {a.duration_minutes ? ` • ${a.duration_minutes} min` : ""}
-                                </p>
-                            </div>
-                            <Badge variant={isLoss ? "red" : "orange"}>
-                                {isLoss ? "Abaixo do custo" : "Margem apertada"}
-                            </Badge>
-                        </div>
+                <PeriodDropdown
+                    options={RETENTION_PERIOD_OPTIONS}
+                    value={String(retentionPeriod)}
+                    setValue={(v) => setRetentionPeriod(Number(v))}
+                    placeholder="Sem retorno há"
+                />
+            </div>
 
-                        {isPromoFix && (
-                            <p className="mt-2 text-xs font-semibold text-brand-orange">
-                                O preço promocional está abaixo do custo
-                            </p>
-                        )}
-
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
-                            <div>
-                                <span className="text-brand-inactive-text block">Custo</span>
-                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(a.cost_price)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-brand-inactive-text block">Preço atual</span>
-                                <span className={`font-bold ${isLoss ? "text-brand-red line-through" : "text-brand-dark dark:text-dark-heading"}`}>
-                                    {formatCurrency(a.effective_price)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-brand-inactive-text block">Margem</span>
-                                <span className={`font-bold ${isLoss ? "text-brand-red" : "text-brand-orange"}`}>
-                                    {a.margin_percent !== null ? `${a.margin_percent}%` : "-"}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mt-2.5 flex items-center justify-between gap-2">
-                            <div className="text-xs text-brand-inactive-text min-w-0">
-                                {isLoss ? (
-                                    <>
-                                        Perde{" "}
-                                        <span className="font-bold text-brand-red">
-                                            {formatCurrency(a.loss_per_unit)}
-                                        </span>
-                                        /atendimento
-                                    </>
-                                ) : (
-                                    <>
-                                        Potencial:{" "}
-                                        <span className="font-bold text-brand-green">
-                                            +{formatCurrency(a.potential_gain_per_unit)}
-                                        </span>
-                                        /atendimento
-                                    </>
-                                )}
-                            </div>
-                            <Button
-                                size="sm"
-                                variant={isPromoFix ? "outlineorange" : "outline"}
-                                className="h-8 text-xs gap-1.5 shrink-0"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    setApplyTarget(a)
-                                }}
+            {retentionOpportunities.length === 0 ? (
+                <div className="py-12">
+                    <IconPlaceholder
+                        icon={CheckCircleIcon}
+                        title="Retenção em dia!"
+                        subtitle={`Nenhum cliente assíduo sem retorno há mais de ${retentionPeriod} dias.`}
+                    />
+                </div>
+            ) : (
+                <>
+                    <InfoCard
+                        title="Oportunidade de Reengajamento"
+                        color="blue"
+                        message={`${retentionOpportunities.length} cliente(s) que já realizaram atendimentos mas estão há mais de ${retentionPeriod} dias sem novo agendamento. Convide-os de volta para aumentar a recorrência.`}
+                    />
+                    <p className="text-xs font-semibold text-brand-inactive-text px-1">
+                        {filteredRetention.length} cliente(s) sem retorno
+                    </p>
+                    {filteredRetention.map((opp) => {
+                        const canNavigate = Boolean(opp.customer_id)
+                        return (
+                            <div
+                                key={opp.key}
+                                onClick={canNavigate ? () => goToCustomer(opp.customer_id) : undefined}
+                                className={`bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-all ${canNavigate ? "hover:border-brand-green cursor-pointer" : ""
+                                    }`}
                             >
-                                <TrendingUpIcon size={14} className="text-brand-primary" />
-                                {isPromoFix ? "Remover promoção" : `Aplicar ${formatCurrency(a.suggested_price)}`}
-                            </Button>
-                        </div>
-                    </div>
-                )
-            })}
+                                <div className="flex items-start gap-3">
+                                    <UserProfileImage
+                                        imageUrl={opp.customer_avatar}
+                                        fullName={opp.customer_name}
+                                        className="w-11 h-11 text-sm shrink-0"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                            {opp.customer_name}
+                                        </p>
+                                        <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
+                                            Último: <span className="font-semibold text-brand-dark dark:text-dark-heading">{opp.last_service_name}</span> ({formatDateBr(opp.last_date)})
+                                        </p>
+                                        <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
+                                            Profissional: {opp.last_staff_name}
+                                        </p>
+                                    </div>
+                                    <Badge variant="orange">
+                                        Ausente há {opp.days_since_last}d
+                                    </Badge>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-brand-border/60 dark:border-dark-border/60">
+                                    <div>
+                                        <span className="text-brand-inactive-text">Histórico: </span>
+                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                            {opp.total_completed} visita(s)
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-brand-inactive-text">Total gasto: </span>
+                                        <span className="font-bold text-brand-green">
+                                            {formatCurrency(opp.total_spent)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </>
+            )}
         </div>
     )
 
-    // --- CONTEÚDO DA SHEET PRINCIPAL ---
+    // --- CONTEÚDO PRINCIPAL DA SHEET ---
     const mainContent = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Sugestões & Oportunidades</h2>
+                <div className="flex items-center gap-2.5">
+                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Sugestões & Oportunidades</h2>
+                </div>
                 <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
@@ -536,21 +648,27 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
             {/* Content List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
                 {/* Navigation Tabs */}
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                        <TabsTrigger value="faltas" className="px-0 pb-3 text-sm">
+                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setSearch("") }}>
+                    <TabsList className="bg-transparent p-0 gap-4 sm:gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6 overflow-x-auto custom-scrollbar flex-nowrap">
+                        <TabsTrigger value="faltas" className="px-0 pb-3 text-xs sm:text-sm shrink-0 whitespace-nowrap">
                             Faltas ({noShowAlerts.length})
                         </TabsTrigger>
-                        <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
-                            Parados ({stagnantServices.length})
+                        <TabsTrigger value="confirmacoes" className="px-0 pb-3 text-xs sm:text-sm shrink-0 whitespace-nowrap">
+                            Confirmações ({pendingConfirmations.length})
                         </TabsTrigger>
-                        <TabsTrigger value="precificacao" className="px-0 pb-3 text-sm">
-                            Precificação ({pricingAlerts.length})
+                        <TabsTrigger value="reagendamentos" className="px-0 pb-3 text-xs sm:text-sm shrink-0 whitespace-nowrap">
+                            Reagendamento ({rescheduleAlerts.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="retencao" className="px-0 pb-3 text-xs sm:text-sm shrink-0 whitespace-nowrap">
+                            Retorno ({retentionOpportunities.length})
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
 
-                {activeTab === "faltas" ? noShowContent : activeTab === "parados" ? stagnantContent : pricingContent}
+                {activeTab === "faltas" && noShowContent}
+                {activeTab === "confirmacoes" && confirmationsContent}
+                {activeTab === "reagendamentos" && rescheduleContent}
+                {activeTab === "retencao" && retentionContent}
             </div>
 
             {/* Footer */}
@@ -562,84 +680,33 @@ export function AppointmentsSuggestionsSheet({ isOpen, onClose, partnerId, store
         </div>
     )
 
-    // --- MODAL DE CONFIRMAÇÃO (APLICAR PREÇO / REMOVER PROMOÇÃO) ---
-    const applyConfirmModal = applyTarget ? (
-        <AlertModal
-            isOpen
-            onClose={() => {
-                if (!isApplying) setApplyTarget(null)
-            }}
-            onConfirm={handleApplyPricing}
-            variant={applyTarget.cause === "promo" ? "warning" : "info"}
-            title={applyTarget.cause === "promo" ? "Remover promoção?" : "Aplicar preço sugerido?"}
-            confirmText={applyTarget.cause === "promo" ? "Remover" : "Aplicar"}
-            isLoading={isApplying}
-            disabled={isApplying}
-            message={
-                <div className="space-y-1.5 text-left">
-                    <p className="font-bold text-brand-dark dark:text-dark-heading">{applyTarget.name}</p>
-                    {applyTarget.cause === "promo" ? (
-                        <>
-                            <p>
-                                Promoção atual: <strong>{formatCurrency(applyTarget.effective_price)}</strong> · Custo:{" "}
-                                <strong>{formatCurrency(applyTarget.cost_price)}</strong>
-                            </p>
-                            <p>
-                                Remover a promoção volta o preço para{" "}
-                                <strong>{formatCurrency(applyTarget.base_price)}</strong>.
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <p>
-                                Preço atual: <strong>{formatCurrency(applyTarget.effective_price)}</strong> · Custo:{" "}
-                                <strong>{formatCurrency(applyTarget.cost_price)}</strong>
-                            </p>
-                            <p>
-                                Novo preço: <strong>{formatCurrency(applyTarget.suggested_price)}</strong>
-                                {pricingMeta && ` (margem padrão de ${pricingMeta.defaultMarginPercent}%)`}
-                            </p>
-                        </>
-                    )}
-                </div>
-            }
-        />
-    ) : null
-
     // --- RENDERIZADOR RESPONSIVO (DESKTOP SHEET VS BOTTOM SHEET) ---
     if (isMobile) {
         return (
-            <>
-                <BottomSheet isOpen={isOpen} onClose={onClose}>
-                    {mainContent}
-                </BottomSheet>
-                {applyConfirmModal}
-            </>
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {mainContent}
+            </BottomSheet>
         )
     }
 
     return (
-        <>
-            <Portal>
+        <Portal>
+            <div
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                style={{ zIndex }}
+                onClick={onClose}
+            >
                 <div
-                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+                    className={`fixed right-4 top-4 bottom-4 w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
+                        ? "translate-x-0 opacity-100"
+                        : "translate-x-[120%] opacity-100"
                         }`}
-                    style={{ zIndex }}
-                    onClick={onClose}
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <div
-                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
-                            ? "translate-x-0 opacity-100"
-                            : "translate-x-[120%] opacity-100"
-                            }`}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {mainContent}
-                    </div>
+                    {mainContent}
                 </div>
-            </Portal>
-
-            {applyConfirmModal}
-        </>
+            </div>
+        </Portal>
     )
 }

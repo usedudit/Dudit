@@ -22,7 +22,7 @@ export function ERPResourceGuard({ children }: { children: React.ReactNode }) {
     if (active) return <>{children}</>
 
     return (
-        <div className="flex items-center justify-center min-h-[calc(100vh-65px)] p-4 text-center">
+        <div className="flex items-center justify-center min-h-full p-4 text-center">
             <div className="flex flex-col items-center">
                 <IconPlaceholder
                     placeholderType="image"

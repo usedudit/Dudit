@@ -96,7 +96,7 @@ export function SystemSettingsSubPage({
 
     if (loading) {
         return (
-            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                 <div className="flex items-center justify-center h-full text-brand-inactive-text">
                     Carregando configurações do sistema...
                 </div>
@@ -105,7 +105,7 @@ export function SystemSettingsSubPage({
     }
 
     return (
-        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}

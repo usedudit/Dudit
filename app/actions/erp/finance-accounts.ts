@@ -9,7 +9,6 @@ import { requireStorePermission } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { createManualTransactionAction } from "@/app/actions/erp/transactions"
 import { startOfDay } from "@/lib/date"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
@@ -160,15 +159,17 @@ export async function getFinanceAccountsAction(partnerId: string, storeId?: stri
 }
 
 function parseBalance(v: unknown): number {
-  if (v === null || v === undefined || v === "") return 0
+  if (v === null || v === undefined || v === "") throw new Error("Informe um saldo válido.")
   const n = typeof v === "number" ? v : Number(String(v).replace(",", "."))
-  return Number.isFinite(n) ? n : 0
+  if (!Number.isFinite(n) || Math.abs(n) > 999_999_999_999.99) {
+    throw new Error("Saldo fora do limite permitido.")
+  }
+  return Math.round(n * 100) / 100
 }
 
 function parseOptionalBalance(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null
-  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."))
-  return Number.isFinite(n) ? n : null
+  return parseBalance(v)
 }
 
 function normalizeName(value: string) {
@@ -181,8 +182,6 @@ export async function createFinanceAccountAction(data: {
   type: FinanceAccountType
   initialBalance: number
   currentBalance?: number | null
-  isSystemManaged?: boolean
-  integrationSource?: string | null
   isDefault?: boolean
   storeId?: string | null
 }) {
@@ -190,7 +189,8 @@ export async function createFinanceAccountAction(data: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requirePermission(data.partnerId, "financial", "create")
+    const user = await requireUser()
+    await requirePermission(data.partnerId, "financial", "create", user)
     const supabase = createAdminClient()
 
     if (data.storeId) {
@@ -208,113 +208,33 @@ export async function createFinanceAccountAction(data: {
     if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
     const normalizedName = normalizeName(data.name)
 
-    const { data: duplicate } = await supabase
-      .from("finance_accounts")
-      .select("id")
-      .eq("partner_id", data.partnerId)
-      .ilike("name", normalizedName)
-      .limit(1)
-      .maybeSingle()
-    if (duplicate?.id) throw new Error("Já existe uma conta com esse nome.")
-
     const initial = parseBalance(data.initialBalance)
     const explicitCurrent =
       data.currentBalance === undefined ? null : parseOptionalBalance(data.currentBalance)
     const targetCurrent =
       explicitCurrent !== null && explicitCurrent !== undefined ? explicitCurrent : initial
-
-    const { data: inserted, error } = await supabase
-      .from("finance_accounts")
-      .insert({
-        partner_id: data.partnerId,
-        name: normalizedName,
-        type: data.type,
-        initial_balance: initial,
-        current_balance: 0,
-        is_system_managed: data.isSystemManaged ?? false,
-        integration_source: data.integrationSource ?? null,
-        is_default: Boolean(data.isDefault),
-        store_id: data.storeId || null,
-      })
-      .select(
-        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
-      )
-      .single()
-
+    const today = new Date().toISOString().slice(0, 10)
+    const openingTransactionDate = startOfDay(today).toISOString()
+    if (data.isDefault !== undefined && typeof data.isDefault !== "boolean") {
+      throw new Error("Valor de conta padrão inválido.")
+    }
+    const { data: created, error } = await supabase.rpc("create_finance_account_with_opening_balance_atomic", {
+      p_partner_id: data.partnerId,
+      p_user_id: user.id,
+      p_store_id: data.storeId || null,
+      p_name: normalizedName,
+      p_type: data.type,
+      p_initial_balance: initial,
+      p_current_balance: targetCurrent,
+      p_is_default: data.isDefault ?? false,
+      p_opening_transaction_date: openingTransactionDate,
+    })
     if (error) throw error
-
-    if (!inserted.integration_source || inserted.integration_source !== "mercadopago") {
-      if (Boolean(data.isDefault)) {
-        let clearDefaultsQuery = supabase
-          .from("finance_accounts")
-          .update({ is_default: false })
-          .eq("partner_id", data.partnerId)
-          .eq("type", data.type)
-          .neq("id", inserted.id)
-          .or("integration_source.is.null,integration_source.neq.mercadopago")
-        clearDefaultsQuery = data.storeId
-          ? clearDefaultsQuery.eq("store_id", data.storeId)
-          : clearDefaultsQuery.is("store_id", null)
-        await clearDefaultsQuery
-      } else {
-        let defaultCountQuery = supabase
-          .from("finance_accounts")
-          .select("id", { count: "exact", head: true })
-          .eq("partner_id", data.partnerId)
-          .eq("type", data.type)
-          .eq("is_default", true)
-          .neq("id", inserted.id)
-          .or("integration_source.is.null,integration_source.neq.mercadopago")
-        defaultCountQuery = data.storeId
-          ? defaultCountQuery.eq("store_id", data.storeId)
-          : defaultCountQuery.is("store_id", null)
-        const { count } = await defaultCountQuery
-
-        if (!count) {
-          await supabase
-            .from("finance_accounts")
-            .update({ is_default: true })
-            .eq("id", inserted.id)
-            .eq("partner_id", data.partnerId)
-        }
-      }
-    }
-
-    if (Math.abs(targetCurrent) >= 0.005) {
-      const today = new Date().toISOString().slice(0, 10)
-      const transactionTs = startOfDay(today).toISOString()
-      const adj = await createManualTransactionAction({
-        partnerId: data.partnerId,
-        transactionType: "adjustment",
-        amount: targetCurrent,
-        description: `Saldo inicial - ${data.name.trim()}`,
-        category: "Ajuste de saldo",
-        categoryId: null,
-        subcategoryId: null,
-        accountId: inserted.id,
-        contactId: null,
-        customerId: null,
-        contactType: null,
-        paymentType: "Ajuste",
-        dueDate: today,
-        paymentDate: transactionTs,
-        transactionDate: transactionTs,
-        storeId: data.storeId || null,
-        status: "paid",
-        notes: null,
-        origin: "manual",
-      })
-      if (!adj.success) throw new Error(adj.error || "Erro ao registrar saldo inicial.")
-    }
-
-    const { data: refreshed } = await supabase
-      .from("finance_accounts")
-      .select("id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source")
-      .eq("id", inserted.id)
-      .single()
+    const account = created?.account
+    if (!account?.id) throw new Error("A RPC não retornou a conta criada.")
 
     await safeRevalidateTag(TAGS.financeAccounts(data.partnerId))
-    return { success: true, data: refreshed || inserted }
+    return { success: true, data: account }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -357,15 +277,7 @@ export async function updateFinanceAccountAction(
     const payload: Record<string, unknown> = {}
     if (data.name !== undefined) {
       const normalizedName = normalizeName(data.name)
-      const { data: duplicate } = await supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("partner_id", partnerId)
-        .ilike("name", normalizedName)
-        .neq("id", id)
-        .limit(1)
-        .maybeSingle()
-      if (duplicate?.id) throw new Error("Já existe uma conta com esse nome.")
+      if (!normalizedName) throw new Error("O nome é obrigatório.")
       payload.name = normalizedName
     }
     if (data.type !== undefined) {
@@ -373,38 +285,23 @@ export async function updateFinanceAccountAction(
       payload.type = data.type
     }
     if (data.initialBalance !== undefined) payload.initial_balance = parseBalance(data.initialBalance)
-    if (data.isActive !== undefined) payload.is_active = data.isActive
-    if (data.isDefault !== undefined) payload.is_default = data.isDefault
-
-    const targetType = (data.type ?? account.type) as string
-    const willBeDefault =
-      data.isDefault === true || (data.isDefault === undefined && account.is_default === true)
-
-    if (account.integration_source !== "mercadopago" && willBeDefault && ["cash", "bank", "wallet"].includes(targetType)) {
-      let clearDefaultsQuery = supabase
-        .from("finance_accounts")
-        .update({ is_default: false })
-        .eq("partner_id", partnerId)
-        .eq("type", targetType)
-        .neq("id", id)
-        .or("integration_source.is.null,integration_source.neq.mercadopago")
-      clearDefaultsQuery = account.store_id
-        ? clearDefaultsQuery.eq("store_id", account.store_id)
-        : clearDefaultsQuery.is("store_id", null)
-      await clearDefaultsQuery
+    if (data.isActive !== undefined) {
+      if (typeof data.isActive !== "boolean") throw new Error("Status da conta inválido.")
+      payload.is_active = data.isActive
+    }
+    if (data.isDefault !== undefined) {
+      if (typeof data.isDefault !== "boolean") throw new Error("Valor de conta padrão inválido.")
+      payload.is_default = data.isDefault
     }
 
-    const { data: updated, error } = await supabase
-      .from("finance_accounts")
-      .update(payload)
-      .eq("id", id)
-      .eq("partner_id", partnerId)
-      .select(
-        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
-      )
-      .single()
-
+    const { data: result, error } = await supabase.rpc("update_finance_account_atomic", {
+      p_partner_id: partnerId,
+      p_account_id: id,
+      p_patch: payload,
+    })
     if (error) throw error
+    const updated = result?.account
+    if (!updated?.id) throw new Error("A RPC não retornou a conta atualizada.")
 
     await safeRevalidateTag(TAGS.financeAccounts(partnerId))
     return { success: true, data: updated }

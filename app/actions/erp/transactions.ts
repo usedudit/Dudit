@@ -1170,17 +1170,18 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             created_by_user_id: userId,
         }
 
-        const inserted = await insertTransactionsWithOptionalCreator(supabase, payload)
-        if (inserted.error) throw inserted.error
-        const data = (inserted.data || [])[0]
-        if (!data) throw new Error("Erro ao criar transação")
-
-        await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.accountId, {
-            transaction_type: input.transactionType,
-            amount: payload.amount as number,
-            status: String(status),
-            refund_kind: input.refundKind,
+        const atomicInsert = await createAdminClient().rpc("create_manual_financial_transactions_atomic", {
+            p_partner_id: input.partnerId,
+            p_rows: [payload],
         })
+        if (atomicInsert.error) throw atomicInsert.error
+        const insertedIds = Array.isArray(atomicInsert.data?.ids) ? atomicInsert.data.ids as string[] : []
+        const { data: insertedRows, error: readError } = insertedIds.length
+            ? await supabase.from("transactions").select("*").in("id", insertedIds)
+            : { data: [], error: new Error("RPC não retornou o lançamento criado.") }
+        if (readError) throw readError
+        const data = (insertedRows || [])[0]
+        if (!data) throw new Error("Erro ao criar transação")
 
         await logAuditEvent({
             partnerId: input.partnerId,
@@ -1316,22 +1317,18 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const outRowWithCreator = { ...outRow, created_by_user_id: userId, reference_note: `transfer:${idempotencyKey}:out` }
         const inRowWithCreator = { ...inRow, created_by_user_id: userId, reference_note: `transfer:${idempotencyKey}:in` }
 
-        const inserted = await insertTransactionsWithOptionalCreator(supabase, [outRowWithCreator, inRowWithCreator])
-        if (inserted.error) throw inserted.error
-        const data = inserted.data || []
-
-        if (isLedgerConfirmedStatus(status)) {
-            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.fromAccountId, {
-                transaction_type: "expense",
-                amount: amt,
-                status,
-            })
-            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.toAccountId, {
-                transaction_type: "income",
-                amount: amt,
-                status,
-            })
-        }
+        const atomicInsert = await createAdminClient().rpc("create_manual_financial_transactions_atomic", {
+            p_partner_id: input.partnerId,
+            p_rows: [outRowWithCreator, inRowWithCreator],
+        })
+        if (atomicInsert.error) throw atomicInsert.error
+        const insertedIds = Array.isArray(atomicInsert.data?.ids) ? atomicInsert.data.ids as string[] : []
+        const { data: insertedRows, error: readError } = insertedIds.length === 2
+            ? await supabase.from("transactions").select("*").in("id", insertedIds)
+            : { data: [], error: new Error("RPC não retornou as duas linhas da transferência.") }
+        if (readError) throw readError
+        const data = insertedRows || []
+        if (data.length !== 2) throw new Error("Não foi possível confirmar as duas linhas da transferência.")
 
         await Promise.allSettled(
             (data || []).map((row: any) =>
@@ -1722,29 +1719,6 @@ export async function createInstallmentGroupAction(input: {
 
         const resolvedPaymentType = input.paymentType || (input.paymentMethodId && !validPaymentMethodId ? input.paymentMethodId : null)
 
-        const { data: group, error: groupErr } = await supabase
-            .from("installment_groups")
-            .insert({
-                partner_id: input.partnerId,
-                store_id: input.storeId || null,
-                description: sanitizeInput(String(input.description || ""), 150).trim(),
-                total_amount: totalAmount,
-                installments_count: count,
-                frequency: input.frequency,
-                interval: interval,
-                interval_value: interval,
-                start_date: startDate.toISOString(),
-                category_id: input.categoryId || null,
-                subcategory_id: input.subcategoryId || null,
-                account_id: input.accountId || null,
-                contact_id: input.contactId || null,
-                payment_method_id: validPaymentMethodId,
-                created_by_user_id: userId,
-            })
-            .select("id")
-            .single()
-        if (groupErr || !group?.id) throw groupErr || new Error("Erro ao criar grupo parcelado.")
-
         const initialStatus = input.initialStatus === "paid" ? "paid" : "pending"
         const firstInstallmentPaymentDate = input.firstInstallmentPaymentDate || new Date().toISOString()
         const transactionsPayload = Array.from({ length: count }).map((_, index) => {
@@ -1776,29 +1750,48 @@ export async function createInstallmentGroupAction(input: {
                 fee_amount: 0,
                 transaction_type: input.transactionType,
                 origin: "manual",
-                installment_group_id: group.id,
                 installment_number: installmentNumber,
                 created_by_user_id: userId,
             }
         })
 
-        const inserted = await insertTransactionsWithOptionalCreator(supabase, transactionsPayload)
-        if (inserted.error) throw inserted.error
-
-        if (initialStatus === "paid" && input.accountId) {
-            const firstInstallmentAmount = Number((transactionsPayload[0] as any)?.amount || 0)
-            if (firstInstallmentAmount > 0) {
-                await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.accountId, {
-                    transaction_type: input.transactionType,
-                    amount: firstInstallmentAmount,
-                    status: "paid",
-                })
-            }
+        const groupDescription = sanitizeInput(String(input.description || ""), 150).trim()
+        const atomicCreate = await createAdminClient().rpc("create_installment_group_atomic", {
+            p_partner_id: input.partnerId,
+            p_user_id: userId,
+            p_group: {
+                store_id: input.storeId || null,
+                description: groupDescription,
+                total_amount: totalAmount,
+                installments_count: count,
+                frequency: input.frequency,
+                interval: interval,
+                interval_value: interval,
+                start_date: startDate.toISOString(),
+                category_id: input.categoryId || null,
+                subcategory_id: input.subcategoryId || null,
+                account_id: input.accountId || null,
+                contact_id: input.contactId || null,
+                payment_method_id: validPaymentMethodId,
+            },
+            p_rows: transactionsPayload,
+        })
+        if (atomicCreate.error) throw atomicCreate.error
+        const groupId = String(atomicCreate.data?.groupId || "")
+        const insertedIds = Array.isArray(atomicCreate.data?.transactionIds)
+            ? atomicCreate.data.transactionIds as string[]
+            : []
+        const { data: insertedRows, error: readError } = insertedIds.length === count
+            ? await supabase.from("transactions").select("id, installment_number").in("id", insertedIds)
+            : { data: [], error: new Error("RPC não retornou todas as parcelas criadas.") }
+        if (readError) throw readError
+        if (!groupId || insertedRows?.length !== count) {
+            throw new Error("Não foi possível confirmar o grupo e todas as parcelas.")
         }
 
         // Log audit event for the installment group creation
         await Promise.allSettled(
-            (inserted.data || []).map((row: any) =>
+            (insertedRows || []).map((row: any) =>
                 logAuditEvent({
                     partnerId: input.partnerId,
                     actorUserId: userId,
@@ -1812,7 +1805,7 @@ export async function createInstallmentGroupAction(input: {
         )
 
         await revalidateTransactions(input.partnerId)
-        return { success: true as const, data: { groupId: group.id, createdCount: (inserted.data || []).length } }
+        return { success: true as const, data: { groupId, createdCount: insertedRows.length } }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao criar parcelamento" }
     }
@@ -2683,176 +2676,61 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             subcategoryId: rec.subcategory_id,
         }, "create")
 
-        const nowIso = new Date().toISOString()
         const paymentTypeLabel = validResolvedPmId
             ? await paymentMethodDisplayLabel(supabase, input.partnerId, validResolvedPmId)
             : (rawMethodName || null)
 
-        // Check if a pending transaction already exists (from cron) - upgrade it to paid
-        const { data: pendingTx } = await supabase
+        const { data: paymentResult, error: paymentError } = await createAdminClient().rpc(
+            "record_recurring_occurrence_payment_atomic",
+            {
+                p_partner_id: input.partnerId,
+                p_recurring_id: input.recurringId,
+                p_user_id: userId,
+                p_due_date: dueDateValue,
+                p_account_id: accountId,
+                p_payment_method_id: validResolvedPmId,
+                p_payment_type: paymentTypeLabel,
+                p_category_name: categoryName,
+                p_payment_amount: paymentAmount,
+                p_interest_amount: interestAmount,
+                p_discount_amount: discountAmount,
+                p_transaction_date: transactionTs,
+            },
+        )
+        if (paymentError) throw paymentError
+        const transactionId = String(paymentResult?.transactionId || "")
+        if (!transactionId) throw new Error("RPC não retornou a ocorrência liquidada.")
+
+        const { data: paidTransaction, error: readError } = await supabase
             .from("transactions")
-            .select("id, status, account_id")
-            .eq("recurring_id", input.recurringId)
+            .select("*")
+            .eq("id", transactionId)
             .eq("partner_id", input.partnerId)
-            .eq("due_date", dueDateValue)
-            .eq("status", "pending")
-            .limit(1)
-            .maybeSingle()
-
-        if (pendingTx) {
-            // Upgrade pending → paid
-            const { data: updated, error: updErr } = await supabase
-                .from("transactions")
-                .update({
-                    status: "paid",
-                    payment_date: nowIso,
-                    account_id: accountId,
-                    payment_method_id: validResolvedPmId,
-                    payment_type: paymentTypeLabel,
-                    amount: finalPaid,
-                    original_amount: paymentAmount,
-                    interest_amount: interestAmount,
-                    discount_amount: discountAmount,
-                    paid_amount: finalPaid,
-                    updated_at: nowIso,
-                })
-                .eq("id", pendingTx.id)
-                .eq("partner_id", input.partnerId)
-                .select("*")
-                .single()
-            if (updErr) throw updErr
-
-            // Insert a payment record for history consistency
-            const tpIdempotencyKey = `recurring:${pendingTx.id}:${nowIso}:${finalPaid}`
-            await supabase
-                .from("transaction_payments")
-                .insert({
-                    partner_id: input.partnerId,
-                    transaction_id: pendingTx.id,
-                    store_id: rec.store_id || null,
-                    amount: finalPaid,
-                    base_amount: paymentAmount,
-                    interest_amount: interestAmount,
-                    discount_amount: discountAmount,
-                    payment_method_id: validResolvedPmId,
-                    created_by_user_id: userId,
-                    created_at: nowIso,
-                    idempotency_key: tpIdempotencyKey,
-                })
-
-            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
-                transaction_type: rec.type,
-                amount: finalPaid,
-                status: "paid",
-            })
-            console.info(
-                "[recurring] occurrence_marked_paid",
-                JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
-            )
-            await logAuditEvent({
-                partnerId: input.partnerId,
-                actorUserId: userId,
-                entityType: "transaction",
-                entityId: pendingTx.id,
-                actionType: "paid",
-                changeLines: [`Pagamento da recorrência confirmado (R$ ${finalPaid.toFixed(2)})`],
-                source: "manual",
-            })
-            await revalidateEntityTimeline("transaction", pendingTx.id)
-            await revalidateTransactions(input.partnerId)
-            return { success: true, data: updated }
+            .single()
+        if (readError) throw readError
+        if (paymentResult?.alreadyProcessed) {
+            return { success: true, data: paidTransaction, alreadyPaid: true }
         }
-
-        // Create a fresh paid transaction from recurring template
-        const payload: Record<string, unknown> = {
-            partner_id: input.partnerId,
-            store_id: rec.store_id || null,
-            description: rec.description,
-            category: categoryName,
-            category_id: rec.category_id,
-            subcategory_id: rec.subcategory_id,
-            contact_id: rec.contact_id,
-            contact_type: rec.contact_type,
-            customer_id: rec.customer_id,
-            amount: finalPaid,
-            due_date: dueDateValue,
-            payment_date: nowIso,
-            transaction_date: transactionTs,
-            status: "paid",
-            notes: null,
-            original_amount: paymentAmount,
-            interest_amount: interestAmount,
-            discount_amount: discountAmount,
-            paid_amount: finalPaid,
-            fee_amount: 0,
-            payment_type: paymentTypeLabel,
-            transaction_type: rec.type,
-            account_id: accountId,
-            origin: "system" as const,
-            recurring_id: rec.id,
-            payment_method_id: validResolvedPmId,
-            created_by_user_id: userId,
-        }
-
-        const insertRes = await insertTransactionsWithOptionalCreator(supabase, payload)
-        const newTx = (insertRes.data || [])[0]
-        const insertErr = insertRes.error
-
-        if (insertErr) {
-            // Handle unique constraint violation gracefully (idempotent)
-            if (insertErr.code === "23505") {
-                return { success: true, data: null, alreadyPaid: true }
-            }
-            throw insertErr
-        }
-
-        if (newTx?.id) {
-            // Insert a payment record for history consistency
-            const tpIdempotencyKey = `recurring:${newTx.id}:${nowIso}:${finalPaid}`
-            await supabase
-                .from("transaction_payments")
-                .insert({
-                    partner_id: input.partnerId,
-                    transaction_id: newTx.id,
-                    store_id: rec.store_id || null,
-                    amount: finalPaid,
-                    base_amount: paymentAmount,
-                    interest_amount: interestAmount,
-                    discount_amount: discountAmount,
-                    payment_method_id: validResolvedPmId,
-                    created_by_user_id: userId,
-                    created_at: nowIso,
-                    idempotency_key: tpIdempotencyKey,
-                })
-        }
-
-        await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
-            transaction_type: rec.type,
-            amount: finalPaid,
-            status: "paid",
-        })
 
         console.info(
             "[recurring] occurrence_marked_paid",
             JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
         )
-        if (newTx?.id) {
-            let recurringCreatedMsg = `Marcou ocorrência recorrente como paga - R$ ${finalPaid.toFixed(2)}`
-            if (interestAmount > 0) recurringCreatedMsg += ` (Juros: R$ ${interestAmount.toFixed(2)})`
-            if (discountAmount > 0) recurringCreatedMsg += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
-            await logAuditEvent({
-                partnerId: input.partnerId,
-                actorUserId: userId,
-                entityType: "transaction",
-                entityId: newTx.id,
-                actionType: "created",
-                changeLines: [recurringCreatedMsg],
-                source: "manual",
-            })
-            await revalidateEntityTimeline("transaction", newTx.id)
-        }
+        let recurringCreatedMsg = `Marcou ocorrência recorrente como paga - R$ ${finalPaid.toFixed(2)}`
+        if (interestAmount > 0) recurringCreatedMsg += ` (Juros: R$ ${interestAmount.toFixed(2)})`
+        if (discountAmount > 0) recurringCreatedMsg += ` (Desconto: R$ ${discountAmount.toFixed(2)})`
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: userId,
+            entityType: "transaction",
+            entityId: transactionId,
+            actionType: "paid",
+            changeLines: [recurringCreatedMsg],
+            source: "manual",
+        })
+        await revalidateEntityTimeline("transaction", transactionId)
         await revalidateTransactions(input.partnerId)
-        return { success: true, data: newTx }
+        return { success: true, data: paidTransaction }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao marcar como pago" }
     }

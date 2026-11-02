@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Badge, Tooltip } from '@/components/reusable';
 import { MoneyIcon, BlockedIcon, EyeOffIcon, PartiallyPaidIcon, LikeIcon, ClockIcon, PlayIcon } from '@/lib/icons';
 import { AlertTriangle } from 'lucide-react';
 import { Appointment } from './types';
@@ -89,14 +90,22 @@ export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appoin
                         )}
                         <div className="flex items-center gap-1.5 shrink-0">
                             {hasCollision && (
-                                <span title="Conflito de horário detectado">
-                                    <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                                </span>
+                                <Tooltip text="Conflito de horário detectado">
+                                    <Badge
+                                        variant="red"
+                                        icon={<AlertTriangle size={12} />}
+                                        className="whitespace-nowrap scale-75 shrink-0"
+                                    />
+                                </Tooltip>
                             )}
                             {isOutsideHours && (
-                                <span title="Agendado fora do horário de funcionamento">
-                                    <AlertTriangle size={14} className="text-orange-500 shrink-0" />
-                                </span>
+                                <Tooltip text="Agendado fora do horário de funcionamento">
+                                    <Badge
+                                        variant="orange"
+                                        icon={<AlertTriangle size={12} />}
+                                        className="whitespace-nowrap scale-75 shrink-0"
+                                    />
+                                </Tooltip>
                             )}
                             {PaymentIcon && <PaymentIcon size={14} className={`${style.text} opacity-70`} />}
                             <StatusIcon size={14} className={`${style.text} opacity-70`} />

@@ -130,8 +130,8 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
 
     if (planGate) {
         return (
-            <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <FadeIn className="h-full">
+                <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
@@ -178,13 +178,13 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
         )
     }
 
-    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+    if (loading) return <div className="flex h-full min-h-[200px] w-full items-center justify-center">
         <ThreeDotsLoader />
     </div>
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}

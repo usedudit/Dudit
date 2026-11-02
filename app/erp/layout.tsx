@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { ERPSidebar } from "@/components/erp/ERPSidebar"
 import { ERPResourceGuard } from "@/components/erp/ERPResourceGuard"
 import { ERPHeader } from "@/components/erp/ERPHeader"
+import { ERPContentRegion } from "@/components/erp/ERPContentRegion"
 import { SidebarProvider } from "@/lib/sidebar-context"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
@@ -255,9 +256,9 @@ export default async function ERPLayout({
             <PlanUpgradeProvider>
               <StoreProvider partnerId={context.partnerId} activeStoreId={effectiveActiveStoreId} initialStores={initialStores}>
                 <SidebarProvider initialExpanded={initialExpanded}>
-                  <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
+                  <div className="flex h-screen overflow-hidden bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
                     <ERPSidebar />
-                    <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="relative flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
                       <OfflineBanner variant="erp" />
                       <ERPHeader
                         userProfile={userProfile}
@@ -268,9 +269,23 @@ export default async function ERPLayout({
                           trialEnd: subscriptionBanner?.trial_end ?? null,
                         }}
                       />
-                      <ERPResourceGuard>
-                        {children}
-                      </ERPResourceGuard>
+                      {/*
+                        Região de conteúdo do ERP.
+
+                        O shell NÃO rola: o header fica fixo e a região é quem
+                        controla o scroll. Ela alterna entre dois modos:
+
+                        - conteúdo normal (listas, grids, dashboard...): o
+                          conteúdo flui e a scrollbar fica na borda da tela;
+                        - entidade (?view/?edit/?create/?duplicate): a página
+                          preenche a região e rola por dentro, logo abaixo do
+                          ERPHeader.
+                      */}
+                      <ERPContentRegion>
+                        <ERPResourceGuard>
+                          {children}
+                        </ERPResourceGuard>
+                      </ERPContentRegion>
                     </div>
                   </div>
                   <LimitStatusWidget />

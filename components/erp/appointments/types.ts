@@ -5,6 +5,8 @@ export type ModeType = 'calendar' | 'list';
 export interface Appointment {
     id: string;
     partnerId: string;
+    customerId?: string | null;
+    customerAvatar?: string | null;
     customer: string;
     service: string;
     date: string;       // Start Date (YYYY-MM-DD)

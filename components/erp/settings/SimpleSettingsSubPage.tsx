@@ -15,8 +15,8 @@ interface SimpleSettingsSubPageProps {
 export function SimpleSettingsSubPage({ title, description, onBack }: SimpleSettingsSubPageProps) {
   const handleBack = React.useCallback(() => onBack(), [onBack])
   return (
-    <FadeIn>
-      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+    <FadeIn className="h-full">
+      <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
           <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-6 flex items-center justify-between">

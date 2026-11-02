@@ -8,10 +8,17 @@ import { requirePermission } from "@/lib/permissions/access"
 import {
   evaluateNoShowAlerts,
   evaluateStagnantServices,
+  evaluatePendingConfirmations,
+  evaluateRescheduleOpportunities,
+  evaluateRetentionOpportunities,
   toDateStr,
   subtractDays,
+  addDays,
   type NoShowAlertsResult,
   type StagnantServicesResult,
+  type PendingConfirmationAlert,
+  type RescheduleOpportunity,
+  type RetentionOpportunity,
 } from "@/lib/erp/appointment-insights"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -243,9 +250,12 @@ async function createAppointmentSaleAndSyncGoals(params: {
   let paymentTransactionId = existingPaymentTx?.id || null
   if (capabilities.hasFinancial && !paymentTransactionId) {
     const nowIso = new Date().toISOString()
-    const { data: tx, error: txError } = await params.supabase
-      .from("transactions")
-      .insert({
+    const { data: txResult, error: txError } = await createAdminClient().rpc(
+      "create_appointment_payment_transaction_atomic",
+      {
+        p_partner_id: params.partnerId,
+        p_appointment_id: params.appointment.id,
+        p_rows: [{
         partner_id: params.partnerId,
         store_id: params.appointment.store_id || null,
         description: fallbackSaleNumber,
@@ -267,22 +277,12 @@ async function createAppointmentSaleAndSyncGoals(params: {
         reference_note: txRefNote,
         account_id: financeAccountId || null,
         created_by_user_id: params.userId,
-      })
-      .select("id")
-      .single()
+        }],
+      },
+    )
     if (txError) throw txError
-    paymentTransactionId = tx?.id || null
-
-    if (financeAccountId && paidAmount > 0) {
-      const { error: balanceError } = await createAdminClient().rpc("apply_account_balance_delta", {
-        p_account_id: financeAccountId,
-        p_partner_id: params.partnerId,
-        p_delta: Math.round(paidAmount * 100) / 100,
-      })
-      if (balanceError) {
-        throw new Error(`Falha ao atualizar saldo da conta financeira: ${balanceError.message}`)
-      }
-    }
+    paymentTransactionId = txResult?.transactionId || null
+    if (!paymentTransactionId) throw new Error("A RPC não retornou a transação de pagamento do agendamento.")
   }
 
   if (capabilities.hasProductivity) {
@@ -471,6 +471,10 @@ export const APPOINTMENT_LIST_COLUMNS = `
     paid_amount,
     payment_method,
     order_source
+  ),
+  customers:customer_id (
+    id,
+    image_url
   )
 `
 
@@ -576,6 +580,209 @@ export async function getNoShowAlertsAction(
     return evaluateNoShowAlerts(past || [], future || [], { periodDays: days, today })
   } catch (error: any) {
     return { error: error.message }
+  }
+}
+
+/**
+ * Sugestões & Oportunidades - agendamentos próximos (próximos 7 dias) aguardando confirmação.
+ */
+export async function getPendingConfirmationsAction(
+  partnerId: string,
+  storeId?: string,
+  lookaheadDays: number = 7
+): Promise<{ error: string } | { items: PendingConfirmationAlert[] }> {
+  try {
+    const context = await getPartnerContextWithPermission("view")
+    if (context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    const effectiveStoreId = storeId || context.storeId
+    if (!effectiveStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(effectiveStoreId, partnerId, "appointments", "view")
+    const admin = createAdminClient()
+
+    const today = toDateStr(new Date())
+    const maxDate = addDays(today, Math.max(1, Math.min(30, lookaheadDays)))
+
+    let query = admin
+      .from("appointments")
+      .select("id, customer_id, customer_name, service_name, staff_name, start_date, start_time, duration_minutes, status, price, notes, source, store_id, needs_reschedule, customers:customer_id(image_url, phone)")
+      .eq("partner_id", partnerId)
+      .gte("start_date", today)
+      .lte("start_date", maxDate)
+      .neq("source", "unavailable")
+
+    query = query.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+
+    const { data, error } = await query
+      .order("start_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(500)
+
+    if (error) return { error: error.message }
+
+    const rows = (data || []).map((row: any) => ({
+      ...row,
+      customer_avatar: row.customers?.image_url || null,
+      phone: row.customers?.phone || null,
+    }))
+
+    const items = evaluatePendingConfirmations(rows, { today, lookaheadDays })
+    return { items }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
+/**
+ * Sugestões & Oportunidades - agendamentos que necessitam reagendamento ou cancelamentos recentes sem remarcação.
+ */
+export async function getRescheduleAlertsAction(
+  partnerId: string,
+  storeId?: string,
+  lookbackDays: number = 30
+): Promise<{ error: string } | { items: RescheduleOpportunity[] }> {
+  try {
+    const context = await getPartnerContextWithPermission("view")
+    if (context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    const effectiveStoreId = storeId || context.storeId
+    if (!effectiveStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(effectiveStoreId, partnerId, "appointments", "view")
+    const admin = createAdminClient()
+
+    const today = toDateStr(new Date())
+    const cutoff = subtractDays(today, Math.max(1, Math.min(90, lookbackDays)))
+
+    let query = admin
+      .from("appointments")
+      .select("id, customer_id, customer_name, service_name, staff_name, start_date, start_time, duration_minutes, status, price, notes, source, store_id, needs_reschedule, customers:customer_id(image_url)")
+      .eq("partner_id", partnerId)
+      .or(`needs_reschedule.eq.true,and(status.ilike.%cancel%,start_date.gte.${cutoff})`)
+      .neq("source", "unavailable")
+
+    query = query.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+
+    let futureQuery = admin
+      .from("appointments")
+      .select("id, customer_id, customer_name, start_date, status, source, store_id")
+      .eq("partner_id", partnerId)
+      .gte("start_date", today)
+      .neq("source", "unavailable")
+
+    futureQuery = futureQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+
+    const [{ data, error }, { data: future, error: futureError }] = await Promise.all([
+      query.order("start_date", { ascending: false }).limit(500),
+      futureQuery.limit(1000),
+    ])
+
+    if (error) return { error: error.message }
+    if (futureError) return { error: futureError.message }
+
+    const rows = (data || []).map((row: any) => ({
+      ...row,
+      customer_avatar: row.customers?.image_url || null,
+    }))
+
+    const items = evaluateRescheduleOpportunities(rows, future || [], { today, lookbackDays })
+    return { items }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
+/**
+ * Sugestões & Oportunidades - clientes fiéis/recorrentes sem novos agendamentos há mais de X dias (risco de churn).
+ */
+export async function getRetentionOpportunitiesAction(
+  partnerId: string,
+  minDays: number = 30,
+  storeId?: string
+): Promise<{ error: string } | { items: RetentionOpportunity[] }> {
+  try {
+    const context = await getPartnerContextWithPermission("view")
+    if (context.partnerId !== partnerId) throw new Error("O parceiro informado não corresponde ao contexto ativo")
+    const effectiveStoreId = storeId || context.storeId
+    if (!effectiveStoreId) throw new Error("Loja ativa não encontrada")
+    await requireStorePermission(effectiveStoreId, partnerId, "appointments", "view")
+    const admin = createAdminClient()
+
+    const today = toDateStr(new Date())
+    const days = Math.max(15, Math.min(180, Number(minDays) || 30))
+    const cutoff = subtractDays(today, 180)
+
+    let pastQuery = admin
+      .from("appointments")
+      .select("id, customer_id, customer_name, service_name, staff_name, start_date, status, price, source, store_id, customers:customer_id(image_url)")
+      .eq("partner_id", partnerId)
+      .gte("start_date", cutoff)
+      .lte("start_date", today)
+      .neq("source", "unavailable")
+
+    let futureQuery = admin
+      .from("appointments")
+      .select("id, customer_id, customer_name, start_date, status, source, store_id")
+      .eq("partner_id", partnerId)
+      .gte("start_date", today)
+      .neq("source", "unavailable")
+
+    pastQuery = pastQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+    futureQuery = futureQuery.or(`store_id.eq.${effectiveStoreId},store_id.is.null`)
+
+    const [{ data: past, error }, { data: future, error: futureError }] = await Promise.all([
+      pastQuery.order("start_date", { ascending: false }).limit(2500),
+      futureQuery.limit(2000),
+    ])
+
+    if (error) return { error: error.message }
+    if (futureError) return { error: futureError.message }
+
+    const rows = (past || []).map((row: any) => ({
+      ...row,
+      customer_avatar: row.customers?.image_url || null,
+    }))
+
+    const items = evaluateRetentionOpportunities(rows, future || [], { today, minDaysSinceLast: days, maxPeriodDays: 180 })
+    return { items }
+  } catch (error: any) {
+    return { error: error.message }
+  }
+}
+
+/**
+ * Confirma rapidamente um agendamento diretamente pela sheet de sugestões.
+ */
+export async function confirmAppointmentQuickAction(
+  appointmentId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { partnerId } = await getPartnerContextWithPermission("edit")
+    const supabase = await getSupabaseServerClient()
+
+    const { data: apt, error: findError } = await supabase
+      .from("appointments")
+      .select("id, partner_id, customer_name, service_name, store_id")
+      .eq("id", appointmentId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (findError || !apt) throw new Error("Agendamento não encontrado")
+
+    const { error: updateError } = await supabase
+      .from("appointments")
+      .update({
+        status: "Confirmado",
+        needs_reschedule: false,
+      })
+      .eq("id", appointmentId)
+      .eq("partner_id", partnerId)
+
+    if (updateError) throw updateError
+
+    safeRevalidateTag(TAGS.appointments(partnerId))
+    revalidatePath("/erp/agendamentos")
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao confirmar agendamento" }
   }
 }
 

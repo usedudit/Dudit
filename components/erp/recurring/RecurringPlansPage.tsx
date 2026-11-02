@@ -487,7 +487,7 @@ export default function RecurringPlansPage({
                             isListLoading ? (
                                 <ERPDetailLoading />
                             ) : (
-                                <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-65px)] bg-white dark:bg-dark-background">
+                                <div className="flex flex-col items-center justify-center gap-4 h-full min-h-[200px] bg-white dark:bg-dark-background">
                                     <IconPlaceholder
                                         placeholderType="image"
                                         imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"

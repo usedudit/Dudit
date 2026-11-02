@@ -1114,7 +1114,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     )
 
     return (
-        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                 {/* DESKTOP (lg:): 50/50 Split View */}
                 <div className="hidden lg:flex lg:flex-row w-full h-full overflow-hidden">
@@ -1128,7 +1128,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         {/* Scrollable details */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
                             {isEditLoadingLocked && (
-                                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                                     <ThreeDotsLoader />
                                 </div>
                             )}
@@ -1261,7 +1261,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         <TabsContent value="Dados Gerais" className="flex-1 h-full overflow-y-auto custom-scrollbar mt-0 pb-20">
                             <div className="flex-1 pt-4 pb-12 px-4 md:px-6">
                                 {isEditLoadingLocked && (
-                                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                                    <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                                         <ThreeDotsLoader />
                                     </div>
                                 )}

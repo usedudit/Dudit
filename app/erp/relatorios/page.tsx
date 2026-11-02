@@ -52,7 +52,10 @@ export default async function ERPReportsPage(props: {
   const businessInfo = normalizeBusinessInfo(context.businessInfo)
   const activeResources = resolveActiveResources(businessInfo)
   const searchParams = await props.searchParams
-  const period = (searchParams?.period as Period) || "monthly"
+  const rawPeriod = searchParams?.period
+  const period: Period = rawPeriod === "daily" || rawPeriod === "weekly" || rawPeriod === "monthly"
+    ? rawPeriod
+    : "monthly"
   const requestedStoreId = searchParams?.store
   const selectedStoreIds = requestedStoreId === "all"
     ? (stores.length ? stores.map((store) => store.id) : context.activeStoreId ? [context.activeStoreId] : [])
@@ -71,7 +74,7 @@ export default async function ERPReportsPage(props: {
       <ERPPageHeader title={storeName ?? "Relatórios"} />
       <FadeIn className="p-4">
         <DashboardProvider>
-          <Suspense fallback={<ReportsSkeleton />}>
+          <Suspense key={`${period}-${storeId}`} fallback={<ReportsSkeleton />}>
             <ReportsContent
               partnerId={partnerId}
               activeResources={activeResources}

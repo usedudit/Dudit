@@ -175,7 +175,7 @@ export default function GoalDetailPage({
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+            <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                 <ThreeDotsLoader />
             </div>
         )
@@ -193,8 +193,8 @@ export default function GoalDetailPage({
     }
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
+        <FadeIn className="h-full">
+            <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-8">
                     {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">

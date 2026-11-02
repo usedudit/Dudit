@@ -156,12 +156,12 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
 
     useEffect(() => { void reload() }, [partnerId])
 
-    if (loading) return <div className="flex h-[calc(100vh-65px)] w-full items-center justify-center">
+    if (loading) return <div className="flex h-full min-h-[200px] w-full items-center justify-center">
         <ThreeDotsLoader />
     </div>
 
     return (
-        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
                 {/* Sticky Header */}

@@ -2,9 +2,16 @@ import { describe, it, expect } from "vitest"
 import {
     isNoShowStatus,
     isCancelledStatus,
+    isPendingConfirmationStatus,
+    isCompletedStatus,
     evaluateNoShowAlerts,
     evaluateStagnantServices,
+    evaluatePendingConfirmations,
+    evaluateRescheduleOpportunities,
+    evaluateRetentionOpportunities,
     subtractDays,
+    addDays,
+    daysBetween,
     toDateStr,
     MIN_NO_SHOWS_TO_ALERT,
 } from "./appointment-insights"
@@ -234,7 +241,89 @@ describe("date helpers", () => {
         expect(subtractDays("2026-03-01", 1)).toBe("2026-02-28")
     })
 
+    it("adds days across month boundaries", () => {
+        expect(addDays("2026-10-09", 7)).toBe("2026-10-16")
+        expect(addDays("2026-02-28", 1)).toBe("2026-03-01")
+    })
+
+    it("calculates days between two dates", () => {
+        expect(daysBetween("2026-10-01", "2026-10-09")).toBe(8)
+        expect(daysBetween("2026-10-09", "2026-10-09")).toBe(0)
+    })
+
     it("formats a date as yyyy-mm-dd", () => {
         expect(toDateStr(new Date(2026, 0, 5))).toBe("2026-01-05")
+    })
+})
+
+describe("evaluatePendingConfirmations", () => {
+    const today = "2026-10-09"
+
+    it("identifies upcoming appointments with pending status within 7 days", () => {
+        const rows = [
+            { id: "1", customer_name: "Lucas", start_date: "2026-10-10", start_time: "14:00", status: "Aguardando", price: 50 },
+            { id: "2", customer_name: "Mariana", start_date: "2026-10-12", start_time: "09:00", status: "Reservado", price: 80 },
+            { id: "3", customer_name: "Pedro", start_date: "2026-10-08", start_time: "10:00", status: "Aguardando", price: 60 }, // past
+            { id: "4", customer_name: "Julia", start_date: "2026-10-25", start_time: "15:00", status: "Aguardando", price: 70 }, // too far (>7d)
+            { id: "5", customer_name: "Carlos", start_date: "2026-10-11", start_time: "11:00", status: "Confirmado", price: 90 }, // already confirmed
+            { id: "6", customer_name: "Bloqueio", start_date: "2026-10-11", status: "Aguardando", source: "unavailable" },
+        ]
+
+        const alerts = evaluatePendingConfirmations(rows as any, { today, lookaheadDays: 7 })
+        expect(alerts).toHaveLength(2)
+        expect(alerts[0].customer_name).toBe("Lucas")
+        expect(alerts[1].customer_name).toBe("Mariana")
+    })
+})
+
+describe("evaluateRescheduleOpportunities", () => {
+    const today = "2026-10-09"
+
+    it("finds appointments marked with needs_reschedule and recent cancellations", () => {
+        const rows = [
+            { id: "1", customer_id: "c1", customer_name: "Roberta", start_date: "2026-10-05", status: "Aguardando", needs_reschedule: true, price: 100 },
+            { id: "2", customer_id: "c2", customer_name: "Felipe", start_date: "2026-10-07", status: "Cancelado", price: 120 },
+            { id: "3", customer_id: "c3", customer_name: "Beatriz", start_date: "2026-10-08", status: "Confirmado", price: 150 },
+        ]
+        const future = [
+            { id: "4", customer_id: "c2", customer_name: "Felipe", start_date: "2026-10-15", status: "Confirmado" },
+        ]
+
+        const result = evaluateRescheduleOpportunities(rows as any, future as any, { today })
+        expect(result).toHaveLength(2)
+
+        const roberta = result.find(r => r.customer_name === "Roberta")
+        expect(roberta).toBeDefined()
+        expect(roberta?.reason).toBe("needs_reschedule")
+        expect(roberta?.has_future_appointment).toBe(false)
+
+        const felipe = result.find(r => r.customer_name === "Felipe")
+        expect(felipe).toBeDefined()
+        expect(felipe?.reason).toBe("cancelled")
+        expect(felipe?.has_future_appointment).toBe(true)
+    })
+})
+
+describe("evaluateRetentionOpportunities", () => {
+    const today = "2026-10-09"
+
+    it("identifies past clients with completed appointments inactive for >30 days without future booking", () => {
+        const past = [
+            { id: "1", customer_id: "c1", customer_name: "Renata", start_date: "2026-08-15", status: "Concluído", price: 150, service_name: "Corte" },
+            { id: "2", customer_id: "c1", customer_name: "Renata", start_date: "2026-09-01", status: "Concluído", price: 100, service_name: "Hidratação" },
+            { id: "3", customer_id: "c2", customer_name: "Thiago", start_date: "2026-10-02", status: "Pago", price: 80, service_name: "Barba" }, // 7 days ago (<30d)
+            { id: "4", customer_id: "c3", customer_name: "Vanessa", start_date: "2026-08-01", status: "Concluído", price: 200, service_name: "Coloração" },
+        ]
+        const future = [
+            { id: "5", customer_id: "c3", customer_name: "Vanessa", start_date: "2026-10-20", status: "Reservado" }, // has future booking
+        ]
+
+        const result = evaluateRetentionOpportunities(past as any, future as any, { today, minDaysSinceLast: 30 })
+        expect(result).toHaveLength(1)
+        expect(result[0].customer_name).toBe("Renata")
+        expect(result[0].total_completed).toBe(2)
+        expect(result[0].total_spent).toBe(250)
+        expect(result[0].last_service_name).toBe("Hidratação")
+        expect(result[0].last_date).toBe("2026-09-01")
     })
 })

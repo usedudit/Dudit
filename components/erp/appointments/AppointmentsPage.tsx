@@ -129,6 +129,8 @@ const AppointmentsPage = ({
 
     const mapDbAppointment = useCallback((row: any): Appointment => ({
         id: String(row.id),
+        customerId: row.customer_id || row.customerId || null,
+        customerAvatar: row.customers?.image_url || row.customer_avatar || row.customerAvatar || null,
         customer: row.customer_name || 'Cliente Sem Nome',
         service: row.service_name || 'Serviço',
         date: row.start_date,
@@ -559,6 +561,8 @@ const AppointmentsPage = ({
                         totalAmount: mapped.totalAmount ?? a.totalAmount,
                         paymentMethod: mapped.paymentMethod ?? a.paymentMethod,
                         orderSource: mapped.orderSource ?? a.orderSource,
+                        customerAvatar: mapped.customerAvatar ?? a.customerAvatar,
+                        customerId: mapped.customerId ?? a.customerId,
                     } : a));
                 } else {
                     throw new Error(updateRes.error || 'Não foi possível atualizar o agendamento.');
@@ -1344,6 +1348,13 @@ const AppointmentsPage = ({
                         onClose={() => setShowSuggestions(false)}
                         partnerId={partnerId}
                         storeId={storeId || undefined}
+                        onSelectAppointment={(appointmentId) => {
+                            const target = appointments.find((a) => a.id === appointmentId);
+                            if (target) {
+                                setSelectedAppointment(target);
+                                setIsSheetOpen(true);
+                            }
+                        }}
                     />
                 </FadeIn>
             </AnimatePresence >

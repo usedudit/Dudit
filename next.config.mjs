@@ -150,6 +150,12 @@ const nextConfig = {
     },
   },
   async headers() {
+    // Em desenvolvimento o Next.js serve os chunks com o mesmo nome de arquivo
+    // (sem hash de conteúdo). Marcar /_next/static como "immutable" por 1 ano
+    // faz o browser guardar o bundle antigo e o hot reload não aparecer - o
+    // dev server inclusive avisa que esse header quebra o comportamento de dev.
+    const isDev = process.env.NODE_ENV === "development"
+
     return [
       {
         // Regra genérica de imagens. Fica antes das regras específicas de
@@ -182,21 +188,27 @@ const nextConfig = {
           },
         ],
       },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
+      ...(isDev
+        ? []
+        : [
+            {
+              source: '/_next/static/:path*',
+              headers: [
+                {
+                  key: 'Cache-Control',
+                  value: 'public, max-age=31536000, immutable',
+                },
+              ],
+            },
+          ]),
       {
         source: '/_next/image(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: isDev
+              ? 'public, max-age=0, must-revalidate'
+              : 'public, max-age=31536000, immutable',
           },
         ],
       },

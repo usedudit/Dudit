@@ -12,7 +12,7 @@ interface QuoteHistoryTabProps {
 export function QuoteHistoryTab({ entries, loading = false }: QuoteHistoryTabProps) {
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+            <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                 <ThreeDotsLoader />
             </div>
         )

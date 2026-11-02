@@ -114,7 +114,7 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
 
   if (loading) {
     return (
-      <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+      <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
         <ThreeDotsLoader />
       </FadeIn>
     )
@@ -123,7 +123,7 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
   const grouped = groupByDate(entries)
 
   return (
-    <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+    <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}

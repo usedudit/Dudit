@@ -172,7 +172,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const showBackButton = isPDV || !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage || isQueryOrTabInnerPage)
 
     return (
-        <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
+        <header className="shrink-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
             <div className="px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14 relative">
                     <div className="flex items-center gap-3">

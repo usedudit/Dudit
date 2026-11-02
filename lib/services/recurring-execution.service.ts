@@ -985,7 +985,6 @@ export async function processPreapprovalPaymentWebhook(params: {
 const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
 
 async function reverseSubscriptionCycleFinancials(params: {
-  subscriptionId: string
   partnerId: string
   paymentId: string
   paymentInfo: any
@@ -1003,118 +1002,29 @@ async function reverseSubscriptionCycleFinancials(params: {
     .eq("mp_payment_id", params.paymentId)
     .maybeSingle()
 
-  let order: any = orderByPayment || null
+  const order: any = orderByPayment || null
+  if (!order) return nothing
 
-  if (!order) {
-    const { data: execRow } = await supabase
-      .from("recurring_executions")
-      .select("order_id")
-      .eq("subscription_id", params.subscriptionId)
-      .not("order_id", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+  const requestedRefundTotal =
+    Number(params.paymentInfo?.transaction_amount_refunded) ||
+    Number(params.paymentInfo?.transaction_amount) ||
+    Number(order.paid_amount || 0)
+  const { data, error } = await supabase.rpc("reverse_subscription_cycle_financials_atomic", {
+    p_partner_id: params.partnerId,
+    p_order_id: order.id,
+    p_payment_id: params.paymentId,
+    p_event_status: String(params.paymentInfo?.status || ""),
+    p_requested_refund_total: round2(Math.max(0, requestedRefundTotal)),
+  })
 
-    if (execRow?.order_id) {
-      const { data: execOrder } = await supabase
-        .from("orders")
-        .select(orderFields)
-        .eq("id", execRow.order_id)
-        .maybeSingle()
-      order = execOrder || null
-    }
+  if (error) {
+    throw new Error(`Falha ao registrar estorno da recorrência: ${error.message}`)
   }
 
-  if (!order || order.situation === "cancelled") return nothing
-
-  const paidAmount = round2(Number(order.paid_amount || 0))
-  if (paidAmount <= 0.009) return nothing
-
-  const { data: refundRows } = await supabase
-    .from("transactions")
-    .select("amount, status")
-    .eq("partner_id", params.partnerId)
-    .eq("reference_note", String(order.id))
-    .eq("kind", "refund")
-
-  const alreadyRefunded = round2(
-    (refundRows || [])
-      .filter((r: any) => String(r.status || "").toLowerCase() !== "cancelled")
-      .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0),
-  )
-
-  const informedAmount =
-    Number(params.paymentInfo?.transaction_amount_refunded || 0) ||
-    Number(params.paymentInfo?.transaction_amount || 0) ||
-    paidAmount
-  const refundAmount = round2(Math.max(0, Math.min(paidAmount - alreadyRefunded, informedAmount)))
-
-  const accountId = order.finance_account_id || null
-
-  if (refundAmount > 0.009 && accountId) {
-    const now = new Date().toISOString()
-    const { error: insertError } = await supabase.from("transactions").insert({
-      partner_id: params.partnerId,
-      store_id: order.store_id || null,
-      description: `Reembolso automático da venda ${order.order_number || order.id}`,
-      category: "Reembolso",
-      customer_id: order.customer_id || null,
-      contact_id: null,
-      contact_type: "customer",
-      amount: refundAmount,
-      original_amount: refundAmount,
-      due_date: null,
-      payment_date: now,
-      transaction_date: now,
-      status: "paid",
-      notes: `Estorno recebido do Mercado Pago (pagamento #${params.paymentId}).`,
-      payment_type: order.payment_method || "Reembolso",
-      interest_amount: null,
-      fee_amount: 0,
-      transaction_type: "refund",
-      origin: "system",
-      refund_kind: "revenue_refund",
-      reference_note: String(order.id),
-      account_id: accountId,
-      payment_method_id: null,
-      kind: "refund",
-    })
-
-    if (insertError) {
-      console.error("[RECURRING] Erro ao criar transacao de estorno:", insertError.message)
-    } else {
-      const { error: balanceError } = await getAdminClient().rpc("apply_account_balance_delta", {
-        p_account_id: accountId,
-        p_partner_id: params.partnerId,
-        p_delta: -Math.abs(refundAmount),
-      })
-      if (balanceError) {
-        throw new Error(`Falha ao devolver saldo da conta da recorrência: ${balanceError.message}`)
-      }
-    }
+  return {
+    reversed: round2(Number(data?.reversed || 0)),
+    orderCancelled: Boolean(data?.orderCancelled),
   }
-
-  const remaining = round2(paidAmount - alreadyRefunded - refundAmount)
-  let orderCancelled = false
-
-  if (remaining <= 0.009) {
-    const existingNotes = String(order.notes || "").trim()
-    const { error: cancelError } = await supabase
-      .from("orders")
-      .update({
-        situation: "cancelled",
-        previous_situation_before_cancel: order.situation,
-        notes: existingNotes
-          ? `${existingNotes} | Cancelado após estorno do Mercado Pago (pagamento #${params.paymentId}).`
-          : `Cancelado após estorno do Mercado Pago (pagamento #${params.paymentId}).`,
-      })
-      .eq("id", order.id)
-      .eq("partner_id", params.partnerId)
-
-    if (!cancelError) orderCancelled = true
-  }
-
-  return { reversed: refundAmount, orderCancelled }
 }
 
 /**
@@ -1141,7 +1051,6 @@ export async function processPreapprovalPaymentFailed(params: {
   if (paymentStatus === "refunded" || paymentStatus === "charged_back") {
     try {
       const reversal = await reverseSubscriptionCycleFinancials({
-        subscriptionId: sub.id,
         partnerId: sub.partner_id,
         paymentId: params.paymentId,
         paymentInfo: params.paymentInfo,

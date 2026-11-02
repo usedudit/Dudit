@@ -818,7 +818,7 @@ export default function CouponsPage({
                         </FadeIn>
                     ) : null
                 ) : (
-                    <FadeIn key="list">
+                    <FadeIn className="h-full" key="list">
                         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
                             <style>{`
           .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }

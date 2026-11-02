@@ -261,30 +261,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             </div>
                         )}
                     </FormSection>
-
-                    {/* Duração e Agendamento */}
-                    {
-                        (!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
-                            <FormSection hasSeparator title="Duração e agendamento">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <ListItem
-                                        icon={ClockIcon}
-                                        title="Duração do Serviço"
-                                        description={serviceData.duration_minutes ? `${serviceData.duration_minutes} minutos` : "Não informada"}
-                                        className="p-4 cursor-default"
-                                    />
-                                    {!isQuickMode && (
-                                        <ListItem
-                                            icon={ClockIcon}
-                                            title="Tempo de Buffer (Intervalo)"
-                                            description={serviceData.buffer_minutes ? `${serviceData.buffer_minutes} minutos` : "Nenhum buffer cadastrado"}
-                                            className="p-4 cursor-default"
-                                        />
-                                    )}
-                                </div>
-                            </FormSection>
-                        )
-                    }
                 </div >
 
                 {/* DIREITA (SidebarCard) */}
@@ -311,6 +287,29 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     )}
 
                     {
+                        (!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
+                            <SidebarCard hasSeparator hasTopStrip title="Duração e agendamento">
+                                <div className="space-y-4">
+                                    <ListItem
+                                        icon={ClockIcon}
+                                        title="Duração do Serviço"
+                                        description={serviceData.duration_minutes ? `${serviceData.duration_minutes} minutos` : "Não informada"}
+                                        className="p-4 cursor-default"
+                                    />
+                                    {!isQuickMode && (
+                                        <ListItem
+                                            icon={ClockIcon}
+                                            title="Tempo de Buffer (Intervalo)"
+                                            description={serviceData.buffer_minutes ? `${serviceData.buffer_minutes} minutos` : "Nenhum buffer cadastrado"}
+                                            className="p-4 cursor-default"
+                                        />
+                                    )}
+                                </div>
+                            </SidebarCard>
+                        )
+                    }
+
+                    {
                         isQuickMode && (
                             <OfficialCategoryCard
                                 categoryId={serviceData?.marketplace_category_id}
@@ -318,16 +317,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 type="service"
                                 isEditing={false}
                             />
-                        )
-                    }
-
-                    {
-                        !isQuickMode && serviceData.notes && (
-                            <SidebarCard hasSeparator title="Observações Internas">
-                                <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
-                                    {serviceData.notes}
-                                </p>
-                            </SidebarCard>
                         )
                     }
                 </div >
@@ -558,45 +547,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     )}
                 </FormSection>
-
-                {/* TEMPO */}
-                {(!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
-                    <FormSection title="Duração e agendamento" hasSeparator>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
-                            <Input
-                                label="Duração do Serviço (minutos)"
-                                name="duration_minutes"
-                                type="number"
-                                min={1}
-                                max={525600}
-                                value={serviceData.duration_minutes || ""}
-                                onChange={handleFieldChange}
-                                disabled={!isEditing}
-                                required
-                                error={fieldErrors?.has("duration_minutes") || Number(serviceData.duration_minutes || 0) > 525600}
-                                errorMessage={
-                                    Number(serviceData.duration_minutes || 0) > 525600
-                                        ? "Duração máxima permitida é de 1 ano"
-                                        : fieldErrors?.has("duration_minutes")
-                                            ? "Duração é obrigatória"
-                                            : undefined
-                                }
-                                dataField="duration_minutes"
-                            />
-                            {!isQuickMode && (
-                                <Input
-                                    label="Tempo de Buffer (minutos)"
-                                    name="buffer_minutes"
-                                    type="number"
-                                    value={serviceData.buffer_minutes || ""}
-                                    onChange={handleFieldChange}
-                                    disabled={!isEditing}
-                                    placeholder="Tempo de intervalo ou limpeza"
-                                />
-                            )}
-                        </div>
-                    </FormSection>
-                )}
             </div>
 
             {/* DIREITA (Widgets) */}
@@ -665,6 +615,46 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     </SidebarCard>
                 )}
 
+                {
+                    (!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
+                        <SidebarCard hasSeparator hasTopStrip title="Duração e agendamento">
+                            <div className="space-y-4">
+                                <Input
+                                    label="Duração do Serviço (minutos)"
+                                    name="duration_minutes"
+                                    type="number"
+                                    min={1}
+                                    max={525600}
+                                    value={serviceData.duration_minutes || ""}
+                                    onChange={handleFieldChange}
+                                    disabled={!isEditing}
+                                    required
+                                    error={fieldErrors?.has("duration_minutes") || Number(serviceData.duration_minutes || 0) > 525600}
+                                    errorMessage={
+                                        Number(serviceData.duration_minutes || 0) > 525600
+                                            ? "Duração máxima permitida é de 1 ano"
+                                            : fieldErrors?.has("duration_minutes")
+                                                ? "Duração é obrigatória"
+                                                : undefined
+                                    }
+                                    dataField="duration_minutes"
+                                />
+                                {!isQuickMode && (
+                                    <Input
+                                        label="Tempo de Buffer (minutos)"
+                                        name="buffer_minutes"
+                                        type="number"
+                                        value={serviceData.buffer_minutes || ""}
+                                        onChange={handleFieldChange}
+                                        disabled={!isEditing}
+                                        placeholder="Tempo de intervalo ou limpeza"
+                                    />
+                                )}
+                            </div>
+                        </SidebarCard>
+                    )
+                }
+
                 {isQuickMode && (
                     <OfficialCategoryCard
                         categoryId={serviceData?.marketplace_category_id}
@@ -672,22 +662,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         type="service"
                         isEditing={isEditing}
                     />
-                )}
-
-                {!isQuickMode && (
-                    <SidebarCard hasSeparator title="Observações Internas">
-                        <FormTextarea
-                            label="Anotações"
-                            name="notes"
-                            value={serviceData.notes}
-                            onChange={handleFieldChange}
-                            disabled={!isEditing}
-                            placeholder="Observações visíveis apenas para a equipe"
-                            className="min-h-[120px]"
-                            maxLength={500}
-                            showCharacterCount
-                        />
-                    </SidebarCard>
                 )}
             </div>
         </div>

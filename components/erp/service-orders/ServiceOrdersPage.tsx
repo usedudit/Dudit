@@ -552,11 +552,11 @@ export default function ServiceOrdersPage({
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
           <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
             {entityState.action === "edit" && isLoadingDetail && !activeOrder ? (
-              <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+              <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                 <ThreeDotsLoader />
               </div>
             ) : entityState.action === "edit" && !isLoadingDetail && !activeOrder ? (
-              <div className="flex flex-col items-center justify-center h-[calc(100vh-65px)] w-full gap-4">
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] w-full gap-4">
                 <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
                 <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
               </div>
@@ -576,11 +576,11 @@ export default function ServiceOrdersPage({
         ) : entityState.isOpen && entityState.action === "view" ? (
           <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
             {isLoadingDetail && !activeOrder ? (
-              <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+              <div className="flex items-center justify-center h-full min-h-[200px] w-full">
                 <ThreeDotsLoader />
               </div>
             ) : !isLoadingDetail && !activeOrder ? (
-              <div className="flex flex-col items-center justify-center h-[calc(100vh-65px)] w-full gap-4">
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] w-full gap-4">
                 <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
                 <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
               </div>

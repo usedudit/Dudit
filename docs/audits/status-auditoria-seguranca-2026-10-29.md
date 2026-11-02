@@ -351,7 +351,7 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 **Correções locais:** liquidação em lote agora usa a RPC atômica e idempotente, inclusive para parcelas, e preserva a data de quitação solicitada. Foi criada a migration `20261101160000_atomic_batch_transaction_settlement_date.sql`, com uma wrapper restrita a `service_role` sobre a RPC existente. Cancelamento, reagendamento e alteração de categoria usam comparação do status/`updated_at` e só registram auditoria quando a gravação condicional afeta a transação. Os lotes limitam seleção a 200 IDs e rejeitam IDs inválidos ou repetidos.
 
-**Pendente:** aplicar a nova migration e validar quitação em lote concorrente e reconciliação ledger/status/saldo em homologação. O usuário informou que aplicou `20261101130000_atomic_close_cash_session.sql`; a aplicação segue sem confirmação independente nesta sessão.
+**Pendente:** validar quitação em lote concorrente e reconciliação ledger/status/saldo em homologação. O usuário informou que aplicou `20261101160000_atomic_batch_transaction_settlement_date.sql` e `20261101130000_atomic_close_cash_session.sql`; não confirmei independentemente o ledger nem os grants nesta sessão.
 
 ### Leitura financeira por loja e fechamento de caixa — 01/11/2026
 
@@ -364,6 +364,46 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 **Teste em homologação pendente:** abrir uma sessão de caixa descartável, fechar enquanto uma movimentação é enviada em paralelo e confirmar que ou a movimentação entra antes do fechamento e nos totais, ou é recusada porque a sessão fechou. Também conferir que erros nas RPCs de movimentação não geram gravação parcial.
 
 **Validação:** revisão estática, `git diff --check` e `npx tsc --noEmit`; não foram feitas gravações no banco nem testes concorrentes em homologação.
+
+### Criação de lançamentos financeiros — 02/11/2026
+
+**Achado confirmado em revisão estática:** a criação de lançamento manual gravava primeiro em `transactions` e depois alterava o saldo da conta em uma chamada separada. A transferência gravava as duas linhas do par e, quando confirmada, aplicava os dois deltas de saldo em chamadas separadas. Uma falha intermediária podia deixar linha sem saldo correspondente, transferência incompleta ou apenas uma das contas movimentada.
+
+**Correção local:** ambas agora chamam `create_manual_financial_transactions_atomic`, que valida parceiro/conta, insere as linhas e calcula/aplica os deltas em uma transação PostgreSQL, com lock ordenado das contas. Foi criada a migration `20261102100000_atomic_manual_transactions_and_transfers.sql`; o usuário informou que aplicou, mas não confirmei no ledger/schema. Ela também corrige a divergência das migrations históricas sobre os tipos aceitos e deixa a constraint `NOT VALID` para preservar registros antigos desconhecidos. Revisão estática local; SQL ainda não foi executado contra PostgreSQL.
+
+**Validação local:** `tsc --noEmit` passou e `git diff --check` passou nos arquivos acompanhados; não executei testes nem consultas ao banco.
+
+**Correções locais desta retomada:** parcelamentos agora chamam `create_installment_group_atomic`, que cria grupo, parcelas e eventual delta da primeira parcela em uma transação; recorrências agora chamam `record_recurring_occurrence_payment_atomic`, que bloqueia o modelo, cria/localiza a ocorrência e registra pagamento, status e saldo na mesma transação. A chave idempotente é estável por recorrência/data. Ambas estão na migration `20261102110000_atomic_installments_and_recurring_payments.sql`; o usuário informou que aplicou, sem confirmação independente no ledger/schema.
+
+**Validação local:** `tsc --noEmit` passou e `git diff --check` passou nos arquivos acompanhados. Não rodei testes nem consultei o banco; o SQL da migration continua pendente de aplicação e validação em PostgreSQL.
+
+**Pendente:** validar em homologação criação de parcelamento com primeira parcela paga/pendente, quitação de ocorrência nova/existente e chamadas concorrentes. O usuário informou que aplicou a migration; não confirmei o ledger/schema nem executei o SQL contra PostgreSQL nesta sessão.
+
+**Contas financeiras — correção adicional:** criação com saldo inicial e atualização de conta/padrão agora usam `create_finance_account_with_opening_balance_atomic` e `update_finance_account_atomic`. A migration `20261102120000_atomic_finance_account_lifecycle.sql` ainda precisa ser aplicada. Metadados reservados de integração foram removidos do input da Server Action. `tsc --noEmit` e `git diff --check` passaram; o SQL não foi executado contra PostgreSQL.
+
+### Contas financeiras e saldo inicial — 02/11/2026
+
+**Achados confirmados:** criar conta e registrar saldo inicial eram operações separadas, podendo deixar uma conta com saldo zero após a ação retornar falha. A escolha de conta padrão também limpava/definia valores em chamadas separadas e ignorava erros. A Server Action aceitava `isSystemManaged`/`integrationSource` vindos do cliente, embora nenhum chamador legítimo da interface use esses campos.
+
+**Correção local:** criação da conta, eventual lançamento de ajuste de abertura e seleção de conta padrão agora são atômicos. Atualização de conta e troca do padrão também usam uma RPC com lock por parceiro. A ação não permite mais atribuir metadados de conta gerenciada/origem de integração. A validação de saldo rejeita valores inválidos em vez de convertê-los silenciosamente para zero.
+
+**Correção adicional:** a criação da transação financeira de pagamento de agendamento também passou a usar uma RPC idempotente que bloqueia o agendamento e grava a transação/saldo atomicamente.
+
+**Migration:** `20261102120000_atomic_finance_account_lifecycle.sql`. Ela usa a RPC de transações atômicas criada em `20261102100000`; o usuário informou que aplicou ambas, sem confirmação independente do ledger/schema.
+
+**Validação pendente:** verificar em homologação criação com saldo inicial zero/positivo/negativo, conta padrão concorrente e atualização de conta. O usuário informou que aplicou as migrations; não confirmei o ledger/schema nem consultei o banco nesta sessão.
+
+**Liquidação à vista de pedidos — correção local:** criação e refinamento da liquidação agora usam `create_order_settlement_atomic` e `refine_order_settlement_atomic`, serializados pela referência estável. O usuário informou que aplicou `20261102130000_atomic_order_settlement_balance.sql`, sem confirmação independente no ledger/schema. A correção evita commit parcial de linha/saldo em novos eventos; divergências anteriores exigem reconciliação.
+
+**Validação desta rodada:** `tsc --noEmit` e `git diff --check` passaram. Não executei testes nem consultas ao banco; a migration SQL aguarda aplicação/validação em PostgreSQL.
+
+**Vendas a prazo — correção local:** a criação/reparação do grupo e das linhas de parcelamento agora usa `upsert_order_installment_ledger_atomic`. A função serializa pela referência do pagamento, recupera grupos parciais de tentativas antigas e ajusta o saldo junto com mudanças de valor em parcelas que já tenham sido pagas. O usuário informou que aplicou `20261102140000_atomic_order_installment_ledger.sql`; não confirmei o ledger/schema nesta sessão.
+
+**Validação local:** `tsc --noEmit` e `git diff --check` passaram antes desta rodada. Não rodei testes nem consultas ao banco; a aplicação da migration foi informada pelo usuário.
+
+**Estorno de recorrência — correção local:** estorno e ajuste do saldo agora são gravados pela RPC `reverse_subscription_cycle_financials_atomic`, com bloqueio do pedido, chave idempotente por pagamento/status/total acumulado informado pelo Mercado Pago e atualização do pedido na mesma transação. O cálculo trata `transaction_amount_refunded` como total acumulado, registra a transação mesmo quando não há conta financeira vinculada e ainda reconcilia o financeiro se o pedido já estava cancelado. A busca exige vínculo exato do `mp_payment_id`; removi o fallback que poderia associar um webhook sem pedido correspondente ao ciclo mais recente da assinatura. Migration pendente: `20261102150000_atomic_subscription_refunds.sql`.
+
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram; a migration também não tem whitespace no fim das linhas. Não rodei testes, SQL nem consultas ao banco. Após aplicar a migration, validar em homologação webhook repetido, reembolso parcial cumulativo, estorno total, pedido previamente cancelado e pedido sem conta financeira.
 
 ### RPC de movimentação de estoque — 30/10/2026
 
@@ -389,10 +429,12 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 - [x] Revisão focada de leituras, estoque e limpeza R2 no módulo de produtos; ainda falta validação integrada por papéis, lojas e armazenamento.
 - [ ] Revisar ações de lote, IDs relacionados e casos de mass assignment; confirmar que o escopo também é aplicado nas gravações e exclusões.
 - [ ] Confirmar no ledger/grants a aplicação de `20261030170000_restrict_financial_balance_delta.sql` e `20261030180000_atomic_transaction_payment.sql`; testar concorrência/idempotência de pagamentos em homologação.
-- [ ] Aplicar e confirmar `20261101130000_atomic_close_cash_session.sql`; exercitar fechamento concorrente com venda, sangria e reembolso em homologação.
+- [ ] Confirmar no ledger/schema a aplicação de `20261101130000_atomic_close_cash_session.sql` e exercitar fechamento concorrente com venda, sangria e reembolso em homologação; o usuário informou que aplicou.
+- [ ] Confirmar no ledger/schema a aplicação de `20261101160000_atomic_batch_transaction_settlement_date.sql` e exercitar quitação em lote concorrente/reconciliação; o usuário informou que aplicou.
 - [ ] Confirmar no catálogo os grants após `20261031100000_restrict_process_return_request_rpc.sql` e `20261031110000_restrict_create_product_transaction_roles.sql`; o usuário informou que ambas foram aplicadas.
 - [ ] Confirmar no ledger/schema a aplicação da migration `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql` antes de depender da preservação do histórico de estoque e da restrição de exclusão com anexos. O usuário informou que aplicou.
 - [ ] Reconciliar fluxos de estorno/cancelamento para alinhar efeito no gateway, ledger e saldo local.
+- [ ] Aplicar `20261102150000_atomic_subscription_refunds.sql` e validar repetição/estorno parcial cumulativo em homologação; o usuário informou que as migrations anteriores da auditoria foram aplicadas.
 - [ ] Revisar as demais regras de papéis e permissões por módulo, incluindo operações administrativas e convites.
 - [ ] Revisar migrations/policies RLS existentes e comparar com a nova migration; verificar conflitos, tabelas sem RLS, views, RPCs, triggers, grants, Storage e Realtime conforme presentes no projeto.
 - [ ] Confirmar/renovar a chave pública Supabase do ambiente local com o dashboard e repetir a inspeção RLS via conexão PostgreSQL com certificado confiável. Não substituir a chave pública por uma chave de serviço.
