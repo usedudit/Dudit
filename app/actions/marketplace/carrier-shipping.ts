@@ -8,6 +8,7 @@ import {
   carrierReasonMessage,
   type CarrierFreightOption,
   type CarrierUnavailableReason,
+  type CarrierQuoteItemInput,
 } from "@/lib/services/shipping/carrier-checkout"
 
 /**
@@ -17,6 +18,7 @@ import {
 export async function quoteCarrierFreightAction(input: {
   partnerId: string
   toPostalCode: string
+  items?: CarrierQuoteItemInput[]
 }): Promise<
   | { success: true; options: CarrierFreightOption[]; fromPostalCode: string }
   | { success: false; error: string; reason: CarrierUnavailableReason }
@@ -32,6 +34,7 @@ export async function quoteCarrierFreightAction(input: {
     const result = await quoteCarrierFreightOptions(supabase, {
       partnerId: input.partnerId,
       toPostalCode: input.toPostalCode,
+      items: input.items,
     })
     if (!result.available) {
       return { success: false, error: carrierReasonMessage(result.reason), reason: result.reason }

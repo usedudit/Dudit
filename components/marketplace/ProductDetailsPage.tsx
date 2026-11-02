@@ -846,7 +846,7 @@ export function ProductDetailsPageClient({
             setCarrierError(null)
             return
         }
-        const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}`
+        const dedupeKey = `${targetPartnerId}:${carrierDestinationCep}:${product.id}:${quantity}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
         let completed = false
@@ -856,7 +856,11 @@ export function ProductDetailsPageClient({
         setCarrierError(null)
             ; (async () => {
                 try {
-                    const res = await quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: carrierDestinationCep })
+                    const res = await quoteCarrierFreightAction({
+                        partnerId: targetPartnerId,
+                        toPostalCode: carrierDestinationCep,
+                        items: [{ productId: product.id, quantity }],
+                    })
                     if (!active) return
                     if (res.success && res.options.length > 0) {
                         setCarrierOptions(res.options)
@@ -877,7 +881,7 @@ export function ProductDetailsPageClient({
             active = false
             if (!completed) carrierQuoteKeyRef.current = null
         }
-    }, [carrierDestinationCep, partner.partner_id, partner.id, partner.mp_user_id, productAllowsShipping])
+    }, [carrierDestinationCep, partner.partner_id, partner.id, partner.mp_user_id, productAllowsShipping, product.id, quantity])
 
     // Apply the first carrier option as delivery fee whenever own quote failed
     useEffect(() => {

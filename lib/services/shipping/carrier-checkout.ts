@@ -10,9 +10,22 @@ import {
   findSuperFreteIntegration,
   buildSuperFreteClient,
   buildSuperFreteVolumes,
+  type ShippingItemLogistics,
 } from "@/lib/services/shipping/superfrete-integration"
 
 export { extractPostalCodeFromAddress } from "@/lib/services/shipping/postal-code"
+
+export interface CarrierQuoteItemInput {
+  productId?: string | null
+  quantity?: number
+  weight_gross?: number | null
+  weight_net?: number | null
+  width?: number | null
+  height?: number | null
+  length?: number | null
+  packaging_type?: string | null
+  preparation_days?: number | null
+}
 
 export interface CarrierFreightOption {
   serviceId: number
@@ -163,14 +176,21 @@ async function loadCarrierContext(
 
 export async function quoteCarrierFreightOptions(
   supabase: SupabaseClient,
-  input: { partnerId: string; toPostalCode: string },
+  input: {
+    partnerId: string
+    toPostalCode: string
+    items?: CarrierQuoteItemInput[]
+  },
 ): Promise<CarrierQuoteResult> {
   const toPostalCode = String(input.toPostalCode || "").replace(/\D/g, "")
   if (!/^\d{8}$/.test(toPostalCode)) {
     return { available: false, reason: "invalid_destination" }
   }
 
-  const fastKey = `${input.partnerId}|${toPostalCode}`
+  const itemsKey = input.items && input.items.length > 0
+    ? input.items.map((i) => `${i.productId || ""}:${i.quantity || 1}`).sort().join(",")
+    : ""
+  const fastKey = `${input.partnerId}|${toPostalCode}|${itemsKey}`
   const fastNow = Date.now()
   const fastCached = carrierFastCache.get(fastKey)
   if (fastCached && fastNow - fastCached.at <= CARRIER_QUOTE_TTL_MS) {
@@ -189,11 +209,54 @@ export async function quoteCarrierFreightOptions(
         ? config.services
         : ([1, 2] as SuperFreteServiceId[])
 
+    // Resolve dimensões e peso da tabela product_logistics se houver itens
+    let resolvedItems: ShippingItemLogistics[] | undefined = undefined
+    if (input.items && input.items.length > 0) {
+      const missingProductIds = input.items
+        .filter((i) => i.productId && i.weight_gross == null && i.width == null)
+        .map((i) => i.productId!)
+
+      const dbMap = new Map<string, any>()
+      if (missingProductIds.length > 0) {
+        const { data: dbLogistics } = await supabase
+          .from("product_logistics")
+          .select("product_id, weight_gross, weight_net, width, height, length, packaging_type, preparation_days")
+          .in("product_id", missingProductIds)
+
+        if (dbLogistics) {
+          for (const row of dbLogistics) {
+            dbMap.set(row.product_id, row)
+          }
+        }
+      }
+
+      resolvedItems = input.items.map((i) => {
+        const dbRow = i.productId ? dbMap.get(i.productId) : undefined
+        return {
+          quantity: Math.max(1, Number(i.quantity || 1)),
+          weight_gross: i.weight_gross != null ? Number(i.weight_gross) : (dbRow?.weight_gross != null ? Number(dbRow.weight_gross) : null),
+          weight_net: i.weight_net != null ? Number(i.weight_net) : (dbRow?.weight_net != null ? Number(dbRow.weight_net) : null),
+          width: i.width != null ? Number(i.width) : (dbRow?.width != null ? Number(dbRow.width) : null),
+          height: i.height != null ? Number(i.height) : (dbRow?.height != null ? Number(dbRow.height) : null),
+          length: i.length != null ? Number(i.length) : (dbRow?.length != null ? Number(dbRow.length) : null),
+          packaging_type: i.packaging_type || dbRow?.packaging_type || null,
+          preparation_days: i.preparation_days != null ? Number(i.preparation_days) : (dbRow?.preparation_days != null ? Number(dbRow.preparation_days) : null),
+        }
+      })
+    }
+
+    const packageVolumes = buildSuperFreteVolumes(config, resolvedItems)
+
     const requestParams = {
       fromPostalCode,
       toPostalCode,
       services,
-      package: buildSuperFreteVolumes(config),
+      package: {
+        height: packageVolumes.height,
+        width: packageVolumes.width,
+        length: packageVolumes.length,
+        weight: packageVolumes.weight,
+      },
       options: {
         own_hand: Boolean(config.ownHand),
         receipt: Boolean(config.receipt),
@@ -215,17 +278,22 @@ export async function quoteCarrierFreightOptions(
     const pending = (async (): Promise<CarrierQuoteResult> => {
       try {
         const quotes = await client.calculateFreight(requestParams)
+        const prepDays = packageVolumes.preparationDays || 0
 
         const options: CarrierFreightOption[] = (Array.isArray(quotes) ? quotes : [])
           .filter((q: any) => q && !q.has_error && Number.isFinite(Number(q.price)))
-          .map((q: any) => ({
-            serviceId: Number(q.id),
-            serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
-            price: Math.round(Number(q.price) * 100) / 100,
-            deliveryMinDays: q.delivery_range?.min ?? q.delivery_time ?? null,
-            deliveryMaxDays: q.delivery_range?.max ?? q.delivery_time ?? null,
-            companyName: q.company?.name || null,
-          }))
+          .map((q: any) => {
+            const minDays = q.delivery_range?.min ?? q.delivery_time ?? null
+            const maxDays = q.delivery_range?.max ?? q.delivery_time ?? null
+            return {
+              serviceId: Number(q.id),
+              serviceName: q.name || SERVICE_LABELS[Number(q.id)] || `Serviço ${q.id}`,
+              price: Math.round(Number(q.price) * 100) / 100,
+              deliveryMinDays: minDays != null ? minDays + prepDays : null,
+              deliveryMaxDays: maxDays != null ? maxDays + prepDays : null,
+              companyName: q.company?.name || null,
+            }
+          })
           .filter((o: CarrierFreightOption) => o.serviceId > 0)
           .sort((a: CarrierFreightOption, b: CarrierFreightOption) => a.price - b.price)
 
@@ -236,6 +304,7 @@ export async function quoteCarrierFreightOptions(
         pruneCarrierQuoteCache(Date.now())
         carrierQuoteCache.delete(cacheKey)
         carrierQuoteCache.set(cacheKey, { at: Date.now(), result })
+        storeCarrierFastResult(fastKey, result)
         return result
       } catch (err) {
         const stale = carrierQuoteCache.get(cacheKey)

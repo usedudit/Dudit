@@ -2830,6 +2830,7 @@ export default function CreateOrder({
                     onClose={() => setIsShippingSheetOpen(false)}
                     selectedCustomerId={selectedCustomer?.id || null}
                     customerDetails={shippingCustomerDetails}
+                    items={items}
                     deliveryAddress={{
                         zipCode: cep,
                         street,

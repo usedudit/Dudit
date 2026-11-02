@@ -2594,6 +2594,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         partnerId={partnerId}
                         storeId={activeStoreId || null}
                         orderSubtotal={subtotal}
+                        items={cart.map(c => ({ productId: c.productId, quantity: c.qty }))}
                         onCreateAddress={handleCreateShippingAddress}
                         onApply={({ shippingFee: fee, distanceKm, breakdown }) => {
                             setShippingFee(Math.max(0, Number(fee || 0)))

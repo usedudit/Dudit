@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { normalizeBusinessInfo } from "@/lib/business-info"
+import { normalizeBusinessInfo, readOnboardingState, toBusinessInfoRecord } from "@/lib/business-info"
 import { revalidatePath } from "next/cache"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
@@ -72,7 +72,9 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
 
                 if (partnerRes.error || !partnerRes.data) throw new Error("Parceiro não encontrado")
 
-                const businessInfo = normalizeBusinessInfo(partnerRes.data.business_info)
+                const rawBusinessInfo = toBusinessInfoRecord(partnerRes.data.business_info)
+                const businessInfo = normalizeBusinessInfo(rawBusinessInfo)
+                const onboarding = readOnboardingState(rawBusinessInfo)
                 const items = [
                     ...(recentProductsRes.data || []).map((p: any) => ({ ...p, itemType: 'product' })),
                     ...(recentServicesRes.data || []).map((s: any) => ({ ...s, itemType: 'service' }))
@@ -88,6 +90,9 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
                     recentOrders: recentOrdersRes.data || [],
                     storeName: storeRes.data?.name || "",
                     businessInfo,
+                    // O botão do Guia de Configuração só some para quem já
+                    // concluiu o wizard — o estado precisa vir do banco.
+                    onboardingCompleted: onboarding.completed,
                 }
             },
             30,
@@ -131,9 +136,13 @@ export async function switchBusinessModeAction(partnerId: string, targetMode: Bu
 
         if (!isOwner) return { success: false, error: "Apenas o proprietário pode alterar o modo de negócio." }
 
-        const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
+        // Preserva o registro cru para não apagar chaves desconhecidas (ex.:
+        // flags de onboarding do Guia de Configuração) ao trocar o modo.
+        const rawBusinessInfo = toBusinessInfoRecord(partnerData?.business_info)
+        const businessInfo = normalizeBusinessInfo(rawBusinessInfo)
         const defaultResources = getDefaultResourcesForModeAndCategory(targetMode, (partnerData as any)?.category?.name || "")
         const updatedInfo = {
+            ...rawBusinessInfo,
             ...businessInfo,
             mode: targetMode,
             activeResources: defaultResources,
@@ -149,6 +158,9 @@ export async function switchBusinessModeAction(partnerId: string, targetMode: Bu
         revalidatePath("/erp")
         // Invalidar o cache de acesso do usuário para que o businessInfo atualizado seja carregado
         await safeRevalidateTag(TAGS.userAccess(user.id))
+        // O dashboard é cacheado pela tag do parceiro: invalida para que a home
+        // reflita o novo modo (e o estado do Guia de Configuração) imediatamente.
+        await safeRevalidateTag(TAGS.partner(partnerId))
         return { success: true }
 
     } catch (e: any) {

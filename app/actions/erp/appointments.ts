@@ -458,11 +458,20 @@ export async function getAppointmentsAction() {
 }
 
 // -- Optimized appointment columns for list/calendar rendering (no select *) --
-const APPOINTMENT_LIST_COLUMNS = `
+export const APPOINTMENT_LIST_COLUMNS = `
   id, partner_id, customer_id, customer_name, service_name,
   start_date, start_time, end_date, end_time, duration_minutes,
   staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source,
-  sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id
+  sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id,
+  orders:marketplace_order_id (
+    id,
+    order_number,
+    situation,
+    total_amount,
+    paid_amount,
+    payment_method,
+    order_source
+  )
 `
 
 const MAX_APPOINTMENT_DURATION_MINUTES = 525600; // 1 year (365 days)
@@ -1983,87 +1992,94 @@ export async function getAppointmentDetailsDataAction(params: {
     const { appointmentId, partnerId, linkedOrderId } = params
     const includePlan = params.includePlan ?? !appointmentId
 
-    // Verify view permissions once
-    await requirePermission(partnerId, "appointments", "view")
+    // Verify view permissions in parallel
+    await Promise.all([
+      requirePermission(partnerId, "appointments", "view"),
+      linkedOrderId ? requirePermission(partnerId, "orders", "view") : Promise.resolve(null),
+    ])
 
     const supabase = createAdminClient()
-    let appointmentScope: { store_id: string | null; marketplace_order_id: string | null; service_name: string | null } | null = null
-    if (appointmentId) {
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("store_id, marketplace_order_id, service_name")
-        .eq("id", appointmentId)
-        .eq("partner_id", partnerId)
-        .maybeSingle()
-      if (error || !data) throw new Error("Agendamento não encontrado")
-      appointmentScope = data
-      if (data.store_id) await requireStorePermission(data.store_id, partnerId, "appointments", "view")
+
+    // Run core database queries in parallel
+    const [appointmentRes, orderRes, orderItemsRes, appointmentItemsRes, partnerPlanRes] = await Promise.all([
+      appointmentId
+        ? supabase
+            .from("appointments")
+            .select("store_id, marketplace_order_id, service_name")
+            .eq("id", appointmentId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      linkedOrderId
+        ? supabase
+            .from("orders")
+            .select("id, store_id, order_number, situation, total_amount, paid_amount, payment_method, order_source")
+            .eq("id", linkedOrderId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      linkedOrderId
+        ? supabase
+            .from("order_items")
+            .select("id, line_type, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
+            .eq("order_id", linkedOrderId)
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: null, error: null }),
+      appointmentId
+        ? supabase
+            .from("appointment_items")
+            .select(`
+                id, appointment_id, product_id, variant_id, service_id,
+                name, quantity, usage_type, created_at, updated_at
+            `)
+            .eq("appointment_id", appointmentId)
+            .order("created_at", { ascending: true })
+            .limit(500)
+        : Promise.resolve({ data: null, error: null }),
+      includePlan
+        ? supabase
+            .from("subscriptions")
+            .select("plan_id, status, plans(slug)")
+            .eq("partner_id", partnerId)
+            .in("status", ["active", "trialing", "past_due"])
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+
+    if (appointmentId && (appointmentRes.error || !appointmentRes.data)) {
+      throw new Error("Agendamento não encontrado")
     }
+    const appointmentScope = appointmentRes.data
+
     if (linkedOrderId) {
-      await requireAppointmentOrderView(linkedOrderId, partnerId)
+      if (orderRes.error || !orderRes.data) {
+        throw new Error("Pedido não encontrado.")
+      }
       if (appointmentScope?.marketplace_order_id && appointmentScope.marketplace_order_id !== linkedOrderId) {
         throw new Error("Pedido não corresponde ao agendamento")
       }
     }
 
-    // Run all database fetches in parallel on the server
-    const [partnerPlanRes, appointmentItemsRes, orderDataRes, appointmentRowRes] = await Promise.all([
-      // The plan is only needed by the item editor. Avoid this query when a
-      // read-only appointment is opened.
-      includePlan ? supabase
-        .from("subscriptions")
-        .select("plan_id, status")
-        .eq("partner_id", partnerId)
-        .in("status", ["active", "trialing", "past_due"])
-        .maybeSingle() : Promise.resolve({ data: null, error: null }),
-
-      // Keep the hot path flat. Joining products/services here made an empty
-      // stock tab wait on a much heavier relational query.
-      appointmentId ? supabase
-        .from("appointment_items")
-        .select(`
-            id, appointment_id, product_id, variant_id, service_id,
-            name, quantity, usage_type, created_at, updated_at
-        `)
-        .eq("appointment_id", appointmentId)
-        .order("created_at", { ascending: true })
-        .limit(500) : Promise.resolve({ data: null, error: null }),
-
-      // 4. Order and Order items (if linkedOrderId provided)
-      linkedOrderId ? Promise.all([
-        supabase
-          .from("orders")
-          .select("order_number, situation, total_amount, paid_amount, payment_method, order_source")
-          .eq("id", linkedOrderId)
-          .eq("partner_id", partnerId)
-          .maybeSingle(),
-        supabase
-          .from("order_items")
-          .select("id, line_type, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
-          .eq("order_id", linkedOrderId)
-          .order("created_at", { ascending: true })
-      ]) : Promise.resolve([null, null]),
-
-      // 5. Appointment row (to identify marketplace appointments)
-      Promise.resolve({ data: appointmentScope, error: null })
-    ])
+    // Verify store permissions concurrently if present
+    const storeChecks: Promise<any>[] = []
+    if (appointmentScope?.store_id) {
+      storeChecks.push(requireStorePermission(appointmentScope.store_id, partnerId, "appointments", "view"))
+    }
+    if (orderRes.data?.store_id && orderRes.data.store_id !== appointmentScope?.store_id) {
+      storeChecks.push(requireStorePermission(orderRes.data.store_id, partnerId, "orders", "view"))
+    }
+    if (storeChecks.length > 0) {
+      await Promise.all(storeChecks)
+    }
 
     // Process Partner Plan
-    let planSlug = 'free'
-    if (partnerPlanRes.data?.plan_id) {
-      const { data: plan } = await supabase
-        .from("plans")
-        .select("slug")
-        .eq("id", partnerPlanRes.data.plan_id)
-        .maybeSingle()
-      planSlug = plan?.slug || 'free'
-    }
+    const planSlug = (partnerPlanRes.data as any)?.plans?.slug || 'free'
 
     // Enrich appointment items only when there are actual product/service IDs.
     let appointmentItems = []
     if (appointmentItemsRes.data) {
-      const isMarketplaceApt = Boolean(appointmentRowRes?.data?.marketplace_order_id)
-      const aptServiceName = appointmentRowRes?.data?.service_name || ''
+      const isMarketplaceApt = Boolean(appointmentScope?.marketplace_order_id)
+      const aptServiceName = appointmentScope?.service_name || ''
 
       const productIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.product_id).filter(Boolean))]
       const serviceIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.service_id).filter(Boolean))]
@@ -2138,17 +2154,15 @@ export async function getAppointmentDetailsDataAction(params: {
 
     // Process Order Data
     let orderData = null
-    if (linkedOrderId && orderDataRes) {
-      const [orderRes, itemsRes] = orderDataRes as any
-      if (orderRes?.data) {
-        orderData = {
-          orderNumber: orderRes.data.order_number || null,
-          situation: orderRes.data.situation || "pending",
-          totalAmount: Number(orderRes.data.total_amount || 0),
-          paidAmount: Number(orderRes.data.paid_amount || 0),
-          paymentMethod: orderRes.data.payment_method || "",
-          orderSource: orderRes.data.order_source || "",
-          items: (itemsRes?.data || []).map((item: any) => ({
+    if (linkedOrderId && orderRes.data) {
+      orderData = {
+        orderNumber: orderRes.data.order_number || null,
+        situation: orderRes.data.situation || "pending",
+        totalAmount: Number(orderRes.data.total_amount || 0),
+        paidAmount: Number(orderRes.data.paid_amount || 0),
+        paymentMethod: orderRes.data.payment_method || "",
+        orderSource: orderRes.data.order_source || "",
+        items: (orderItemsRes?.data || []).map((item: any) => ({
             id: item.id,
             lineType: item.line_type || "product",
             productName: item.product_name,
@@ -2159,7 +2173,6 @@ export async function getAppointmentDetailsDataAction(params: {
             isGift: Boolean(item.is_gift),
             originalPrice: item.original_price ? Number(item.original_price) : null,
           })),
-        }
       }
     }
 

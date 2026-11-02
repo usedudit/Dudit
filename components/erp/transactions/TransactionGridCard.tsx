@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox, DropdownItem, Tooltip } from "@/components/reusable"
 import { CreditCardIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
 import { PaymentMethodIndicator } from "./PaymentMethodIndicator";
@@ -139,7 +140,17 @@ const TransactionGridCard = React.memo(
                         <div className="flex flex-col gap-0.5 min-w-0">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {transaction.createdAtDate}
+                                {(() => {
+                                    const isPaid =
+                                        transaction.rawStatus === "paid" ||
+                                        transaction.status === "Pago" ||
+                                        transaction.status === "Recebido" ||
+                                        Boolean(transaction.paymentDateRaw);
+                                    return (
+                                        (isPaid && (transaction.paymentDateDate || (transaction.paymentDateRaw ? formatBrazilDateFromDbInput(transaction.paymentDateRaw, "dayMonthYear") : null))) ||
+                                        transaction.createdAtDate
+                                    );
+                                })()}
                             </span>
                         </div>
 

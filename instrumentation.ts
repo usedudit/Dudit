@@ -29,8 +29,15 @@ export async function register() {
     // Increase default EventEmitter max listeners to 25.
     // Next.js 16+ internals + Sentry APM instrumentation attach 11 close listeners to ServerResponse,
     // which exceeds Node's default threshold of 10 and emits a false-positive warning.
+    // `await import("node:events")` devolve o namespace ESM, onde `defaultMaxListeners`
+    // é um binding somente-leitura (atribuir direto lança TypeError e derruba o dev).
+    // O export default do namespace é o próprio module.exports do CJS, que expõe o
+    // getter/setter ligado ao EventEmitter - é por ele que o default é ajustado.
     const events = await import("node:events");
-    events.defaultMaxListeners = 25;
+    const eventsCjs = (events as unknown as { default?: { defaultMaxListeners?: number } }).default;
+    if (eventsCjs) {
+      eventsCjs.defaultMaxListeners = 25;
+    }
 
     await import("./sentry.server.config");
 

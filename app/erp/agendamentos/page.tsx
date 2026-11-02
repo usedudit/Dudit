@@ -9,6 +9,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
+import { APPOINTMENT_LIST_COLUMNS } from "@/app/actions/erp/appointments"
 
 export const dynamic = "force-dynamic"
 
@@ -31,7 +32,21 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
     servicesQuery = servicesQuery.eq("store_id", storeId)
   }
 
-  const [partnerUsersRes, partnerRes, customersRes, servicesRes, unavailableRes] = await Promise.all([
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+
+  let appointmentsQuery = supabase
+    .from("appointments")
+    .select(APPOINTMENT_LIST_COLUMNS)
+    .eq("partner_id", partnerId)
+    .lte("start_date", todayStr)
+    .or(`end_date.gte.${todayStr},and(end_date.is.null,start_date.gte.${todayStr})`)
+
+  if (storeId) {
+    appointmentsQuery = appointmentsQuery.or(`store_id.eq.${storeId},store_id.is.null`)
+  }
+
+  const [partnerUsersRes, partnerRes, customersRes, servicesRes, unavailableRes, appointmentsRes] = await Promise.all([
     supabase
       .from("partner_users")
       .select("id, user_id, role_id, role")
@@ -57,6 +72,10 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       .eq("partner_id", partnerId)
       .eq("is_active", true)
       .order("name"),
+    appointmentsQuery
+      .order("start_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(500),
   ])
 
   // Resolve team member display names from user_profiles
@@ -123,6 +142,7 @@ async function loadCatalogs(partnerId: string, storeId?: string | null) {
       resources: Array.isArray(s.resources) ? s.resources : [],
     })),
     unavailableTypes: unavailableRes.data || [],
+    initialAppointments: appointmentsRes.data || [],
     openingHours: (() => {
       const stores = (partner as any)?.stores || []
       const activeStore = storeId ? stores.find((s: any) => s.id === storeId) : null
@@ -156,6 +176,7 @@ export default async function AgendamentosPage() {
           initialCustomers={catalogs.customers}
           initialServices={catalogs.services}
           initialUnavailableTypes={catalogs.unavailableTypes}
+          initialAppointments={catalogs.initialAppointments}
           openingHours={catalogs.openingHours}
         />
       </FadeIn>

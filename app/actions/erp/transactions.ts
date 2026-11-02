@@ -894,6 +894,8 @@ export async function getFinancialTransactionsAction(
                 createdAtDate: formatDateLabel(t.created_at || now.toISOString()),
                 createdAtTime: formatTime(t.created_at || now.toISOString()),
                 createdAtRaw: t.created_at || now.toISOString(),
+                paymentDateDate: t.payment_date ? formatDateLabel(t.payment_date) : null,
+                paymentDateTime: t.payment_date && String(t.payment_date).includes("T") ? formatTime(t.payment_date) : null,
                 daysUntilDue,
                 isOverdue,
                 originSource: (() => {
@@ -3722,7 +3724,7 @@ export async function getTransactionDetailsAction(
             }
         }
 
-        const paymentDateSubtitle = formatDateTime(row.created_at)
+        const paymentDateSubtitle = formatDateTime(row.payment_date || row.created_at)
         let goalBonusDetails: TransactionDetailPayload["goalBonusDetails"] = null
         if (String(row.reference_note || "").startsWith("goal-bonus:")) {
             const parts = String(row.reference_note || "").split(":")
@@ -3807,7 +3809,7 @@ export async function getTransactionDetailsAction(
             subcategoryLine,
             accountLine,
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
-            paymentDateLine: formatDateTime(row.created_at),
+            paymentDateLine: formatDateTime(row.payment_date || row.created_at),
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
             goalBonusDetails,
             originalAmount: groupOriginalAmount !== null

@@ -3,6 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { toBusinessInfoRecord } from "@/lib/business-info"
 import { createServiceAction } from "@/app/actions/erp/servicos"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { safeRevalidateTag, safeRevalidatePath } from "@/lib/utils/revalidation"
@@ -31,7 +32,11 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             return { success: false, error: "Parceiro não informado" }
         }
 
-        await requirePermission(partnerId, "products", "create", user)
+        // O guia vive no dashboard: basta acesso a ele para concluir. Exigir
+        // `products.create` impedia quem desativou o recurso Produtos de
+        // finalizar o guia — o botão voltava para a home sem conseguir sair.
+        // A criação do primeiro item tem as próprias verificações de permissão.
+        await requirePermission(partnerId, "dashboard", "view", user)
 
         const admin = getAdminClient()
 
@@ -45,9 +50,10 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             return { success: false, error: "Parceiro não encontrado" }
         }
 
-        const rawBusinessInfo = (partnerRes.data.business_info && typeof partnerRes.data.business_info === "object")
-            ? partnerRes.data.business_info
-            : {}
+        // `business_info` pode chegar como JSONB ou como string JSON. O helper
+        // garante que o restante das flags (recursos, vendas, onboarding) não
+        // seja apagado ao concluir o guia.
+        const rawBusinessInfo = toBusinessInfoRecord(partnerRes.data.business_info)
 
         // Determinar order_flow padrão e recursos baseado no modo de negócio
         const businessMode = rawBusinessInfo.mode || "erp"
@@ -87,9 +93,7 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
         ]
 
         if (storeRes.data?.id) {
-            const rawStoreBusinessInfo = (storeRes.data.business_info && typeof storeRes.data.business_info === "object")
-                ? storeRes.data.business_info
-                : {}
+            const rawStoreBusinessInfo = toBusinessInfoRecord(storeRes.data.business_info)
             updatePromises.push(
                 admin.from("stores").update({
                     business_info: {

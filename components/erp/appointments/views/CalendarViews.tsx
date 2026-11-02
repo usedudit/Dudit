@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarX, X, CalendarPlus, CalendarOff, ArrowUpDown, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon, BlockedIcon } from '@/lib/icons';
@@ -338,23 +338,32 @@ export const DayView = ({
     handleOpenUnavailable,
     openingHours
 }: any) => {
-    const { startHour, endHour } = getGridHoursRange(currentDate, openingHours);
-    const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => i + startHour);
+    const { startHour, endHour } = useMemo(() => getGridHoursRange(currentDate, openingHours), [currentDate, openingHours]);
+    const hours = useMemo(() => Array.from({ length: endHour - startHour + 1 }, (_, i) => i + startHour), [startHour, endHour]);
 
-    const currentDateStr = formatDateStr(currentDate);
+    const currentDateStr = useMemo(() => formatDateStr(currentDate), [currentDate]);
 
     // Multi-day events covering this date
-    const allDayEvents = appointments.filter((a: Appointment) => {
+    const allDayEvents = useMemo(() => appointments.filter((a: Appointment) => {
         if (!isMultiDay(a)) return false;
         const start = a.date;
         const end = a.endDate || a.date;
         return currentDateStr >= start && currentDateStr <= end;
-    });
+    }), [appointments, currentDateStr]);
 
     // Hourly single-day events for this specific date
-    const hourlyEvents = appointments.filter((a: Appointment) => a.date === currentDateStr && !isMultiDay(a));
+    const hourlyEvents = useMemo(() => appointments.filter((a: Appointment) => a.date === currentDateStr && !isMultiDay(a)), [appointments, currentDateStr]);
 
-    const closedBlocks = getClosedBlocks(currentDate, openingHours, startHour, endHour);
+    const closedBlocks = useMemo(() => getClosedBlocks(currentDate, openingHours, startHour, endHour), [currentDate, openingHours, startHour, endHour]);
+
+    const staffAppointmentsMap = useMemo(() => {
+        const map = new Map<string, any[]>();
+        for (const staff of staffMembers) {
+            const raw = hourlyEvents.filter((a: Appointment) => a.staffId === staff.id);
+            map.set(staff.id, arrangeAppointments(raw));
+        }
+        return map;
+    }, [hourlyEvents, staffMembers]);
 
     return (
         <div className="flex flex-col h-full overflow-hidden relative">
@@ -400,8 +409,7 @@ export const DayView = ({
 
                 <div className="flex-1 flex overflow-x-auto no-scrollbar relative overflow-y-scroll custom-scrollbar">
                     {staffMembers.map((staff: StaffMember, colIndex: number) => {
-                        const rawAppointments = hourlyEvents.filter((a: Appointment) => a.staffId === staff.id);
-                        const staffAppointments = arrangeAppointments(rawAppointments);
+                        const staffAppointments = staffAppointmentsMap.get(staff.id) || [];
 
                         return (
                             <div key={staff.id} className="flex-1 min-w-[200px] border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface relative group resource-column">
@@ -585,84 +593,88 @@ export const TimelineView = ({
     handleOpenMore,
     openingHours
 }: any) => {
-    const days = getWeekDays(currentDate);
+    const days = useMemo(() => getWeekDays(currentDate), [currentDate]);
     const staffCount = staffMembers.length;
     const maxItems = staffCount <= 4 ? 4 : 3;
 
-    const weekStartStr = formatDateStr(days[0]);
-    const weekEndStr = formatDateStr(days[6]);
+    const weekStartStr = useMemo(() => formatDateStr(days[0]), [days]);
+    const weekEndStr = useMemo(() => formatDateStr(days[6]), [days]);
 
     // Multi-day events that overlap with current week
-    const longWeekEvents = appointments.filter((a: Appointment) => {
-        if (!isMultiDay(a)) return false;
-        const start = a.date;
-        const end = a.endDate || a.date;
-        return (start <= weekEndStr) && (end >= weekStartStr);
-    }).sort((a: Appointment, b: Appointment) => a.date.localeCompare(b.date) || b.duration - a.duration);
+    const { longWeekEvents, multiDaySlots, slotRowCount } = useMemo(() => {
+        const longEvents = appointments.filter((a: Appointment) => {
+            if (!isMultiDay(a)) return false;
+            const start = a.date;
+            const end = a.endDate || a.date;
+            return (start <= weekEndStr) && (end >= weekStartStr);
+        }).sort((a: Appointment, b: Appointment) => a.date.localeCompare(b.date) || b.duration - a.duration);
 
-    // Compute multi-day slot layout so overlapping bars are placed in separate horizontal rows
-    const multiDaySlots: Array<{
-        apt: Appointment;
-        startCol: number;
-        endCol: number;
-        span: number;
-        slotRow: number;
-        isStart: boolean;
-        isEnd: boolean;
-    }> = [];
+        // Compute multi-day slot layout so overlapping bars are placed in separate horizontal rows
+        const slots: Array<{
+            apt: Appointment;
+            startCol: number;
+            endCol: number;
+            span: number;
+            slotRow: number;
+            isStart: boolean;
+            isEnd: boolean;
+        }> = [];
 
-    const slotGrid: boolean[][] = []; // slotGrid[row][col]
+        const slotGrid: boolean[][] = []; // slotGrid[row][col]
 
-    longWeekEvents.forEach((apt: Appointment) => {
-        const aptStart = apt.date;
-        const aptEnd = apt.endDate || apt.date;
+        longEvents.forEach((apt: Appointment) => {
+            const aptStart = apt.date;
+            const aptEnd = apt.endDate || apt.date;
 
-        let startCol = 0;
-        let endCol = 6;
+            let startCol = 0;
+            let endCol = 6;
 
-        days.forEach((d: Date, idx: number) => {
-            const dStr = formatDateStr(d);
-            if (dStr === aptStart) startCol = idx;
-            if (dStr < aptStart && idx > startCol) startCol = idx + 1;
-            if (dStr === aptEnd) endCol = idx;
-            if (dStr > aptEnd && idx <= endCol) endCol = Math.max(0, idx - 1);
-        });
+            days.forEach((d: Date, idx: number) => {
+                const dStr = formatDateStr(d);
+                if (dStr === aptStart) startCol = idx;
+                if (dStr < aptStart && idx > startCol) startCol = idx + 1;
+                if (dStr === aptEnd) endCol = idx;
+                if (dStr > aptEnd && idx <= endCol) endCol = Math.max(0, idx - 1);
+            });
 
-        // Clamp
-        startCol = Math.max(0, Math.min(6, startCol));
-        endCol = Math.max(startCol, Math.min(6, endCol));
-        const span = endCol - startCol + 1;
+            // Clamp
+            startCol = Math.max(0, Math.min(6, startCol));
+            endCol = Math.max(startCol, Math.min(6, endCol));
+            const span = endCol - startCol + 1;
 
-        // Find first row where columns startCol..endCol are free
-        let slotRow = 0;
-        while (true) {
-            if (!slotGrid[slotRow]) slotGrid[slotRow] = Array(7).fill(false);
-            let free = true;
-            for (let c = startCol; c <= endCol; c++) {
-                if (slotGrid[slotRow][c]) {
-                    free = false;
+            // Find first row where columns startCol..endCol are free
+            let slotRow = 0;
+            while (true) {
+                if (!slotGrid[slotRow]) slotGrid[slotRow] = Array(7).fill(false);
+                let free = true;
+                for (let c = startCol; c <= endCol; c++) {
+                    if (slotGrid[slotRow][c]) {
+                        free = false;
+                        break;
+                    }
+                }
+                if (free) {
+                    for (let c = startCol; c <= endCol; c++) {
+                        slotGrid[slotRow][c] = true;
+                    }
                     break;
                 }
+                slotRow++;
             }
-            if (free) {
-                for (let c = startCol; c <= endCol; c++) {
-                    slotGrid[slotRow][c] = true;
-                }
-                break;
-            }
-            slotRow++;
-        }
 
-        multiDaySlots.push({
-            apt,
-            startCol,
-            endCol,
-            span,
-            slotRow,
-            isStart: aptStart >= weekStartStr,
-            isEnd: aptEnd <= weekEndStr
+            slots.push({
+                apt,
+                startCol,
+                endCol,
+                span,
+                slotRow,
+                isStart: aptStart >= weekStartStr,
+                isEnd: aptEnd <= weekEndStr
+            });
         });
-    });
+
+        return { longWeekEvents: longEvents, multiDaySlots: slots, slotRowCount: slotGrid.length || 1 };
+    }, [appointments, weekStartStr, weekEndStr, days]);
 
     return (
         <div className="flex flex-col h-full min-h-[600px] relative overflow-hidden">
@@ -701,7 +713,7 @@ export const TimelineView = ({
                             <div
                                 className="grid grid-cols-7 gap-y-1.5 w-full relative"
                                 style={{
-                                    gridTemplateRows: `repeat(${slotGrid.length || 1}, minmax(26px, auto))`
+                                    gridTemplateRows: `repeat(${slotRowCount}, minmax(26px, auto))`
                                 }}
                             >
                                 {multiDaySlots.map(({ apt, startCol, span, slotRow, isStart, isEnd }) => (

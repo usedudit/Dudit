@@ -83,6 +83,8 @@ interface POSShippingSheetProps {
     preferCarrier?: boolean
     /** Serviço de transportadora pré-selecionado. */
     initialCarrierServiceId?: number | null
+    /** Itens do pedido para cálculo exato de cubagem e peso via product_logistics. */
+    items?: Array<{ productId?: string | null; product_id?: string | null; id?: string | null; quantity?: number; [key: string]: any }>
 }
 
 export default function POSShippingSheet({
@@ -99,6 +101,7 @@ export default function POSShippingSheet({
     onApply,
     preferCarrier = false,
     initialCarrierServiceId = null,
+    items = [],
 }: POSShippingSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
 
@@ -333,7 +336,15 @@ export default function POSShippingSheet({
         if (destinationCep.length === 8) {
             setCarrierLoading(true)
             setCarrierError(null)
-            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+            const carrierItems = (items || []).map((it: any) => ({
+                productId: it.productId || it.product_id || it.id,
+                quantity: Math.max(1, Number(it.quantity || 1)),
+            }))
+            quoteCarrierFreightAction({
+                partnerId,
+                toPostalCode: destinationCep,
+                items: carrierItems,
+            })
                 .then((res) => {
                     if (carrierFetchIdRef.current !== fetchId) return
                     if (res.success && res.options.length > 0) {

@@ -23,6 +23,8 @@ export interface ERPTransaction {
   createdAtDate: string
   createdAtTime: string
   createdAtRaw?: string | null
+  paymentDateDate?: string | null
+  paymentDateTime?: string | null
   daysUntilDue: number
   isOverdue: boolean
   paymentType: string

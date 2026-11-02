@@ -660,7 +660,12 @@ export function CheckoutPageClient() {
     // the in-flight request and discard its results.
     useEffect(() => {
         if (formData.deliveryType !== "delivery" || !carrierAllowed || !partnerId || !destinationCep || !mpAvailable) return
-        const dedupeKey = `${partnerId}:${destinationCep}`
+        const productItems = products.map((p: any) => ({
+            productId: p.product_id || p.id,
+            quantity: Math.max(1, Number(p.quantity || 1)),
+        }))
+        const itemsDedupe = productItems.map((p: any) => `${p.productId}:${p.quantity}`).sort().join(",")
+        const dedupeKey = `${partnerId}:${destinationCep}:${itemsDedupe}`
         if (carrierQuoteKeyRef.current === dedupeKey) return
         let active = true
         let completed = false
@@ -668,7 +673,11 @@ export function CheckoutPageClient() {
         setCarrierQuoteLoading(true)
             ; (async () => {
                 try {
-                    const res = await quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep })
+                    const res = await quoteCarrierFreightAction({
+                        partnerId,
+                        toPostalCode: destinationCep,
+                        items: productItems,
+                    })
                     if (!active) return
                     if (res.success && res.options.length > 0) {
                         setCarrierOptions(res.options)
@@ -696,7 +705,7 @@ export function CheckoutPageClient() {
                 setCarrierQuoteLoading(false)
             }
         }
-    }, [destinationCep, partnerId, formData.deliveryType, mpAvailable, carrierAllowed])
+    }, [destinationCep, partnerId, formData.deliveryType, mpAvailable, carrierAllowed, products])
 
     const handleCarrierSelect = (opt: CarrierFreightOption) => {
         setSelectedCarrierServiceId(opt.serviceId)

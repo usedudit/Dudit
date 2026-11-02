@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getPartnerPlan } from "@/lib/services/subscription.service";
-import { normalizeBusinessInfo } from "@/lib/business-info";
+import { normalizeBusinessInfo, readOnboardingState } from "@/lib/business-info";
 import { DashboardContext, DashboardLayout } from "./types";
 import { getStoreUrl } from "@/lib/utils/url-generator";
 import { getActiveStoreId } from "@/lib/auth/partner-context";
@@ -39,7 +39,7 @@ export async function getDashboardLayout(
     : await getActiveStoreId();
 
   // Store e queries de fallback
-  const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, addresses!store_id!left(city, state)"
+  const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, business_info, addresses!store_id!left(city, state)"
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [
@@ -263,7 +263,13 @@ export async function getDashboardLayout(
   const isQuickMode = businessMode === "quick" || businessMode === "showcase";
 
   const rawBusinessInfo: any = partner.business_info || {};
-  const onboardingCompleted = typeof rawBusinessInfo === "object" && Boolean(rawBusinessInfo?.onboardingCompleted);
+  // O Guia de Configuração é concluído uma única vez. A flag é persistida em
+  // `partners.business_info` e espelhada em `stores.business_info` pelo wizard.
+  // A loja é usada como fallback para que o guia não reapareça caso algum fluxo
+  // de configuração tenha recriado o `business_info` do parceiro.
+  const onboardingCompleted =
+    readOnboardingState(rawBusinessInfo).completed ||
+    readOnboardingState((store as any)?.business_info).completed;
   const needsOnboarding = !onboardingCompleted && !isDesapego && !hasItems;
 
   const context: DashboardContext = {

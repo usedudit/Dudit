@@ -41,6 +41,8 @@ import {
   findSuperFreteIntegration as getSuperFreteIntegration,
   buildSuperFreteClient as createClientFromIntegration,
   resolveSuperFreteEnvironment,
+  consolidateShippingVolumes,
+  type ShippingItemLogistics,
   type PartnerIntegrationRow,
 } from "@/lib/services/shipping/superfrete-integration"
 
@@ -1214,7 +1216,7 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
     supabase
       .from("orders")
       .select(
-        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, partner_id, nfe_number, delivery_address, delivery_breakdown, stores(name), order_items(product_name, quantity, product_price, products(name), services(name))",
+        "id, order_number, situation, store_id, buyer_id, customer_id, customer_name, partner_id, nfe_number, delivery_address, delivery_breakdown, stores(name), order_items(id, product_id, product_name, quantity, product_price, products(name, product_logistics(weight_gross, weight_net, width, height, length, packaging_type, preparation_days)), services(name))",
       )
       .eq("id", orderId)
       .eq("partner_id", partnerId)
@@ -1224,6 +1226,35 @@ async function loadShippingOrderContext(orderId: string, partnerId: string) {
   if (!order) return { error: "Pedido não encontrado." }
   if (order.situation === "cancelled") return { error: "Pedidos cancelados não podem ter etiqueta." }
   if (!integration?.access_token_encrypted) return { error: "SuperFrete não conectado." }
+
+  if (order && Array.isArray(order.order_items) && order.order_items.length > 0) {
+    const missingLogisticsProductIds = order.order_items
+      .map((it: any) => it.product_id)
+      .filter((id: string | null | undefined) => {
+        if (!id) return false
+        const it = order.order_items.find((item: any) => item.product_id === id)
+        const log = Array.isArray(it?.products?.product_logistics)
+          ? it.products.product_logistics[0]
+          : it?.products?.product_logistics
+        return !log
+      })
+
+    if (missingLogisticsProductIds.length > 0) {
+      const { data: dbLogistics } = await supabase
+        .from("product_logistics")
+        .select("product_id, weight_gross, weight_net, width, height, length, packaging_type, preparation_days")
+        .in("product_id", missingLogisticsProductIds)
+
+      if (dbLogistics && dbLogistics.length > 0) {
+        const logMap = new Map(dbLogistics.map((l: any) => [l.product_id, l]))
+        for (const it of order.order_items) {
+          if (it.product_id && logMap.has(it.product_id)) {
+            it._directLogistics = logMap.get(it.product_id)
+          }
+        }
+      }
+    }
+  }
 
   const config = ((integration as any).config as Record<string, any>) || {}
 
@@ -1433,13 +1464,30 @@ function buildShippingProducts(order: any): Array<{ name: string; quantity: numb
   }))
 }
 
-function buildVolumes(config: Record<string, any>) {
-  return {
-    height: Number(config.height ?? 10),
-    width: Number(config.width ?? 10),
-    length: Number(config.length ?? 10),
-    weight: Number(config.weight ?? 0.5),
+function buildVolumes(config: Record<string, any>, order?: any) {
+  if (order && Array.isArray(order.order_items) && order.order_items.length > 0) {
+    const items: ShippingItemLogistics[] = order.order_items.map((it: any) => {
+      const rawLog =
+        it._directLogistics ||
+        (Array.isArray(it.products?.product_logistics)
+          ? it.products.product_logistics[0]
+          : it.products?.product_logistics) ||
+        it.product_logistics
+
+      return {
+        quantity: Math.max(1, Number(it.quantity || 1)),
+        weight_gross: rawLog?.weight_gross != null ? Number(rawLog.weight_gross) : null,
+        weight_net: rawLog?.weight_net != null ? Number(rawLog.weight_net) : null,
+        width: rawLog?.width != null ? Number(rawLog.width) : null,
+        height: rawLog?.height != null ? Number(rawLog.height) : null,
+        length: rawLog?.length != null ? Number(rawLog.length) : null,
+        packaging_type: rawLog?.packaging_type || null,
+        preparation_days: rawLog?.preparation_days != null ? Number(rawLog.preparation_days) : null,
+      }
+    })
+    return consolidateShippingVolumes(items, config)
   }
+  return consolidateShippingVolumes(null, config)
 }
 
 function collapseSpaces(value: unknown): string {
@@ -1572,7 +1620,7 @@ export async function getOrderShippingQuoteAction(payload: { orderId: string }):
         fromPostalCode: originPostalCode,
         toPostalCode: destinationPostalCode,
         services,
-        package: buildVolumes(config),
+        package: buildVolumes(config, order),
         options: {
           own_hand: Boolean(config.ownHand),
           receipt: Boolean(config.receipt),
@@ -1702,7 +1750,7 @@ export async function createOrderShippingLabelAction(payload: {
     })
     if (!recipientName.ok) return { success: false, error: recipientName.error }
 
-    const volumes = buildVolumes(config)
+    const volumes = buildVolumes(config, order)
     const label = await client.createOrder({
       service: requestedService as SuperFreteServiceId,
       from: buildFromAddressPayload(origin, senderName.name),
@@ -2372,7 +2420,7 @@ async function prepareReturnShipmentQuote(
     fromPostalCode,
     toPostalCode,
     services,
-    package: buildVolumes(config),
+    package: buildVolumes(config, order),
     options: {
       own_hand: Boolean(config.ownHand),
       receipt: Boolean(config.receipt),
@@ -2532,7 +2580,7 @@ export async function createReturnShippingLabelAction(payload: {
       from: buildFromAddressPayload(buyerAddress, senderName.name),
       to: buildToAddressPayload(storeAddress, recipientName.name),
       products: buildShippingProducts(order),
-      volumes: buildVolumes(config),
+      volumes: buildVolumes(config, order),
       options: {
         insurance_value: Number(config.insuranceValue || 0),
         receipt: Boolean(config.receipt),

@@ -13,6 +13,7 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { validateBrazilMobile, sanitizeInput } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
+import { toBusinessInfoRecord } from "@/lib/business-info"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { getFiscalPublishBlockReason } from "@/lib/fiscal/publish-gate"
 import { moderateStoreContent } from "@/lib/moderation/product-moderation"
@@ -315,7 +316,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         // SEO cooldown: store name, city, and state can only be changed every 15 days
         const { data: currentStore } = await admin
             .from("stores")
-            .select("name, last_seo_update_at, addresses(city, state)")
+            .select("name, last_seo_update_at, business_info, addresses(city, state)")
             .eq("id", input.storeId)
             .maybeSingle()
 
@@ -383,7 +384,15 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.is_showcase_active !== undefined) updateData.is_showcase_active = input.is_showcase_active
         if (input.accept_orders_when_closed !== undefined) updateData.accept_orders_when_closed = input.accept_orders_when_closed
         // F5.4b: Business data fields
-        if (input.business_info !== undefined) updateData.business_info = input.business_info
+        if (input.business_info !== undefined) {
+            // Mescla com o registro atual em vez de sobrescrever: o formulário
+            // envia apenas `{ mode }` e sobrescrever apagaria as flags de
+            // onboarding do Guia de Configuração.
+            updateData.business_info = {
+                ...toBusinessInfoRecord(currentStore?.business_info),
+                ...toBusinessInfoRecord(input.business_info),
+            }
+        }
         if (input.category_id !== undefined) updateData.category_id = input.category_id
         if (input.subcategory_id !== undefined) updateData.subcategory_id = input.subcategory_id
         if (input.timezone !== undefined) updateData.timezone = input.timezone

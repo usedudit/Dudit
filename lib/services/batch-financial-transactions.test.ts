@@ -176,3 +176,81 @@ describe("Grace Period Queue Timing & Undo Mechanism", () => {
     })
 })
 
+describe("Financial Transactions Sorting Rules", () => {
+    interface SortableTx {
+        id: string
+        createdAtRaw?: string | null
+        paymentDateRaw?: string | null
+        dueDateRaw?: string | null
+    }
+
+    const parseSortTime = (raw?: string | null): number => {
+        if (!raw) return 0
+        if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            const ts = new Date(`${raw}T12:00:00`).getTime()
+            return Number.isFinite(ts) ? ts : 0
+        }
+        const ts = new Date(raw).getTime()
+        return Number.isFinite(ts) ? ts : 0
+    }
+
+    const transactionSortTime = (item: SortableTx) => {
+        const raw = item.paymentDateRaw || item.createdAtRaw || item.dueDateRaw || null
+        return parseSortTime(raw)
+    }
+
+    const sortTransactions = (items: SortableTx[]) => {
+        return [...items].sort((a, b) => {
+            const diff = transactionSortTime(b) - transactionSortTime(a)
+            if (diff !== 0) return diff
+            const aCreated = a.createdAtRaw ? new Date(a.createdAtRaw).getTime() : 0
+            const bCreated = b.createdAtRaw ? new Date(b.createdAtRaw).getTime() : 0
+            if (bCreated !== aCreated) return bCreated - aCreated
+            return String(b.id || "").localeCompare(String(a.id || ""))
+        })
+    }
+
+    it("should sort paid transactions by payment date descending, not by creation date", () => {
+        const oldCreatedPaidRecently: SortableTx = {
+            id: "tx-old-created-paid-today",
+            createdAtRaw: "2026-09-01T10:00:00Z",
+            paymentDateRaw: "2026-11-02T15:00:00Z",
+        }
+        const newCreatedPaidYesterday: SortableTx = {
+            id: "tx-new-created-paid-yesterday",
+            createdAtRaw: "2026-11-01T08:00:00Z",
+            paymentDateRaw: "2026-11-01T09:00:00Z",
+        }
+        const intermediate: SortableTx = {
+            id: "tx-october",
+            createdAtRaw: "2026-10-15T12:00:00Z",
+            paymentDateRaw: "2026-10-15T12:00:00Z",
+        }
+
+        const sorted = sortTransactions([intermediate, newCreatedPaidYesterday, oldCreatedPaidRecently])
+
+        // The transaction paid today (Nov 2) must be first, despite having a creation date from September!
+        expect(sorted.map((t) => t.id)).toEqual([
+            "tx-old-created-paid-today",
+            "tx-new-created-paid-yesterday",
+            "tx-october",
+        ])
+    })
+
+    it("should break ties by creation date descending when payment dates are identical", () => {
+        const txA: SortableTx = {
+            id: "tx-a",
+            createdAtRaw: "2026-11-02T08:00:00Z",
+            paymentDateRaw: "2026-11-02",
+        }
+        const txB: SortableTx = {
+            id: "tx-b",
+            createdAtRaw: "2026-11-02T14:00:00Z",
+            paymentDateRaw: "2026-11-02",
+        }
+
+        const sorted = sortTransactions([txA, txB])
+        expect(sorted.map((t) => t.id)).toEqual(["tx-b", "tx-a"])
+    })
+})
+

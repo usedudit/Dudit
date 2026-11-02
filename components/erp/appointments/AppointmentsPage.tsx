@@ -93,6 +93,7 @@ const AppointmentsPage = ({
     initialCustomers = [],
     initialServices = [],
     initialUnavailableTypes = [],
+    initialAppointments = [],
     openingHours = null,
 }: {
     partnerId: string;
@@ -101,6 +102,7 @@ const AppointmentsPage = ({
     initialCustomers?: Array<{ id: string; name: string; email?: string; phone?: string; avatar_url?: string | null }>;
     initialServices?: Array<{ id: string; name: string; price: number; promotional_price?: number | null; category_id?: string | null; duration: string; bufferMinutes: number; category: string; billingUnit: string; resources?: any[] }>;
     initialUnavailableTypes?: any[];
+    initialAppointments?: any[];
     openingHours?: any;
 }) => {
     const router = useRouter();
@@ -124,8 +126,47 @@ const AppointmentsPage = ({
     const [currentDate, setCurrentDate] = useState(new Date());
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+
+    const mapDbAppointment = useCallback((row: any): Appointment => ({
+        id: String(row.id),
+        customer: row.customer_name || 'Cliente Sem Nome',
+        service: row.service_name || 'Serviço',
+        date: row.start_date,
+        time: String(row.start_time || '').slice(0, 5),
+        endDate: row.end_date || undefined,
+        endTime: row.end_time ? String(row.end_time).slice(0, 5) : undefined,
+        duration: Number(row.duration_minutes || 0),
+        status: row.status || 'Reservado',
+        staff: row.staff_name || 'Profissional',
+        staffId: String(row.staff_partner_user_id || ''),
+        price: Number(row.price || 0),
+        pricingUnit: row.pricing_unit || 'Por Serviço',
+        notes: row.notes || undefined,
+        partnerId: row.partner_id,
+        source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
+        recurrence: (row.recurrence as any) || 'none',
+        saleId: row.sale_id || row.marketplace_order_id || null,
+        marketplaceOrderId: row.marketplace_order_id || null,
+        paidAmount: Number(row.orders?.paid_amount ?? row.paid_amount ?? 0),
+        totalAmount: row.orders?.total_amount != null ? Number(row.orders.total_amount) : undefined,
+        orderNumber: row.orders?.order_number || null,
+        paymentMethod: row.orders?.payment_method || undefined,
+        orderSource: row.orders?.order_source || undefined,
+        salesChannel: row.orders?.order_source || row.sales_channel || "booking",
+        paymentStatus: row.orders?.situation || row.payment_status || "unpaid",
+        fulfillmentMode: row.fulfillment_mode || null,
+        needsReschedule: Boolean(row.needs_reschedule),
+        serviceId: row.service_id || null,
+        categoryId: row.category_id || null,
+    }), []);
+
+    const [appointments, setAppointments] = useState<Appointment[]>(() => {
+        if (initialAppointments && initialAppointments.length > 0) {
+            return initialAppointments.map(mapDbAppointment);
+        }
+        return [];
+    });
+    const [isLoadingAppointments, setIsLoadingAppointments] = useState(() => !(initialAppointments && initialAppointments.length > 0));
     const [realStaffMembers, setRealStaffMembers] = useState<StaffMember[]>(() =>
         initialTeam.map(m => ({ id: m.id, name: m.name, role: m.role }))
     );
@@ -178,35 +219,6 @@ const AppointmentsPage = ({
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug);
 
-    const mapDbAppointment = useCallback((row: any): Appointment => ({
-        id: String(row.id),
-        customer: row.customer_name || 'Cliente Sem Nome',
-        service: row.service_name || 'Serviço',
-        date: row.start_date,
-        time: String(row.start_time || '').slice(0, 5),
-        endDate: row.end_date || undefined,
-        endTime: row.end_time ? String(row.end_time).slice(0, 5) : undefined,
-        duration: Number(row.duration_minutes || 0),
-        status: row.status || 'Reservado',
-        staff: row.staff_name || 'Profissional',
-        staffId: String(row.staff_partner_user_id || ''),
-        price: Number(row.price || 0),
-        pricingUnit: row.pricing_unit || 'Por Serviço',
-        notes: row.notes || undefined,
-        partnerId: row.partner_id,
-        source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
-        recurrence: (row.recurrence as any) || 'none',
-        saleId: row.sale_id || row.marketplace_order_id || null,
-        marketplaceOrderId: row.marketplace_order_id || null,
-        paidAmount: Number(row.paid_amount || 0),
-        salesChannel: row.sales_channel || "booking",
-        paymentStatus: row.payment_status || "unpaid",
-        fulfillmentMode: row.fulfillment_mode || null,
-        needsReschedule: Boolean(row.needs_reschedule),
-        serviceId: row.service_id || null,
-        categoryId: row.category_id || null,
-    }), []);
-
     // Catalogs come from SSR props - only refresh unavailable types when needed
     const refreshUnavailableTypes = useCallback(async () => {
         const unavailRes = await getUnavailableTypesAction(partnerId);
@@ -237,10 +249,20 @@ const AppointmentsPage = ({
         return realUnavailableTypes;
     }, [realUnavailableTypes]);
 
-    // -- Appointment cache: keyed by "startDate|endDate|staffId" --
+    // -- Appointment cache: keyed by "startDate|endDate" --
     // Stale-while-revalidate: serve cache instantly, revalidate in background.
-    const appointmentCacheRef = useRef<Map<string, { data: Appointment[]; ts: number }>>(new Map());
-    const inFlightRef = useRef<Set<string>>(new Set());
+    const appointmentCacheRef = useRef<Map<string, { data: Appointment[]; ts: number }>>((() => {
+        const cache = new Map<string, { data: Appointment[]; ts: number }>();
+        if (initialAppointments && initialAppointments.length > 0) {
+            const todayStr = formatDateStr(new Date());
+            cache.set(`${todayStr}|${todayStr}`, {
+                data: initialAppointments.map(mapDbAppointment),
+                ts: Date.now()
+            });
+        }
+        return cache;
+    })());
+    const inFlightRef = useRef<Map<string, Promise<Appointment[] | null>>>(new Map());
     const fetchAbortRef = useRef<number>(0);
 
     // Stable cache key for the current view
@@ -253,32 +275,36 @@ const AppointmentsPage = ({
         [currentRange]
     );
 
-    // -- Core network fetch (always hits server, deduped by key) --
+    // -- Core network fetch (deduped by key via shared promise) --
     const fetchRange = useCallback(async (
         startDate: string,
         endDate: string,
     ): Promise<Appointment[] | null> => {
         const key = `${startDate}|${endDate}`;
 
-        // Skip if already in-flight (prevents duplicate requests)
-        if (inFlightRef.current.has(key)) return null;
-        inFlightRef.current.add(key);
+        const existing = inFlightRef.current.get(key);
+        if (existing) return existing;
 
-        try {
-            const res = await getAppointmentsByDateRangeAction(startDate, endDate, undefined, storeId);
-            if (res.success) {
-                const mapped = (res.items || []).map(mapDbAppointment);
-                appointmentCacheRef.current.set(key, { data: mapped, ts: Date.now() });
-                return mapped;
+        const fetchPromise = (async () => {
+            try {
+                const res = await getAppointmentsByDateRangeAction(startDate, endDate, undefined, storeId);
+                if (res.success) {
+                    const mapped = (res.items || []).map(mapDbAppointment);
+                    appointmentCacheRef.current.set(key, { data: mapped, ts: Date.now() });
+                    return mapped;
+                }
+                return null;
+            } catch (err) {
+                console.error('[AppointmentsPage] Fetch failed:', err);
+                return null;
+            } finally {
+                inFlightRef.current.delete(key);
             }
-            return null;
-        } catch (err) {
-            console.error('[AppointmentsPage] Fetch failed:', err);
-            return null;
-        } finally {
-            inFlightRef.current.delete(key);
-        }
-    }, [mapDbAppointment]);
+        })();
+
+        inFlightRef.current.set(key, fetchPromise);
+        return fetchPromise;
+    }, [mapDbAppointment, storeId]);
 
     // -- Compute adjacent ranges for prefetching --
     const getAdjacentRanges = useCallback((date: Date, view: ViewType) => {
@@ -331,20 +357,17 @@ const AppointmentsPage = ({
             }
             setIsLoadingAppointments(false);
 
-            // 3. Prefetch adjacent ranges only for week/month views. The day
-            // view is the default and prefetching both neighboring days there
-            // doubled the request count without helping most interactions.
-            if (typeof window !== 'undefined' && calendarView !== 'day') {
+            // 3. Prefetch next range during browser idle time for instant transitions
+            if (typeof window !== 'undefined') {
                 const prefetchFn = () => {
                     if (fetchAbortRef.current !== fetchId) return;
-                    const { prev, next } = getAdjacentRanges(currentDate, calendarView);
-                    fetchRange(prev.startDate, prev.endDate);
+                    const { next } = getAdjacentRanges(currentDate, calendarView);
                     fetchRange(next.startDate, next.endDate);
                 };
                 if ('requestIdleCallback' in window) {
-                    (window as any).requestIdleCallback(prefetchFn, { timeout: 3000 });
+                    (window as any).requestIdleCallback(prefetchFn, { timeout: 2000 });
                 } else {
-                    setTimeout(prefetchFn, 2000);
+                    setTimeout(prefetchFn, 1000);
                 }
             }
         };
@@ -356,14 +379,15 @@ const AppointmentsPage = ({
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                appointmentCacheRef.current.clear()
-                setIsLoadingAppointments(true)
+                appointmentCacheRef.current.clear();
+                inFlightRef.current.clear();
+                setIsLoadingAppointments(true);
                 fetchRange(currentRange.startDate, currentRange.endDate).then(freshData => {
-                    if (freshData) setAppointments(freshData)
-                    setIsLoadingAppointments(false)
-                })
+                    if (freshData) setAppointments(freshData);
+                    setIsLoadingAppointments(false);
+                });
             }
-        }
+        };
         document.addEventListener('visibilitychange', handleVisibilityChange)
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
     }, [currentRange, fetchRange])
@@ -448,6 +472,7 @@ const AppointmentsPage = ({
 
             if (res.success) {
                 appointmentCacheRef.current.clear();
+                inFlightRef.current.clear();
                 // We could just filter locally for speed, but let's re-fetch for safety or rely on revalidation
                 setAppointments(prev => {
                     if (deleteAll) {
@@ -469,6 +494,7 @@ const AppointmentsPage = ({
             const res = await deleteAppointmentAction(id, notify, note);
             if (res.success) {
                 appointmentCacheRef.current.clear();
+                inFlightRef.current.clear();
                 setAppointments(prev => prev.filter(a => a.id !== id));
                 setIsSheetOpen(false);
                 setSelectedAppointment(null);
@@ -525,7 +551,15 @@ const AppointmentsPage = ({
 
                 if (updateRes.success && updateRes.item) {
                     const mapped = mapDbAppointment(updateRes.item);
-                    setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
+                    setAppointments((prev) => prev.map((a) => a.id === mapped.id ? {
+                        ...a,
+                        ...mapped,
+                        orderNumber: mapped.orderNumber ?? a.orderNumber,
+                        paymentStatus: mapped.paymentStatus ?? a.paymentStatus,
+                        totalAmount: mapped.totalAmount ?? a.totalAmount,
+                        paymentMethod: mapped.paymentMethod ?? a.paymentMethod,
+                        orderSource: mapped.orderSource ?? a.orderSource,
+                    } : a));
                 } else {
                     throw new Error(updateRes.error || 'Não foi possível atualizar o agendamento.');
                 }
@@ -568,6 +602,7 @@ const AppointmentsPage = ({
 
             // Invalidate cache so next navigation fetches fresh data
             appointmentCacheRef.current.clear();
+            inFlightRef.current.clear();
 
             setIsSheetOpen(false);
             setTempSelectionTime(null);
@@ -697,7 +732,7 @@ const AppointmentsPage = ({
         setSelectedIds(new Set());
     }, [viewMode, calendarView, currentDate, appointmentFilters]);
 
-    const handleGridMouseMove = (e: React.MouseEvent, colIndex: number) => {
+    const handleGridMouseMove = useCallback((e: React.MouseEvent, colIndex: number) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const hourHeight = 80;
@@ -707,11 +742,17 @@ const AppointmentsPage = ({
         const hour = startHour + Math.floor(snappedMinutes / 60);
         const minutes = snappedMinutes % 60;
         const top = (snappedMinutes / 60) * hourHeight;
-        setHoverTime({ hour, minutes, top });
-        setHoverColIndex(colIndex);
-    };
 
-    const handleTimelineMouseMove = (e: React.MouseEvent, staffId: string) => {
+        setHoverTime(prev => {
+            if (prev && prev.hour === hour && prev.minutes === minutes && prev.top === top) {
+                return prev;
+            }
+            return { hour, minutes, top };
+        });
+        setHoverColIndex(prev => prev === colIndex ? prev : colIndex);
+    }, [currentDate, openingHours]);
+
+    const handleTimelineMouseMove = useCallback((e: React.MouseEvent, staffId: string) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
 
@@ -728,9 +769,14 @@ const AppointmentsPage = ({
         const minutes = snappedMinutes % 60;
         const top = 0;
 
-        setHoverTime({ hour, minutes, top });
-        setHoverStaffId(staffId);
-    };
+        setHoverTime(prev => {
+            if (prev && prev.hour === hour && prev.minutes === minutes && prev.top === top) {
+                return prev;
+            }
+            return { hour, minutes, top };
+        });
+        setHoverStaffId(prev => prev === staffId ? prev : staffId);
+    }, [currentDate, openingHours]);
 
     const handleGridMouseLeave = () => {
         setHoverTime(null);
@@ -1279,6 +1325,7 @@ const AppointmentsPage = ({
                                             const createRes = await createAppointmentsAction(payloads);
                                             if (createRes.success) {
                                                 appointmentCacheRef.current.clear();
+                                                inFlightRef.current.clear();
                                                 setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
                                             }
                                         }

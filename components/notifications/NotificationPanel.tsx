@@ -3,7 +3,7 @@
 import { useCallback, useRef, useEffect, useState } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { ActionsDropdown, AlertModal, Button, DropdownItem, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader, Tabs, TabsList, TabsTrigger } from "../reusable"
+import { ActionsDropdown, AlertModal, Button, DropdownItem, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, Badge } from "../reusable"
 import { usePushNotificationStatus } from "./PushNotificationManager"
 import { BellIcon, CheckCircleIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 
@@ -122,7 +122,7 @@ export function NotificationPanel({
 		<>
 			{pushBanner}
 			{grouped.length > 0 && (
-			<div className="flex-1 overflow-y-auto custom-scrollbar px-2 mt-2 relative">
+				<div className="flex-1 overflow-y-auto custom-scrollbar px-2 mt-2 relative">
 					<div className="flex items-center px-2">
 						<Tabs value={erpFilter} onValueChange={onErpFilter} className="flex-1">
 							<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
@@ -131,9 +131,9 @@ export function NotificationPanel({
 									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
 										{opt.label}
 										{opt.unread ? (
-											<span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 ml-1 text-[10px] font-bold rounded-full bg-brand-red text-white">
+											<Badge variant="red" icon={null}>
 												{opt.unread > 99 ? "99+" : opt.unread}
-											</span>
+											</Badge>
 										) : null}
 									</TabsTrigger>
 								))}
@@ -141,10 +141,10 @@ export function NotificationPanel({
 						</Tabs>
 						{(((unreadCount ?? 0) > 0 && onMarkAllAsRead) || onDeleteAll) && (
 							<>
-								<div className="border-l border-brand-border dark:border-dark-border h-6 mx-2 shrink-0" />
+								<div className="border-l border-brand-border dark:border-dark-border h-5 mx-2 shrink-0" />
 								<ActionsDropdown
 									trigger={
-										<Button variant="ghost" size="sm" className="h-7 w-7 min-w-[28px] p-0">
+										<Button variant="outline" size="sm" className="h-7 w-7 min-w-[28px] p-0">
 											<ThreeDotsIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-heading" />
 										</Button>
 									}

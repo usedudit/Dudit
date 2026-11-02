@@ -268,7 +268,7 @@ export default function TransactionsPage({
             transactionType: item.transactionType,
             isRecurring: !!item.recurringId,
             paymentMethodSubtitle: item.paymentType,
-            paymentDateSubtitle: item.dueDate || item.paymentDateRaw || null,
+            paymentDateSubtitle: item.paymentDateRaw ? (item.paymentDateDate || formatBrazilDateFromDbInput(item.paymentDateRaw, "dayMonthYear")) : (item.dueDate || null),
             creatorName: "...",
             originLabel: item.origin === "manual" ? "Manual" : item.origin === "gateway" ? "Gateway" : "Sistema",
             originSource: item.originSource || "Manual",
@@ -709,6 +709,8 @@ export default function TransactionsPage({
                 createdAtDate: latestPaidAt ? formatDateFromRaw(latestPaidAt) || first.createdAtDate : first.createdAtDate,
                 createdAtTime: latestPaidAt ? formatTimeFromRaw(latestPaidAt) || first.createdAtTime : first.createdAtTime,
                 paymentDateRaw: latestPaidAt,
+                paymentDateDate: latestPaidAt ? formatDateFromRaw(latestPaidAt) || first.createdAtDate : first.createdAtDate,
+                paymentDateTime: latestPaidAt ? formatTimeFromRaw(latestPaidAt) || first.createdAtTime : first.createdAtTime,
                 amount: gAmt,
                 paidAmount: gAmt,
                 paymentType: combinedPaymentType,
@@ -772,9 +774,11 @@ export default function TransactionsPage({
         result = [...passthrough, ...collapsedGroups, ...collapsedPaidInstallmentGroups]
 
         const transactionSortTime = (item: ERPTransaction) => {
-            const raw = item.createdAtRaw || item.paymentDateRaw || item.dueDateRaw || null
+            const raw = item.paymentDateRaw || item.createdAtRaw || item.dueDateRaw || null
             if (!raw) return 0
-            const ts = new Date(raw).getTime()
+            const ts = typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+                ? new Date(`${raw}T12:00:00`).getTime()
+                : new Date(raw).getTime()
             return Number.isFinite(ts) ? ts : 0
         }
 
@@ -842,7 +846,14 @@ export default function TransactionsPage({
                 return String(aDate).localeCompare(String(bDate))
             })
         } else {
-            result = [...result].sort((a, b) => transactionSortTime(b) - transactionSortTime(a))
+            result = [...result].sort((a, b) => {
+                const diff = transactionSortTime(b) - transactionSortTime(a)
+                if (diff !== 0) return diff
+                const aCreated = a.createdAtRaw ? new Date(a.createdAtRaw).getTime() : 0
+                const bCreated = b.createdAtRaw ? new Date(b.createdAtRaw).getTime() : 0
+                if (bCreated !== aCreated) return bCreated - aCreated
+                return String(b.id || "").localeCompare(String(a.id || ""))
+            })
         }
 
         return result

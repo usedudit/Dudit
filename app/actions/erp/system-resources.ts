@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { normalizeBusinessInfo } from "@/lib/business-info"
+import { normalizeBusinessInfo, toBusinessInfoRecord } from "@/lib/business-info"
 import { normalizeActiveResources, resolveActiveResources, SYSTEM_RESOURCES_VERSION } from "@/lib/system-resources"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { can } from "@/lib/permissions/can"
@@ -88,7 +88,12 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
     return { success: false, error: fetchError?.message || "Parceiro nao encontrado" }
   }
 
-  const businessInfo = normalizeBusinessInfo(partner.business_info)
+  // O registro cru é a base do update: `normalizeBusinessInfo` reconstrói o
+  // objeto e conhece apenas mode/activeResources/resourcesVersion/salesSettings.
+  // Sem o spread do registro original, salvar recursos apagava as flags de
+  // onboarding (Guia de Configuração) e o guia voltava a aparecer na home.
+  const rawBusinessInfo = toBusinessInfoRecord(partner.business_info)
+  const businessInfo = normalizeBusinessInfo(rawBusinessInfo)
   const currentResources = new Set(resolveActiveResources(businessInfo))
   const nextActiveResources = normalizeActiveResources(activeResources)
   const nextResources = new Set(nextActiveResources)
@@ -114,6 +119,7 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
   }
 
   const nextBusinessInfo = {
+    ...rawBusinessInfo,
     ...businessInfo,
     activeResources: nextActiveResources,
     resourcesVersion: SYSTEM_RESOURCES_VERSION,
@@ -131,6 +137,10 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
   invalidateStoreCapabilityCache(context.partnerId)
 
   revalidateTag(TAGS.userAccess(user.id), "max")
+  // O dashboard (e o botão do Guia de Configuração) é cacheado pela tag do
+  // parceiro. Sem esta revalidação a home continuaria exibindo o estado
+  // anterior por até o TTL do cache.
+  revalidateTag(TAGS.partner(context.partnerId), "max")
   revalidatePath("/erp")
   revalidatePath("/erp/configuracoes")
 

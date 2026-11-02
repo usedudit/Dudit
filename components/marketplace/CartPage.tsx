@@ -946,14 +946,25 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 const destinationCep = String(selectedAddress?.zip_code || "").replace(/\D/g, "")
                 const shippingAvailability = getPartnerShippingAvailability(data)
                 if (destinationCep.length === 8 && data.partner?.mp_user_id && data.shippingEnabled && shippingAvailability.allAllowShipping) {
-                    const carrierKey = `${targetPartnerId}:${destinationCep}`
+                    const productItems = (data.items || [])
+                        .filter((it: any) => (it.item_type || "product") === "product")
+                        .map((it: any) => ({
+                            productId: it.product_id || it.productId || it.id,
+                            quantity: Math.max(1, Number(it.quantity || 1)),
+                        }))
+                    const itemsDedupe = productItems.map((p: any) => `${p.productId}:${p.quantity}`).sort().join(",")
+                    const carrierKey = `${targetPartnerId}:${destinationCep}:${itemsDedupe}`
                     if (carrierFetchedKeysRef.current[storeKey] !== carrierKey) {
                         carrierFetchedKeysRef.current[storeKey] = carrierKey
                         setCarrierQuotes(prev => ({
                             ...prev,
                             [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: carrierKey },
                         }))
-                        quoteCarrierFreightAction({ partnerId: targetPartnerId, toPostalCode: destinationCep }).then(res => {
+                        quoteCarrierFreightAction({
+                            partnerId: targetPartnerId,
+                            toPostalCode: destinationCep,
+                            items: productItems,
+                        }).then(res => {
                             if (deliveryQuoteSeqRef.current[storeKey] !== quoteSeq) return
                             setCarrierQuotes(prev => {
                                 const cur = prev[storeKey]

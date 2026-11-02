@@ -14,7 +14,7 @@ import { sanitizeInput, validateBrazilMobile } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
-import { normalizeBusinessInfo } from "@/lib/business-info"
+import { normalizeBusinessInfo, toBusinessInfoRecord } from "@/lib/business-info"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
@@ -684,14 +684,29 @@ export async function updatePartnerAction(partnerId: string, data: any) {
 
   // Partner table fields
   if (data.businessInfo !== undefined) {
-    const existingInfo = normalizeBusinessInfo(partnerCheck?.business_info)
+    // O registro cru preserva chaves que o frontend não envia (ex.: flags do
+    // Guia de Configuração). Editar o perfil da loja não pode apagar o
+    // onboarding já concluído.
+    const existingRawInfo = toBusinessInfoRecord(partnerCheck?.business_info)
+    const existingInfo = normalizeBusinessInfo(existingRawInfo)
     const newInfo = normalizeBusinessInfo(data.businessInfo)
     updateData.business_info = {
+      ...existingRawInfo,
       ...newInfo,
       activeResources: existingInfo.activeResources,
       mode: existingInfo.mode, // Never trust the frontend for mode changes on update
       ...(existingInfo.resourcesVersion !== undefined
         ? { resourcesVersion: existingInfo.resourcesVersion }
+        : {}),
+      // O Guia de Configuração só é concluído pelo wizard de onboarding.
+      ...(existingInfo.onboardingCompleted !== undefined
+        ? { onboardingCompleted: existingInfo.onboardingCompleted }
+        : {}),
+      ...(existingInfo.onboardingGoals !== undefined
+        ? { onboardingGoals: existingInfo.onboardingGoals }
+        : {}),
+      ...(existingInfo.onboardingCompletedAt !== undefined
+        ? { onboardingCompletedAt: existingInfo.onboardingCompletedAt }
         : {}),
     }
   }

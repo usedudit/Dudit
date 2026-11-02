@@ -6,6 +6,7 @@ import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reu
 import { CreditCardIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
+import { formatBrazilDateFromDbInput, formatTime } from "@/lib/utils/formatters"
 import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
 import type { ERPTransaction } from "@/lib/services/transactions.types"
 
@@ -99,17 +100,33 @@ const TransactionListItem = React.memo(
                         </span>
                     )
 
-                case "date":
+                case "date": {
+                    const isPaid =
+                        transaction.rawStatus === "paid" ||
+                        transaction.status === "Pago" ||
+                        transaction.status === "Recebido" ||
+                        Boolean(transaction.paymentDateRaw);
+                    const displayDate =
+                        (isPaid && (transaction.paymentDateDate || (transaction.paymentDateRaw ? formatBrazilDateFromDbInput(transaction.paymentDateRaw, "dayMonthYear") : null))) ||
+                        transaction.createdAtDate;
+                    const displayTime =
+                        (isPaid && transaction.paymentDateRaw)
+                            ? (transaction.paymentDateTime || (String(transaction.paymentDateRaw).includes("T") ? formatTime(transaction.paymentDateRaw) : null))
+                            : transaction.createdAtTime;
+
                     return (
                         <div className="flex flex-col text-left">
                             <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                {transaction.createdAtDate}
+                                {displayDate}
                             </span>
-                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                {transaction.createdAtTime}
-                            </span>
+                            {displayTime && (
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                    {displayTime}
+                                </span>
+                            )}
                         </div>
                     )
+                }
 
                 case "dueDate":
                     return (

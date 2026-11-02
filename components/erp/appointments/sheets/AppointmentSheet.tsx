@@ -238,7 +238,18 @@ export const AppointmentSheet = ({
         paidAmount: number
         situation: string
         orderSource: string
-    } | null>(null)
+    } | null>(() => {
+        if (mode === 'view' && appointment && (appointment.orderNumber || appointment.totalAmount != null)) {
+            return {
+                totalAmount: Number(appointment.totalAmount ?? appointment.price ?? 0),
+                paymentMethod: appointment.paymentMethod || "",
+                paidAmount: Number(appointment.paidAmount || 0),
+                situation: appointment.paymentStatus || "unpaid",
+                orderSource: appointment.orderSource || appointment.salesChannel || "",
+            };
+        }
+        return null;
+    })
 
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
@@ -391,6 +402,7 @@ export const AppointmentSheet = ({
     }, [clientsCatalog]);
 
     useEffect(() => {
+        if (clientsCatalog && clientsCatalog.length > 0) return;
         if (partnerId && mode === 'create') {
             fetchPartnerCustomersBucket(partnerId).then(res => {
                 if (res && res.length > 0) {
@@ -1275,13 +1287,46 @@ export const AppointmentSheet = ({
     };
 
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
-    const [orderNumber, setOrderNumber] = useState<string | null>(null);
+    const [orderNumber, setOrderNumber] = useState<string | null>(appointment?.orderNumber || null);
     const [orderItems, setOrderItems] = useState<any[] | null>(null);
-    const [orderPaymentInfo, setOrderPaymentInfo] = useState<{ situation: string; paidAmount: number; totalAmount: number } | null>(null);
+    const [orderPaymentInfo, setOrderPaymentInfo] = useState<{ situation: string; paidAmount: number; totalAmount: number } | null>(() => {
+        if (mode === 'view' && appointment && (appointment.orderNumber || appointment.totalAmount != null || appointment.paymentStatus)) {
+            return {
+                situation: appointment.paymentStatus || 'unpaid',
+                paidAmount: Number(appointment.paidAmount || 0),
+                totalAmount: Number(appointment.totalAmount ?? appointment.price ?? 0),
+            };
+        }
+        return null;
+    });
 
     const linkedOrderId = appointment?.marketplaceOrderId
         || appointment?.saleId
         || null;
+
+    useEffect(() => {
+        if (mode === 'view' && appointment) {
+            if (appointment.orderNumber) {
+                setOrderNumber(appointment.orderNumber);
+            }
+            if (appointment.paymentStatus || appointment.totalAmount != null) {
+                setOrderPaymentInfo(prev => ({
+                    situation: appointment.paymentStatus || prev?.situation || 'unpaid',
+                    paidAmount: Number(appointment.paidAmount ?? prev?.paidAmount ?? 0),
+                    totalAmount: Number(appointment.totalAmount ?? appointment.price ?? prev?.totalAmount ?? 0),
+                }));
+            }
+            if (appointment.orderNumber || appointment.totalAmount != null) {
+                setMarketplaceOrderData(prev => ({
+                    totalAmount: Number(appointment.totalAmount ?? appointment.price ?? prev?.totalAmount ?? 0),
+                    paymentMethod: appointment.paymentMethod || prev?.paymentMethod || "",
+                    paidAmount: Number(appointment.paidAmount ?? prev?.paidAmount ?? 0),
+                    situation: appointment.paymentStatus || prev?.situation || "unpaid",
+                    orderSource: appointment.orderSource || appointment.salesChannel || prev?.orderSource || "",
+                }));
+            }
+        }
+    }, [mode, appointment]);
 
     const linkedSalePaymentStatus = String(orderPaymentInfo?.situation || appointment?.paymentStatus || '').toLowerCase();
     const isSalePriceLocked = mode === 'view' && (linkedSalePaymentStatus === 'paid' || linkedSalePaymentStatus === 'partially_paid');
@@ -1310,14 +1355,16 @@ export const AppointmentSheet = ({
             setOrderItems(null);
             setMarketplaceOrderData(null);
             setOrderPaymentInfo(null);
+            setIsLoadingItems(false);
+            return;
         }
 
         setIsLoadingItems(true);
 
         getAppointmentDetailsDataAction({
-            appointmentId: mode === 'view' ? appointment?.id : undefined,
+            appointmentId: appointment?.id,
             partnerId,
-            linkedOrderId: mode === 'view' ? linkedOrderId : null
+            linkedOrderId: linkedOrderId || null
         }).then(res => {
             if (cancelled) return;
             if (res && res.success && res.data) {

@@ -15,6 +15,10 @@ export interface Appointment {
     status: 'Reservado' | 'Confirmado' | 'Aguardando' | 'Em andamento' | 'Iniciado' | 'Concluído' | 'Pago' | 'Ausência' | 'Cancelado' | 'Indisponível' | 'Partially Paid' | 'Pago Parcialmente';
     paymentStatus?: string;
     paidAmount?: number;
+    totalAmount?: number;
+    orderNumber?: string | null;
+    paymentMethod?: string;
+    orderSource?: string;
     salesChannel?: string;
     fulfillmentMode?: string | null;
     needsReschedule?: boolean;

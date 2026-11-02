@@ -64,7 +64,6 @@ import type { FinancialBreakdownData } from "@/lib/payments/order-financial-brea
 import {
   hasReceivedMpPayment,
   getOrderDepositSummary,
-  getDepositCheckoutMeta,
   DEPOSIT_STATUS_LABELS,
   shouldShowSinal,
   canPaySinal,
@@ -480,7 +479,6 @@ export default function OrderDetailView({
     paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : "";
   const depositSummary = getOrderDepositSummary(order);
   const isDepositOrder = depositSummary.usesDeposit;
-  const rawDepositMeta = getDepositCheckoutMeta(order.checkout_fulfillment);
   // For deposit orders the stored total can be only the sinal; use the full
   // order value from the deposit metadata so balance/total are correct.
   const effectiveOrderTotal =
@@ -523,42 +521,11 @@ export default function OrderDetailView({
     ) ||
     mpLegs.find((e: any) => Boolean(e?.cardLastDigits)) ||
     mpLegs[0];
-  const mpPaymentStatus = mpLeg?.paymentStatus;
-  const mpPaymentStatusDetail = mpLeg?.paymentStatusDetail;
   const mpTotalFeeAmount = mpLeg?.feeAmount;
   const mpFeeDetails:
     Array<{ type: string; amount: number; feePayer: string }> | undefined =
     mpLeg?.feeDetails;
   const mpNetReceivedAmount = mpLeg?.amountReceived;
-
-  const translateMpStatus = (status: string) => {
-    const map: Record<string, string> = {
-      approved: "Aprovado",
-      pending: "Pendente",
-      authorized: "Autorizado",
-      in_process: "Em processamento",
-      in_mediation: "Em mediação",
-      rejected: "Rejeitado",
-      cancelled: "Cancelado",
-      refunded: "Reembolsado",
-      charged_back: "Estornado",
-      expired: "Expirado",
-    };
-    return map[status?.toLowerCase()] || status;
-  };
-
-  const translateMpStatusDetail = (detail: string) => {
-    const map: Record<string, string> = {
-      accredited: "Aprovado",
-      pending_review: "Em análise",
-      pending_capitation: "Aguardando captura",
-      credited: "Creditado",
-      already_refunded: "Já reembolsado",
-      partially_refunded: "Parcialmente reembolsado",
-      deviation: "Desvio",
-    };
-    return map[detail?.toLowerCase()] || detail;
-  };
 
   const getCardBrandInfo = (mpPaymentMethodId: string | null) => {
     const brands: Record<string, { label: string; icon: string }> = {
@@ -615,16 +582,10 @@ export default function OrderDetailView({
     const methodEntries = breakdown.filter(
       (b: any) => b?.method && !b?.checkoutPricing,
     );
-    const nonDepositMethodEntries = methodEntries.filter(
-      (b: any) => String(b?.paymentKind || "").toLowerCase() !== "deposit",
-    );
-    // Show the balance/regular payment method when one exists; the sinal
-    // method is displayed in its own row.
-    const labelEntries =
-      nonDepositMethodEntries.length > 0
-        ? nonDepositMethodEntries
-        : methodEntries;
-    const paidMethodEntries = labelEntries.filter(
+    // Mirror the order list/grid: consider every received leg (including the
+    // sinal) so a sinal paid via Mercado Pago plus a manual balance payment is
+    // correctly shown as "Múltiplos meios".
+    const paidMethodEntries = methodEntries.filter(
       (b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009,
     );
     const paidLabels = Array.from(
@@ -645,15 +606,15 @@ export default function OrderDetailView({
     } else if (paidMethodEntries.length === 1) {
       pmLabel = paidMethodEntries[0]?.method || order.payment_method || null;
     } else {
-      pmLabel = labelEntries[0]?.method || order.payment_method || null;
+      pmLabel = methodEntries[0]?.method || order.payment_method || null;
     }
 
     if (
       pmLabel &&
-      labelEntries.length === 1 &&
-      labelEntries[0]?.installmentNumber > 1
+      methodEntries.length === 1 &&
+      methodEntries[0]?.installmentNumber > 1
     ) {
-      pmLabel = `${pmLabel} - ${labelEntries[0].installmentNumber}x`;
+      pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`;
     }
     return pmLabel;
   })();
@@ -1175,42 +1136,62 @@ export default function OrderDetailView({
   const nonSinalPaymentLegs = receivedPaymentLegs.filter(
     (entry: any) => !isSinalPaymentLeg(entry, depositSummary),
   );
-  const legsMethodLabel = (legs: any[]) =>
-    Array.from(
-      new Set(
-        legs
-          .map((entry: any) => {
-            const method = String(entry?.method || "").trim();
-            return method ? formatPaymentMethodLabel(method, null) : "";
-          })
-          .filter(Boolean),
-      ),
-    ).join(", ");
-  const sinalMethodLabel =
-    legsMethodLabel(sinalPaymentLegs) ||
-    String(depositSummary.paymentProvider || order.payment_provider || "");
-  const balanceMethodLabel = legsMethodLabel(nonSinalPaymentLegs);
-  const sinalPaidAt = String(
-    rawDepositMeta.depositPaidAt ||
-    sinalPaymentLegs.find((entry: any) => entry?.manuallyConfirmedAt)
-      ?.manuallyConfirmedAt ||
-    (depositSummary.sinalPaid ? order.mp_date_approved : "") ||
-    "",
-  );
-  const balancePaidAt = String(
-    rawDepositMeta.balancePaidAt ||
-    nonSinalPaymentLegs.find((entry: any) => entry?.manuallyConfirmedAt)
-      ?.manuallyConfirmedAt ||
-    (depositSummary.remainingBalance <= 0.009
-      ? order.paid_at || order.mp_date_approved
-      : "") ||
-    "",
-  );
+
+  type PaymentValueLine = { label: string; amount: number; baseAmount: number };
+  const buildPaymentValueLines = (
+    legs: any[],
+    prefix = "",
+  ): PaymentValueLine[] => {
+    const grouped = new Map<string, PaymentValueLine>();
+    for (const entry of legs) {
+      const method = String(entry?.method || "").trim();
+      const provider = String(entry?.provider || "").trim();
+      const methodLabel = method
+        ? formatPaymentMethodLabel(method, null)
+        : "Método não informado";
+      // Keep the gateway visible (e.g. "Pix (Mercado Pago)") when the ledger
+      // entry stores the provider separately from the method.
+      const methodWithProvider =
+        /mercado\s*pago/i.test(provider) &&
+          !/mercado\s*pago/i.test(methodLabel)
+          ? `${methodLabel} (Mercado Pago)`
+          : methodLabel;
+      const label = `${prefix}${methodWithProvider}`;
+      const received = Number(entry.amountReceived ?? entry.amount ?? 0);
+      const baseAmount = Number(entry.amount || 0);
+      const displayAmount = received > 0.009 ? received : baseAmount;
+      const key = label.toLowerCase();
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.amount += displayAmount;
+        existing.baseAmount += baseAmount;
+      } else {
+        grouped.set(key, {
+          label,
+          amount: displayAmount,
+          baseAmount,
+        });
+      }
+    }
+    return Array.from(grouped.values());
+  };
+
+  const paymentValueLines = [
+    ...buildPaymentValueLines(sinalPaymentLegs, "Sinal - "),
+    ...buildPaymentValueLines(nonSinalPaymentLegs),
+  ];
+  const balanceDisplayAmount =
+    depositSummary.balanceAmount > 0.009
+      ? depositSummary.balanceAmount
+      : Math.max(
+        0,
+        depositSummary.fullOrderTotal - depositSummary.depositAmount,
+      );
   const showMethodValues =
-    nonSinalPaymentLegs.length > 0 &&
-    (nonSinalPaymentLegs.length > 1 ||
-      (nonSinalPaymentLegs.length === 1 &&
-        (isDepositOrder || remainingPaymentAmount > 0.009)));
+    paymentValueLines.length > 0 &&
+    (isDepositOrder ||
+      nonSinalPaymentLegs.length > 1 ||
+      (nonSinalPaymentLegs.length === 1 && remainingPaymentAmount > 0.009));
 
   const paymentStatusBadge = (paid: boolean) => (
     <span
@@ -1227,22 +1208,23 @@ export default function OrderDetailView({
         value={renderPaymentMethodValue()}
       />
 
+      <PaymentRow
+        label="Valor Original"
+        value={
+          <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+            {formatCurrency(subtotalValue)}
+          </span>
+        }
+      />
+
       {shouldShowSinal(depositSummary) &&
         depositSummary.depositAmount > 0.009 && (
           <PaymentRow
             label="Sinal"
             value={
-              <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex flex-col items-end gap-0.5">
-                <span className="flex items-center gap-1.5">
-                  {formatCurrency(depositSummary.depositAmount)}
-                  {paymentStatusBadge(depositSummary.sinalPaid)}
-                </span>
-                <span className="text-xs font-normal text-brand-inactive-text dark:text-dark-body">
-                  {sinalMethodLabel || "Método não informado"}
-                  {depositSummary.sinalPaid && sinalPaidAt
-                    ? ` • ${formatDateTime(sinalPaidAt)}`
-                    : ""}
-                </span>
+              <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                {formatCurrency(depositSummary.depositAmount)}
+                {paymentStatusBadge(depositSummary.sinalPaid)}
               </span>
             }
           />
@@ -1252,23 +1234,10 @@ export default function OrderDetailView({
         <PaymentRow
           label="Saldo"
           value={
-            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex flex-col items-end gap-0.5">
-              <span className="flex items-center gap-1.5">
-                {formatCurrency(depositSummary.remainingBalance)}
-                {paymentStatusBadge(
-                  depositSummary.remainingBalance <= 0.009,
-                )}
-              </span>
-              {(balanceMethodLabel || balancePaidAt) && (
-                <span className="text-xs font-normal text-brand-inactive-text dark:text-dark-body">
-                  {balanceMethodLabel ||
-                    (depositSummary.remainingBalance <= 0.009
-                      ? "Método não informado"
-                      : "")}
-                  {depositSummary.remainingBalance <= 0.009 && balancePaidAt
-                    ? `${balanceMethodLabel ? " • " : ""}${formatDateTime(balancePaidAt)}`
-                    : ""}
-                </span>
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+              {formatCurrency(balanceDisplayAmount)}
+              {paymentStatusBadge(
+                depositSummary.remainingBalance <= 0.009,
               )}
             </span>
           }
@@ -1277,26 +1246,6 @@ export default function OrderDetailView({
 
       {isMercadoPago && (
         <>
-          {mpPaymentStatus && (
-            <PaymentRow
-              label="Status do Pagamento (MP)"
-              value={
-                <span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
-                  {translateMpStatus(mpPaymentStatus)}
-                  {mpPaymentStatusDetail &&
-                    translateMpStatusDetail(mpPaymentStatusDetail) !==
-                    translateMpStatus(mpPaymentStatus)
-                    ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})`
-                    : ""}
-                  {order.mp_date_approved && (
-                    <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">
-                      em {formatDateTime(order.mp_date_approved)}
-                    </span>
-                  )}
-                </span>
-              }
-            />
-          )}
           {mpLeg?.cardLastDigits &&
             (() => {
               const brand = getCardBrandInfo(
@@ -1397,44 +1346,26 @@ export default function OrderDetailView({
           label="Valores por meio"
           value={
             <div className="flex flex-col gap-1">
-              {nonSinalPaymentLegs.map((entry: any, index: number) => {
-                const received = Number(
-                  entry.amountReceived ?? entry.amount ?? 0,
-                );
-                const baseAmount = Number(entry.amount || 0);
-                const displayAmount =
-                  received > 0.009 ? received : baseAmount;
-                return (
-                  <span
-                    key={`${entry.method}-${index}`}
-                    className="text-brand-dark dark:text-dark-heading font-bold text-sm"
-                  >
-                    {formatPaymentMethodLabel(entry.method, null)}:{" "}
-                    {formatCurrency(displayAmount)}
-                    {baseAmount > 0.009 &&
-                      received > 0.009 &&
-                      Math.abs(baseAmount - received) > 0.009 ? (
-                      <span className="text-brand-muted font-normal">
-                        {" "}
-                        (de {formatCurrency(baseAmount)})
-                      </span>
-                    ) : null}
-                  </span>
-                );
-              })}
+              {paymentValueLines.map((line, index) => (
+                <span
+                  key={`${line.label}-${index}`}
+                  className="text-brand-dark dark:text-dark-heading font-bold text-sm"
+                >
+                  {line.label}: {formatCurrency(line.amount)}
+                  {line.baseAmount > 0.009 &&
+                    line.amount > 0.009 &&
+                    Math.abs(line.baseAmount - line.amount) > 0.009 ? (
+                    <span className="text-brand-muted font-normal">
+                      {" "}
+                      (de {formatCurrency(line.baseAmount)})
+                    </span>
+                  ) : null}
+                </span>
+              ))}
             </div>
           }
         />
       )}
-
-      <PaymentRow
-        label="Valor Original"
-        value={
-          <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-            {formatCurrency(subtotalValue)}
-          </span>
-        }
-      />
 
       {!hasOnlyServices && (
         <PaymentRow
@@ -1614,7 +1545,7 @@ export default function OrderDetailView({
         <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
           Total do Pedido
         </span>
-        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
+        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading">
           {formatCurrency(effectiveOrderTotal)}
         </span>
       </div>
@@ -1626,16 +1557,17 @@ export default function OrderDetailView({
       title="Detalhes do Pagamento"
       headerRight={
         hasMinimumPlan(planSlug, "crescer") ? (
-          <button
+          <Button
+            variant="link"
             onClick={loadFinancialBreakdown}
-            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+            className="shrink-0"
           >
             {financialLoading
               ? "Carregando..."
               : showFinancialBreakdown
                 ? "Ocultar lucro líquido"
                 : "Ver lucro líquido"}
-          </button>
+          </Button>
         ) : null
       }
       hasSeparator
