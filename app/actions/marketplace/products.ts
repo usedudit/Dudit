@@ -542,12 +542,14 @@ const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: stri
 
   const supabase = getAdminClient()
   const guess = citySlugWithoutState.split("-").join(" ")
+  // Use lowercase for state matching since DB may store lowercase (sp) vs uppercase (SP)
+  const stateLower = state.toLowerCase()
 
   // Fast path: exact (case-insensitive) match - 1 row instead of the whole state.
   const fast = await supabase
     .from("addresses")
     .select("city, state")
-    .eq("state", state)
+    .ilike("state", stateLower)
     .not("city", "is", null)
     .ilike("city", guess)
     .limit(1)
@@ -558,7 +560,7 @@ const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: stri
   const { data: addresses } = await supabase
     .from("addresses")
     .select("city, state")
-    .eq("state", state)
+    .ilike("state", stateLower)
 
   if (addresses && addresses.length > 0) {
     const targetSlug = citySlugWithoutState
@@ -571,7 +573,8 @@ const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: stri
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/\s+/g, "-")
-      return addrSlug === targetSlug && a.state === state
+      // Compare state case-insensitively
+      return addrSlug === targetSlug && a.state.toLowerCase() === stateLower
     })
     if (match) {
       return { city: match.city, state: match.state }
@@ -579,7 +582,7 @@ const resolveCityAndStateFromSlugDb = async (slug: string): Promise<{ city: stri
   }
 
   const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
-  return { city: fallbackCityName, state }
+  return { city: fallbackCityName, state: stateLower }
 }
 
 const resolveCityAndStateFromSlugCached = unstable_cache(

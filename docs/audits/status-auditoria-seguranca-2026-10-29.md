@@ -345,13 +345,21 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 **Limite residual:** a proteção evita sobrescrever uma versão concorrente, mas a gravação do pedido e a criação posterior de transações financeiras ainda não compartilham uma única transação PostgreSQL. Falhas entre essas etapas precisam de teste/reconciliação em homologação.
 
+### Liquidação financeira em lote — 01/11/2026
+
+**Achado confirmado:** `updateFinancialTransactionsInBatchAction` liquidava cada transação com INSERT no ledger de pagamentos, UPDATE da transação e delta do saldo em três chamadas independentes. Duas execuções podiam inserir pagamentos duplicados e aplicar o saldo duas vezes; uma falha intermediária também podia deixar o ledger, status e saldo divergentes. O cancelamento/reagendamento em lote também gravava após validar elegibilidade numa leitura anterior, sem condicionar a mutação ao status/versão lidos.
+
+**Correções locais:** liquidação em lote agora usa a RPC atômica e idempotente, inclusive para parcelas, e preserva a data de quitação solicitada. Foi criada a migration `20261101160000_atomic_batch_transaction_settlement_date.sql`, com uma wrapper restrita a `service_role` sobre a RPC existente. Cancelamento, reagendamento e alteração de categoria usam comparação do status/`updated_at` e só registram auditoria quando a gravação condicional afeta a transação. Os lotes limitam seleção a 200 IDs e rejeitam IDs inválidos ou repetidos.
+
+**Pendente:** aplicar a nova migration e validar quitação em lote concorrente e reconciliação ledger/status/saldo em homologação. O usuário informou que aplicou `20261101130000_atomic_close_cash_session.sql`; a aplicação segue sem confirmação independente nesta sessão.
+
 ### Leitura financeira por loja e fechamento de caixa — 01/11/2026
 
 **Achados confirmados:** `getFinanceAccountsAction` retornava contas e saldos de todas as lojas quando os chamadores omitiam `storeId`, embora isso ocorra no uso normal e o contexto ERP tenha uma loja ativa. As ações de caixa ativo e histórico tinham o mesmo comportamento sem `storeId`. O fechamento de caixa calculava saldo e contagens a partir de uma leitura anterior e depois atualizava a sessão; uma movimentação concorrente podia ser gravada no intervalo e ficar fora do fechamento. O saldo esperado também não subtraía reembolsos em dinheiro, embora a verificação de sangria já os subtraísse.
 
 **Correções locais:** a listagem de contas valida o parceiro ativo e, sem loja explícita, usa a loja ativa e inclui contas globais; a permissão da loja é checada antes da leitura. As leituras de sessão ativa e histórico também derivam a loja ativa, validam parceiro/loja e falham fechado se não houver loja resolvida. O saldo esperado e o fechamento subtraem reembolsos em dinheiro. O fechamento chama `erp_close_cash_session_atomic`, que bloqueia a sessão, recalcula o saldo e grava o fechamento enquanto mantém o lock usado pela RPC de movimentação; valida métodos de pagamento e valores de contagem e só pode ser executada por `service_role`. As RPCs existentes de sangria/reforço e estorno agora são chamadas com o cliente autenticado, necessário para `auth.uid()` nas funções `SECURITY INVOKER`; em erro, a ação falha fechado em vez de gravar por um caminho de fallback sem lock. O resumo é recarregado após o fechamento.
 
-**Migration pendente de aplicação:** `20261101130000_atomic_close_cash_session.sql`. Esta proteção só entra em vigor no ambiente quando a migration for aplicada. A integração e a sincronização de grants ainda precisam ser confirmadas.
+**Estado da migration:** o usuário informou que aplicou `20261101130000_atomic_close_cash_session.sql`; não confirmei o ledger, a função ou os grants no banco.
 
 **Teste em homologação pendente:** abrir uma sessão de caixa descartável, fechar enquanto uma movimentação é enviada em paralelo e confirmar que ou a movimentação entra antes do fechamento e nos totais, ou é recusada porque a sessão fechou. Também conferir que erros nas RPCs de movimentação não geram gravação parcial.
 

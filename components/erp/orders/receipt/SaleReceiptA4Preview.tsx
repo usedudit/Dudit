@@ -50,6 +50,11 @@ const SaleReceiptA4Preview = ({
 
     const isDeliveryFree = data.deliveryPayer === 'seller'
     const isDelivery = data.deliveryType !== "pickup" && Boolean(data.customerAddress)
+    const shouldShowOnlinePaymentNotice = Boolean(
+        data.isOnlinePayment &&
+        data.deliveryType === "delivery" &&
+        data.items.length > 0
+    )
     const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
     const pages = useMemo(() => {
@@ -247,7 +252,9 @@ const SaleReceiptA4Preview = ({
                                             {data.paymentLines && data.paymentLines.length > 0 ? (
                                                 data.paymentLines.map((line, i) => (
                                                     <div key={i} className="flex justify-between items-center text-xs">
-                                                        <span className="text-gray-600 font-medium">{line.label}</span>
+                                                        <span className={`${line.kind === "sinal" ? "text-brand-dark font-bold" : "text-gray-600 font-medium"}`}>
+                                                            {line.label}
+                                                        </span>
                                                         <span className="font-bold text-brand-dark">{formatCurrency(line.amount)}</span>
                                                     </div>
                                                 ))
@@ -259,7 +266,7 @@ const SaleReceiptA4Preview = ({
                                             )}
 
                                             {/* Aviso para pagamento online */}
-                                            {data.isOnlinePayment && (
+                                            {shouldShowOnlinePaymentNotice && (
                                                 <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5 mt-2">
                                                     Pedido pago online. Não cobrar do cliente
                                                 </div>

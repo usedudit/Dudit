@@ -4275,6 +4275,21 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
         if (!input.transactionIds || input.transactionIds.length === 0) {
             return { success: false as const, error: "Nenhuma transação selecionada." }
         }
+        if (input.transactionIds.length > 200) {
+            return { success: false as const, error: "Selecione no máximo 200 transações por lote." }
+        }
+        if (new Set(input.transactionIds).size !== input.transactionIds.length) {
+            return { success: false as const, error: "A seleção contém IDs repetidos ou inválidos." }
+        }
+        if (
+            input.actionType === "settle" &&
+            input.settlePaymentDate !== undefined &&
+            (!/^\d{4}-\d{2}-\d{2}$/.test(input.settlePaymentDate) ||
+                Number.isNaN(new Date(`${input.settlePaymentDate}T00:00:00.000Z`).getTime()) ||
+                new Date(`${input.settlePaymentDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== input.settlePaymentDate)
+        ) {
+            return { success: false as const, error: "Data de quitação inválida." }
+        }
 
         // Parse IDs: separate direct UUIDs and group- UUIDs
         const directIds: string[] = []
@@ -4294,11 +4309,18 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
         if (directIds.length === 0 && groupIds.length === 0) {
             return { success: false as const, error: "Nenhuma transação válida selecionada." }
         }
+        if (
+            directIds.length + groupIds.length !== input.transactionIds.length ||
+            new Set(directIds).size !== directIds.length ||
+            new Set(groupIds).size !== groupIds.length
+        ) {
+            return { success: false as const, error: "A seleção contém IDs inválidos ou repetidos." }
+        }
 
         // 1. Fetch current selected transactions
         let query = supabase
             .from("transactions")
-            .select("id, partner_id, status, installment_group_id, amount, original_amount, paid_amount, description, account_id, payment_type, payment_method_id, transaction_type, refund_kind, due_date, notes, store_id, category_id, category")
+            .select("id, partner_id, status, installment_group_id, amount, original_amount, paid_amount, description, account_id, payment_type, payment_method_id, transaction_type, refund_kind, due_date, notes, store_id, category_id, category, updated_at")
             .eq("partner_id", input.partnerId)
 
         if (directIds.length > 0 && groupIds.length > 0) {
@@ -4394,7 +4416,7 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                     const prevNotes = String(tx.notes || "").trim()
                     const nextNotes = prevNotes ? `${prevNotes}\n${cancellationLine}` : cancellationLine
 
-                    const { error: updErr } = await supabase
+                    const { data: updatedRow, error: updErr } = await supabase
                         .from("transactions")
                         .update({
                             status: "cancelled",
@@ -4403,8 +4425,13 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         })
                         .eq("id", tx.id)
                         .eq("partner_id", input.partnerId)
+                        .eq("status", "pending")
+                        .eq("updated_at", tx.updated_at)
+                        .select("id")
+                        .maybeSingle()
 
                     if (updErr) throw updErr
+                    if (!updatedRow) throw new Error("A transação mudou durante o lote e não foi cancelada.")
 
                     await logAuditEvent({
                         partnerId: input.partnerId,
@@ -4454,52 +4481,35 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         accountId: resolvedAccountId,
                         paymentMethodId: validPmId,
                     }, "edit")
-                    const paymentAmount = Math.max(0, Number(tx.amount || 0) - Number(tx.paid_amount || 0)) || Number(tx.amount || 0)
-                    if (paymentAmount <= 0) return
+                    const paymentAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+                    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+                        throw new Error("Valor pendente inválido para quitação.")
+                    }
 
                     const paymentDate = input.settlePaymentDate || nowIso.slice(0, 10)
-
-                    // Insert transaction_payment (without non-existent columns)
-                    const { error: insPaymentErr } = await supabase
-                        .from("transaction_payments")
-                        .insert({
-                            partner_id: input.partnerId,
-                            transaction_id: tx.id,
-                            store_id: tx.store_id || null,
-                            amount: paymentAmount,
-                            base_amount: paymentAmount,
-                            interest_amount: 0,
-                            discount_amount: 0,
-                            payment_method_id: validPmId || null,
-                            created_by_user_id: userId,
-                            created_at: nowIso,
-                        })
-
-                    if (insPaymentErr) throw insPaymentErr
-
-                    // Update transaction
-                    const { error: updTxErr } = await supabase
-                        .from("transactions")
-                        .update({
-                            status: "paid",
-                            paid_amount: tx.amount,
-                            payment_date: paymentDate,
-                            account_id: resolvedAccountId,
-                            payment_method_id: validPmId || null,
-                            payment_type: rawPm || tx.payment_type,
-                            updated_at: nowIso,
-                        })
-                        .eq("id", tx.id)
-                        .eq("partner_id", input.partnerId)
-
-                    if (updTxErr) throw updTxErr
-
-                    // Update balance
-                    await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
-                        transaction_type: tx.transaction_type,
-                        amount: paymentAmount,
-                        refund_kind: tx.refund_kind,
-                    })
+                    const requestId = crypto.randomUUID()
+                    const idempotencyKey = `txpayment:${tx.id}:${requestId}`
+                    const { data: paymentResult, error: paymentError } = await supabase.rpc(
+                        "record_transaction_payment_with_date_atomic",
+                        {
+                            p_partner_id: input.partnerId,
+                            p_transaction_id: tx.id,
+                            p_user_id: userId,
+                            p_payment_amount: paymentAmount,
+                            p_interest_amount: 0,
+                            p_discount_amount: 0,
+                            p_payment_method_id: validPmId || null,
+                            p_payment_type: rawPm || tx.payment_type,
+                            p_account_id: resolvedAccountId,
+                            p_idempotency_key: idempotencyKey,
+                            p_require_installment: Boolean(tx.installment_group_id),
+                            p_payment_date: paymentDate,
+                        },
+                    )
+                    if (paymentError || !(paymentResult as any)?.success) {
+                        throw new Error(paymentError?.message || "Não foi possível quitar a transação de forma segura.")
+                    }
+                    const paidNow = Number((paymentResult as any).paidNow || 0)
 
                     await logAuditEvent({
                         partnerId: input.partnerId,
@@ -4507,7 +4517,7 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         entityType: "transaction",
                         entityId: tx.id,
                         actionType: "updated",
-                        changeLines: [`Quitado em massa no valor de R$ ${paymentAmount.toFixed(2)} por ${actorName}`],
+                        changeLines: [`Quitado em massa no valor de R$ ${paidNow.toFixed(2)} por ${actorName}`],
                         source: "manual",
                         storeId: tx.store_id || null,
                     })
@@ -4522,7 +4532,7 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         nextDueDate = baseDate.toISOString().slice(0, 10)
                     }
 
-                    const { error: updErr } = await supabase
+                    const { data: updatedRow, error: updErr } = await supabase
                         .from("transactions")
                         .update({
                             due_date: nextDueDate,
@@ -4530,8 +4540,13 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         })
                         .eq("id", tx.id)
                         .eq("partner_id", input.partnerId)
+                        .eq("status", "pending")
+                        .eq("updated_at", tx.updated_at)
+                        .select("id")
+                        .maybeSingle()
 
                     if (updErr) throw updErr
+                    if (!updatedRow) throw new Error("A transação mudou durante o lote e não foi reagendada.")
 
                     await logAuditEvent({
                         partnerId: input.partnerId,
@@ -4548,7 +4563,7 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                     const validCatId = sanitizeUUID(input.categoryId)
                     const catName = input.categoryName?.trim() || "Geral"
 
-                    const { error: updErr } = await supabase
+                    const { data: updatedRow, error: updErr } = await supabase
                         .from("transactions")
                         .update({
                             category_id: validCatId || null,
@@ -4557,8 +4572,13 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                         })
                         .eq("id", tx.id)
                         .eq("partner_id", input.partnerId)
+                        .eq("status", tx.status)
+                        .eq("updated_at", tx.updated_at)
+                        .select("id")
+                        .maybeSingle()
 
                     if (updErr) throw updErr
+                    if (!updatedRow) throw new Error("A transação mudou durante o lote e a categoria não foi alterada.")
 
                     await logAuditEvent({
                         partnerId: input.partnerId,

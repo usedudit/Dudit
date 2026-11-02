@@ -275,7 +275,7 @@ export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ l
                 .from("addresses")
                 .select("latitude, longitude")
                 .ilike("city", dbCity)
-                .eq("state", dbState)
+                .ilike("state", dbState)
                 .not("latitude", "is", null)
                 .limit(1)
 
@@ -949,14 +949,15 @@ async function searchMarketplaceByCity(
 
     const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
     const dbCity = resolved?.city
-    const dbState = resolved?.state || state
+    // Use case-insensitive state matching since DB may store lowercase (sp) vs uppercase (SP)
+    const dbState = (resolved?.state || state).toLowerCase()
 
     if (query.trim()) {
         let partnersQuery = supabase
             .from("stores")
             .select("id, partner_id, addresses!store_id!inner(city, state, neighborhood, latitude, longitude)")
             .eq("is_active", true)
-            .eq("addresses.state", dbState)
+            .ilike("addresses.state", dbState)
 
         if (cidadeSlug.startsWith("estado-")) {
             // Rota de estado: não filtra por cidade
@@ -1035,7 +1036,7 @@ async function searchMarketplaceByCity(
             )
         `)
         .eq("is_active", true)
-        .eq("addresses.state", dbState)
+        .ilike("addresses.state", dbState)
 
     if (cidadeSlug.startsWith("estado-")) {
         // Rota de estado

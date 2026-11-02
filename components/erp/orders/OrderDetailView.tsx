@@ -64,9 +64,11 @@ import type { FinancialBreakdownData } from "@/lib/payments/order-financial-brea
 import {
   hasReceivedMpPayment,
   getOrderDepositSummary,
+  getDepositCheckoutMeta,
   DEPOSIT_STATUS_LABELS,
   shouldShowSinal,
   canPaySinal,
+  isSinalPaymentLeg,
 } from "@/lib/payments/order-financial-state";
 import {
   cleanOrderNotes,
@@ -476,9 +478,19 @@ export default function OrderDetailView({
   const paymentStatus = getPaymentStatusMeta(order.situation);
   const pendingSuffix =
     paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : "";
+  const depositSummary = getOrderDepositSummary(order);
+  const isDepositOrder = depositSummary.usesDeposit;
+  const rawDepositMeta = getDepositCheckoutMeta(order.checkout_fulfillment);
+  // For deposit orders the stored total can be only the sinal; use the full
+  // order value from the deposit metadata so balance/total are correct.
+  const effectiveOrderTotal =
+    depositSummary.usesDeposit && depositSummary.fullOrderTotal > 0.009
+      ? depositSummary.fullOrderTotal
+      : Number(order.total_amount || 0);
+  const paidAmountValue = Number(order.paid_amount || 0);
   const remainingPaymentAmount = Math.max(
     0,
-    Number(order.total_amount || 0) - Number(order.paid_amount || 0),
+    effectiveOrderTotal - paidAmountValue,
   );
   const hasPendingPayment =
     order.situation !== "paid" &&
@@ -488,11 +500,15 @@ export default function OrderDetailView({
   const breakdown = Array.isArray(order.payment_breakdown)
     ? order.payment_breakdown
     : [];
-  const paymentEntry = breakdown.find(
-    (e: any) => e?.method && !e?.checkoutPricing,
-  );
+  const paymentEntry =
+    breakdown.find(
+      (e: any) =>
+        e?.method &&
+        !e?.checkoutPricing &&
+        String(e?.paymentKind || "").toLowerCase() !== "deposit",
+    ) || breakdown.find((e: any) => e?.method && !e?.checkoutPricing);
   const installmentCount = paymentEntry?.installmentNumber || 1;
-  const mpLeg = breakdown.find(
+  const mpLegs = breakdown.filter(
     (e: any) =>
       String(e?.provider || "")
         .toLowerCase()
@@ -501,6 +517,12 @@ export default function OrderDetailView({
         .toLowerCase()
         .includes("mercado pago"),
   );
+  const mpLeg =
+    mpLegs.find(
+      (e: any) => String(e?.paymentKind || "").toLowerCase() !== "deposit",
+    ) ||
+    mpLegs.find((e: any) => Boolean(e?.cardLastDigits)) ||
+    mpLegs[0];
   const mpPaymentStatus = mpLeg?.paymentStatus;
   const mpPaymentStatusDetail = mpLeg?.paymentStatusDetail;
   const mpTotalFeeAmount = mpLeg?.feeAmount;
@@ -593,7 +615,16 @@ export default function OrderDetailView({
     const methodEntries = breakdown.filter(
       (b: any) => b?.method && !b?.checkoutPricing,
     );
-    const paidMethodEntries = methodEntries.filter(
+    const nonDepositMethodEntries = methodEntries.filter(
+      (b: any) => String(b?.paymentKind || "").toLowerCase() !== "deposit",
+    );
+    // Show the balance/regular payment method when one exists; the sinal
+    // method is displayed in its own row.
+    const labelEntries =
+      nonDepositMethodEntries.length > 0
+        ? nonDepositMethodEntries
+        : methodEntries;
+    const paidMethodEntries = labelEntries.filter(
       (b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009,
     );
     const paidLabels = Array.from(
@@ -614,15 +645,15 @@ export default function OrderDetailView({
     } else if (paidMethodEntries.length === 1) {
       pmLabel = paidMethodEntries[0]?.method || order.payment_method || null;
     } else {
-      pmLabel = methodEntries[0]?.method || order.payment_method || null;
+      pmLabel = labelEntries[0]?.method || order.payment_method || null;
     }
 
     if (
       pmLabel &&
-      methodEntries.length === 1 &&
-      methodEntries[0]?.installmentNumber > 1
+      labelEntries.length === 1 &&
+      labelEntries[0]?.installmentNumber > 1
     ) {
-      pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`;
+      pmLabel = `${pmLabel} - ${labelEntries[0].installmentNumber}x`;
     }
     return pmLabel;
   })();
@@ -826,11 +857,8 @@ export default function OrderDetailView({
   );
   const changeAmount =
     totalReceived > 0.005
-      ? Math.max(0, totalReceived - Number(order.total_amount || 0))
-      : Math.max(
-        0,
-        Number(order.paid_amount || 0) - Number(order.total_amount || 0),
-      );
+      ? Math.max(0, totalReceived - effectiveOrderTotal)
+      : Math.max(0, Number(order.paid_amount || 0) - effectiveOrderTotal);
   const cashEntry = Array.isArray(order.payment_breakdown)
     ? order.payment_breakdown.find((entry: any) => {
       const m = String(entry?.method || "")
@@ -858,7 +886,7 @@ export default function OrderDetailView({
     })();
   const cashChangeAmount =
     wantsChange && payWithAmount
-      ? payWithAmount - Number(order.total_amount || 0)
+      ? payWithAmount - effectiveOrderTotal
       : 0;
 
   const cleanNotes = cleanOrderNotes(order.notes);
@@ -898,11 +926,6 @@ export default function OrderDetailView({
       sum + Number(item.subtotal || item.product_price * item.quantity || 0),
     0,
   );
-  const isDepositOrder = Boolean(
-    order?.checkout_fulfillment?.depositCheckout?.payDepositOnly ||
-    order?.checkout_fulfillment?.depositCheckout?.usesDeposit,
-  );
-  const depositSummary = getOrderDepositSummary(order);
   const hasItemDiscount =
     isMarketplaceOrder &&
     !isDepositOrder &&
@@ -1140,6 +1163,486 @@ export default function OrderDetailView({
       </span>
       <div className="text-right">{value}</div>
     </div>
+  );
+
+  const receivedPaymentLegs = paymentBreakdown.filter(
+    (entry: any) =>
+      Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009,
+  );
+  const sinalPaymentLegs = receivedPaymentLegs.filter((entry: any) =>
+    isSinalPaymentLeg(entry, depositSummary),
+  );
+  const nonSinalPaymentLegs = receivedPaymentLegs.filter(
+    (entry: any) => !isSinalPaymentLeg(entry, depositSummary),
+  );
+  const legsMethodLabel = (legs: any[]) =>
+    Array.from(
+      new Set(
+        legs
+          .map((entry: any) => {
+            const method = String(entry?.method || "").trim();
+            return method ? formatPaymentMethodLabel(method, null) : "";
+          })
+          .filter(Boolean),
+      ),
+    ).join(", ");
+  const sinalMethodLabel =
+    legsMethodLabel(sinalPaymentLegs) ||
+    String(depositSummary.paymentProvider || order.payment_provider || "");
+  const balanceMethodLabel = legsMethodLabel(nonSinalPaymentLegs);
+  const sinalPaidAt = String(
+    rawDepositMeta.depositPaidAt ||
+    sinalPaymentLegs.find((entry: any) => entry?.manuallyConfirmedAt)
+      ?.manuallyConfirmedAt ||
+    (depositSummary.sinalPaid ? order.mp_date_approved : "") ||
+    "",
+  );
+  const balancePaidAt = String(
+    rawDepositMeta.balancePaidAt ||
+    nonSinalPaymentLegs.find((entry: any) => entry?.manuallyConfirmedAt)
+      ?.manuallyConfirmedAt ||
+    (depositSummary.remainingBalance <= 0.009
+      ? order.paid_at || order.mp_date_approved
+      : "") ||
+    "",
+  );
+  const showMethodValues =
+    nonSinalPaymentLegs.length > 0 &&
+    (nonSinalPaymentLegs.length > 1 ||
+      (nonSinalPaymentLegs.length === 1 &&
+        (isDepositOrder || remainingPaymentAmount > 0.009)));
+
+  const paymentStatusBadge = (paid: boolean) => (
+    <span
+      className={`text-xs font-semibold px-1.5 py-0.5 rounded ${paid ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
+    >
+      {paid ? "pago" : "pendente"}
+    </span>
+  );
+
+  const renderPaymentDetailsRows = () => (
+    <div className="space-y-3">
+      <PaymentRow
+        label="Método de Pagamento"
+        value={renderPaymentMethodValue()}
+      />
+
+      {shouldShowSinal(depositSummary) &&
+        depositSummary.depositAmount > 0.009 && (
+          <PaymentRow
+            label="Sinal"
+            value={
+              <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex flex-col items-end gap-0.5">
+                <span className="flex items-center gap-1.5">
+                  {formatCurrency(depositSummary.depositAmount)}
+                  {paymentStatusBadge(depositSummary.sinalPaid)}
+                </span>
+                <span className="text-xs font-normal text-brand-inactive-text dark:text-dark-body">
+                  {sinalMethodLabel || "Método não informado"}
+                  {depositSummary.sinalPaid && sinalPaidAt
+                    ? ` • ${formatDateTime(sinalPaidAt)}`
+                    : ""}
+                </span>
+              </span>
+            }
+          />
+        )}
+
+      {isDepositOrder && (
+        <PaymentRow
+          label="Saldo"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex flex-col items-end gap-0.5">
+              <span className="flex items-center gap-1.5">
+                {formatCurrency(depositSummary.remainingBalance)}
+                {paymentStatusBadge(
+                  depositSummary.remainingBalance <= 0.009,
+                )}
+              </span>
+              {(balanceMethodLabel || balancePaidAt) && (
+                <span className="text-xs font-normal text-brand-inactive-text dark:text-dark-body">
+                  {balanceMethodLabel ||
+                    (depositSummary.remainingBalance <= 0.009
+                      ? "Método não informado"
+                      : "")}
+                  {depositSummary.remainingBalance <= 0.009 && balancePaidAt
+                    ? `${balanceMethodLabel ? " • " : ""}${formatDateTime(balancePaidAt)}`
+                    : ""}
+                </span>
+              )}
+            </span>
+          }
+        />
+      )}
+
+      {isMercadoPago && (
+        <>
+          {mpPaymentStatus && (
+            <PaymentRow
+              label="Status do Pagamento (MP)"
+              value={
+                <span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
+                  {translateMpStatus(mpPaymentStatus)}
+                  {mpPaymentStatusDetail &&
+                    translateMpStatusDetail(mpPaymentStatusDetail) !==
+                    translateMpStatus(mpPaymentStatus)
+                    ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})`
+                    : ""}
+                  {order.mp_date_approved && (
+                    <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">
+                      em {formatDateTime(order.mp_date_approved)}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          )}
+          {mpLeg?.cardLastDigits &&
+            (() => {
+              const brand = getCardBrandInfo(
+                mpLeg.mpPaymentMethodId || mpLeg.paymentMethodId || null,
+              );
+              return (
+                <PaymentRow
+                  label="Cartão"
+                  value={
+                    <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-1.5 justify-end">
+                      {brand && (
+                        <img
+                          src={`https://img.dudit.com.br/static/icons/payments/${brand.icon}`}
+                          alt={brand.label}
+                          className="w-5 h-4 object-contain"
+                        />
+                      )}
+                      <span>•••• {mpLeg.cardLastDigits}</span>
+                    </span>
+                  }
+                />
+              );
+            })()}
+          {(order.mp_installments || installmentCount) > 1 && (
+            <PaymentRow
+              label="Parcelas"
+              value={
+                <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
+                  <span>
+                    {order.mp_installments || installmentCount}x de{" "}
+                    {formatCurrency(
+                      mpLeg?.installmentAmount ||
+                      Number(mpLeg?.amount || 0) /
+                      (order.mp_installments || installmentCount),
+                    )}
+                  </span>
+                  <button
+                    onClick={() => setShowInstallmentModal(true)}
+                    className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                  >
+                    Ver parcelas
+                  </button>
+                </span>
+              }
+            />
+          )}
+          {showFinancialBreakdown && mpTotalFeeAmount != null && (
+            <PaymentRow
+              label="Taxa do Mercado Pago"
+              value={
+                <span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
+                  {formatCurrency(mpTotalFeeAmount)}
+                </span>
+              }
+            />
+          )}
+          {showFinancialBreakdown &&
+            Array.isArray(mpFeeDetails) &&
+            mpFeeDetails.length > 0 &&
+            mpFeeDetails.map((fd, i) => {
+              const feeTypeLabel =
+                fd.type === "mercadopago_fee"
+                  ? "Taxa MP"
+                  : fd.type === "installment_fee"
+                    ? "Taxa de Parcelamento"
+                    : fd.type === "coupon_fee"
+                      ? "Taxa de Cupom"
+                      : fd.type === "application_fee"
+                        ? "Taxa de Aplicação"
+                        : fd.type || `Taxa ${i + 1}`;
+              return (
+                <PaymentRow
+                  key={i}
+                  label={feeTypeLabel}
+                  value={
+                    <span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
+                      {formatCurrency(fd.amount)}
+                    </span>
+                  }
+                />
+              );
+            })}
+          {showFinancialBreakdown && mpNetReceivedAmount != null && (
+            <PaymentRow
+              label="Valor Líquido Recebido"
+              value={
+                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                  {formatCurrency(mpNetReceivedAmount)}
+                </span>
+              }
+            />
+          )}
+        </>
+      )}
+
+      {showMethodValues && (
+        <PaymentRow
+          label="Valores por meio"
+          value={
+            <div className="flex flex-col gap-1">
+              {nonSinalPaymentLegs.map((entry: any, index: number) => {
+                const received = Number(
+                  entry.amountReceived ?? entry.amount ?? 0,
+                );
+                const baseAmount = Number(entry.amount || 0);
+                const displayAmount =
+                  received > 0.009 ? received : baseAmount;
+                return (
+                  <span
+                    key={`${entry.method}-${index}`}
+                    className="text-brand-dark dark:text-dark-heading font-bold text-sm"
+                  >
+                    {formatPaymentMethodLabel(entry.method, null)}:{" "}
+                    {formatCurrency(displayAmount)}
+                    {baseAmount > 0.009 &&
+                      received > 0.009 &&
+                      Math.abs(baseAmount - received) > 0.009 ? (
+                      <span className="text-brand-muted font-normal">
+                        {" "}
+                        (de {formatCurrency(baseAmount)})
+                      </span>
+                    ) : null}
+                  </span>
+                );
+              })}
+            </div>
+          }
+        />
+      )}
+
+      <PaymentRow
+        label="Valor Original"
+        value={
+          <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+            {formatCurrency(subtotalValue)}
+          </span>
+        }
+      />
+
+      {!hasOnlyServices && (
+        <PaymentRow
+          label="Tipo de Entrega"
+          value={
+            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+              {order.delivery_type === "pickup"
+                ? "Retirada no local"
+                : "Entrega no endereço"}
+            </span>
+          }
+        />
+      )}
+
+      {(Number(order.delivery_fee || 0) > 0 ||
+        order.delivery_payer === "seller" ||
+        Number(
+          order.delivery_breakdown?.originalFee ||
+          order.delivery_breakdown?.deliverySubsidy ||
+          0,
+        ) > 0) && (
+          <PaymentRow
+            label="Valor da Entrega"
+            value={
+              <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
+                {Number(order.delivery_fee || 0) > 0
+                  ? formatCurrency(order.delivery_fee)
+                  : formatCurrency(
+                    Number(
+                      order.delivery_breakdown?.originalFee ||
+                      order.delivery_breakdown?.deliverySubsidy ||
+                      0,
+                    ),
+                  )}
+                {Number(order.delivery_fee || 0) === 0 && (
+                  <span className="text-brand-green">
+                    - Frete Grátis (Subsidiado pela loja)
+                  </span>
+                )}
+                {Number(order.delivery_fee || 0) > 0 &&
+                  order.delivery_payer === "seller" && (
+                    <span className="text-brand-orange">
+                      - Subsidiado pela loja
+                    </span>
+                  )}
+                {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
+                  <span className="text-xs text-brand-muted font-normal">
+                    ({order.delivery_breakdown.distanceKm} km)
+                  </span>
+                )}
+              </span>
+            }
+          />
+        )}
+
+      {Number(order.additional_costs || 0) > 0 && (
+        <PaymentRow
+          label="Outros Custos"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+              {formatCurrency(order.additional_costs)}
+            </span>
+          }
+        />
+      )}
+
+      {Number(order.discount_value || 0) > 0 && (
+        <PaymentRow
+          label="Desconto do Pedido"
+          value={
+            <span className="text-brand-green font-bold">
+              - {formatCurrency(order.discount_value)}
+            </span>
+          }
+        />
+      )}
+      {couponDiscountAmount > 0 && (
+        <PaymentRow
+          label="Desconto por Cupom"
+          value={
+            <span className="text-brand-green font-bold">
+              - {formatCurrency(couponDiscountAmount)}
+            </span>
+          }
+        />
+      )}
+      {paymentMethodDiscountAmount > 0 && (
+        <PaymentRow
+          label={
+            order.payment_method === "exchange"
+              ? "Crédito de troca"
+              : order.payment_method === "store_credit"
+                ? "Vale-compra"
+                : "Desconto do Método"
+          }
+          value={
+            <span className="text-brand-green font-bold">
+              - {formatCurrency(paymentMethodDiscountAmount)}
+            </span>
+          }
+        />
+      )}
+      {!hasDetailedAmounts && effectivePaymentMethodExtraAmount > 0 && (
+        <PaymentRow
+          label="Taxa do Método"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+              + {formatCurrency(effectivePaymentMethodExtraAmount)}
+            </span>
+          }
+        />
+      )}
+      {hasDetailedAmounts && detailedInterestAmount > 0 && (
+        <PaymentRow
+          label="Juros do Método"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+              + {formatCurrency(detailedInterestAmount)}
+            </span>
+          }
+        />
+      )}
+      {hasDetailedAmounts && detailedFeeAmount > 0 && (
+        <PaymentRow
+          label="Taxa do Método"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+              + {formatCurrency(detailedFeeAmount)}
+            </span>
+          }
+        />
+      )}
+      {hasDetailedAmounts && detailedFixedFeeAmount > 0 && (
+        <PaymentRow
+          label="Custo do Método"
+          value={
+            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+              + {formatCurrency(detailedFixedFeeAmount)}
+            </span>
+          }
+        />
+      )}
+
+      {changeAmount > 0.009 && (
+        <PaymentRow
+          label="Troco"
+          value={
+            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+              {formatCurrency(changeAmount)}
+            </span>
+          }
+        />
+      )}
+      {wantsChange && payWithAmount !== null && (
+        <PaymentRow
+          label="Troco Solicitado"
+          value={
+            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+              {formatCurrency(cashChangeAmount)} (para{" "}
+              {formatCurrency(payWithAmount)})
+            </span>
+          }
+        />
+      )}
+      {order.is_refunded && Number(order.refunded_amount || 0) > 0 && (
+        <PaymentRow
+          label="Valor Reembolsado"
+          value={
+            <span className="text-brand-red font-bold">
+              - {formatCurrency(order.refunded_amount || 0)}
+            </span>
+          }
+        />
+      )}
+
+      <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
+          Total do Pedido
+        </span>
+        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
+          {formatCurrency(effectiveOrderTotal)}
+        </span>
+      </div>
+    </div>
+  );
+
+  const renderPaymentDetailsSection = (className?: string) => (
+    <FormSection
+      title="Detalhes do Pagamento"
+      headerRight={
+        hasMinimumPlan(planSlug, "crescer") ? (
+          <button
+            onClick={loadFinancialBreakdown}
+            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+          >
+            {financialLoading
+              ? "Carregando..."
+              : showFinancialBreakdown
+                ? "Ocultar lucro líquido"
+                : "Ver lucro líquido"}
+          </button>
+        ) : null
+      }
+      hasSeparator
+      className={className}
+    >
+      {renderPaymentDetailsRows()}
+    </FormSection>
   );
 
   return (
@@ -1711,477 +2214,7 @@ export default function OrderDetailView({
                             </div>
                           )}
 
-                          <FormSection
-                            title="Detalhes do Pagamento"
-                            headerRight={
-                              hasMinimumPlan(planSlug, "crescer") ? (
-                                <button
-                                  onClick={loadFinancialBreakdown}
-                                  className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                >
-                                  {financialLoading
-                                    ? "Carregando..."
-                                    : showFinancialBreakdown
-                                      ? "Ocultar lucro líquido"
-                                      : "Ver lucro líquido"}
-                                </button>
-                              ) : null
-                            }
-                            hasSeparator
-                          >
-                            <div className="space-y-3">
-                              <PaymentRow
-                                label="Método de Pagamento"
-                                value={renderPaymentMethodValue()}
-                              />
-
-                              {shouldShowSinal(depositSummary) &&
-                                depositSummary.depositAmount > 0.009 && (
-                                  <PaymentRow
-                                    label="Sinal"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                        {formatCurrency(
-                                          depositSummary.depositAmount,
-                                        )}
-                                        <span className="text-brand-border dark:text-dark-border">
-                                          |
-                                        </span>
-                                        <span
-                                          className={`inline-flex items-center gap-1 font-bold ${depositSummary.sinalPaid ? "text-brand-green" : "text-brand-orange"}`}
-                                        >
-                                          {depositSummary.sinalPaid ? (
-                                            <CheckCircleIcon
-                                              size={14}
-                                              className="shrink-0 text-brand-green"
-                                            />
-                                          ) : (
-                                            <ClockIcon
-                                              size={14}
-                                              className="shrink-0 text-brand-orange"
-                                            />
-                                          )}
-                                        </span>
-                                      </span>
-                                    }
-                                  />
-                                )}
-
-                              {isMercadoPago && (
-                                <>
-                                  {mpPaymentStatus && (
-                                    <PaymentRow
-                                      label="Status do Pagamento (MP)"
-                                      value={
-                                        <span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
-                                          {translateMpStatus(mpPaymentStatus)}
-                                          {mpPaymentStatusDetail &&
-                                            translateMpStatusDetail(
-                                              mpPaymentStatusDetail,
-                                            ) !==
-                                            translateMpStatus(mpPaymentStatus)
-                                            ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})`
-                                            : ""}
-                                          {order.mp_date_approved && (
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">
-                                              em{" "}
-                                              {formatDateTime(
-                                                order.mp_date_approved,
-                                              )}
-                                            </span>
-                                          )}
-                                        </span>
-                                      }
-                                    />
-                                  )}
-                                  {mpLeg?.cardLastDigits &&
-                                    (() => {
-                                      const brand = getCardBrandInfo(
-                                        mpLeg.mpPaymentMethodId ||
-                                        mpLeg.paymentMethodId ||
-                                        null,
-                                      );
-                                      return (
-                                        <PaymentRow
-                                          label="Cartão"
-                                          value={
-                                            <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-1.5 justify-end">
-                                              {brand && (
-                                                <img
-                                                  src={`https://img.dudit.com.br/static/icons/payments/${brand.icon}`}
-                                                  alt={brand.label}
-                                                  className="w-5 h-4 object-contain"
-                                                />
-                                              )}
-                                              <span>
-                                                •••• {mpLeg.cardLastDigits}
-                                              </span>
-                                            </span>
-                                          }
-                                        />
-                                      );
-                                    })()}
-                                  {installmentCount > 1 && (
-                                    <PaymentRow
-                                      label="Parcelas"
-                                      value={
-                                        <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
-                                          <span>
-                                            {installmentCount}x de{" "}
-                                            {formatCurrency(
-                                              mpLeg?.installmentAmount ||
-                                              Number(mpLeg?.amount || 0) /
-                                              installmentCount,
-                                            )}
-                                          </span>
-                                          <button
-                                            onClick={() =>
-                                              setShowInstallmentModal(true)
-                                            }
-                                            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                          >
-                                            Ver parcelas
-                                          </button>
-                                        </span>
-                                      }
-                                    />
-                                  )}
-                                  {showFinancialBreakdown &&
-                                    mpTotalFeeAmount != null && (
-                                      <PaymentRow
-                                        label="Taxa do Mercado Pago"
-                                        value={
-                                          <span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
-                                            {formatCurrency(mpTotalFeeAmount)}
-                                          </span>
-                                        }
-                                      />
-                                    )}
-                                  {showFinancialBreakdown &&
-                                    Array.isArray(mpFeeDetails) &&
-                                    mpFeeDetails.length > 0 &&
-                                    mpFeeDetails.map((fd, i) => {
-                                      const feeTypeLabel =
-                                        fd.type === "mercadopago_fee"
-                                          ? "Taxa MP"
-                                          : fd.type === "installment_fee"
-                                            ? "Taxa de Parcelamento"
-                                            : fd.type === "coupon_fee"
-                                              ? "Taxa de Cupom"
-                                              : fd.type === "application_fee"
-                                                ? "Taxa de Aplicação"
-                                                : fd.type || `Taxa ${i + 1}`;
-                                      return (
-                                        <PaymentRow
-                                          key={i}
-                                          label={feeTypeLabel}
-                                          value={
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
-                                              {formatCurrency(fd.amount)}
-                                            </span>
-                                          }
-                                        />
-                                      );
-                                    })}
-                                  {showFinancialBreakdown &&
-                                    mpNetReceivedAmount != null && (
-                                      <PaymentRow
-                                        label="Valor Líquido Recebido"
-                                        value={
-                                          <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                            {formatCurrency(
-                                              mpNetReceivedAmount,
-                                            )}
-                                          </span>
-                                        }
-                                      />
-                                    )}
-                                </>
-                              )}
-
-                              {(() => {
-                                const paidBreakdown = paymentBreakdown.filter(
-                                  (entry: any) =>
-                                    Number(
-                                      entry.amountReceived ?? entry.amount ?? 0,
-                                    ) > 0.009,
-                                );
-                                if (
-                                  paidBreakdown.length <= 1 &&
-                                  !(
-                                    paidBreakdown.length === 1 &&
-                                    Number(order.paid_amount || 0) > 0.009 &&
-                                    remainingPaymentAmount > 0.009
-                                  )
-                                )
-                                  return null;
-                                return (
-                                  <PaymentRow
-                                    label="Valores por meio"
-                                    value={
-                                      <div className="flex flex-col gap-1">
-                                        {paidBreakdown.map(
-                                          (entry: any, index: number) => {
-                                            const received = Number(
-                                              entry.amountReceived ??
-                                              entry.amount ??
-                                              0,
-                                            );
-                                            const baseAmount = Number(
-                                              entry.amount || 0,
-                                            );
-                                            const displayAmount =
-                                              received > 0.009
-                                                ? received
-                                                : baseAmount;
-                                            return (
-                                              <span
-                                                key={`${entry.method}-${index}`}
-                                                className="text-brand-dark dark:text-dark-heading font-bold text-sm"
-                                              >
-                                                {formatPaymentMethodLabel(
-                                                  entry.method,
-                                                  null,
-                                                )}
-                                                :{" "}
-                                                {formatCurrency(displayAmount)}
-                                                {baseAmount > 0.009 &&
-                                                  received > 0.009 &&
-                                                  Math.abs(
-                                                    baseAmount - received,
-                                                  ) > 0.009 ? (
-                                                  <span className="text-brand-muted font-normal">
-                                                    {" "}
-                                                    (de{" "}
-                                                    {formatCurrency(baseAmount)}
-                                                    )
-                                                  </span>
-                                                ) : null}
-                                              </span>
-                                            );
-                                          },
-                                        )}
-                                      </div>
-                                    }
-                                  />
-                                );
-                              })()}
-
-                              <PaymentRow
-                                label="Valor Original"
-                                value={
-                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                    {formatCurrency(subtotalValue)}
-                                  </span>
-                                }
-                              />
-
-                              {!hasOnlyServices && (
-                                <PaymentRow
-                                  label="Tipo de Entrega"
-                                  value={
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                      {order.delivery_type === "pickup"
-                                        ? "Retirada no local"
-                                        : "Entrega no endereço"}
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                              {(Number(order.delivery_fee || 0) > 0 ||
-                                order.delivery_payer === "seller" ||
-                                Number(
-                                  order.delivery_breakdown?.originalFee ||
-                                  order.delivery_breakdown?.deliverySubsidy ||
-                                  0,
-                                ) > 0) && (
-                                  <PaymentRow
-                                    label="Valor da Entrega"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
-                                        {Number(order.delivery_fee || 0) > 0
-                                          ? formatCurrency(order.delivery_fee)
-                                          : formatCurrency(
-                                            Number(
-                                              order.delivery_breakdown
-                                                ?.originalFee ||
-                                              order.delivery_breakdown
-                                                ?.deliverySubsidy ||
-                                              0,
-                                            ),
-                                          )}
-                                        {Number(order.delivery_fee || 0) ===
-                                          0 && (
-                                            <span className="text-brand-green">
-                                              - Frete Grátis (Subsidiado pela loja)
-                                            </span>
-                                          )}
-                                        {Number(order.delivery_fee || 0) > 0 &&
-                                          order.delivery_payer === "seller" && (
-                                            <span className="text-brand-orange">
-                                              - Subsidiado pela loja
-                                            </span>
-                                          )}
-                                        {Number(
-                                          order.delivery_breakdown?.distanceKm ||
-                                          0,
-                                        ) > 0 && (
-                                            <span className="text-xs text-brand-muted font-normal">
-                                              ({order.delivery_breakdown.distanceKm}{" "}
-                                              km)
-                                            </span>
-                                          )}
-                                      </span>
-                                    }
-                                  />
-                                )}
-
-                              {Number(order.additional_costs || 0) > 0 && (
-                                <PaymentRow
-                                  label="Outros Custos"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                      {formatCurrency(order.additional_costs)}
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                              {Number(order.discount_value || 0) > 0 && (
-                                <PaymentRow
-                                  label="Desconto do Pedido"
-                                  value={
-                                    <span className="text-brand-green font-bold">
-                                      - {formatCurrency(order.discount_value)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {couponDiscountAmount > 0 && (
-                                <PaymentRow
-                                  label="Desconto por Cupom"
-                                  value={
-                                    <span className="text-brand-green font-bold">
-                                      - {formatCurrency(couponDiscountAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {paymentMethodDiscountAmount > 0 && (
-                                <PaymentRow
-                                  label={
-                                    order.payment_method === "exchange"
-                                      ? "Crédito de troca"
-                                      : order.payment_method === "store_credit"
-                                        ? "Vale-compra"
-                                        : "Desconto do Método"
-                                  }
-                                  value={
-                                    <span className="text-brand-green font-bold">
-                                      -{" "}
-                                      {formatCurrency(
-                                        paymentMethodDiscountAmount,
-                                      )}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {!hasDetailedAmounts &&
-                                effectivePaymentMethodExtraAmount > 0 && (
-                                  <PaymentRow
-                                    label="Taxa do Método"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                        +{" "}
-                                        {formatCurrency(
-                                          effectivePaymentMethodExtraAmount,
-                                        )}
-                                      </span>
-                                    }
-                                  />
-                                )}
-                              {hasDetailedAmounts &&
-                                detailedInterestAmount > 0 && (
-                                  <PaymentRow
-                                    label="Juros do Método"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                        +{" "}
-                                        {formatCurrency(detailedInterestAmount)}
-                                      </span>
-                                    }
-                                  />
-                                )}
-                              {hasDetailedAmounts && detailedFeeAmount > 0 && (
-                                <PaymentRow
-                                  label="Taxa do Método"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                      + {formatCurrency(detailedFeeAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {hasDetailedAmounts &&
-                                detailedFixedFeeAmount > 0 && (
-                                  <PaymentRow
-                                    label="Custo do Método"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                        +{" "}
-                                        {formatCurrency(detailedFixedFeeAmount)}
-                                      </span>
-                                    }
-                                  />
-                                )}
-
-                              {changeAmount > 0.009 && (
-                                <PaymentRow
-                                  label="Troco"
-                                  value={
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                      {formatCurrency(changeAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {wantsChange && payWithAmount !== null && (
-                                <PaymentRow
-                                  label="Troco Solicitado"
-                                  value={
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                      {formatCurrency(cashChangeAmount)} (para{" "}
-                                      {formatCurrency(payWithAmount)})
-                                    </span>
-                                  }
-                                />
-                              )}
-                              {order.is_refunded &&
-                                Number(order.refunded_amount || 0) > 0 && (
-                                  <PaymentRow
-                                    label="Valor Reembolsado"
-                                    value={
-                                      <span className="text-brand-red font-bold">
-                                        -{" "}
-                                        {formatCurrency(
-                                          order.refunded_amount || 0,
-                                        )}
-                                      </span>
-                                    }
-                                  />
-                                )}
-
-                              <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
-                                  Total do Pedido
-                                </span>
-                                <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
-                                  {formatCurrency(order.total_amount)}
-                                </span>
-                              </div>
-                            </div>
-                          </FormSection>
+                          {renderPaymentDetailsSection()}
                         </div>
 
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
@@ -2679,458 +2712,7 @@ export default function OrderDetailView({
                         )}
 
                         {/* 5. Detalhes do Pagamento */}
-                        <FormSection
-                          title="Detalhes do Pagamento"
-                          headerRight={
-                            hasMinimumPlan(planSlug, "crescer") ? (
-                              <button
-                                onClick={loadFinancialBreakdown}
-                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                              >
-                                {financialLoading
-                                  ? "Carregando..."
-                                  : showFinancialBreakdown
-                                    ? "Ocultar lucro líquido"
-                                    : "Ver lucro líquido"}
-                              </button>
-                            ) : null
-                          }
-                          hasSeparator
-                          className="mt-0"
-                        >
-                          <div className="space-y-3">
-                            <PaymentRow
-                              label="Método de Pagamento"
-                              value={renderPaymentMethodValue()}
-                            />
-
-                            {shouldShowSinal(depositSummary) &&
-                              depositSummary.depositAmount > 0.009 && (
-                                <PaymentRow
-                                  label="Sinal"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                      {formatCurrency(
-                                        depositSummary.depositAmount,
-                                      )}
-                                      <span
-                                        className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.sinalPaid ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
-                                      >
-                                        {depositSummary.sinalPaid
-                                          ? "pago"
-                                          : "pendente"}
-                                      </span>
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                            {isDepositOrder && depositSummary.sinalPaid && (
-                              <PaymentRow
-                                label="Saldo"
-                                value={
-                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                    {formatCurrency(
-                                      depositSummary.remainingBalance,
-                                    )}
-                                    <span
-                                      className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.remainingBalance <= 0.009 ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}
-                                    >
-                                      {depositSummary.remainingBalance <= 0.009
-                                        ? "pago"
-                                        : "pendente"}
-                                    </span>
-                                  </span>
-                                }
-                              />
-                            )}
-
-                            {isMercadoPago && (
-                              <>
-                                {order.mp_payment_status && (
-                                  <PaymentRow
-                                    label="Status do Pagamento (MP)"
-                                    value={
-                                      <span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
-                                        {translateMpStatus(
-                                          order.mp_payment_status,
-                                        )}
-                                        {order.mp_payment_status_detail &&
-                                          translateMpStatusDetail(
-                                            order.mp_payment_status_detail,
-                                          ) !==
-                                          translateMpStatus(
-                                            order.mp_payment_status,
-                                          )
-                                          ? ` (${translateMpStatusDetail(order.mp_payment_status_detail)})`
-                                          : ""}
-                                        {order.mp_date_approved && (
-                                          <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">
-                                            em{" "}
-                                            {formatDateTime(
-                                              order.mp_date_approved,
-                                            )}
-                                          </span>
-                                        )}
-                                      </span>
-                                    }
-                                  />
-                                )}
-                                {mpLeg?.cardLastDigits &&
-                                  (() => {
-                                    const brand = getCardBrandInfo(
-                                      mpLeg.mpPaymentMethodId ||
-                                      mpLeg.paymentMethodId ||
-                                      null,
-                                    );
-                                    return (
-                                      <PaymentRow
-                                        label="Cartão"
-                                        value={
-                                          <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-1.5 justify-end">
-                                            {brand && (
-                                              <img
-                                                src={`https://img.dudit.com.br/static/icons/payments/${brand.icon}`}
-                                                alt={brand.label}
-                                                className="w-5 h-4 object-contain"
-                                              />
-                                            )}
-                                            <span>
-                                              •••• {mpLeg.cardLastDigits}
-                                            </span>
-                                          </span>
-                                        }
-                                      />
-                                    );
-                                  })()}
-                                {(order.mp_installments || installmentCount) >
-                                  1 && (
-                                    <PaymentRow
-                                      label="Parcelas"
-                                      value={
-                                        <span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
-                                          <span>
-                                            {order.mp_installments ||
-                                              installmentCount}
-                                            x de{" "}
-                                            {formatCurrency(
-                                              mpLeg?.installmentAmount ||
-                                              Number(mpLeg?.amount || 0) /
-                                              (order.mp_installments ||
-                                                installmentCount),
-                                            )}
-                                          </span>
-                                          <button
-                                            onClick={() =>
-                                              setShowInstallmentModal(true)
-                                            }
-                                            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                          >
-                                            Ver parcelas
-                                          </button>
-                                        </span>
-                                      }
-                                    />
-                                  )}
-                                {showFinancialBreakdown &&
-                                  order.mp_total_fee_amount != null && (
-                                    <PaymentRow
-                                      label="Taxa do Mercado Pago"
-                                      value={
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
-                                          {formatCurrency(
-                                            order.mp_total_fee_amount,
-                                          )}
-                                        </span>
-                                      }
-                                    />
-                                  )}
-                                {showFinancialBreakdown &&
-                                  order.mp_net_received_amount != null && (
-                                    <PaymentRow
-                                      label="Valor Líquido Recebido"
-                                      value={
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                          {formatCurrency(
-                                            order.mp_net_received_amount,
-                                          )}
-                                        </span>
-                                      }
-                                    />
-                                  )}
-                              </>
-                            )}
-
-                            {(() => {
-                              const paidBreakdown = paymentBreakdown.filter(
-                                (entry: any) =>
-                                  Number(
-                                    entry.amountReceived ?? entry.amount ?? 0,
-                                  ) > 0.009,
-                              );
-                              if (
-                                paidBreakdown.length <= 1 &&
-                                !(
-                                  paidBreakdown.length === 1 &&
-                                  Number(order.paid_amount || 0) > 0.009 &&
-                                  remainingPaymentAmount > 0.009
-                                )
-                              )
-                                return null;
-                              return (
-                                <PaymentRow
-                                  label="Valores por meio"
-                                  value={
-                                    <div className="flex flex-col gap-1">
-                                      {paidBreakdown.map(
-                                        (entry: any, index: number) => {
-                                          const received = Number(
-                                            entry.amountReceived ??
-                                            entry.amount ??
-                                            0,
-                                          );
-                                          const baseAmount = Number(
-                                            entry.amount || 0,
-                                          );
-                                          const displayAmount =
-                                            received > 0.009
-                                              ? received
-                                              : baseAmount;
-                                          return (
-                                            <span
-                                              key={`${entry.method}-${index}`}
-                                              className="text-brand-dark dark:text-dark-heading font-bold text-sm"
-                                            >
-                                              {formatPaymentMethodLabel(
-                                                entry.method,
-                                                null,
-                                              )}
-                                              : {formatCurrency(displayAmount)}
-                                              {baseAmount > 0.009 &&
-                                                received > 0.009 &&
-                                                Math.abs(baseAmount - received) >
-                                                0.009 ? (
-                                                <span className="text-brand-muted font-normal">
-                                                  {" "}
-                                                  (de{" "}
-                                                  {formatCurrency(baseAmount)})
-                                                </span>
-                                              ) : null}
-                                            </span>
-                                          );
-                                        },
-                                      )}
-                                    </div>
-                                  }
-                                />
-                              );
-                            })()}
-
-                            <PaymentRow
-                              label="Valor Original"
-                              value={
-                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                  {formatCurrency(subtotalValue)}
-                                </span>
-                              }
-                            />
-
-                            {!hasOnlyServices && (
-                              <PaymentRow
-                                label="Tipo de Entrega"
-                                value={
-                                  <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                    {order.delivery_type === "pickup"
-                                      ? "Retirada no local"
-                                      : "Entrega no endereço"}
-                                  </span>
-                                }
-                              />
-                            )}
-
-                            {(Number(order.delivery_fee || 0) > 0 ||
-                              order.delivery_payer === "seller" ||
-                              Number(
-                                order.delivery_breakdown?.originalFee ||
-                                order.delivery_breakdown?.deliverySubsidy ||
-                                0,
-                              ) > 0) && (
-                                <PaymentRow
-                                  label="Valor da Entrega"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
-                                      {Number(order.delivery_fee || 0) > 0
-                                        ? formatCurrency(order.delivery_fee)
-                                        : formatCurrency(
-                                          Number(
-                                            order.delivery_breakdown
-                                              ?.originalFee ||
-                                            order.delivery_breakdown
-                                              ?.deliverySubsidy ||
-                                            0,
-                                          ),
-                                        )}
-                                      {Number(order.delivery_fee || 0) === 0 && (
-                                        <span className="text-brand-green">
-                                          - Frete Grátis (Subsidiado pela loja)
-                                        </span>
-                                      )}
-                                      {Number(order.delivery_fee || 0) > 0 &&
-                                        order.delivery_payer === "seller" && (
-                                          <span className="text-brand-orange">
-                                            - Subsidiado pela loja
-                                          </span>
-                                        )}
-                                      {Number(
-                                        order.delivery_breakdown?.distanceKm || 0,
-                                      ) > 0 && (
-                                          <span className="text-xs text-brand-muted font-normal">
-                                            ({order.delivery_breakdown.distanceKm}{" "}
-                                            km)
-                                          </span>
-                                        )}
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                            {Number(order.additional_costs || 0) > 0 && (
-                              <PaymentRow
-                                label="Outros Custos"
-                                value={
-                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                    {formatCurrency(order.additional_costs)}
-                                  </span>
-                                }
-                              />
-                            )}
-
-                            {Number(order.discount_value || 0) > 0 && (
-                              <PaymentRow
-                                label="Desconto do Pedido"
-                                value={
-                                  <span className="text-brand-green font-bold">
-                                    - {formatCurrency(order.discount_value)}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {couponDiscountAmount > 0 && (
-                              <PaymentRow
-                                label="Desconto por Cupom"
-                                value={
-                                  <span className="text-brand-green font-bold">
-                                    - {formatCurrency(couponDiscountAmount)}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {paymentMethodDiscountAmount > 0 && (
-                              <PaymentRow
-                                label="Desconto do Método"
-                                value={
-                                  <span className="text-brand-green font-bold">
-                                    -{" "}
-                                    {formatCurrency(
-                                      paymentMethodDiscountAmount,
-                                    )}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {!hasDetailedAmounts &&
-                              effectivePaymentMethodExtraAmount > 0 && (
-                                <PaymentRow
-                                  label="Taxa do Método"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                      +{" "}
-                                      {formatCurrency(
-                                        effectivePaymentMethodExtraAmount,
-                                      )}
-                                    </span>
-                                  }
-                                />
-                              )}
-                            {hasDetailedAmounts &&
-                              detailedInterestAmount > 0 && (
-                                <PaymentRow
-                                  label="Juros do Método"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                      + {formatCurrency(detailedInterestAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-                            {hasDetailedAmounts && detailedFeeAmount > 0 && (
-                              <PaymentRow
-                                label="Taxa do Método"
-                                value={
-                                  <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                    + {formatCurrency(detailedFeeAmount)}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {hasDetailedAmounts &&
-                              detailedFixedFeeAmount > 0 && (
-                                <PaymentRow
-                                  label="Custo do Método"
-                                  value={
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                      + {formatCurrency(detailedFixedFeeAmount)}
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                            {changeAmount > 0.009 && (
-                              <PaymentRow
-                                label="Troco"
-                                value={
-                                  <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                    {formatCurrency(changeAmount)}
-                                  </span>
-                                }
-                              />
-                            )}
-                            {wantsChange && payWithAmount !== null && (
-                              <PaymentRow
-                                label="Troco Solicitado"
-                                value={
-                                  <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                    {formatCurrency(cashChangeAmount)} (para{" "}
-                                    {formatCurrency(payWithAmount)})
-                                  </span>
-                                }
-                              />
-                            )}
-                            {order.is_refunded &&
-                              Number(order.refunded_amount || 0) > 0 && (
-                                <PaymentRow
-                                  label="Valor Reembolsado"
-                                  value={
-                                    <span className="text-brand-red font-bold">
-                                      -{" "}
-                                      {formatCurrency(
-                                        order.refunded_amount || 0,
-                                      )}
-                                    </span>
-                                  }
-                                />
-                              )}
-
-                            <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                              <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">
-                                Total do Pedido
-                              </span>
-                              <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
-                                {formatCurrency(order.total_amount)}
-                              </span>
-                            </div>
-                          </div>
-                        </FormSection>
+                        {renderPaymentDetailsSection("mt-0")}
                       </div>
                     </FadeIn>
                   </TabsContent>

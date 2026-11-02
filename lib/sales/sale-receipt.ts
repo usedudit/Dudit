@@ -6,6 +6,10 @@ import {
 import { formatAddressParts, stripCep } from "@/lib/utils/format-address";
 import { cleanOrderNotes } from "@/lib/orders/order-utils";
 import { getLegReceivedAmount } from "@/lib/payments/payment-ledger";
+import {
+  getOrderDepositSummary,
+  isSinalPaymentLeg,
+} from "@/lib/payments/order-financial-state";
 
 export type SaleReceiptFormat = "thermal" | "thermal-58" | "a4";
 
@@ -22,6 +26,7 @@ export type SaleReceiptItem = {
 export type SaleReceiptPaymentLine = {
   label: string;
   amount: number;
+  kind?: "sinal" | "saldo" | "payment";
 };
 
 export type SaleReceiptInstallmentDetail = {
@@ -309,12 +314,90 @@ export function buildPaymentLinesFromOrder(
   const breakdown = Array.isArray(order.payment_breakdown)
     ? order.payment_breakdown
     : [];
-  const filtered = breakdown.filter(
+  const receivedLegs = breakdown.filter(
     (e: any) => e?.method && getLegReceivedAmount(e) > 0.009,
   );
-  if (filtered.length > 0) {
+  const depositSummary = getOrderDepositSummary(order);
+  const sinalLegs = receivedLegs.filter((e: any) =>
+    isSinalPaymentLeg(e, depositSummary),
+  );
+  const regularLegs = receivedLegs.filter(
+    (e: any) => !isSinalPaymentLeg(e, depositSummary),
+  );
+
+  if (depositSummary.usesDeposit) {
+    const lines: SaleReceiptPaymentLine[] = [];
+    const sinalMethod = Array.from(
+      new Set(
+        sinalLegs
+          .map((entry: any) =>
+            String(entry?.method || "").trim()
+              ? getReceiptMethodTypeLabel(String(entry.method))
+              : "",
+          )
+          .filter(Boolean),
+      ),
+    ).join(", ");
+
+    if (
+      depositSummary.sinalPaid &&
+      depositSummary.depositAmount > 0.009
+    ) {
+      lines.push({
+        label: `Sinal${sinalMethod ? ` - ${sinalMethod}` : ""}`,
+        amount: depositSummary.depositAmount,
+        kind: "sinal",
+      });
+    }
+
+    if (regularLegs.length > 0) {
+      const grouped = groupPaymentMethods(
+        regularLegs.map((e: any) => ({
+          method: String(e.method),
+          amount: getLegReceivedAmount(e),
+          wantsChange: e.wantsChange,
+          payWithAmount: e.payWithAmount,
+        })),
+      );
+      for (const entry of grouped) {
+        let label = entry.label;
+        if (toCanonicalPaymentType(entry.method) === "cash" && entry.wantsChange) {
+          const trocoPara =
+            entry.payWithAmount != null
+              ? Number(entry.payWithAmount)
+              : entry.amount;
+          label = `Dinheiro (Troco para R$ ${trocoPara.toFixed(2).replace(".", ",")})`;
+        } else if (
+          toCanonicalPaymentType(entry.method) === "cash" &&
+          entry.wantsChange === false
+        ) {
+          label = "Dinheiro (Valor exato)";
+        }
+        lines.push({
+          label: `${depositSummary.sinalPaid ? "Saldo - " : ""}${label}`,
+          amount: entry.amount,
+          kind: "payment",
+        });
+      }
+    }
+
+    if (
+      depositSummary.sinalPaid &&
+      depositSummary.remainingBalance > 0.009
+    ) {
+      lines.push({
+        label: "Saldo a pagar",
+        amount: depositSummary.remainingBalance,
+        kind: "saldo",
+      });
+    }
+
+    if (lines.length > 0) return lines;
+  }
+
+  if (regularLegs.length > 0) {
     const grouped = groupPaymentMethods(
-      filtered.map((e: any) => ({
+      regularLegs.map((e: any) => ({
         method: String(e.method),
         amount: getLegReceivedAmount(e),
         wantsChange: e.wantsChange,

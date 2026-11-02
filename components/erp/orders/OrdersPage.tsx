@@ -1691,6 +1691,7 @@ export default function OrdersPage({
                 isOpen={deliveryStatusModal.open}
                 onClose={() => setDeliveryStatusModal({ open: false, order: null })}
                 title="Alterar status de entrega"
+                maxWidth="sm"
                 footer={
                     <div className="flex justify-end gap-3 w-full">
                         <Button variant="outline" onClick={() => setDeliveryStatusModal({ open: false, order: null })}>

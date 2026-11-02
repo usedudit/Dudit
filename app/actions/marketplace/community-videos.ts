@@ -55,7 +55,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
         .select("partner_id, addresses!store_id!inner(city, state)")
         .eq("is_active", true)
         .eq("addresses.city", resolved.city)
-        .eq("addresses.state", resolved.state)
+        .ilike("addresses.state", resolved.state)
 
       const ids = (cityStores || []).map((s: any) => s.partner_id).filter(Boolean)
       // If no stores found in this city, return empty immediately
@@ -70,7 +70,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
       .from("stores")
       .select("partner_id, addresses!store_id!inner(state)")
       .eq("is_active", true)
-      .eq("addresses.state", uf)
+      .ilike("addresses.state", uf)
 
     const ids = (stateStores || []).map((s: any) => s.partner_id).filter(Boolean)
     if (ids.length === 0) {

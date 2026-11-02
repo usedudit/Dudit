@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { getExpectedMpChargeAmount, getOrderPaidAmount, getOrderTotalAmount, getOrderRemainingBalance, getOrderDepositSummary, mergeCheckoutFulfillment } from "@/lib/payments/order-financial-state"
+import { getExpectedMpChargeAmount, getOrderPaidAmount, getOrderTotalAmount, getOrderRemainingBalance, getOrderDepositSummary, isSinalPaymentLeg, mergeCheckoutFulfillment } from "@/lib/payments/order-financial-state"
 import type { OrderFinancialSnapshot } from "@/lib/payments/order-financial-state"
 
 describe("getOrderPaidAmount", () => {
@@ -52,6 +52,75 @@ describe("getOrderDepositSummary", () => {
     expect(summary.usesDeposit).toBe(true)
     expect(summary.depositStatus).toBe("expired")
     expect(summary.sinalPaid).toBe(false)
+  })
+
+  it("uses the full order total from deposit metadata when the stored total is only the sinal", () => {
+    const order: OrderFinancialSnapshot = {
+      total_amount: 30,
+      paid_amount: 30,
+      checkout_fulfillment: {
+        depositCheckout: {
+          usesDeposit: true,
+          payDepositOnly: true,
+          depositAmount: 30,
+          initialChargeAmount: 30,
+          fullOrderTotal: 100,
+          remainingBalance: 70,
+        },
+      },
+    }
+    const summary = getOrderDepositSummary(order)
+    expect(summary.fullOrderTotal).toBe(100)
+    expect(summary.remainingBalance).toBe(70)
+    expect(summary.sinalPaid).toBe(true)
+    expect(summary.depositStatus).toBe("partially_paid")
+  })
+})
+
+describe("isSinalPaymentLeg", () => {
+  it("detects legs marked as deposit", () => {
+    const summary = getOrderDepositSummary({
+      total_amount: 100,
+      paid_amount: 30,
+      checkout_fulfillment: {
+        depositCheckout: {
+          usesDeposit: true,
+          depositAmount: 30,
+          initialChargeAmount: 30,
+          fullOrderTotal: 100,
+        },
+      },
+    })
+    expect(
+      isSinalPaymentLeg(
+        { method: "Pix", amountReceived: 30, paymentKind: "deposit" },
+        summary,
+      ),
+    ).toBe(true)
+    expect(
+      isSinalPaymentLeg(
+        { method: "Pix", amountReceived: 70, paymentKind: "balance" },
+        summary,
+      ),
+    ).toBe(false)
+  })
+
+  it("falls back to the sinal amount for legacy legs without paymentKind", () => {
+    const summary = getOrderDepositSummary({
+      total_amount: 100,
+      paid_amount: 30,
+      checkout_fulfillment: {
+        depositCheckout: {
+          usesDeposit: true,
+          depositAmount: 30,
+          initialChargeAmount: 30,
+          fullOrderTotal: 100,
+        },
+      },
+    })
+    expect(
+      isSinalPaymentLeg({ method: "Pix", amountReceived: 30 }, summary),
+    ).toBe(true)
   })
 })
 

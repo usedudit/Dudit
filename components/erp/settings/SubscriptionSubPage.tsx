@@ -959,66 +959,55 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
 
                         {subData?.subscription?.status === "past_due" && (
-                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100">
-                                <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold">Pagamento da assinatura em atraso</p>
-                                    <p className="text-xs opacity-90">
-                                        {(subData.subscription.grace_days_left ?? 0) > 0
-                                            ? `Regularize em até ${subData.subscription.grace_days_left} dia${subData.subscription.grace_days_left === 1 ? "" : "s"} para não perder os recursos do plano.`
-                                            : "Regularize agora para reativar os recursos do plano."}
-                                        {subData.subscription.grace_period_ends_at
-                                            ? ` Prazo: ${formatDate(subData.subscription.grace_period_ends_at)}.`
-                                            : ""}
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="destructive"
-                                    className="hidden sm:flex h-9 shrink-0"
+                            <InfoCard
+                                title="Pagamento da assinatura em atraso"
+                                message={
+                                    `${(subData.subscription.grace_days_left ?? 0) > 0
+                                        ? `Regularize em até ${subData.subscription.grace_days_left} dia${subData.subscription.grace_days_left === 1 ? "" : "s"} para não perder os recursos do plano.`
+                                        : "Regularize agora para reativar os recursos do plano."
+                                    }${subData.subscription.grace_period_ends_at
+                                        ? ` Prazo: ${formatDate(subData.subscription.grace_period_ends_at)}.`
+                                        : ""
+                                    }`
+                                }
+                                color="red"
+                                bottomElement={<Button
+                                    variant="link"
                                     onClick={handleGenerateManualPayment}
                                     disabled={manualPaymentModal.loading}
                                     isLoading={manualPaymentModal.loading}
                                 >
                                     Pagar agora
-                                </Button>
-                            </div>
+                                </Button>}
+                            />
                         )}
 
                         {isPendingPayment && (
-                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-                                <ClockIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold">Assinatura aguardando pagamento</p>
-                                    <p className="text-xs opacity-90">
-                                        {pendingChange
-                                            ? `Plano ${pendingChange.plan_name}${pendingChange.amount > 0 ? ` — ${formatCurrency(pendingChange.amount)}` : ""}${pendingInvoiceDate ? `, vencimento em ${formatDate(pendingInvoiceDate)}` : ""}. Seu plano atual continua ativo até a confirmação do pagamento.`
-                                            : "O pagamento da troca de plano ainda não foi confirmado."}
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="destructive"
-                                    className="hidden sm:flex h-9 shrink-0"
+                            <InfoCard
+                                title="Assinatura aguardando pagamento"
+                                message={pendingChange
+                                    ? `Plano ${pendingChange.plan_name}${pendingChange.amount > 0 ? ` — ${formatCurrency(pendingChange.amount)}` : ""}${pendingInvoiceDate ? `, vencimento em ${formatDate(pendingInvoiceDate)}` : ""}. Seu plano atual continua ativo até a confirmação do pagamento.`
+                                    : "O pagamento da troca de plano ainda não foi confirmado."}
+                                color="orange"
+                                bottomElement={<Button
+                                    variant="link"
                                     onClick={handlePayPending}
                                     disabled={manualPaymentModal.loading}
                                     isLoading={manualPaymentModal.loading}
                                 >
                                     Pagar agora
-                                </Button>
-                            </div>
+                                </Button>}
+                            />
                         )}
 
                         {hasScheduledChange && (
-                            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">
-                                <InfoIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold">Troca de plano agendada</p>
-                                    <p className="text-xs opacity-90">
-                                        {scheduledPlanIsFree
-                                            ? `Seu acesso ao plano ${getHardcodedPlan(scheduledPlan!.slug).name} (gratuito) começa em ${formatDate(subData!.subscription!.current_period_end!)}. Após essa data, não será mais cobrado.`
-                                            : `Seu plano passa para ${scheduledPlan!.name} (${formatCurrency(Number(scheduledPlan!.price))}/mês) a partir de ${formatDate(subData!.subscription!.current_period_end!)}.`}
-                                    </p>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Troca de plano agendada"
+                                message={scheduledPlanIsFree
+                                    ? `Seu acesso ao plano ${getHardcodedPlan(scheduledPlan!.slug).name} (gratuito) começa em ${formatDate(subData!.subscription!.current_period_end!)}. Após essa data, não será mais cobrado.`
+                                    : `Seu plano passa para ${scheduledPlan!.name} (${formatCurrency(Number(scheduledPlan!.price))}/mês) a partir de ${formatDate(subData!.subscription!.current_period_end!)}.`}
+                                color="blue"
+                            />
                         )}
 
                         {/* Top 2 Cards: Current Plan & Next Invoices (Equal Size & Side-by-Side) */}
@@ -1234,20 +1223,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     {shownDueDate ? formatDate(shownDueDate) : "-"}
                                                 </span>
                                             </div>
-
-                                            {isPendingPayment && (
-                                                <div className="pt-3">
-                                                    <Button
-                                                        variant="link"
-                                                        className="h-9 w-full text-brand-orange dark:text-amber-400"
-                                                        onClick={handlePayPending}
-                                                        disabled={manualPaymentModal.loading}
-                                                        isLoading={manualPaymentModal.loading}
-                                                    >
-                                                        Pagar fatura
-                                                    </Button>
-                                                </div>
-                                            )}
                                         </>
                                     )}
                                 </div>

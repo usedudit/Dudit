@@ -105,6 +105,40 @@ export function shouldShowSinal(depositSummary: OrderDepositSummary | null): boo
   );
 }
 
+/**
+ * Identifies a payment ledger entry that belongs to the sinal (deposit).
+ * New entries carry `paymentKind: "deposit"`. Older entries may not, so fall
+ * back to matching the received amount against the sinal while the order has
+ * not received anything beyond it.
+ */
+export function isSinalPaymentLeg(
+  entry: any,
+  depositSummary: OrderDepositSummary | null,
+): boolean {
+  if (!entry) return false
+  const kind = String(entry.paymentKind || "").toLowerCase()
+  if (kind === "deposit") return true
+  if (kind === "balance" || kind === "full") return false
+  if (!depositSummary?.usesDeposit) return false
+
+  const depositAmount = Math.max(
+    0,
+    Number(
+      depositSummary.initialChargeAmount || depositSummary.depositAmount || 0,
+    ),
+  )
+  const received = Math.max(
+    0,
+    Number(entry.amountReceived ?? entry.amount ?? 0),
+  )
+  return (
+    depositSummary.sinalPaid &&
+    depositAmount > 0.009 &&
+    received <= depositAmount + 0.01 &&
+    depositSummary.paidAmount <= depositAmount + 0.01
+  )
+}
+
 export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepositSummary {
   const rawMeta = getDepositCheckoutMeta(order.checkout_fulfillment ?? null)
   const paidAmount = getOrderPaidAmount(order)

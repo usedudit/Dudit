@@ -67,14 +67,7 @@ export default async function ERPEstatisticasPage(props: {
                 <DashboardProvider>
                     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
                         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                    Estatísticas
-                                </h1>
-                                <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                                </p>
-                            </div>
+                            <div className="hidden xl:block" />
                             <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
                                 <GlobalPeriodFilter />
                             </Suspense>

@@ -186,7 +186,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     }
 
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
-    const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
     const paymentBreakdown = useMemo(() => {
         return Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
             ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
@@ -235,7 +234,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
         const raw = preferred?.method || originalPaymentMethod
         return raw && raw !== "Não informado" ? formatPaymentMethodLabel(raw, null) : ""
     }, [paymentBreakdown, originalPaymentMethod])
-    const paymentMethodLabel = `${friendlyMethod || "Não informado"}${pendingSuffix}`
+    const paymentMethodLabel = friendlyMethod || "Não informado"
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
     const [currentPage, setCurrentPage] = React.useState(1);
@@ -772,8 +771,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <PaymentRow
                                     label="Método de Pagamento"
                                     value={
-                                        <div className="flex items-center gap-2">
-                                            <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} />
+                                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                                            <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} simplify />
+                                            <span className="text-brand-border dark:text-dark-border">|</span>
+                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{payStatusMeta.label}</span>
                                         </div>
                                     }
                                 />
@@ -1454,8 +1455,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <PaymentRow
                                 label="Método de Pagamento"
                                 value={
-                                    <div className="flex items-center gap-2">
-                                        <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} />
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} simplify />
+                                        <span className="text-brand-border dark:text-dark-border">|</span>
+                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{payStatusMeta.label}</span>
                                     </div>
                                 }
                             />

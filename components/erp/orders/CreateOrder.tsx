@@ -2044,7 +2044,6 @@ export default function CreateOrder({
                                     <FadeIn key="payment">
                                         <SidebarCard title="Pagamento" hasSeparator hasTopStrip className="lg:mt-6">
                                             {(() => {
-                                                const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
                                                 const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
                                                     ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
                                                     : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod
@@ -2060,7 +2059,7 @@ export default function CreateOrder({
                                                         return raw && raw !== "Não informado" ? formatPaymentMethodLabel(raw, null) : "";
                                                     })();
                                                 const mpSuffix = originalPaymentProvider === "Mercado Pago" && friendlyMethod && friendlyMethod !== "Múltiplos meios" && !friendlyMethod.toLowerCase().includes("mercado pago") ? " (Mercado Pago)" : "";
-                                                const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}${pendingSuffix}`;
+                                                const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}`;
                                                 const hasCoupon = Number(effectiveCouponDiscountAmount || 0) > 0;
 
                                                 return isPaidOrder ? (

@@ -1048,6 +1048,9 @@ const PaymentModal = ({
         setWantsChange(false);
         setPayWithAmount(0);
         setSplitSelectedType(null);
+        userManuallyChangedRef.current = false;
+        setPaymentBaseAmount(0);
+        setCalcBaseAmount(0);
         if (options?.clearType) {
             setSelectedMethodType(null);
         }
@@ -1112,8 +1115,10 @@ const PaymentModal = ({
     useEffect(() => {
         if (isOpen) {
             paymentCalculationCacheRef.current.clear();
+            userManuallyChangedRef.current = false;
             setView('methods');
             setPaymentBaseAmount(0);
+            setCalcBaseAmount(0);
             setInstallments('1');
             setIsReceiptOpen(false);
             setPaymentPendingType('none');
@@ -1859,6 +1864,7 @@ const PaymentModal = ({
 
     // Debounce base amount input typing to recalculate payment method details
     useEffect(() => {
+        if (!userManuallyChangedRef.current) return;
         const handler = setTimeout(() => {
             setCalcBaseAmount(paymentBaseAmount);
         }, 500);
@@ -1892,9 +1898,10 @@ const PaymentModal = ({
         // For single-leg partial payments, price only the amount being charged now - not the full remaining.
         const singleLegPartialBase =
             editingPaymentIndex === null &&
-                paymentBaseAmount > 0.009 &&
-                paymentBaseAmount < netChargeTarget - 0.009
-                ? paymentBaseAmount
+                userManuallyChangedRef.current &&
+                calcBaseAmount > 0.009 &&
+                calcBaseAmount < netChargeTarget - 0.009
+                ? calcBaseAmount
                 : null;
         const base = editingPaymentIndex !== null
             ? Math.max(0, Number(calcBaseAmount || 0))
@@ -2525,6 +2532,7 @@ const PaymentModal = ({
         const isCreditOnlyConfirm = view === 'methods' && hasCreditLeg;
 
         let selectedLegs: any[] = [];
+        let singleMethodLegAmount = 0;
 
         if (isCreditOnlyConfirm) {
             selectedLegs = [];
@@ -2563,15 +2571,16 @@ const PaymentModal = ({
                 });
         } else {
             const isUnpaid = isUnpaidRegister || (netChargeTarget > 0 && paymentBaseAmount === 0);
-            const isPartialSingleLeg = !isUnpaid && paymentBaseAmount > 0.009 && paymentBaseAmount < netChargeTarget - 0.009;
+            const isPartialSingleLeg = !isUnpaid && userManuallyChangedRef.current && paymentBaseAmount > 0.009 && paymentBaseAmount < netChargeTarget - 0.009;
             const methodLegAmount = isPartialSingleLeg
-                ? paymentBaseAmount
+                ? Number(paymentCalculation?.finalAmount ?? paymentBaseAmount)
                 : Number(paymentCalculation?.finalAmount ?? finalTotalWithMethodPricing ?? netChargeTarget);
+            singleMethodLegAmount = methodLegAmount;
             const actualReceived = isUnpaid ? 0 : (view === 'money'
-                ? (wantsChange ? Math.max(payWithAmount, paymentBaseAmount) : Math.max(paymentBaseAmount, paymentBaseAmount))
+                ? (wantsChange ? Math.max(payWithAmount, methodLegAmount) : Math.max(methodLegAmount, methodLegAmount))
                 : isPartialSingleLeg
-                    ? paymentBaseAmount
-                    : Number(paymentCalculation?.amountReceived ?? paymentBaseAmount ?? 0));
+                    ? Number(paymentCalculation?.amountReceived ?? paymentBaseAmount)
+                    : Number(paymentCalculation?.amountReceived ?? methodLegAmount ?? 0));
 
             const methodLeg = {
                 method: (() => {
@@ -2649,7 +2658,7 @@ const PaymentModal = ({
                 : null;
 
         const singleRegisterAmount =
-            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : (view === 'money' && wantsChange ? Math.max(payWithAmount, paymentBaseAmount) : paymentBaseAmount)))) : (effectiveCreditApplied + (splitFinalCharged || 0));
+            view !== 'split' ? (isUnpaidRegister ? 0 : (effectiveCreditApplied + (isCreditOnlyConfirm ? 0 : (view === 'money' && wantsChange ? Math.max(payWithAmount, singleMethodLegAmount) : singleMethodLegAmount)))) : (effectiveCreditApplied + (splitFinalCharged || 0));
 
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
@@ -2692,6 +2701,7 @@ const PaymentModal = ({
                 paymentMethodId: null,
                 installmentNumber: 1,
                 provider: "Mercado Pago",
+                paymentKind: "deposit",
                 paymentStatus: depositPaid ? "approved" : "pending",
                 mpPaymentMethodId: "pix",
             };
@@ -2745,9 +2755,12 @@ const PaymentModal = ({
         if (!selectedMethodId) return;
         setIsGeneratingPix(true);
         try {
+            const pixAmount = paymentCalculation?.success && paymentCalculation?.finalAmount != null
+                ? Number(paymentCalculation.finalAmount)
+                : (paymentBaseAmount > 0 ? paymentBaseAmount : netChargeTarget);
             const payload = generateStaticPix(
                 keyToUse,
-                paymentBaseAmount,
+                pixAmount,
                 selectedStore?.name || "Loja",
                 "",
                 "DUDIT",
@@ -2771,9 +2784,12 @@ const PaymentModal = ({
             const res = await getPaymentMethodDetailsAction(selectedMethodId);
             if (res.success && res.method.pix_key) {
                 setHasPixKey(true);
+                const pixAmount = paymentCalculation?.success && paymentCalculation?.finalAmount != null
+                    ? Number(paymentCalculation.finalAmount)
+                    : (paymentBaseAmount > 0 ? paymentBaseAmount : netChargeTarget);
                 const payload = generateStaticPix(
                     res.method.pix_key,
-                    paymentBaseAmount,
+                    pixAmount,
                     selectedStore?.name || "Loja",
                     "",
                     "DUDIT",
@@ -2836,6 +2852,7 @@ const PaymentModal = ({
                 paymentMethodId: null,
                 installmentNumber: 1,
                 provider: "Mercado Pago",
+                paymentKind: "deposit",
                 paymentStatus: depositPaid ? "approved" : "pending",
                 mpPaymentMethodId: "pix",
             };
@@ -3709,7 +3726,7 @@ const PaymentModal = ({
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                                    {formatCurrency(paymentBaseAmount)}
+                                                    {formatCurrency(finalDueForLeg)}
                                                 </div>
                                             </div>
                                             <div className="w-full text-left space-y-4">
@@ -4509,7 +4526,7 @@ const PaymentModal = ({
                     }}
                     qrCode={pixQrData.qrDataUrl}
                     payload={pixQrData.payload}
-                    amount={paymentBaseAmount}
+                    amount={paymentCalculation?.success && paymentCalculation?.finalAmount != null ? Number(paymentCalculation.finalAmount) : (paymentBaseAmount > 0 ? paymentBaseAmount : netChargeTarget)}
                     onConfirmPayment={async () => {
                         setShowPixQrModal(false);
                         setPixQrData(null);

@@ -33,6 +33,11 @@ export default function SaleReceiptThermalPreview({
     const totalDiscounts = (data.generalDiscount || 0) + (data.couponDiscount || 0) + (data.methodDiscount || 0)
     const totalOtherCosts = (data.otherCosts || 0) + (data.methodFee || 0) + (data.methodInterest || 0)
     const isDelivery = data.deliveryType !== "pickup" && Boolean(data.customerAddress)
+    const shouldShowOnlinePaymentNotice = Boolean(
+        data.isOnlinePayment &&
+        data.deliveryType === "delivery" &&
+        data.items.length > 0
+    )
 
     const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
@@ -181,13 +186,14 @@ export default function SaleReceiptThermalPreview({
                                 key={`pay-${i}`}
                                 left={line.label}
                                 right={`R$ ${formatReceiptAmount(line.amount)}`}
+                                bold={line.kind === "sinal"}
                             />
                         ))
                     ) : (
                         <ReceiptRow left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
                     )}
 
-                    {data.isOnlinePayment && (
+                    {shouldShowOnlinePaymentNotice && (
                         <div
                             className="mt-2 py-1 px-1.5 border text-center font-bold text-[10.5px] uppercase tracking-tight"
                             style={{

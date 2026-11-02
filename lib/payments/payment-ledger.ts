@@ -353,10 +353,21 @@ export function normalizeDepositCheckoutMeta(
 ): NormalizedDepositCheckout | null {
   if (!meta || typeof meta !== "object") return null
 
+  const orderTotalRounded = roundPaymentAmount(orderTotal)
+  const metaFullOrderTotal = roundPaymentAmount(meta.fullOrderTotal)
+  const usesDeposit = Boolean(meta.usesDeposit || meta.payDepositOnly)
+  // Deposit-only orders can have `orders.total_amount` set to the initial
+  // charge (the sinal) while the real order total lives in the deposit
+  // metadata. Prefer the larger value for deposit orders so the balance is not
+  // computed as zero.
   const fullOrderTotal = Math.max(
     0,
     roundPaymentAmount(
-      orderTotal > 0 ? orderTotal : Number(meta.fullOrderTotal || 0),
+      usesDeposit && metaFullOrderTotal > orderTotalRounded
+        ? metaFullOrderTotal
+        : orderTotalRounded > 0
+          ? orderTotalRounded
+          : metaFullOrderTotal,
     ),
   )
   const depositAmount = Math.max(
@@ -364,7 +375,6 @@ export function normalizeDepositCheckoutMeta(
     roundPaymentAmount(meta.depositAmount ?? meta.serviceDepositAmount ?? 0),
   )
   const paid = Math.max(0, roundPaymentAmount(paidAmount))
-  const usesDeposit = Boolean(meta.usesDeposit || meta.payDepositOnly)
   const payDepositOnly = Boolean(meta.payDepositOnly)
 
   if (!usesDeposit && !payDepositOnly) {
