@@ -401,9 +401,27 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 **Validação local:** `tsc --noEmit` e `git diff --check` passaram antes desta rodada. Não rodei testes nem consultas ao banco; a aplicação da migration foi informada pelo usuário.
 
-**Estorno de recorrência — correção local:** estorno e ajuste do saldo agora são gravados pela RPC `reverse_subscription_cycle_financials_atomic`, com bloqueio do pedido, chave idempotente por pagamento/status/total acumulado informado pelo Mercado Pago e atualização do pedido na mesma transação. O cálculo trata `transaction_amount_refunded` como total acumulado, registra a transação mesmo quando não há conta financeira vinculada e ainda reconcilia o financeiro se o pedido já estava cancelado. A busca exige vínculo exato do `mp_payment_id`; removi o fallback que poderia associar um webhook sem pedido correspondente ao ciclo mais recente da assinatura. Migration pendente: `20261102150000_atomic_subscription_refunds.sql`.
+**Estorno de recorrência — correção local:** estorno e ajuste do saldo agora são gravados pela RPC `reverse_subscription_cycle_financials_atomic`, com bloqueio do pedido, chave idempotente por pagamento/status/total acumulado informado pelo Mercado Pago e atualização do pedido na mesma transação. O cálculo trata `transaction_amount_refunded` como total acumulado, registra a transação mesmo quando não há conta financeira vinculada e ainda reconcilia o financeiro se o pedido já estava cancelado. A busca exige vínculo exato do `mp_payment_id`; removi o fallback que poderia associar um webhook sem pedido correspondente ao ciclo mais recente da assinatura. O usuário informou que aplicou `20261102150000_atomic_subscription_refunds.sql`; não confirmei no ledger/schema.
 
-**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram; a migration também não tem whitespace no fim das linhas. Não rodei testes, SQL nem consultas ao banco. Após aplicar a migration, validar em homologação webhook repetido, reembolso parcial cumulativo, estorno total, pedido previamente cancelado e pedido sem conta financeira.
+**Validação desta rodada:** `npx tsc --noEmit` e `git diff --check` passaram; a migration também não tem whitespace no fim das linhas. Não rodei testes, SQL nem consultas ao banco. O usuário informou que aplicou a migration; validar em homologação webhook repetido, reembolso parcial cumulativo, estorno total, pedido previamente cancelado e pedido sem conta financeira.
+
+### Confirmação de pagamento em agendamento — 02/11/2026
+
+**Achados confirmados em revisão estática:** `confirmAppointmentOrderPaymentAction` aceitava redução do preço do pedido pela entrada do cliente sem exigir `orders.can_apply_discount`; IDs de serviço e método de pagamento também não eram validados contra parceiro/loja. Um helper interno de sincronização de entrega estava exportado em um módulo com `"use server"`, ampliando sem necessidade a superfície de ações remotas.
+
+**Correção local:** a ação agora valida formato/limites dos dados de pagamento, exige permissão de desconto quando o preço ou desconto reduzem o pedido, limita serviço e métodos ao parceiro/loja do pedido e escopa a leitura/remapeamento de agendamentos pelo parceiro. O helper interno deixou de ser exportado. Não foi criada migration.
+
+**Validação local:** `npx tsc --noEmit` e `git diff --check` passaram. Sem testes ou chamada ao banco.
+
+### Cancelamento em lote com reembolso — 02/11/2026
+
+**Achado confirmado:** `updateOrdersStatusInBatchAction` autorizava o cancelamento com `orders.cancel`, mas aceitava também `generateAutomaticRefund` sem exigir `orders.can_refund` no parceiro e na loja. O helper fazia inserts de reembolso e deltas de saldo em chamadas separadas e calculava o restante fora de lock, permitindo duplicidade em chamadas concorrentes. A seleção de conta fallback também não restringia a loja do pedido.
+
+**Correção local:** agora o reembolso exige a permissão específica `orders.can_refund` no escopo do parceiro/loja. O helper usa a RPC `create_order_cancellation_refunds_atomic`, que bloqueia o pedido, valida loja/conta/métodos, impede ultrapassar o valor ainda reembolsável e grava as linhas e o débito do saldo na mesma transação, com chave idempotente estável por pedido/linha. Contas fallback ficam limitadas à loja do pedido ou contas globais. A ação também compara `updated_at` no cancelamento antes de iniciar efeitos colaterais, para que apenas uma requisição concorrente vença. O nome em notas usa o perfil autenticado, sem fallback para nome enviado pelo cliente. O usuário informou que aplicou `20261102160000_atomic_order_cancellation_refunds.sql`; não confirmei no ledger/schema.
+
+**Hardening adicional do status de pagamento:** o `expectedUpdatedAt` agora é obrigatório para qualquer chamada que envie valor ou detalhamento do pagamento, e tais chamadas ficam limitadas a um pedido. Valores/IDs do breakdown passam por validação; métodos são resolvidos no parceiro e loja do pedido; descontos exigem `orders.can_apply_discount` e não podem superar o total. Removi a aceitação do `mpPaymentId` superior porque nenhum chamador legítimo desta ação o usa; IDs de pagamento do Mercado Pago novos também não podem ser injetados no breakdown. Isso reduz alteração concorrente e vínculo indevido de dados de pagamento.
+
+**Validação local:** `npx tsc --noEmit` e `git diff --check` passaram; a migration não tem whitespace no fim das linhas. Não rodei testes, SQL ou consultas ao banco. Falta validar cancelamento concorrente e reembolso em homologação.
 
 ### RPC de movimentação de estoque — 30/10/2026
 
@@ -433,8 +451,8 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 - [ ] Confirmar no ledger/schema a aplicação de `20261101160000_atomic_batch_transaction_settlement_date.sql` e exercitar quitação em lote concorrente/reconciliação; o usuário informou que aplicou.
 - [ ] Confirmar no catálogo os grants após `20261031100000_restrict_process_return_request_rpc.sql` e `20261031110000_restrict_create_product_transaction_roles.sql`; o usuário informou que ambas foram aplicadas.
 - [ ] Confirmar no ledger/schema a aplicação da migration `20261030200000_preserve_stock_movement_ledger_on_order_delete.sql` antes de depender da preservação do histórico de estoque e da restrição de exclusão com anexos. O usuário informou que aplicou.
-- [ ] Reconciliar fluxos de estorno/cancelamento para alinhar efeito no gateway, ledger e saldo local.
-- [ ] Aplicar `20261102150000_atomic_subscription_refunds.sql` e validar repetição/estorno parcial cumulativo em homologação; o usuário informou que as migrations anteriores da auditoria foram aplicadas.
+- [ ] Reconciliar fluxos de estorno/cancelamento para alinhar efeito no gateway, ledger e saldo local; validar repetição/concorrência em homologação após `20261102160000_atomic_order_cancellation_refunds.sql` (aplicação informada pelo usuário, sem confirmação no ledger).
+- [ ] Validar repetição/estorno parcial cumulativo em homologação após `20261102150000_atomic_subscription_refunds.sql`; o usuário informou que aplicou a migration, sem confirmação independente do ledger.
 - [ ] Revisar as demais regras de papéis e permissões por módulo, incluindo operações administrativas e convites.
 - [ ] Revisar migrations/policies RLS existentes e comparar com a nova migration; verificar conflitos, tabelas sem RLS, views, RPCs, triggers, grants, Storage e Realtime conforme presentes no projeto.
 - [ ] Confirmar/renovar a chave pública Supabase do ambiente local com o dashboard e repetir a inspeção RLS via conexão PostgreSQL com certificado confiável. Não substituir a chave pública por uma chave de serviço.

@@ -9,7 +9,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
-import { APPOINTMENT_LIST_COLUMNS } from "@/app/actions/erp/appointments"
+import { APPOINTMENT_LIST_COLUMNS } from "@/lib/erp/appointment-insights"
 
 export const dynamic = "force-dynamic"
 

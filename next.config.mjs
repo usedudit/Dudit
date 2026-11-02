@@ -1,4 +1,4 @@
-import { withSentryConfig } from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import withSerwistInit from "@serwist/next"
 
 import { spawnSync } from "node:child_process"
@@ -130,6 +130,7 @@ const nextConfig = {
     return config
   },
   experimental: {
+    cpus: process.env.BUILD_FOR_RENDER || process.env.RENDER || process.env.CI ? 1 : undefined,
     optimizePackageImports: [
       '@/components',
       '@/lib',

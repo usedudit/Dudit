@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { safeFetch } from "@/lib/security/ssrf-guard"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 function categorizePhones(rawPhones: string[]) {
   let telefone_fixo = ""

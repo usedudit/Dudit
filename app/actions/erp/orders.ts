@@ -1732,14 +1732,14 @@ async function createRefundTransactionForCancelledOrder(params: {
       .from("transactions")
       .select("id, amount, status")
       .eq("partner_id", params.partnerId)
-      .eq("refund_kind", "revenue_refund")
       .eq("reference_note", params.orderId)
-      .in("status", ["paid", "partially_paid"]);
+      .or("kind.eq.refund,refund_kind.eq.revenue_refund");
 
   if (existingRefundsError) return { error: existingRefundsError.message };
 
   const alreadyRefundedAmount = (existingRefunds || []).reduce(
     (sum: number, tx: any) => {
+      if (String(tx.status || "").toLowerCase() === "cancelled") return sum;
       return sum + Math.abs(Number(tx.amount || 0));
     },
     0,
@@ -1874,13 +1874,16 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
   let financeAccountId = params.financeAccountId || null;
   if (!financeAccountId) {
     // Fallback 1: Try to query the partner's default active financial account
-    const { data: defaultAccount } = await params.supabase
+    let defaultAccountQuery = params.supabase
       .from("finance_accounts")
       .select("id")
       .eq("partner_id", params.partnerId)
       .eq("is_default", true)
-      .eq("is_active", true)
-      .maybeSingle();
+      .eq("is_active", true);
+    defaultAccountQuery = params.storeId
+      ? defaultAccountQuery.or(`store_id.is.null,store_id.eq.${params.storeId}`)
+      : defaultAccountQuery.is("store_id", null);
+    const { data: defaultAccount } = await defaultAccountQuery.maybeSingle();
 
     if (defaultAccount?.id) {
       financeAccountId = defaultAccount.id;
@@ -1889,14 +1892,16 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
 
   if (!financeAccountId) {
     // Fallback 2: Try to query any active financial account for the partner
-    const { data: anyAccount } = await params.supabase
+    let anyAccountQuery = params.supabase
       .from("finance_accounts")
       .select("id")
       .eq("partner_id", params.partnerId)
       .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: true });
+    anyAccountQuery = params.storeId
+      ? anyAccountQuery.or(`store_id.is.null,store_id.eq.${params.storeId}`)
+      : anyAccountQuery.is("store_id", null);
+    const { data: anyAccount } = await anyAccountQuery.limit(1).maybeSingle();
 
     if (anyAccount?.id) {
       financeAccountId = anyAccount.id;
@@ -1993,122 +1998,36 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     });
   }
 
-  const transactionContactId = await resolveTransactionContactByName({
-    supabase: params.supabase,
-    partnerId: params.partnerId,
-    name: params.customerName,
-  });
+  const { data, error } = await createAdminClient().rpc(
+    "create_order_cancellation_refunds_atomic",
+    {
+      p_partner_id: params.partnerId,
+      p_order_id: params.orderId,
+      p_account_id: financeAccountId,
+      p_created_by_user_id: params.createdByUserId || null,
+      p_rows: refundLegs.map((leg) => ({
+        amount: leg.amount,
+        payment_type: leg.method,
+        payment_method_id: leg.paymentMethodId || null,
+      })),
+    },
+  );
 
-  const paymentDate = new Date().toISOString();
-  let createdCount = 0;
-
-  for (const leg of refundLegs) {
-    const refundPayload = {
-      partner_id: params.partnerId,
-      store_id: params.storeId || null,
-      description: `Reembolso automático da venda ${params.orderNumber}`,
-      category: "Reembolso",
-      customer_id: params.customerId || null,
-      contact_id: transactionContactId,
-      contact_type: "customer",
-      amount: leg.amount,
-      due_date: null,
-      payment_date: paymentDate,
-      transaction_date: paymentDate,
-      status: "paid",
-      notes: "Gerado automaticamente ao cancelar venda.",
-      payment_type: leg.method,
-      original_amount: leg.amount,
-      interest_amount: null,
-      fee_amount: 0,
-      transaction_type: "refund",
-      origin: "system",
-      refund_kind: "revenue_refund",
-      reference_note: params.orderId,
-      account_id: financeAccountId,
-      payment_method_id: leg.paymentMethodId || null,
-      created_by_user_id: params.createdByUserId || null,
-      kind: "refund",
-    };
-
-    let insertResult = await params.supabase
-      .from("transactions")
-      .insert(refundPayload)
-      .select("id")
-      .maybeSingle();
-
-    if (insertResult.error) {
-      const message = String(insertResult.error.message || "").toLowerCase();
-      const fallbackPayload = { ...refundPayload };
-      let shouldRetry = false;
-      if (
-        message.includes("created_by_user_id") &&
-        message.includes("transactions")
-      ) {
-        delete (fallbackPayload as Record<string, unknown>).created_by_user_id;
-        shouldRetry = true;
-      }
-      if (message.includes("payment_method_id")) {
-        (fallbackPayload as Record<string, unknown>).payment_method_id = null;
-        shouldRetry = true;
-      }
-      if (shouldRetry) {
-        insertResult = await params.supabase
-          .from("transactions")
-          .insert(fallbackPayload)
-          .select("id")
-          .maybeSingle();
-      }
-    }
-
-    if (insertResult.error || !insertResult.data?.id) {
-      console.error("[orders_cancel_refund] failed_to_create_refund", {
-        orderId: params.orderId,
-        orderNumber: params.orderNumber,
-        partnerId: params.partnerId,
-        financeAccountId,
-        paidAmount,
-        alreadyRefundedAmount,
-        refundableAmount,
-        leg,
-        error: insertResult.error,
-      });
-      return {
-        error:
-          insertResult.error?.message ||
-          "Não foi possível gerar o reembolso automático.",
-      };
-    }
-
-    const { error: balanceError } = await createAdminClient().rpc(
-      "apply_account_balance_delta",
-      {
-        p_account_id: financeAccountId,
-        p_partner_id: params.partnerId,
-        p_delta: -Math.abs(leg.amount),
-      },
-    );
-
-    if (balanceError) {
-      console.error(
-        "[orders_cancel_refund] failed_to_apply_account_balance_delta",
-        {
-          orderId: params.orderId,
-          orderNumber: params.orderNumber,
-          transactionId: insertResult.data.id,
-          partnerId: params.partnerId,
-          financeAccountId,
-          leg,
-          error: balanceError,
-        },
-      );
-      return { success: false as const, error: "O reembolso foi registrado, mas o saldo da conta não foi atualizado. Requer reconciliação." }
-    }
-
-    createdCount += 1;
+  if (error) {
+    console.error("[orders_cancel_refund] atomic_refund_failed", {
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      partnerId: params.partnerId,
+      financeAccountId,
+      paidAmount,
+      alreadyRefundedAmount,
+      refundableAmount,
+      error,
+    });
+    return { error: error.message || "Não foi possível gerar o reembolso automático." };
   }
 
-  return { success: true as const, created: createdCount };
+  return { success: true as const, created: Number(data?.created || 0) };
 }
 
 function buildReopenStockErrorMessage(items: OrderStockItem[]) {
@@ -5233,7 +5152,7 @@ export async function updateOrderNotesAction(input: {
   return { success: true as const };
 }
 
-export async function syncOrderDeliveryStatusToDeliveries(
+async function syncOrderDeliveryStatusToDeliveries(
   supabase: any,
   partnerId: string,
   orderIds: string[],
@@ -5314,7 +5233,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
   changeReason?: string;
   paidAmount?: number;
   paymentBreakdown?: any[];
-  mpPaymentId?: string;
   manualBalanceOverride?: boolean;
   expectedUpdatedAt?: string;
 }) {
@@ -5329,11 +5247,42 @@ export async function updateOrdersStatusInBatchAction(payload: {
   ) {
     return { error: "Ação inválida para pedidos." };
   }
+  if (
+    payload.generateAutomaticRefund !== undefined &&
+    typeof payload.generateAutomaticRefund !== "boolean"
+  ) {
+    return { error: "Opção de reembolso inválida." };
+  }
   if (!Array.isArray(payload.orderIds) || payload.orderIds.length === 0 || payload.orderIds.length > 100) {
     return { error: "Informe de 1 a 100 pedidos para atualizar." };
   }
   if (new Set(payload.orderIds).size !== payload.orderIds.length || payload.orderIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
     return { error: "A lista contém IDs inválidos ou repetidos." };
+  }
+  if (
+    payload.actionType === "payment_status" &&
+    payload.paidAmount !== undefined &&
+    (!Number.isFinite(payload.paidAmount) || payload.paidAmount < 0)
+  ) {
+    return { error: "Valor recebido inválido." };
+  }
+  if (
+    payload.actionType === "payment_status" &&
+    payload.paymentBreakdown !== undefined &&
+    (!Array.isArray(payload.paymentBreakdown) ||
+      payload.paymentBreakdown.length > 20 ||
+      payload.paymentBreakdown.some((leg: any) =>
+        !leg ||
+        !String(leg.method || "").trim() ||
+        String(leg.method).length > 120 ||
+        ["amount", "amountReceived", "effectiveAmount", "netAmount", "adjustmentAmount", "adjustmentPercent", "paymentMethodDiscountAmount", "interestAmount", "feeAmount", "fixedFeeAmount", "installmentCostAmount", "installmentAmount"]
+          .some((key) => leg[key] != null && (!Number.isFinite(leg[key]) || leg[key] < 0)) ||
+        (leg.paymentMethodId != null &&
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(leg.paymentMethodId))) ||
+        (leg.mpPaymentId != null && String(leg.mpPaymentId).length > 100)
+      ))
+  ) {
+    return { error: "Detalhamento de pagamento inválido." };
   }
 
   const access = await requirePermission(
@@ -5344,6 +5293,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
   );
   if (payload.actionType === "payment_status") {
     await requirePermission(payload.partnerId, "financial", "edit", user);
+  }
+  if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
+    await requirePermission(payload.partnerId, "orders", "can_refund", user);
   }
   const supabase = createAdminClient();
   const capabilities = await getPartnerCapabilities(payload.partnerId);
@@ -5359,7 +5311,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
   if (!currentOrders || currentOrders.length !== payload.orderIds.length) {
     return { error: "Nenhum pedido válido foi encontrado para processar." };
   }
-  if (payload.actionType === "payment_status" && payload.paidAmount !== undefined) {
+  if (
+    payload.actionType === "payment_status" &&
+    (payload.paidAmount !== undefined || payload.paymentBreakdown !== undefined)
+  ) {
     const order = currentOrders[0] as any;
     if (
       payload.orderIds.length !== 1 ||
@@ -5373,12 +5328,63 @@ export async function updateOrdersStatusInBatchAction(payload: {
     }
   }
 
+  if (payload.actionType === "payment_status" && Array.isArray(payload.paymentBreakdown)) {
+    const paymentMethodIds = Array.from(new Set(
+      payload.paymentBreakdown
+        .map((leg: any) => leg.paymentMethodId)
+        .filter((id: unknown): id is string => typeof id === "string" && Boolean(id)),
+    ));
+    if (paymentMethodIds.length > 0) {
+      const { data: methods, error: methodsError } = await supabase
+        .from("payment_methods")
+        .select("id, store_id")
+        .eq("partner_id", payload.partnerId)
+        .in("id", paymentMethodIds);
+      const orderStoreId = (currentOrders[0] as any)?.store_id || null;
+      if (
+        methodsError ||
+        (methods || []).length !== paymentMethodIds.length ||
+        (methods || []).some((method: any) => method.store_id && method.store_id !== orderStoreId)
+      ) {
+        return { error: "Um método de pagamento não pertence ao parceiro/loja do pedido." };
+      }
+    }
+
+    const order = currentOrders[0] as any;
+    const existingMpIds = new Set(
+      (Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [])
+        .map((leg: any) => String(leg?.mpPaymentId || ""))
+        .filter(Boolean),
+    );
+    if (payload.paymentBreakdown.some((leg: any) =>
+      leg?.mpPaymentId && !existingMpIds.has(String(leg.mpPaymentId))
+    )) {
+      return { error: "Não é permitido vincular um novo ID do Mercado Pago por esta ação." };
+    }
+
+    const discountRequested = payload.paymentBreakdown.some((leg: any) =>
+      String(leg?.adjustmentType || "").toLowerCase() === "discount" &&
+      Number(leg?.paymentMethodDiscountAmount || leg?.adjustmentAmount || 0) > 0.009
+    );
+    if (discountRequested) {
+      await requirePermission(payload.partnerId, "orders", "can_apply_discount", user);
+      const totalDiscount = payload.paymentBreakdown.reduce((sum: number, leg: any) =>
+        sum + Number(leg?.paymentMethodDiscountAmount || leg?.adjustmentAmount || 0), 0);
+      if (totalDiscount > Number((currentOrders[0] as any).total_amount || 0) + 0.009) {
+        return { error: "O desconto informado excede o valor do pedido." };
+      }
+    }
+  }
+
   const storeAction = payload.actionType === "cancel" ? "cancel" : "edit";
   for (const order of currentOrders as any[]) {
     if (order.store_id) {
       await requireStorePermission(order.store_id, payload.partnerId, "orders", storeAction);
       if (payload.actionType === "payment_status") {
         await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
+      }
+      if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
+        await requireStorePermission(order.store_id, payload.partnerId, "orders", "can_refund");
       }
     }
   }
@@ -5442,8 +5448,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         : Promise.resolve({ data: null }),
     ]);
 
-    const effectiveUserName =
-      profileRes.data?.full_name || payload.userName || "Usuario";
+    const effectiveUserName = profileRes.data?.full_name || "Usuário";
     const sellerPartnerUserIdMap = new Map<string, string>();
     for (const row of partnerUsersRes.data || []) {
       if (row.user_id && row.id) {
@@ -5467,7 +5472,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
       );
       const stockWasRestoredOnCancel = shouldRestoreStockWithMovement;
 
-      const { error: updateOrderErr } = await supabase
+      let cancelOrderQuery = supabase
         .from("orders")
         .update({
           situation: "cancelled",
@@ -5477,13 +5482,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
         })
         .eq("id", order.id)
         .eq("partner_id", payload.partnerId);
+      cancelOrderQuery = order.updated_at
+        ? cancelOrderQuery.eq("updated_at", order.updated_at)
+        : cancelOrderQuery.eq("situation", order.situation);
+      const { data: cancelledOrder, error: updateOrderErr } = await cancelOrderQuery
+        .select("id")
+        .maybeSingle();
 
-      if (updateOrderErr) {
+      if (updateOrderErr || !cancelledOrder) {
         return {
           success: false,
           order,
           stockWasRestoredOnCancel,
-          warning: `Pedido ${order.order_number || order.id}: falha ao cancelar (${updateOrderErr.message})`,
+          warning: `Pedido ${order.order_number || order.id}: falha ao cancelar (${updateOrderErr?.message || "o pedido mudou durante a operação"})`,
         };
       }
 
@@ -6054,7 +6065,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
         ...(nextCheckoutFulfillment
           ? { checkout_fulfillment: nextCheckoutFulfillment }
           : {}),
-        ...(payload.mpPaymentId ? { mp_payment_id: payload.mpPaymentId } : {}),
       };
 
       const updatePaymentState = () => {
@@ -6985,6 +6995,35 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
   try {
     const user = await requireUser();
     if (!user) return { success: false, error: "Não autenticado" };
+    const submittedBreakdown = payload.paymentBreakdown as unknown;
+    const invalidBreakdown =
+      submittedBreakdown !== undefined &&
+      (!Array.isArray(submittedBreakdown) ||
+        submittedBreakdown.length > 10 ||
+        submittedBreakdown.some((leg: any) =>
+          !leg ||
+          !String(leg.method || "").trim() ||
+          !Number.isFinite(leg.amount) ||
+          leg.amount < 0 ||
+          (leg.paymentMethodId != null &&
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              String(leg.paymentMethodId),
+            )),
+        ));
+    if (
+      !["paid", "partially_paid", "unpaid"].includes(String(payload.paymentStatus)) ||
+      !Number.isFinite(payload.paidAmount) ||
+      payload.paidAmount < 0 ||
+      (payload.servicePrice !== undefined &&
+        (!Number.isFinite(payload.servicePrice) || payload.servicePrice < 0)) ||
+      !String(payload.paymentMethod || "").trim() ||
+      String(payload.paymentMethod).length > 120 ||
+      String(payload.serviceName || "").length > 500 ||
+      String(payload.notes || "").length > 5000 ||
+      invalidBreakdown
+    ) {
+      return { success: false, error: "Dados de pagamento inválidos." };
+    }
     await requirePermission(payload.partnerId, "orders", "edit");
     await requirePermission(payload.partnerId, "financial", "edit", user);
 
@@ -7003,6 +7042,46 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     if (order.store_id) {
       await requireStorePermission(order.store_id, payload.partnerId, "orders", "edit");
       await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
+    }
+    if (
+      payload.servicePrice !== undefined &&
+      payload.servicePrice < Number(order.total_amount || 0) - 0.009
+    ) {
+      await requirePermission(payload.partnerId, "orders", "can_apply_discount", user);
+    }
+    if (payload.serviceId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.serviceId)) {
+        return { success: false, error: "Serviço inválido para este pedido." };
+      }
+      let serviceQuery = supabase
+        .from("services")
+        .select("id, store_id")
+        .eq("id", payload.serviceId)
+        .eq("partner_id", payload.partnerId);
+      serviceQuery = order.store_id
+        ? serviceQuery.or(`store_id.is.null,store_id.eq.${order.store_id}`)
+        : serviceQuery.is("store_id", null);
+      const { data: service } = await serviceQuery.maybeSingle();
+      if (!service) return { success: false, error: "Serviço inválido para este pedido." };
+    }
+    const paymentMethodIds = Array.from(new Set(
+      (payload.paymentBreakdown || [])
+        .map((leg) => leg.paymentMethodId)
+        .filter((id): id is string => Boolean(id)),
+    ));
+    if (paymentMethodIds.length > 0) {
+      let methodQuery = supabase
+        .from("payment_methods")
+        .select("id, store_id")
+        .eq("partner_id", payload.partnerId)
+        .in("id", paymentMethodIds);
+      methodQuery = order.store_id
+        ? methodQuery.or(`store_id.is.null,store_id.eq.${order.store_id}`)
+        : methodQuery.is("store_id", null);
+      const { data: methods, error: methodsError } = await methodQuery;
+      if (methodsError || (methods || []).length !== paymentMethodIds.length) {
+        return { success: false, error: "Método de pagamento inválido para este pedido." };
+      }
     }
     if (payload.financeAccountId) {
       const { data: financeAccount } = await supabase
@@ -7033,7 +7112,8 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
       const { data: apptsBefore } = await supabase
         .from("appointments")
         .select("id, order_item_id, service_id, service_name")
-        .eq("marketplace_order_id", payload.orderId);
+        .eq("marketplace_order_id", payload.orderId)
+        .eq("partner_id", payload.partnerId);
 
       // Delete existing non-gift service items then recreate individual items
       await supabase
@@ -7108,7 +7188,8 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 await supabase
                   .from("appointments")
                   .update({ order_item_id: match.id })
-                  .eq("id", appt.id);
+                  .eq("id", appt.id)
+                  .eq("partner_id", payload.partnerId);
               }
             }
           }
@@ -7126,10 +7207,20 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     let breakdownDiscount = 0;
     for (const entry of payload.paymentBreakdown || []) {
       if ((entry as any).adjustmentType === "discount") {
+        const discountAmount = Number((entry as any).paymentMethodDiscountAmount || 0);
+        if (!Number.isFinite(discountAmount) || discountAmount < 0) {
+          return { success: false, error: "Desconto de pagamento inválido." };
+        }
         breakdownDiscount += Number(
           (entry as any).paymentMethodDiscountAmount || 0,
         );
       }
+    }
+    if (breakdownDiscount > Number(order.total_amount || 0) + 0.009) {
+      return { success: false, error: "O desconto informado excede o valor do pedido." };
+    }
+    if (breakdownDiscount > 0.009) {
+      await requirePermission(payload.partnerId, "orders", "can_apply_discount", user);
     }
     const paymentMethodDiscountAmount = breakdownDiscount;
     const paymentMethodExtraAmount = 0;
@@ -7337,22 +7428,44 @@ export async function getOrderPresignedUploadUrlAction(
 
     const { getUploadKindFromMimeType, getUploadValidationRules } =
       await import("@/lib/r2/config");
-    const kind = getUploadKindFromMimeType(fileType) || "image";
+    const kind = getUploadKindFromMimeType(fileType);
+    if (!kind || kind === "video") {
+      return { success: false, error: "Este tipo de arquivo não é permitido em anexos de pedidos." };
+    }
+    if (!Number.isSafeInteger(fileSize) || fileSize < 1) {
+      return { success: false, error: "Tamanho de arquivo inválido." };
+    }
     const { validateUploadRequest } = await import("@/lib/security/file-validator");
     const uploadValidation = validateUploadRequest(fileName, fileType, fileSize);
     if (!uploadValidation.success) return { success: false, error: uploadValidation.error || "Arquivo inválido." };
 
-    if (kind === "document") {
-      const { getPartnerPlan } =
-        await import("@/lib/services/subscription.service");
-      const plan = await getPartnerPlan(partnerId);
-      if (plan.slug !== "crescer" && plan.slug !== "escalar") {
-        return {
-          success: false,
-          error:
-            "Upload de documentos não permitido no seu plano. Faça upgrade para Crescer ou Escalar.",
-        };
-      }
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service");
+    const { getPlanImageAttachmentLimit } = await import("@/lib/subscription/plan-tier");
+    const plan = await getPartnerPlan(partnerId);
+    const attachmentLimit = kind === "image"
+      ? getPlanImageAttachmentLimit(plan.slug)
+      : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 15 : 0;
+    if (attachmentLimit === 0) {
+      return {
+        success: false,
+        error: "Upload de anexos não permitido no seu plano. Faça upgrade para Crescer ou Escalar.",
+      };
+    }
+
+    const { getAdminClient } = await import("@/lib/supabase/admin");
+    const { data: existingAttachments, error: attachmentCountError } = await getAdminClient()
+      .from("order_attachments")
+      .select("file_type")
+      .eq("order_id", orderId);
+    if (attachmentCountError) throw attachmentCountError;
+    const sameKindCount = (existingAttachments || []).filter(
+      (attachment: any) => getUploadKindFromMimeType(String(attachment.file_type || "")) === kind,
+    ).length;
+    if (sameKindCount >= attachmentLimit) {
+      return {
+        success: false,
+        error: `Limite de anexos excedido para o seu plano (${attachmentLimit} arquivo(s)). Faça upgrade para enviar mais.`,
+      };
     }
 
     const rules = getUploadValidationRules(kind);
@@ -7370,6 +7483,7 @@ export async function getOrderPresignedUploadUrlAction(
     const result = await generateSignedUploadUrl({
       fileName,
       fileType,
+      contentLength: fileSize,
       userId: user.id,
       prefix: R2_PREFIXES.orderAttachments,
       kind,
@@ -7412,7 +7526,7 @@ export async function saveOrderAttachmentAction(
     if (!order) return { success: false, error: "Pedido não encontrado." };
     if (order.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "edit");
 
-    const { R2_PREFIXES } = await import("@/lib/r2/config");
+    const { R2_PREFIXES, getUploadKindFromMimeType } = await import("@/lib/r2/config");
     const { validateKeyOwnership } = await import("@/lib/r2/server");
     const expectedPrefix = `users/${user.id}/${R2_PREFIXES.orderAttachments}`;
     if (
@@ -7424,26 +7538,40 @@ export async function saveOrderAttachmentAction(
     ) {
       return { success: false, error: "Chave de arquivo inválida para este usuário." };
     }
+    if (!Number.isSafeInteger(fileSize) || fileSize < 1) {
+      return { success: false, error: "Tamanho de arquivo inválido." };
+    }
+    const uploadKind = getUploadKindFromMimeType(fileType);
+    if (!uploadKind || uploadKind === "video") {
+      return { success: false, error: "Este tipo de arquivo não é permitido em anexos de pedidos." };
+    }
     const { validateUploadRequest } = await import("@/lib/security/file-validator");
     const validation = validateUploadRequest(fileName, fileType, fileSize);
     if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." };
     const { getAdminClient } = await import("@/lib/supabase/admin");
     const admin = getAdminClient();
 
-    // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
-    const { getPartnerPlan } =
-      await import("@/lib/services/subscription.service");
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service");
+    const { getPlanImageAttachmentLimit } = await import("@/lib/subscription/plan-tier");
     const plan = await getPartnerPlan(partnerId);
-    const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0;
+    const limit = uploadKind === "image"
+      ? getPlanImageAttachmentLimit(plan.slug)
+      : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 15 : 0;
+    if (limit === 0) {
+      return { success: false, error: "Upload de anexos não permitido no seu plano." };
+    }
 
-    const { count, error: countErr } = await admin
+    const { data: existingAttachments, error: countErr } = await admin
       .from("order_attachments")
-      .select("id", { count: "exact", head: true })
+      .select("file_type")
       .eq("order_id", orderId);
 
     if (countErr) throw countErr;
 
-    if ((count || 0) >= limit) {
+    const sameKindCount = (existingAttachments || []).filter(
+      (attachment: any) => getUploadKindFromMimeType(String(attachment.file_type || "")) === uploadKind,
+    ).length;
+    if (sameKindCount >= limit) {
       return {
         success: false,
         error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.`,
@@ -7462,7 +7590,7 @@ export async function saveOrderAttachmentAction(
     try {
       const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }));
       actualFileSize = Number(head.ContentLength);
-      if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType) {
+      if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || actualFileSize !== fileSize || head.ContentType !== fileType) {
         return { success: false, error: "O arquivo enviado não corresponde aos dados informados." };
       }
       const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize);

@@ -2,6 +2,27 @@ export const DEFAULT_NO_SHOW_PERIOD_DAYS = 90
 export const DEFAULT_STAGNANT_PERIOD_DAYS = 90
 export const MIN_NO_SHOWS_TO_ALERT = 2
 
+// -- Optimized appointment columns for list/calendar rendering (no select *) --
+export const APPOINTMENT_LIST_COLUMNS = `
+  id, partner_id, customer_id, customer_name, service_name,
+  start_date, start_time, end_date, end_time, duration_minutes,
+  staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source,
+  sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id,
+  orders:marketplace_order_id (
+    id,
+    order_number,
+    situation,
+    total_amount,
+    paid_amount,
+    payment_method,
+    order_source
+  ),
+  customers:customer_id (
+    id,
+    image_url
+  )
+`
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function toDateStr(date: Date): string {

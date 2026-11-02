@@ -35,6 +35,8 @@ export interface SignedUrlResponse {
 export interface UploadConfig {
   fileName: string
   fileType: string
+  /** Exact expected size, signed into PUT requests when supplied. */
+  contentLength?: number
   /** User ID from requireUser() - REQUIRED for multi-tenant isolation */
   userId: string
   prefix?: string
@@ -137,6 +139,7 @@ export async function generateSignedUploadUrl(
     fileName,
     fileType,
     userId,
+    contentLength,
     prefix = R2_PREFIXES.products,
     key: requestedKey,
     expiresIn: requestedExpiry,
@@ -153,6 +156,12 @@ export async function generateSignedUploadUrl(
   // 2. Validate MIME type against strict allowlist
   if (!allowedMimeTypes.includes(fileType)) {
     throw new Error("Tipo de arquivo não permitido")
+  }
+  if (
+    contentLength !== undefined &&
+    (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > defaultRules.maxSize)
+  ) {
+    throw new Error("Tamanho de arquivo inválido")
   }
 
   if (fileType === "text/html" || fileType === "image/svg+xml" || fileType === "application/javascript") {
@@ -182,10 +191,17 @@ export async function generateSignedUploadUrl(
       Bucket: serverConfig.bucketName,
       Key: key,
       ContentType: fileType,
+      ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
       // No ACL - R2 access is controlled via bucket settings and presigned URLs
     })
 
-    const uploadUrl = await getSignedUrl(client, command, { expiresIn })
+    const uploadUrl = await getSignedUrl(client, command, {
+      expiresIn,
+      signableHeaders: new Set([
+        "content-type",
+        ...(contentLength !== undefined ? ["content-length"] : []),
+      ]),
+    })
 
     const baseUrl = getR2PublicUrl().replace(/\/+$/, "")
     return {
