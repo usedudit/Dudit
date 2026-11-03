@@ -358,7 +358,7 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
 
   // Try RPC first (single server-side aggregation - much faster)
   try {
-    const { data: rpcResult, error: rpcError } = await supabase.rpc("get_sales_goals_summary", {
+    const { data: rpcResult, error: rpcError } = await getAdminClient().rpc("get_sales_goals_summary", {
       p_partner_id: partnerId,
     })
 

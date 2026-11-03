@@ -510,7 +510,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
 
     // ── Single bulk RPC call replaces N×400 serial round trips ─────────
     const t1 = performance.now()
-    const { data: bulkRows, error: rpcErr } = await supabase.rpc(
+    const { data: bulkRows, error: rpcErr } = await createAdminClient().rpc(
       "generate_recurring_occurrences_bulk",
       {
         p_partner_id: partnerId,

@@ -1221,9 +1221,11 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             ? 'pending_moderation'
             : (product.moderation_status || 'approved')
 
-        const { data: updatedProduct, error: transactionError } = await supabase.rpc(
-            "update_product_transaction",
+        const adminRpc = getAdminClient()
+        const { data: updatedProduct, error: transactionError } = await adminRpc.rpc(
+            "update_product_transaction_server",
             {
+                p_actor_user_id: cleanupUser.id,
                 p_product_id: productId,
                 p_product_data: payload,
                 p_fiscal_data: fiscalPayload,
@@ -2960,7 +2962,7 @@ export async function checkProductInOrdersAction(productId: string) {
     try {
         await fetchProductAndVerifyOwnership(productId, "view")
         const supabase = await getSupabaseServerClient()
-        const { data: count } = await supabase.rpc('get_product_pending_orders_count', { p_product_id: productId })
+        const { data: count } = await getAdminClient().rpc('get_product_pending_orders_count', { p_product_id: productId })
         return { count: count || 0 }
     } catch (error: any) {
         return { count: 0, error: error.message }

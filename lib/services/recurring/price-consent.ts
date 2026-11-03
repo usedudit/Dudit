@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 
 /** Prazo que o cliente tem para aceitar/recusar uma mudanca de plano. */
@@ -17,7 +18,7 @@ export async function detectPlanPriceChange(
   client: ConsentClient,
   opts: { planId: string },
 ): Promise<{ affected: number }> {
-  const { data, error } = await client.rpc("mark_recurring_plan_price_change", {
+  const { data, error } = await getAdminClient().rpc("mark_recurring_plan_price_change", {
     p_plan_id: opts.planId,
     p_window_days: PRICE_CHANGE_WINDOW_DAYS,
   })

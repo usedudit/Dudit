@@ -11,6 +11,7 @@ import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
 import { AVATAR_COLORS, getBannerUrlByColor } from "@/lib/utils/avatar"
 import { isUuid } from "@/lib/utils/short-id"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -518,8 +519,12 @@ export async function getCollectionItems(collectionId: string, storeId?: string)
 
 export async function recordCollectionView(id: string): Promise<void> {
   try {
-    const supabase = await getSupabaseServerClient()
-    await supabase.rpc("increment_collection_views", { p_collection_id: id })
+    const collectionId = sanitizeUUID(id)
+    if (!collectionId) return
+    const rateLimit = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rateLimit.success) return
+    const admin = getAdminClient()
+    await admin.rpc("increment_collection_views", { p_collection_id: collectionId })
   } catch {
     // fire-and-forget: view counting never blocks
   }

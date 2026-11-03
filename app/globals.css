@@ -676,6 +676,22 @@ tbody tr {
   background: #374151;
 }
 
+/* ERP - modo conteudo
+ *
+ * A regiao de conteudo (abaixo do ERPHeader) e quem rola nas paginas de
+ * conteudo normal (listas, grids, dashboard, importacoes, configuracoes...),
+ * para que a scrollbar nativa do navegador fique na borda da tela.
+ *
+ * Para isso a raiz da pagina nao pode ter altura fixa: com `height: auto` a
+ * cadeia de `h-full` das paginas colapsa, o conteudo flui e a regiao rola o
+ * conjunto. Paginas que precisam ocupar 100% da viewport (PDV, agenda) sao
+ * acao de fora usando a classe `erp-fill-viewport`.
+ */
+.erp-content-flow > *:not(.erp-fill-viewport) {
+  height: auto;
+  flex-shrink: 0;
+}
+
 /* Mobile scrollbar hide - UNIVERSAL */
 @media (pointer: coarse),
 (max-width: 1024px) {

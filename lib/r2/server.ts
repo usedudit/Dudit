@@ -324,7 +324,7 @@ export async function uploadBufferToR2({
   buffer: Buffer | Uint8Array | string
   key: string
   contentType?: string
-}): Promise<{ key: string; publicUrl: string }> {
+}): Promise<{ key: string }> {
   if (!key || key.includes("..") || key.startsWith("/")) {
     throw new Error("Chave de upload inválida")
   }
@@ -341,11 +341,9 @@ export async function uploadBufferToR2({
       })
     )
 
-    const baseUrl = getR2PublicUrl().replace(/\/+$/, "")
-    return {
-      key,
-      publicUrl: `${baseUrl}/${key}`,
-    }
+    // This helper is used for private ERP documents (for example NF-e XMLs).
+    // Never manufacture or return a public URL for an object in this flow.
+    return { key }
   } finally {
     client.destroy()
   }

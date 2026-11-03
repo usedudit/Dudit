@@ -1212,7 +1212,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
         <FadeIn className="h-full">
             <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={detailTab} onValueChange={setDetailTab} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">

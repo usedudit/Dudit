@@ -13,6 +13,7 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getR2PublicUrl } from "@/lib/r2/r2-server-config"
 import { resolveCityAndStateFromSlug } from "./products"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 
 type ActionResult<T = void> = { success: true; data?: T } | { success: false; error: string }
 
@@ -442,8 +443,12 @@ export async function deleteCommunityVideosInBatch(ids: string[]): Promise<Actio
 
 export async function recordVideoView(id: string): Promise<void> {
   try {
-    const supabase = await getSupabaseServerClient()
-    await supabase.rpc("increment_community_video_views", { p_video_id: id })
+    const videoId = sanitizeUUID(id)
+    if (!videoId) return
+    const rateLimit = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rateLimit.success) return
+    const admin = getAdminClient()
+    await admin.rpc("increment_community_video_views", { p_video_id: videoId })
   } catch {
     // fire-and-forget
   }
@@ -451,8 +456,12 @@ export async function recordVideoView(id: string): Promise<void> {
 
 export async function recordVideoClick(id: string): Promise<void> {
   try {
-    const supabase = await getSupabaseServerClient()
-    await supabase.rpc("increment_community_video_clicks", { p_video_id: id })
+    const videoId = sanitizeUUID(id)
+    if (!videoId) return
+    const rateLimit = await requireRateLimit(RateLimitCategory.API_GENERAL)
+    if (!rateLimit.success) return
+    const admin = getAdminClient()
+    await admin.rpc("increment_community_video_clicks", { p_video_id: videoId })
   } catch {
     // fire-and-forget
   }

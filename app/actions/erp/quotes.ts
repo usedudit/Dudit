@@ -1212,7 +1212,7 @@ export async function duplicateQuoteAction(quoteId: string) {
                 .maybeSingle()
 
             // Call Transaction RPC Function
-            const { data: newQuote, error: rpcError } = await supabase.rpc('duplicate_quote_with_items', {
+            const { data: newQuote, error: rpcError } = await getAdminClient().rpc('duplicate_quote_with_items', {
                 p_quote_id: quoteId,
                 p_partner_id: ctx.partnerId,
                 p_user_id: user.id

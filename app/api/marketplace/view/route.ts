@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAdminClient } from "@/lib/supabase/admin"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 import { incrementMarketplaceView } from "@/lib/services/marketplace-metrics.service"
 
 const VALID_TYPES = new Set(["produto", "servico", "plano"])
@@ -7,6 +9,13 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.API_GENERAL)
+    if (rateLimit.limited) {
+      return NextResponse.json(rateLimit.body || { error: "Too many requests" }, {
+        status: rateLimit.status || 429,
+      })
+    }
+
     const body = await request.json().catch(() => ({}))
     const entityType = String(body.entityType || "")
     const entityId = String(body.entityId || "")
@@ -15,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getAdminClient()
     await incrementMarketplaceView(
       supabase,
       entityType as "produto" | "servico" | "plano",

@@ -474,7 +474,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
         <FadeIn className="h-full">
             <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-300">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">

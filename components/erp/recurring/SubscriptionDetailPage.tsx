@@ -662,7 +662,7 @@ export const SubscriptionDetailPage: React.FC<SubscriptionDetailPageProps> = ({
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth"
+            className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-24 md:pb-8 scroll-smooth"
           >
             {/* Sticky Header */}
             <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-500 ease-in-out">

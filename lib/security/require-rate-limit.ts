@@ -143,6 +143,12 @@ export async function requireRateLimit(
         // Memory pre-check for non-critical routes to save Redis commands during fast UI interaction
         if (!config.failClosed) {
             const now = Date.now()
+            if (localShortCircuitCache.size > 1000) {
+                for (const [k, v] of localShortCircuitCache) {
+                    if (v.resetAt <= now) localShortCircuitCache.delete(k)
+                }
+            }
+
             const cached = localShortCircuitCache.get(identifier)
             if (cached && cached.resetAt > now) {
                 cached.count++

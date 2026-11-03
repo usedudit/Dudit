@@ -1839,7 +1839,7 @@ export default function CreateTransactionPage({
                     <div
                         ref={scrollContainerRef}
                         onScroll={handleScroll}
-                        className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar"
+                        className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar"
                     >
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">

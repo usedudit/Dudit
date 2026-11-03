@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 export interface GrantCreditsInput {
   partnerId: string
@@ -148,7 +149,9 @@ export async function consumeSubscriptionCredits(
   }
 
   // Call the database function
-  const { data, error } = await supabase.rpc("consume_credits_fifo", {
+  // This SECURITY DEFINER RPC mutates credit balances and is service-role only.
+  // Callers perform their user/partner checks before reaching this server helper.
+  const { data, error } = await getAdminClient().rpc("consume_credits_fifo", {
     p_partner_id: input.partnerId,
     p_customer_id: input.customerId,
     p_service_id: input.serviceId || null,

@@ -5,7 +5,7 @@ import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { parseNFeFull, type NFMetadata, type ProductFromXML, type DuplicataFromXML } from "@/lib/xml-parser"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireStorePermission, requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -1123,13 +1123,21 @@ export async function confirmImportAction(
 
     const { data: xmlImport, error: fetchErr } = await supabase
       .from("xml_imports")
-      .select("id, status, total_value, supplier_id, duplicatas, partner_id, invoice_number, access_key, raw_xml, xml_hash, xml_size, file_key, file_name")
+      .select("id, status, total_value, supplier_id, duplicatas, partner_id, store_id, invoice_number, access_key, raw_xml, xml_hash, xml_size, file_key, file_name")
       .eq("id", xmlImportId)
       .eq("partner_id", partnerId)
       .single()
 
     if (fetchErr || !xmlImport) {
       return { success: false, error: "Importação não encontrada" }
+    }
+
+    const effectiveStoreId = xmlImport.store_id || null
+    if (storeId && storeId !== effectiveStoreId) {
+      return { success: false, error: "A loja não corresponde à importação." }
+    }
+    if (effectiveStoreId) {
+      await requireStorePermission(effectiveStoreId, partnerId, "products", "create")
     }
 
     if (xmlImport.status !== "preview" && xmlImport.status !== "failed") {
@@ -1167,10 +1175,11 @@ export async function confirmImportAction(
       }
     }
 
-    const { data: result, error: rpcErr } = await supabase.rpc("execute_xml_import", {
+    const admin = getAdminClient()
+    const { data: result, error: rpcErr } = await admin.rpc("execute_xml_import", {
       p_xml_import_id: xmlImportId,
       p_partner_id: partnerId,
-      p_store_id: storeId,
+      p_store_id: effectiveStoreId,
       p_items: decisions,
       p_supplier_actions: Object.keys(supplierActions).length > 0 ? supplierActions : null,
       p_created_by: user.id,
@@ -1576,11 +1585,28 @@ export async function revertImportAction(
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()
 
-    const { data: result, error: rpcErr } = await supabase.rpc("revert_xml_import", {
+    const { data: xmlImport } = await supabase
+      .from("xml_imports")
+      .select("id, partner_id, store_id")
+      .eq("id", xmlImportId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!xmlImport) return { success: false, error: "Importação não encontrada" }
+
+    const effectiveStoreId = xmlImport.store_id || null
+    if (storeId && storeId !== effectiveStoreId) {
+      return { success: false, error: "A loja não corresponde à importação." }
+    }
+    if (effectiveStoreId) {
+      await requireStorePermission(effectiveStoreId, partnerId, "products", "create")
+    }
+
+    const admin = getAdminClient()
+    const { data: result, error: rpcErr } = await admin.rpc("revert_xml_import", {
       p_xml_import_id: xmlImportId,
       p_reason: reason || null,
       p_created_by: user.id,
-      p_store_id: storeId || null,
+      p_store_id: effectiveStoreId,
     })
 
     if (rpcErr) {

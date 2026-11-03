@@ -152,13 +152,13 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 200,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: true,
+    failClosed: false,
   },
   [RateLimitCategory.PRODUCT_DELETE]: {
     maxRequests: 50,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: true,
+    failClosed: false,
   },
   [RateLimitCategory.REPORT_CREATE]: {
     // Reports are abuse-sensitive: combine user+IP and fail-closed to block
@@ -268,7 +268,7 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 200,
     window: "1 h",
     identifierType: IdentifierType.USER,
-    failClosed: true,
+    failClosed: false,
   },
   [RateLimitCategory.SERVICE_ORDER_PUBLIC]: {
     maxRequests: 120,

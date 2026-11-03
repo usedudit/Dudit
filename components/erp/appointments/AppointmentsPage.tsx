@@ -832,7 +832,7 @@ const AppointmentsPage = ({
             <AnimatePresence mode="wait">
                 <FadeIn
                     key="list"
-                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 erp-fill-viewport"
                 >
                     <style>{`
                     .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 

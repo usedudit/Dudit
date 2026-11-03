@@ -36,23 +36,17 @@ if (!kvUrl || !kvToken) {
 
 const redis = new Redis({ url: kvUrl, token: kvToken })
 
-async function cleanSearchTelemetryKeys() {
-    console.log("🔍 Procurando chaves ddt:search:* no Redis...")
-
+async function deletePattern(pattern: string): Promise<number> {
+    console.log(`🔍 Procurando chaves ${pattern} no Redis...`)
     let cursor: string | number = 0
     let totalDeleted = 0
 
     do {
-        // Usa SCAN para varrer com segurança sem travar o Redis
-        const [nextCursor, keys] = await redis.scan(cursor, { match: "ddt:search:*", count: 100 })
+        const [nextCursor, keys] = await redis.scan(cursor, { match: pattern, count: 100 })
         cursor = nextCursor
 
         if (keys && keys.length > 0) {
-            console.log(`Encontradas ${keys.length} chaves no lote atual. Deletando...`)
-            for (const key of keys) {
-                console.log(` - Removendo: ${key}`)
-            }
-            // Deleta em lote via pipeline
+            console.log(`Encontradas ${keys.length} chaves (${pattern}). Deletando...`)
             const p = redis.pipeline()
             for (const key of keys) {
                 p.del(key)
@@ -62,10 +56,25 @@ async function cleanSearchTelemetryKeys() {
         }
     } while (cursor !== 0 && cursor !== "0")
 
-    console.log(`\n🎉 Concluído com sucesso! Total de chaves ddt:search:* deletadas: ${totalDeleted}`)
+    return totalDeleted
 }
 
-cleanSearchTelemetryKeys().catch((err) => {
+async function cleanLegacyRedisKeys() {
+    console.log("🧹 Iniciando limpeza de chaves legadas e órfãs no Redis...")
+
+    const searchDeleted = await deletePattern("ddt:search:*")
+    const exploreDeleted = await deletePattern("explore:*")
+    const dataDeleted = await deletePattern("data:v2:*")
+
+    const total = searchDeleted + exploreDeleted + dataDeleted
+    console.log(`\n🎉 Concluído com sucesso!`)
+    console.log(` - ddt:search:*: ${searchDeleted}`)
+    console.log(` - explore:*: ${exploreDeleted}`)
+    console.log(` - data:v2:*: ${dataDeleted}`)
+    console.log(` Total de chaves deletadas: ${total}`)
+}
+
+cleanLegacyRedisKeys().catch((err) => {
     console.error("Erro ao limpar chaves:", err)
     process.exit(1)
 })

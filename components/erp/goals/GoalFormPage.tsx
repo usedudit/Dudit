@@ -359,7 +359,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8">
+                <div className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-24 md:pb-8">
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
