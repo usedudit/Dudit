@@ -146,7 +146,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
     }
 
     // Upload a single file to R2 via signed URL
-    const uploadFileToR2 = async (file: File): Promise<{ url: string; name: string; size: number; key?: string }> => {
+    const uploadFileToR2 = async (file: File): Promise<{ url: string | null; name: string; size: number; key?: string }> => {
         let contentType = file.type
         const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."))
         if (!contentType || contentType === "application/octet-stream") {
@@ -210,7 +210,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
         setUploadStatus("Enviando evidências...")
         try {
             // 1. Upload staged images to R2
-            const uploadedImages: { url: string; name: string; size: number; key?: string }[] = []
+            const uploadedImages: { url: string | null; name: string; size: number; key?: string }[] = []
             for (let i = 0; i < stagedImages.length; i++) {
                 const imgFile = stagedImages[i]
                 setUploadStatus(`Enviando imagem (${i + 1}/${stagedImages.length})...`)
@@ -219,7 +219,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             }
 
             // 2. Upload staged documents to R2
-            const uploadedDocs: { url: string; name: string; size: number; key?: string }[] = []
+            const uploadedDocs: { url: string | null; name: string; size: number; key?: string }[] = []
             for (let i = 0; i < stagedDocs.length; i++) {
                 const docFile = stagedDocs[i]
                 setUploadStatus(`Enviando documento (${i + 1}/${stagedDocs.length})...`)

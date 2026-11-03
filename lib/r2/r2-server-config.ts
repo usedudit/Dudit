@@ -1,6 +1,7 @@
 import "server-only"
 
 import { r2PublicConfig } from "./r2-public"
+import { isKeyPrivate } from "./config"
 
 /**
  * R2 server credentials - NEVER import from client code.
@@ -12,7 +13,24 @@ export function getR2ServerConfig() {
     secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID || "",
     bucketName: process.env.CLOUDFLARE_R2_BUCKET || "",
+    privateBucketName: process.env.CLOUDFLARE_R2_PRIVATE_BUCKET || "",
   }
+}
+
+/** Select the storage bucket by data classification. Private keys fail closed. */
+export function getR2BucketNameForKey(key: string): string {
+  const config = getR2ServerConfig()
+  if (isKeyPrivate(key)) {
+    if (!config.privateBucketName) {
+      throw new Error("CLOUDFLARE_R2_PRIVATE_BUCKET não está configurado para arquivos privados")
+    }
+    if (config.privateBucketName === config.bucketName) {
+      throw new Error("O bucket privado precisa ser diferente do bucket público")
+    }
+    return config.privateBucketName
+  }
+  if (!config.bucketName) throw new Error("CLOUDFLARE_R2_BUCKET não está configurado")
+  return config.bucketName
 }
 
 /**
@@ -47,6 +65,12 @@ export function validateR2Config() {
 
   if (!config.bucketName) {
     errors.push("CLOUDFLARE_R2_BUCKET não está configurado")
+  }
+
+  if (!config.privateBucketName) {
+    errors.push("CLOUDFLARE_R2_PRIVATE_BUCKET não está configurado")
+  } else if (config.privateBucketName === config.bucketName) {
+    errors.push("CLOUDFLARE_R2_PRIVATE_BUCKET deve apontar para um bucket diferente")
   }
 
   if (!r2PublicConfig.cdnUrl) {

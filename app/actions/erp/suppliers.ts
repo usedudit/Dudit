@@ -17,6 +17,7 @@ import { enrichAddressData } from "@/lib/services/location.service"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { resolveRecordImage, validatePrivateRecordImageKey } from "@/lib/r2/private-record-image"
 
 async function requireSupplierModuleAccess(supplierId: string, action: "view" | "create" | "edit" | "delete") {
   const user = await requireUser()
@@ -75,6 +76,12 @@ export async function createComprehensiveSupplierAction(data: {
   const user = await requireUser()
 
   await requirePartnerAccessWithPermission(data.partnerId, "suppliers", "create")
+  let imageUrl: string | null
+  try {
+    imageUrl = validatePrivateRecordImageKey(data.image_url, user.id, "suppliers")
+  } catch (error: any) {
+    return { error: error.message || "Imagem inválida." }
+  }
 
   // Check subscription feature
   if (!await canUseFeature(data.partnerId, "supplier_management")) {
@@ -120,7 +127,7 @@ export async function createComprehensiveSupplierAction(data: {
     crt: data.crt || null,
     notes: sanitizeNotes(data.notes),
     supplier_code: supplierCode,
-    image_url: data.image_url || null,
+    image_url: imageUrl,
   }).select().single()
 
   if (error) {
@@ -306,6 +313,20 @@ export async function updateComprehensiveSupplierAction(data: {
   }
 
   const { supabase, partnerId } = await requireSupplierModuleAccess(data.supplierId, "edit")
+  const { data: existingImageRow, error: existingImageError } = await supabase
+    .from("suppliers")
+    .select("image_url")
+    .eq("id", data.supplierId)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+  if (existingImageError || !existingImageRow) return { error: "Fornecedor não encontrado." }
+  const currentUser = await requireUser()
+  let imageUrl: string | null
+  try {
+    imageUrl = validatePrivateRecordImageKey(data.image_url, currentUser.id, "suppliers", existingImageRow.image_url)
+  } catch (error: any) {
+    return { error: error.message || "Imagem inválida." }
+  }
 
   if (data.personType !== "foreign" && data.phone && !validateBrazilMobile(data.phone)) {
     return { error: "Celular inválido. Use o formato (00) 90000-0000" }
@@ -340,7 +361,7 @@ export async function updateComprehensiveSupplierAction(data: {
       inscricao_municipal: data.inscricaoMunicipal || null,
       crt: data.crt || null,
       notes: sanitizeNotes(data.notes),
-      image_url: data.image_url || null,
+      image_url: imageUrl,
       updated_at: new Date().toISOString(),
     })
     .eq("id", data.supplierId)
@@ -569,7 +590,8 @@ export async function getERPSuppliersPageAction(
       }
     }))
 
-    return { success: true, items, nextCursor, hasMore }
+    const itemsWithSignedImages = await Promise.all(items.map((item: any) => resolveRecordImage(item)))
+    return { success: true, items: itemsWithSignedImages, nextCursor, hasMore }
   } catch (e: any) {
     return { success: false, error: e?.message || "Erro ao carregar fornecedores" }
   }
@@ -613,7 +635,7 @@ export async function getSupplierByIdAction(supplierId: string) {
     supplier.municipio_codigo_ibge = supplierAddr.municipio_codigo_ibge
   }
 
-  return { supplier }
+  return { supplier: await resolveRecordImage(supplier) }
 }
 
 export async function deleteSuppliersInBatchAction(supplierIds: string[]) {

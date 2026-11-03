@@ -708,7 +708,7 @@ export async function getStockMovementPresignedUploadUrlAction(
   fileType: string,
   fileSize: number
 ): Promise<
-  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
   | { success: false; error: string }
 > {
   try {

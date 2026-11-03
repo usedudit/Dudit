@@ -1214,7 +1214,7 @@ export async function getPresignedUploadUrlAction(
   fileType: string,
   fileSize: number,
 ): Promise<
-  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
   | { success: false; error: string }
 > {
   try {
@@ -1223,10 +1223,8 @@ export async function getPresignedUploadUrlAction(
     const user = await requireUser()
 
     const allowedPrefixes = new Set([
-      "service-orders",
-      "serviceOrderAttachments",
+      R2_PREFIXES.serviceOrderAttachments,
       R2_PREFIXES.serviceOrderSignatures,
-      R2_PREFIXES.serviceOrderPdfs,
     ])
     if (!allowedPrefixes.has(prefix)) {
       return { success: false, error: "Destino de upload inválido." }
@@ -1298,7 +1296,7 @@ export async function saveAttachmentAction(
     if (
       typeof fileKey !== "string" ||
       !validateKeyOwnership(fileKey, user.id) ||
-      !new RegExp(`^users/${user.id}/(?:service-orders|serviceOrderAttachments)[^/]+$`).test(fileKey) ||
+      !new RegExp(`^users/${user.id}/service-orders/attachments/[^/]+$`).test(fileKey) ||
       fileKey.includes("..") ||
       fileKey.startsWith("/")
     ) {
@@ -1328,7 +1326,7 @@ export async function saveAttachmentAction(
       return { success: false, error: "Upload de anexos não permitido no seu plano." }
     }
 
-    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+    const { getR2ServerConfig, getR2BucketNameForKey } = await import("@/lib/r2/r2-server-config")
     const { S3Client, HeadObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3")
     const serverConfig = getR2ServerConfig()
     const s3 = new S3Client({
@@ -1339,7 +1337,8 @@ export async function saveAttachmentAction(
     let actualFileSize: number
     let finalHash: string
     try {
-      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+      const bucketName = getR2BucketNameForKey(fileKey)
+      const head = await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: fileKey }))
       actualFileSize = Number(head.ContentLength)
       if (!Number.isSafeInteger(actualFileSize) || actualFileSize !== fileSize || head.ContentType !== fileType) {
         return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
@@ -1351,7 +1350,7 @@ export async function saveAttachmentAction(
       if (fileHash !== undefined && !/^[a-f0-9]{64}$/i.test(fileHash)) {
         return { success: false, error: "Hash do arquivo inválido." }
       }
-      const object = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+      const object = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: fileKey }))
       if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
       const crypto = await import("node:crypto")
       const hash = crypto.createHash("sha256")
@@ -1503,11 +1502,14 @@ export async function deleteAttachmentAction(
 
     if (attachment.file_key) {
       const { deleteFileFromR2 } = await import("@/lib/r2/server")
-      try { await deleteFileFromR2(attachment.file_key) } catch { }
+      // Keep the database reference if storage deletion fails so the operation
+      // can be retried and does not silently orphan the object.
+      await deleteFileFromR2(attachment.file_key)
     }
 
     const admin = getAdminClient()
-    await admin.from("service_order_attachments").delete().eq("id", attachmentId).eq("service_order_id", serviceOrderId)
+    const { error: deleteError } = await admin.from("service_order_attachments").delete().eq("id", attachmentId).eq("service_order_id", serviceOrderId)
+    if (deleteError) throw deleteError
 
     await logAuditEvent({
       partnerId, actorUserId: user.id,
@@ -1533,7 +1535,42 @@ export async function deleteServiceOrderAction(
     const user = await requireUser()
     const admin = getAdminClient()
 
-    await admin.from("service_orders").delete().eq("id", serviceOrderId).eq("partner_id", partnerId)
+    const { data: serviceOrder, error: serviceOrderError } = await admin
+      .from("service_orders")
+      .select("id, store_id, signature_image_key")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (serviceOrderError || !serviceOrder) {
+      return { success: false, error: serviceOrderError?.message || "Ordem de serviço não encontrada." }
+    }
+    if (serviceOrder.store_id) {
+      await requireStorePermission(serviceOrder.store_id, partnerId, "service_orders", "delete")
+    }
+
+    const { data: attachments, error: attachmentsError } = await admin
+      .from("service_order_attachments")
+      .select("file_key")
+      .eq("service_order_id", serviceOrderId)
+    if (attachmentsError) throw attachmentsError
+
+    const fileKeys = Array.from(new Set([
+      serviceOrder.signature_image_key,
+      ...(attachments || []).map((attachment: any) => attachment.file_key),
+    ].filter((key): key is string => typeof key === "string" && key.length > 0)))
+    if (fileKeys.length) {
+      const { deleteFileFromR2 } = await import("@/lib/r2/server")
+      // Delete objects before cascading the attachment rows. On failure the OS
+      // remains in the database so the cleanup can be retried.
+      for (const key of fileKeys) await deleteFileFromR2(key)
+    }
+
+    const { error: deleteError } = await admin
+      .from("service_orders")
+      .delete()
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+    if (deleteError) throw deleteError
 
     await logAuditEvent({
       partnerId, actorUserId: user.id,
@@ -2462,7 +2499,7 @@ export async function getPublicPresignedUploadUrlAction(
   fileType: string,
   fileSize: number,
 ): Promise<
-  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
   | { success: false; error: string }
 > {
   try {

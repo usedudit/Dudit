@@ -26,6 +26,7 @@ import { checkLimit } from "@/lib/services/subscription.service"
 import { requireAuthorizedCustomerContext, requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { resolveRecordImage, validatePrivateRecordImageKey } from "@/lib/r2/private-record-image"
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -160,6 +161,12 @@ export async function createComprehensiveCustomerAction(data: {
   const user = customerAccess.user
   const partnerId = customerAccess.partnerId
   const admin = customerAccess.admin
+  let imageUrl: string | null
+  try {
+    imageUrl = validatePrivateRecordImageKey(data.image_url, user.id, "customers")
+  } catch (error: any) {
+    return { error: error.message || "Imagem inválida." }
+  }
 
   if (!data.name.trim()) {
     return { error: "Nome é obrigatório" }
@@ -245,7 +252,7 @@ export async function createComprehensiveCustomerAction(data: {
     birth_date: data.birthDate || null,
     mother_name: data.motherName ? sanitizeInput(data.motherName, 150) : null,
     father_name: data.fatherName ? sanitizeInput(data.fatherName, 150) : null,
-    image_url: data.image_url || null,
+    image_url: imageUrl,
   }).select("id").single()
 
   if (error) {
@@ -304,6 +311,7 @@ export async function createComprehensiveCustomerAction(data: {
 
   await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
+  const resolvedImage = await resolveRecordImage({ image_url: imageUrl })
   return {
     success: true,
     data: {
@@ -318,7 +326,8 @@ export async function createComprehensiveCustomerAction(data: {
       store_credit: 0,
       created_at: new Date().toISOString(),
       person_type: data.personType,
-      image_url: data.image_url || null,
+      image_url: resolvedImage.image_url || null,
+      image_key: resolvedImage.image_key,
       city: data.city || null,
       state: data.state || null,
       orders_count: 0,
@@ -419,6 +428,19 @@ export async function updateComprehensiveCustomerAction(data: {
   const customerAccess = await requireAuthorizedCustomerRecord(data.customerId, "edit")
   const partnerId = customerAccess.partnerId
   const supabase = customerAccess.admin
+  const { data: existingImageRow, error: existingImageError } = await supabase
+    .from("customers")
+    .select("image_url")
+    .eq("id", data.customerId)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+  if (existingImageError || !existingImageRow) return { error: "Cliente não encontrado." }
+  let imageUrl: string | null
+  try {
+    imageUrl = validatePrivateRecordImageKey(data.image_url, customerAccess.user.id, "customers", existingImageRow.image_url)
+  } catch (error: any) {
+    return { error: error.message || "Imagem inválida." }
+  }
 
   if (data.email && !validateEmail(data.email)) {
     return { error: "E-mail inválido" }
@@ -473,7 +495,7 @@ export async function updateComprehensiveCustomerAction(data: {
     website: data.website || null,
     person_type: data.personType,
     status: data.status || "ativo",
-    image_url: data.image_url || null,
+    image_url: imageUrl,
   }
 
   if (customerAccess.roleId !== "operator") {
@@ -623,6 +645,7 @@ export async function updateComprehensiveCustomerAction(data: {
 
   await revalidateCustomers(partnerId)
   revalidatePath("/erp/clientes")
+  const resolvedImage = await resolveRecordImage({ image_url: imageUrl })
   return {
     success: true,
     data: {
@@ -635,7 +658,8 @@ export async function updateComprehensiveCustomerAction(data: {
       status: data.status || "ativo",
       is_active: (data.status || "ativo") === "ativo",
       person_type: data.personType,
-      image_url: data.image_url || null,
+      image_url: resolvedImage.image_url || null,
+      image_key: resolvedImage.image_key,
       city: data.city || null,
       state: data.state || null,
     },
@@ -646,7 +670,7 @@ export async function getCustomerByIdAction(customerId: string) {
   const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
   const authorizedPartner = { partnerId: customerAccess.partnerId }
   const detailAdmin = createAdminClient()
-  const { data: customer, error: customerError } = await getCachedErpPage(
+  const { data: customerData, error: customerError } = await getCachedErpPage(
     ["erp-customer-detail", authorizedPartner.partnerId, customerId],
     [TAGS.customers(authorizedPartner.partnerId), TAGS.orders(authorizedPartner.partnerId)],
     async () => {
@@ -669,9 +693,11 @@ export async function getCustomerByIdAction(customerId: string) {
     console.error("[getCustomerByIdAction] Customer lookup error:", customerError)
   }
 
-  if (!customer) {
+  if (!customerData) {
     return { error: "Cliente nÃ£o encontrado" }
   }
+
+  const customer = await resolveRecordImage(customerData)
 
   // Decrypt CPF if present
   if (customer.cpf) {
@@ -1032,7 +1058,8 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
       })
     }
 
-    return { customers: result }
+    const customersWithSignedImages = await Promise.all(result.map((customer: any) => resolveRecordImage(customer)))
+    return { customers: customersWithSignedImages }
   } catch (err: any) {
     console.error("[getPartnerCustomersAction] Error:", err)
     return { error: err.message || "Erro interno ao buscar clientes" }
@@ -1316,7 +1343,7 @@ export async function getERPCustomersPageAction(
     const hasMore = page.hasMore
     const items: any[] = page.items
 
-    const visibleItems = items.map((item) => {
+    const visibleItems = await Promise.all(items.map(async (item) => {
       const safeItem = { ...item }
       if (!canViewPersonalData) {
         delete safeItem.birth_date
@@ -1327,8 +1354,8 @@ export async function getERPCustomersPageAction(
         delete safeItem.total_spent
         delete safeItem.last_order_at
       }
-      return safeItem
-    })
+      return resolveRecordImage(safeItem)
+    }))
 
     const last = visibleItems[visibleItems.length - 1]
     const nextCursor: ERPCustomerListCursor | null =

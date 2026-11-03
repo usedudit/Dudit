@@ -70,6 +70,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
         prefix: "customers/",
+        partnerId,
+        partnerPermission: customerId ? "edit" : "create",
     })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -173,7 +175,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         setBirthDate(c.birth_date || "")
         setMotherName(c.mother_name || "")
         setFatherName(c.father_name || "")
-        setImageUrl(c.image_url || "")
+        setImageUrl(c.image_key || c.image_url || "")
         setImagePreview(c.image_url || "")
         if (c.phone_fixed) setPhone(c.phone_fixed)
     }, [])
@@ -384,8 +386,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             let finalImageUrl = imageUrl
             if (imageFile) {
                 const uploadRes = await uploadFile(imageFile)
-                if (uploadRes && uploadRes.publicUrl) {
-                    finalImageUrl = uploadRes.publicUrl
+                if (uploadRes && uploadRes.key) {
+                    finalImageUrl = uploadRes.key
                 } else {
                     notifyError("Erro ao fazer upload da imagem.")
                     setIsSaving(false)

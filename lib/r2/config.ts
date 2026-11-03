@@ -187,11 +187,17 @@ export const PRIVATE_PREFIXES = [
   "erp/attachments/",
   "erp/contracts/",
   "erp/invoices/",
+  "customers/",
+  "suppliers/",
   "customers/documents/",
+  "orders/",
   "orders/attachments/",
+  "billing-refunds/",
+  "service-orders/",
   "service-orders/attachments/",
   "service-orders/signatures/",
   "service-orders/pdfs/",
+  "returns/",
   "temp/",
 ] as const
 
@@ -199,7 +205,9 @@ export const PRIVATE_PREFIXES = [
  * Helper to determine if a key or path belongs to a private folder.
  */
 export function isKeyPrivate(key: string): boolean {
-  return PRIVATE_PREFIXES.some(prefix => key.includes(prefix))
+  const normalized = key.replace(/^\/+/, "")
+  const userScoped = normalized.match(/^users\/[^/]+\/(.*)$/)?.[1] ?? normalized
+  return PRIVATE_PREFIXES.some(prefix => userScoped.startsWith(prefix))
 }
 
 // ─── Unified Dynamic Rules Helpers ──────────────────────────────────────────

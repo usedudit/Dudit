@@ -1,5 +1,6 @@
 "use server"
 
+import crypto from "crypto"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { parseNFeXML, mapNFeToProductData } from "@/lib/xml-parser"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
@@ -137,7 +138,9 @@ export async function importProductsFromXMLAction(xmlContent: string, partnerId:
       const cleanXml = xmlContent.replace(/xmlns[^=]*="[^"]*"/g, "")
       const chNFeMatch = cleanXml.match(/<chNFe>(.*?)<\/chNFe>/) || cleanXml.match(/Id="NFe(.*?)["\s>]/)
       const chNFe = chNFeMatch?.[1] ? chNFeMatch[1].replace(/\D/g, "") : `${Date.now()}`
-      const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${chNFe}.xml`
+      // Do not put the full fiscal access key (a sensitive identifier) in the
+      // object path. It remains available in the protected invoice metadata.
+      const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${crypto.randomUUID()}.xml`
       await uploadBufferToR2({
         buffer: xmlContent,
         key: fileKey,

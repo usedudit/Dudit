@@ -66,7 +66,7 @@ const MANAGE_ROLES = new Set(["owner", "admin", "manager"])
 const VIEW_ROLES = new Set(["owner", "admin", "manager", "operator"])
 
 const evidenceSchema = z.object({
-    file_url: z.string().url(),
+    file_url: z.string().url().nullable().optional(),
     file_key: z.string().max(500).nullable().optional(),
     file_name: z.string().max(255).nullable().optional(),
     file_type: z.string().max(120).nullable().optional(),
@@ -77,12 +77,10 @@ const evidenceSchema = z.object({
 
 async function verifyReturnEvidencePayload(evidence: z.infer<typeof evidenceSchema>[], ownerUserId: string) {
     if (evidence.length === 0) return []
-    const [{ getR2PublicUrl }, { verifyUploadedObject }, { validateUploadRequest }] = await Promise.all([
-        import("@/lib/r2/r2-server-config"),
+    const [{ verifyUploadedObject }, { validateUploadRequest }] = await Promise.all([
         import("@/lib/r2/server"),
         import("@/lib/security/file-validator"),
     ])
-    const publicBase = getR2PublicUrl().replace(/\/+$/, "")
     const expectedKeyPattern = new RegExp(`^users/${ownerUserId}/returns/[^/]+$`)
     const verifiedEvidence = []
 
@@ -97,15 +95,13 @@ async function verifyReturnEvidencePayload(evidence: z.infer<typeof evidenceSche
         ) {
             throw new Error("Evidência inválida ou não pertence a este usuário.")
         }
-        const expectedUrl = `${publicBase}/${key}`
-        if (item.file_url !== expectedUrl) {
-            throw new Error("A URL da evidência não corresponde ao arquivo enviado.")
-        }
         const validation = validateUploadRequest(fileName, fileType, fileSize)
         if (!validation.success) throw new Error(validation.error || "Arquivo de evidência inválido.")
         const verified = await verifyUploadedObject(key, fileSize, fileType)
         verifiedEvidence.push({
-            file_url: expectedUrl,
+            // Private evidence is addressed only by key; the key is authorized
+            // and signed separately when an authorized participant opens it.
+            file_url: null,
             file_key: key,
             file_name: fileName,
             file_type: fileType,
@@ -561,6 +557,30 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
         }))
 
         const normalized = normalizeReturnRow({ ...data, auditLogs: returnEvents })
+        const evidenceRows = (data.return_evidence || []) as any[]
+        if (evidenceRows.length) {
+            const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+            const evidenceUploads = await Promise.all(evidenceRows.map(async (evidence) => {
+                const key = String(evidence.file_key || "")
+                const ownerId = String(evidence.uploaded_by || data.created_by || "")
+                if (
+                    !ownerId ||
+                    !new RegExp(`^users/${ownerId}/(?:returns|orders/attachments)/[^/]+$`).test(key) ||
+                    key.includes("..")
+                ) return null
+                const fileUrl = await generateSignedDownloadUrl(key)
+                return {
+                    file_url: fileUrl,
+                    file_key: key,
+                    file_name: evidence.file_name || key.split("/").pop() || "evidencia",
+                    file_type: evidence.file_type || "application/octet-stream",
+                    file_size: evidence.file_size || 0,
+                }
+            }))
+            const validEvidence = evidenceUploads.filter(Boolean) as NonNullable<(typeof evidenceUploads)[number]>[]
+            normalized.evidenceImages = validEvidence.map((evidence) => evidence.file_url)
+            ;(normalized as any).evidenceUploads = validEvidence
+        }
         if (buyerDetails) {
             normalized.customerEmail = normalized.customerEmail || buyerDetails.email || undefined
             normalized.customerPhone = normalized.customerPhone || buyerDetails.phone || undefined
@@ -2166,7 +2186,7 @@ export async function getReturnEvidencePresignedUploadUrlAction(
     fileType: string,
     fileSize: number
 ): Promise<
-    | { success: true; uploadUrl: string; publicUrl: string; key: string }
+    | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
     | { success: false; error: string }
 > {
     try {
@@ -2338,11 +2358,13 @@ export async function deleteReturnEvidenceAction(
 
         if (evidence.file_key) {
             const { deleteFileFromR2 } = await import("@/lib/r2/server")
-            try { await deleteFileFromR2(evidence.file_key) } catch { }
+            // Keep the database reference if R2 fails so the deletion can be retried.
+            await deleteFileFromR2(evidence.file_key)
         }
 
         const admin = createAdminClient()
-        await admin.from("return_evidence").delete().eq("id", evidenceId).eq("return_request_id", returnRequestId)
+        const { error: deleteError } = await admin.from("return_evidence").delete().eq("id", evidenceId).eq("return_request_id", returnRequestId)
+        if (deleteError) throw deleteError
 
         await logAuditEvent({
             partnerId,
@@ -2395,8 +2417,8 @@ export async function getReturnEvidenceAction(
 
         const mapped = (data || []).map((e: any) => ({
             id: e.id,
-            file_key: e.file_key || e.file_url,
-            file_name: e.file_name || e.file_url.substring(e.file_url.lastIndexOf("/") + 1),
+            file_key: e.file_key || e.file_url || "",
+            file_name: e.file_name || String(e.file_key || e.file_url || "evidencia").split("/").pop(),
             file_type: e.file_type || "application/octet-stream",
             file_size: e.file_size || 0,
             created_at: e.created_at

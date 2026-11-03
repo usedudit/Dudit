@@ -72,6 +72,8 @@ export const accountDeletionTask = task({
       // Step 1: Cloudflare R2 Purge (deleting_storage)
       // ───────────────────────────────────────────────────────────────────────
       let filesDeleted = deletion.checkpoints?.step_status?.deleting_storage?.filesDeleted || 0
+      let filesDeferredForDatabaseCleanup = deletion.checkpoints?.step_status?.deleting_storage?.filesDeferredForDatabaseCleanup || 0
+      let unclassifiedFilesPreserved = deletion.checkpoints?.step_status?.deleting_storage?.unclassifiedFilesPreserved || 0
       let deletingStorageCompleted = deletion.checkpoints?.step_status?.deleting_storage?.completed || false
 
       if (!deletingStorageCompleted) {
@@ -80,7 +82,10 @@ export const accountDeletionTask = task({
           .update({ status: "deleting_storage" })
           .eq("id", payload.deletionId)
 
-        filesDeleted = await AccountDeletionService.purgeCloudflareR2(payload.userId)
+        const storageResult = await AccountDeletionService.purgeCloudflareR2(payload.userId)
+        filesDeleted = storageResult.filesDeleted
+        filesDeferredForDatabaseCleanup = storageResult.filesDeferredForDatabaseCleanup
+        unclassifiedFilesPreserved = storageResult.unclassifiedFilesPreserved
 
         const { data: cur } = await admin
           .from("account_deletions")
@@ -89,7 +94,12 @@ export const accountDeletionTask = task({
           .maybeSingle()
 
         const stepStatus = cur?.checkpoints?.step_status || {}
-        stepStatus.deleting_storage = { completed: true, filesDeleted }
+        stepStatus.deleting_storage = {
+          completed: true,
+          filesDeleted,
+          filesDeferredForDatabaseCleanup,
+          unclassifiedFilesPreserved,
+        }
 
         await admin
           .from("account_deletions")
@@ -170,6 +180,8 @@ export const accountDeletionTask = task({
       // ───────────────────────────────────────────────────────────────────────
       let dbRowsDeleted = deletion.checkpoints?.step_status?.deleting_database?.dbRowsDeleted || 0
       let ordersAnonymized = deletion.checkpoints?.step_status?.deleting_database?.ordersAnonymized || 0
+      let r2CleanupDeleted = deletion.checkpoints?.step_status?.deleting_database?.r2CleanupDeleted || 0
+      let r2CleanupFailed = deletion.checkpoints?.step_status?.deleting_database?.r2CleanupFailed || 0
       let deletingDbCompleted = deletion.checkpoints?.step_status?.deleting_database?.completed || false
 
       if (!deletingDbCompleted) {
@@ -190,6 +202,16 @@ export const accountDeletionTask = task({
           deletion.requested_at
         )
 
+        // Cascaded record deletes enqueue referenced private and marketplace
+        // objects transactionally. Drain several batches now; pg_cron retries
+        // anything deferred by transient R2 failures or a very large account.
+        const { processR2CleanupBatch } = await import("@/lib/r2/cleanup-queue")
+        for (let batchIndex = 0; batchIndex < 10; batchIndex++) {
+          const batch = await processR2CleanupBatch(100)
+          r2CleanupDeleted += batch.deleted
+          r2CleanupFailed += batch.failed + batch.persistenceErrors
+          if (batch.claimed < 100) break
+        }
         const { data: cur } = await admin
           .from("account_deletions")
           .select("checkpoints")
@@ -197,13 +219,20 @@ export const accountDeletionTask = task({
           .maybeSingle()
 
         const stepStatus = cur?.checkpoints?.step_status || {}
-        stepStatus.deleting_database = { completed: true, dbRowsDeleted, ordersAnonymized }
+        stepStatus.deleting_database = {
+          completed: true,
+          dbRowsDeleted,
+          ordersAnonymized,
+          r2CleanupDeleted,
+          r2CleanupFailed,
+        }
 
         await admin
           .from("account_deletions")
           .update({ checkpoints: { ...(cur?.checkpoints || {}), step_status: stepStatus } })
           .eq("id", payload.deletionId)
       }
+      filesDeleted += r2CleanupDeleted
 
       // ───────────────────────────────────────────────────────────────────────
       // Step 5: Delete Supabase Auth User (deleting_auth)
@@ -243,6 +272,10 @@ export const accountDeletionTask = task({
         servicesDeleted: plannedReport.servicesCount,
         ordersAnonymized: ordersAnonymized,
         filesDeleted: filesDeleted,
+        filesDeferredForDatabaseCleanup,
+        unclassifiedFilesPreserved,
+        r2CleanupDeleted,
+        r2CleanupFailed,
         whatsappDisconnected: whatsappDisconnected
       }
 
@@ -285,6 +318,8 @@ export const accountDeletionTask = task({
         dbRowsRemoved: dbRowsDeleted,
         filesRemoved: filesDeleted,
         redisKeysRemoved: plannedReport.redisKeysCount,
+        filesDeferredForDatabaseCleanup,
+        unclassifiedFilesPreserved,
         subscriptionsCancelled: customerSubscriptionsCancelled,
         whatsappInstancesRemoved: whatsappDisconnected,
         complianceRetained: "Minimized evidence may be retained for up to five years where necessary for legal obligations or the exercise of rights; this is a case-specific retention policy and not a blanket five-year retention rule under the CDC."

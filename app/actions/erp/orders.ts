@@ -7482,7 +7482,7 @@ export async function getOrderPresignedUploadUrlAction(
   fileType: string,
   fileSize: number,
 ): Promise<
-  | { success: true; uploadUrl: string; publicUrl: string; key: string }
+  | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
   | { success: false; error: string }
 > {
   try {
@@ -7634,7 +7634,7 @@ export async function saveOrderAttachmentAction(
       return { success: false, error: "Upload de anexos não permitido no seu plano." };
     }
 
-    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config");
+    const { getR2ServerConfig, getR2BucketNameForKey } = await import("@/lib/r2/r2-server-config");
     const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3");
     const serverConfig = getR2ServerConfig();
     const s3 = new S3Client({
@@ -7644,7 +7644,8 @@ export async function saveOrderAttachmentAction(
     });
     let actualFileSize: number;
     try {
-      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }));
+      const bucketName = getR2BucketNameForKey(fileKey);
+      const head = await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: fileKey }));
       actualFileSize = Number(head.ContentLength);
       if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || actualFileSize !== fileSize || head.ContentType !== fileType) {
         return { success: false, error: "O arquivo enviado não corresponde aos dados informados." };
@@ -7671,7 +7672,7 @@ export async function saveOrderAttachmentAction(
     let finalHash: string;
     try {
       const object = await hashClient.send(
-        new GetObjectCommand({ Bucket: hashConfig.bucketName, Key: fileKey }),
+        new GetObjectCommand({ Bucket: getR2BucketNameForKey(fileKey), Key: fileKey }),
       );
       if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.");
       const crypto = await import("node:crypto");

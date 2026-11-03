@@ -9,7 +9,8 @@ import {
   CopyObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
-import { getR2ServerConfig, getR2PublicUrl } from "./r2-server-config"
+import { getR2ServerConfig, getR2PublicUrl, getR2BucketNameForKey } from "./r2-server-config"
+import { isKeyPrivate } from "./config"
 import {
   ALLOWED_MIME_TYPES,
   ALLOWED_EXTENSIONS,
@@ -26,7 +27,7 @@ import {
 
 export interface SignedUrlResponse {
   uploadUrl: string
-  publicUrl: string
+  publicUrl: string | null
   key: string
   /** Exact Content-Type included in the AWS SigV4 signature - client PUT must use this value. */
   contentType: string
@@ -183,12 +184,12 @@ export async function generateSignedUploadUrl(
     throw new Error("Chave de upload inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
 
   try {
     const command = new PutObjectCommand({
-      Bucket: serverConfig.bucketName,
+      Bucket: bucketName,
       Key: key,
       ContentType: fileType,
       ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
@@ -203,10 +204,9 @@ export async function generateSignedUploadUrl(
       ]),
     })
 
-    const baseUrl = getR2PublicUrl().replace(/\/+$/, "")
     return {
       uploadUrl,
-      publicUrl: `${baseUrl}/${key}`,
+      publicUrl: isKeyPrivate(key) ? null : `${getR2PublicUrl().replace(/\/+$/, "")}/${key}`,
       key,
       contentType: fileType,
     }
@@ -227,11 +227,11 @@ export async function generateSignedDownloadUrl(
     throw new Error("Chave de arquivo inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
   try {
     const command = new GetObjectCommand({
-      Bucket: serverConfig.bucketName,
+      Bucket: bucketName,
       Key: key,
     })
     return await getSignedUrl(client, command, { expiresIn })
@@ -257,10 +257,10 @@ export async function verifyUploadedObject(
     throw new Error("Hash do arquivo inválido")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
   try {
-    const head = await client.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: key }))
+    const head = await client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }))
     const contentLength = Number(head.ContentLength)
     if (
       !Number.isSafeInteger(contentLength) ||
@@ -270,7 +270,7 @@ export async function verifyUploadedObject(
       throw new Error("O arquivo enviado não corresponde aos dados informados.")
     }
 
-    const object = await client.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: key }))
+    const object = await client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }))
     if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
     const { createHash } = await import("node:crypto")
     const hash = createHash("sha256")
@@ -298,15 +298,54 @@ export async function deleteFileFromR2(key: string) {
     throw new Error("Chave de arquivo inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
   try {
     await client.send(
       new DeleteObjectCommand({
-        Bucket: serverConfig.bucketName,
+        Bucket: bucketName,
         Key: key,
       })
     )
+  } finally {
+    client.destroy()
+  }
+}
+
+/**
+ * Delete a registered customer object from both configured buckets. Checking
+ * both buckets also removes legacy copies left by the public/private split.
+ */
+export async function deleteManagedFileFromAllBuckets(key: string): Promise<void> {
+  const userScopedPath = key?.match(/^users\/[0-9a-f-]{36}\/(.*)$/i)?.[1] || ""
+  const isPublishedMedia = ["products/", "services/", "partners/", "community-videos/"]
+    .some((prefix) => userScopedPath.startsWith(prefix))
+  const isLegacyServiceOrderAttachment = /^users\/[0-9a-f-]{36}\/(?:service-orders[^/]+|serviceOrderAttachments[^/]+)$/i.test(key || "")
+  if (
+    !key || key.includes("..") || key.startsWith("/") ||
+    (!isKeyPrivate(key) && !isPublishedMedia && !isLegacyServiceOrderAttachment)
+  ) {
+    throw new Error("Chave R2 inválida para limpeza")
+  }
+
+  const config = getR2ServerConfig()
+  if (!config.bucketName || !config.privateBucketName) {
+    throw new Error("Os buckets público e privado precisam estar configurados para a limpeza R2")
+  }
+  if (config.bucketName === config.privateBucketName) {
+    throw new Error("O bucket privado precisa ser diferente do bucket público")
+  }
+
+  const client = createR2Client()
+  try {
+    const results = await Promise.allSettled(
+      [...new Set([config.bucketName, config.privateBucketName])].map((Bucket) =>
+        client.send(new DeleteObjectCommand({ Bucket, Key: key })),
+      ),
+    )
+    if (results.some((result) => result.status === "rejected")) {
+      throw new Error("Falha ao remover o objeto de um dos buckets R2")
+    }
   } finally {
     client.destroy()
   }
@@ -329,12 +368,12 @@ export async function uploadBufferToR2({
     throw new Error("Chave de upload inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
   try {
     await client.send(
       new PutObjectCommand({
-        Bucket: serverConfig.bucketName,
+        Bucket: bucketName,
         Key: key,
         Body: typeof buffer === "string" ? Buffer.from(buffer, "utf-8") : buffer,
         ContentType: contentType,
@@ -362,14 +401,18 @@ export async function copyFileInR2(sourceKey: string, destinationKey: string): P
     throw new Error("Chave de destino inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const sourceBucket = getR2BucketNameForKey(sourceKey)
+  const destinationBucket = getR2BucketNameForKey(destinationKey)
+  if (sourceBucket !== destinationBucket) {
+    throw new Error("Não é permitido copiar arquivos entre buckets público e privado")
+  }
   const client = createR2Client()
   try {
     await client.send(
       new CopyObjectCommand({
-        Bucket: serverConfig.bucketName,
+        Bucket: destinationBucket,
         Key: destinationKey,
-        CopySource: `${serverConfig.bucketName}/${sourceKey}`,
+        CopySource: `${sourceBucket}/${sourceKey}`,
       })
     )
   } finally {
@@ -382,12 +425,12 @@ export async function getFileMetadataFromR2(key: string) {
     throw new Error("Chave de arquivo inválida")
   }
 
-  const serverConfig = getR2ServerConfig()
+  const bucketName = getR2BucketNameForKey(key)
   const client = createR2Client()
   try {
     const result = await client.send(
       new HeadObjectCommand({
-        Bucket: serverConfig.bucketName,
+        Bucket: bucketName,
         Key: key,
       })
     )

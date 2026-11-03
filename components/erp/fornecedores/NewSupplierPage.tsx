@@ -66,6 +66,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { uploadFile, isLoading: isUploadingImage } = useR2Upload({
         prefix: "suppliers/",
+        partnerId,
+        partnerPermission: supplierId ? "edit" : "create",
     })
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -151,7 +153,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                         setInscricaoMunicipal(s.inscricao_municipal || "")
                         setObservacoes(s.notes || "")
                         setSupplierCode(s.supplier_code || "")
-                        setImageUrl(s.image_url || "")
+                        setImageUrl(s.image_key || s.image_url || "")
                         setImagePreview(s.image_url || "")
                         // Address fields (direct from suppliers table)
                         setCep(s.zip_code || "")
@@ -304,8 +306,8 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             let finalImageUrl = imageUrl
             if (imageFile) {
                 const uploadRes = await uploadFile(imageFile)
-                if (uploadRes && uploadRes.publicUrl) {
-                    finalImageUrl = uploadRes.publicUrl
+                if (uploadRes && uploadRes.key) {
+                    finalImageUrl = uploadRes.key
                 } else {
                     notifyError("Erro ao fazer upload da imagem.")
                     setIsSaving(false)

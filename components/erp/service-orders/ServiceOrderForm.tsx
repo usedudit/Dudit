@@ -24,6 +24,7 @@ import { fetchPartnerServicesBucket, fetchPartnerProductsBucket, type PartnerSer
 import { getPOSCustomerDetailsAction } from "@/app/actions/erp/pdv"
 import { normalizeCustomerForCard } from "@/lib/utils/customer"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { R2_PREFIXES } from "@/lib/r2/config"
 import {
     createServiceOrderAction,
     updateServiceOrderAction,
@@ -718,7 +719,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                     try {
                         const file = att.file
                         const urlRes = await getPresignedUploadUrlAction(
-                            partnerId, "serviceOrderAttachments", file.name, file.type, file.size
+                            partnerId, R2_PREFIXES.serviceOrderAttachments, file.name, file.type, file.size
                         )
                         if (!urlRes.success) throw new Error(urlRes.error || "Erro ao gerar URL")
 

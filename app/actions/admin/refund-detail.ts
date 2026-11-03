@@ -41,6 +41,19 @@ export async function getAdminRefundRequestDetail(refundRequestId: string) {
     if (error) throw error
     if (!refund) return null
 
+    const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+    const signEvidence = async (items: unknown) => {
+        if (!Array.isArray(items)) return []
+        return Promise.all(items.map(async (item: any) => {
+            const key = typeof item?.key === "string" ? item.key : ""
+            if (!/^users\/[^/]+\/billing-refunds\/[^/]+$/.test(key) || key.includes("..")) return item
+            return { ...item, url: await generateSignedDownloadUrl(key) }
+        }))
+    }
+    refund.images = await signEvidence(refund.images)
+    refund.documents = await signEvidence(refund.documents)
+    refund.admin_evidence = await signEvidence(refund.admin_evidence)
+
     const stores = refund.partner?.stores
     if (Array.isArray(stores)) {
         for (const store of stores) {

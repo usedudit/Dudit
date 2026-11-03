@@ -17,12 +17,50 @@ import { decryptCpfIfEncrypted } from "@/lib/crypto"
 const evidenceItemSchema = z.union([
     z.string(),
     z.object({
-        url: z.string(),
+        url: z.string().nullable().optional(),
         name: z.string().optional(),
         size: z.number().optional(),
         key: z.string().optional(),
     }),
 ])
+
+const BILLING_REFUND_EVIDENCE_MIME_TYPES = new Set([
+    "image/jpeg", "image/png", "image/webp", "image/avif", "application/pdf",
+])
+
+async function validateBillingRefundEvidence(items: unknown[], userId: string) {
+    const { getFileMetadataFromR2 } = await import("@/lib/r2/server")
+    const validated = []
+    for (const item of items) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Anexo de reembolso inválido.")
+        const entry = item as { key?: unknown; name?: unknown; size?: unknown }
+        const key = typeof entry.key === "string" ? entry.key : ""
+        const name = typeof entry.name === "string" ? entry.name : ""
+        const size = Number(entry.size)
+        if (
+            !new RegExp(`^users/${userId}/billing-refunds/[^/]+$`).test(key) ||
+            key.includes("..") || !name || !Number.isSafeInteger(size) || size < 1
+        ) throw new Error("O anexo precisa pertencer ao usuário e à solicitação atual.")
+        const metadata = await getFileMetadataFromR2(key)
+        if (
+            metadata.contentLength !== size ||
+            !metadata.contentType || !BILLING_REFUND_EVIDENCE_MIME_TYPES.has(metadata.contentType)
+        ) throw new Error("O arquivo enviado não corresponde aos dados informados.")
+        validated.push({ url: null, key, name, size })
+    }
+    return validated
+}
+
+async function signBillingRefundEvidence(items: unknown) {
+    if (!Array.isArray(items)) return []
+    const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+    return Promise.all(items.map(async (item: any) => {
+        if (typeof item === "string") return item
+        const key = typeof item?.key === "string" ? item.key : ""
+        if (!/^users\/[^/]+\/billing-refunds\/[^/]+$/.test(key) || key.includes("..")) return item
+        return { ...item, url: await generateSignedDownloadUrl(key) }
+    }))
+}
 
 const requestRefundSchema = z.object({
     partnerId: z.string().uuid(),
@@ -110,6 +148,11 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
             return { error: "Apenas faturas pagas e concluídas podem receber solicitação de reembolso." }
         }
 
+        const [images, documents] = await Promise.all([
+            validateBillingRefundEvidence(data.images, user.id),
+            validateBillingRefundEvidence(data.documents, user.id),
+        ])
+
         const purchaseAmount = Number(purchase.total_amount || purchase.amount || 0)
         if (purchaseAmount <= 0) {
             return { error: "Não é possível solicitar reembolso de assinaturas ou faturas gratuitas." }
@@ -152,8 +195,8 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
                 amount: purchaseAmount,
                 reason_category: data.reasonCategory,
                 reason_description: data.reasonDescription,
-                images: data.images,
-                documents: data.documents,
+                images,
+                documents,
                 is_within_7_days: isWithin7Days,
                 status: "pending",
                 token: null,
@@ -368,6 +411,9 @@ export async function getPublicRefundDetailsAction(token: string) {
             success: true,
             refund: {
                 ...refund,
+                images: await signBillingRefundEvidence(refund.images),
+                documents: await signBillingRefundEvidence(refund.documents),
+                admin_evidence: await signBillingRefundEvidence(refund.admin_evidence),
                 purchase: refund.purchase ? {
                     ...refund.purchase,
                     plan,
@@ -445,13 +491,15 @@ export async function adminListRefundRequestsAction(params?: {
             : { data: [] }
         const planMap = new Map((plansData || []).map((p: any) => [p.id, p]))
 
-        const enrichedData = (data || []).map((r: any) => ({
+        const enrichedData = await Promise.all((data || []).map(async (r: any) => ({
             ...r,
+            images: await signBillingRefundEvidence(r.images),
+            documents: await signBillingRefundEvidence(r.documents),
             purchase: r.purchase ? {
                 ...r.purchase,
                 plan: r.purchase.purchaseable_id ? planMap.get(r.purchase.purchaseable_id) || null : null,
             } : null,
-        }))
+        })))
 
         // Estatísticas rápidas
         const { data: statsData } = await supabase
@@ -493,6 +541,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
         if (!adminUser) return { error: "Admin não autenticado." }
 
         const data = adminProcessRefundSchema.parse(input)
+        const adminEvidence = await validateBillingRefundEvidence(data.adminEvidence || [], adminUser.id)
 
         // 2. Step-Up Authentication: Validação de Senha do Administrador
         let adminEmail = adminUser.email
@@ -677,7 +726,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
                 refunded_amount: targetAmount,
                 mp_refund_id: mpRefundId,
                 admin_response: data.adminResponse || "Reembolso aprovado e estorno processado.",
-                admin_evidence: data.adminEvidence || [],
+                admin_evidence: adminEvidence,
                 admin_id: adminUser.id,
                 processed_at: nowIso,
                 grace_period_ends_at: gracePeriodIso,
@@ -743,6 +792,7 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
         if (!adminUser) return { error: "Admin não autenticado." }
 
         const data = adminRejectRefundSchema.parse(input)
+        const adminEvidence = await validateBillingRefundEvidence(data.adminEvidence || [], adminUser.id)
 
         const { data: refundReq, error: reqErr } = await supabase
             .from("billing_refund_requests")
@@ -759,7 +809,7 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
             .update({
                 status: "rejected",
                 admin_response: data.adminResponse,
-                admin_evidence: data.adminEvidence || [],
+                admin_evidence: adminEvidence,
                 admin_id: adminUser.id,
                 processed_at: nowIso,
                 updated_at: nowIso,

@@ -11,6 +11,8 @@ import {
 
 export interface UseR2UploadOptions {
   prefix?: string
+  partnerId?: string
+  partnerPermission?: "create" | "edit"
   endpoint?: string
   allowedTypes?: string[]
   maxSize?: number
@@ -78,6 +80,12 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
         }
         if (options?.prefix) {
           queryObj.prefix = options.prefix
+        }
+        if (options?.partnerId) {
+          queryObj.partnerId = options.partnerId
+        }
+        if (options?.partnerPermission) {
+          queryObj.partnerPermission = options.partnerPermission
         }
         const searchParams = new URLSearchParams(queryObj)
         signedUrlResponse = await fetch(`${endpoint}?${searchParams}`, { method: "GET" })

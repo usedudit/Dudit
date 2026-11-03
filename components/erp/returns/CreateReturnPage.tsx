@@ -377,6 +377,12 @@ export default function CreateReturnPage({
                 .then((res: any) => {
                     if (res.success && res.data) {
                         setRawReturnRequestData(res.data)
+                        if (Array.isArray(res.data.evidenceImages)) {
+                            setEvidenceImages(res.data.evidenceImages)
+                        }
+                        if (Array.isArray(res.data.evidenceUploads)) {
+                            setEvidenceUploads(res.data.evidenceUploads)
+                        }
                         if (res.data.returnEvents) {
                             setReturnEvents(res.data.returnEvents)
                         }
@@ -491,7 +497,7 @@ export default function CreateReturnPage({
             setExchangeBalanceResolution(returnRequest.exchangeBalanceResolution || "store_credit")
             setReplacementProduct((returnRequest as any).replacementProduct || "")
             setEvidenceImages(returnRequest.evidenceImages || [])
-            setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
+            setEvidenceUploads((returnRequest as any).evidenceUploads || (returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.sellerNotes || "")
         }
     }, [mode, returnRequest, productBucket.bucket])
@@ -987,7 +993,7 @@ export default function CreateReturnPage({
                             metadata: { originalName: file.name },
                         }
                         finalEvidenceUploads[index] = uploadObj
-                        finalEvidenceImages[index] = uploaded.publicUrl
+                        finalEvidenceImages[index] = uploaded.publicUrl ?? ""
                     } catch (uploadErr) {
                         console.error("Error uploading file:", file.name, uploadErr)
                         notifyError(`Falha ao fazer upload da imagem ${file.name}.`)

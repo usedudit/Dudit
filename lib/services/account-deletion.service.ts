@@ -528,13 +528,21 @@ export class AccountDeletionService {
   }
 
   /**
-   * Purge files in Cloudflare R2 bucket under user prefix.
-   * Performs list -> delete -> list again -> verify empty.
+   * Remove unreferenced R2 objects under the account owner's user prefix.
+   * Referenced tenant objects are left for database-delete triggers to enqueue;
+   * unknown key formats are preserved for a reviewed reconciliation pass.
    */
-  static async purgeCloudflareR2(userId: string): Promise<number> {
+  static async purgeCloudflareR2(userId: string): Promise<{
+    filesDeleted: number
+    filesDeferredForDatabaseCleanup: number
+    unclassifiedFilesPreserved: number
+  }> {
     const config = getR2ServerConfig()
-    if (!config.accessKeyId || !config.secretAccessKey) {
+    if (!config.accessKeyId || !config.secretAccessKey || !config.accountId) {
       throw new Error("R2 server credentials not found")
+    }
+    if (!config.bucketName || !config.privateBucketName) {
+      throw new Error("Both public and private R2 buckets are required before account file cleanup")
     }
 
     const s3 = new S3Client({
@@ -545,38 +553,70 @@ export class AccountDeletionService {
 
     const prefix = `users/${userId}/`
     let deletedCount = 0
+    let referencedCount = 0
+    let unclassifiedCount = 0
+    const buckets = [...new Set([config.bucketName, config.privateBucketName].filter(Boolean))]
+    const admin = getAdminClient()
 
-    // List objects
-    const listRes = await s3.send(new ListObjectsV2Command({
-      Bucket: config.bucketName,
-      Prefix: prefix
-    }))
-
-    const objects = listRes.Contents || []
-
-    if (objects.length > 0) {
-      const keys = objects.map(obj => ({ Key: obj.Key! }))
-
-      // Bulk Delete
-      const delRes = await s3.send(new DeleteObjectsCommand({
-        Bucket: config.bucketName,
-        Delete: { Objects: keys }
-      }))
-
-      deletedCount = delRes.Deleted?.length || 0
-
-      // Double-check verification listing
-      const verifyRes = await s3.send(new ListObjectsV2Command({
-        Bucket: config.bucketName,
-        Prefix: prefix
-      }))
-
-      if (verifyRes.Contents && verifyRes.Contents.length > 0) {
-        throw new Error(`R2 Verification Failed: Prefix ${prefix} is not empty after bulk delete. Objects remaining: ${verifyRes.Contents.length}`)
+    const classify = async (keys: string[], countResults = true) => {
+      if (!keys.length) return new Map<string, boolean>()
+      const { data, error } = await admin.rpc("classify_r2_reconciliation_keys", { p_keys: keys })
+      if (error) throw new Error(`R2 cleanup classification failed: ${error.message}`)
+      const rows = (Array.isArray(data) ? data : []) as Array<{ object_key: string; is_referenced: boolean }>
+      const refs = new Map(rows.map((row) => [row.object_key, row.is_referenced]))
+      if (countResults) {
+        unclassifiedCount += keys.filter((key) => !refs.has(key)).length
+        referencedCount += rows.filter((row) => row.is_referenced).length
       }
+      return refs
     }
 
-    return deletedCount
+    try {
+      for (const bucket of buckets) {
+        let continuationToken: string | undefined
+        do {
+          const page = await s3.send(new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }))
+          const pageKeys = (page.Contents || []).flatMap(obj => obj.Key ? [obj.Key] : [])
+          const refs = await classify(pageKeys)
+          const deletable = pageKeys.filter((key) => refs.has(key) && !refs.get(key))
+          for (let i = 0; i < deletable.length; i += 1000) {
+            const delRes = await s3.send(new DeleteObjectsCommand({
+              Bucket: bucket,
+              Delete: { Objects: deletable.slice(i, i + 1000).map((Key) => ({ Key })) },
+            }))
+            if (delRes.Errors?.length) throw new Error("R2 bulk delete returned object errors")
+            deletedCount += delRes.Deleted?.length || 0
+          }
+          continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined
+        } while (continuationToken)
+
+        let verifyToken: string | undefined
+        do {
+          const verify = await s3.send(new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: verifyToken,
+          }))
+          const remainingKeys = (verify.Contents || []).flatMap(obj => obj.Key ? [obj.Key] : [])
+          const refs = await classify(remainingKeys, false)
+          if (remainingKeys.some((key) => refs.has(key) && !refs.get(key))) {
+            throw new Error("R2 verification found unreferenced managed objects after account cleanup")
+          }
+          verifyToken = verify.IsTruncated ? verify.NextContinuationToken : undefined
+        } while (verifyToken)
+      }
+      return {
+        filesDeleted: deletedCount,
+        filesDeferredForDatabaseCleanup: referencedCount,
+        unclassifiedFilesPreserved: unclassifiedCount,
+      }
+    } finally {
+      s3.destroy()
+    }
   }
 
   /**

@@ -816,7 +816,9 @@ export async function uploadXMLAction(
     }
 
     // 10.5. Upload do XML para o Cloudflare R2
-    const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${metadata.invoice.chave}.xml`
+    // Keep the NFe access key in the protected database record, not in the
+    // object path, which can appear in logs and operational tooling.
+    const fileKey = `users/${user.id}/${R2_PREFIXES.erpInvoices}${crypto.randomUUID()}.xml`
     const fileName = `NFe-${metadata.invoice.numero || metadata.invoice.chave}.xml`
     try {
       await uploadBufferToR2({

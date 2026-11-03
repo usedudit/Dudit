@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth/authorization"
+import { requirePermission } from "@/lib/permissions/access"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { validateUploadRequest } from "@/lib/security/file-validator"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
     const fileName = searchParams.get("fileName")
     const fileType = searchParams.get("fileType")
     const requestedPrefix = searchParams.get("prefix")
+    const partnerId = searchParams.get("partnerId")
+    const partnerPermission = searchParams.get("partnerPermission")
     const fileSize = Number(searchParams.get("fileSize"))
 
     // 3. VALIDATE REQUIRED PARAMS
@@ -50,6 +53,17 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(
           { error: "Prefixo de upload inválido ou não permitido" },
           { status: 400 }
+        )
+      }
+      if (requestedPrefix === R2_PREFIXES.customers || requestedPrefix === R2_PREFIXES.suppliers) {
+        if (!partnerId || (partnerPermission !== "create" && partnerPermission !== "edit")) {
+          return NextResponse.json({ error: "partnerId e permissão válidos são obrigatórios para imagens do ERP." }, { status: 400 })
+        }
+        await requirePermission(
+          partnerId,
+          requestedPrefix === R2_PREFIXES.customers ? "customers" : "suppliers",
+          partnerPermission,
+          user,
         )
       }
       prefix = requestedPrefix
