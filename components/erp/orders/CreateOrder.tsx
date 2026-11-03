@@ -33,6 +33,9 @@ import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-se
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
 import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction, syncPlatformDriverForOrderAction } from "@/app/actions/erp/delivery-driver-assignments"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
+import { getOrderResponsiblesAction, type TeamMember } from "@/app/actions/erp/team"
+import { ROLE_LABELS } from "@/lib/permissions/partner-roles"
+import type { PartnerRole } from "@/lib/permissions/types"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -104,7 +107,7 @@ const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "general" },
     { field: "manualItemNames", tab: "general" },
     { field: "manualItemPrices", tab: "general" },
-    { field: "financeAccountId", tab: "general" },
+    { field: "sellerPartnerUserId", tab: "general" },
     { field: "deliveryDate", tab: "delivery" },
     { field: "deliveryTime", tab: "delivery" },
 ]
@@ -315,6 +318,11 @@ export default function CreateOrder({
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPersonOption[]>([])
     const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false)
     const [financeAccountId, setFinanceAccountId] = useState("")
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+    const [sellerPartnerUserId, setSellerPartnerUserId] = useState<string>("")
+    const [currentLoggedPartnerUserId, setCurrentLoggedPartnerUserId] = useState<string>("")
+    const teamMembersRef = useRef<TeamMember[]>([])
+    teamMembersRef.current = teamMembers
 
     // items
     const [items, setItems] = useState<any[]>([])
@@ -538,6 +546,7 @@ export default function CreateOrder({
             deliveryMethod,
             paymentStatus,
             deliveryStatus,
+            sellerPartnerUserId,
             deliveryDate,
             deliveryTime,
             financeAccountId,
@@ -548,7 +557,7 @@ export default function CreateOrder({
             discountType,
             couponId
         })
-    }, [items, selectedCustomer, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, deliveryDate, deliveryTime, financeAccountId, notes, shippingFee, otherCosts, discountValue, discountType, couponId])
+    }, [items, selectedCustomer, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, sellerPartnerUserId, deliveryDate, deliveryTime, financeAccountId, notes, shippingFee, otherCosts, discountValue, discountType, couponId])
 
     const [initialSignature, setInitialSignature] = useState("")
     const signatureCaptured = useRef(false)
@@ -615,6 +624,9 @@ export default function CreateOrder({
                 setDeliveryDate(order.created_at.split('T')[0])
                 setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
                 setFinanceAccountId(order.finance_account_id || "")
+                if (order.seller_partner_user_id) {
+                    setSellerPartnerUserId(order.seller_partner_user_id)
+                }
                 setNotes(cleanOrderNotes(order.notes))
                 setShippingFee((order.delivery_fee || 0).toString())
                 setDeliveryBreakdown(
@@ -774,6 +786,43 @@ export default function CreateOrder({
         }
         void loadDeliveryPeople()
     }, [deliveryMethod, deliveryPeople.length, partnerId])
+
+    useEffect(() => {
+        let isMounted = true
+        async function loadResponsibles() {
+            try {
+                const res = await getOrderResponsiblesAction()
+                if (!isMounted) return
+                if (res.members) {
+                    setTeamMembers(res.members)
+                }
+                if (res.currentPartnerUserId) {
+                    setCurrentLoggedPartnerUserId(res.currentPartnerUserId)
+                    if (!editOrderId) {
+                        setSellerPartnerUserId((prev) => prev || res.currentPartnerUserId || "")
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao carregar equipe:", err)
+            }
+        }
+        void loadResponsibles()
+        return () => {
+            isMounted = false
+        }
+    }, [editOrderId])
+
+    useEffect(() => {
+        if (editOrderId && loadedOrderRef.current && !sellerPartnerUserId && teamMembers.length > 0) {
+            const order = loadedOrderRef.current
+            if (order.seller_partner_user_id) {
+                setSellerPartnerUserId(order.seller_partner_user_id)
+            } else if (order.created_by) {
+                const matched = teamMembers.find(m => m.userId === order.created_by)
+                if (matched) setSellerPartnerUserId(matched.id)
+            }
+        }
+    }, [editOrderId, teamMembers, sellerPartnerUserId])
 
     useEffect(() => {
         if (financeAccountId || financeAccounts.length === 0) return
@@ -1295,6 +1344,7 @@ export default function CreateOrder({
         setDeliveryDate(formatLocalISODate(new Date()))
         setDeliveryTime(formatCurrentLocalTime())
         setFinanceAccountId("")
+        setSellerPartnerUserId(currentLoggedPartnerUserId)
         setOriginalPaidAmount(0)
         setOriginalPaymentMethod("Não informado")
         setOriginalPaymentProvider("")
@@ -1377,10 +1427,16 @@ export default function CreateOrder({
             }
         }
 
-        if (!financeAccountId) {
-            setFieldErrors(new Set(["financeAccountId"]))
+        let effectiveAccountId = financeAccountId
+        if (!effectiveAccountId && financeAccounts.length > 0) {
+            effectiveAccountId = pickBankThenCashDefaultFinanceAccountId(financeAccounts) || ""
+            if (effectiveAccountId) setFinanceAccountId(effectiveAccountId)
+        }
+
+        if (salesSettings.requireSeller && !sellerPartnerUserId) {
+            setFieldErrors(new Set(["sellerPartnerUserId"]))
             setActiveTab("general")
-            setValidationMessage("Selecione a conta de recebimento da venda antes de salvar.")
+            setValidationMessage("Selecione o funcionário responsável antes de salvar.")
             setShowValidationModal(true)
             return false
         }
@@ -1469,17 +1525,15 @@ export default function CreateOrder({
         checkoutFulfillment?: Record<string, unknown> | null
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
-        let finalDeliveryStatus = !editOrderId && isCarrierDelivery ? "not_sent" : deliveryStatus;
+        let finalDeliveryStatus = deliveryStatus;
         if (paymentOverrides?.isPendingDelivery) {
             finalDeliveryStatus = deliveryMethod === "pickup" ? "pickup_available" : "not_sent";
         } else if (paymentOverrides?.deliveryStatus) {
             finalDeliveryStatus = paymentOverrides.deliveryStatus;
-        } else if (editOrderId) {
-            finalDeliveryStatus = deliveryStatus;
-        } else if (isCarrierDelivery) {
+        } else if (!editOrderId && isCarrierDelivery) {
             finalDeliveryStatus = "not_sent";
         } else {
-            finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
+            finalDeliveryStatus = deliveryStatus || (deliveryMethod === "pickup" ? "not_sent" : "not_sent");
         }
 
         return {
@@ -1491,6 +1545,7 @@ export default function CreateOrder({
             salesChannel,
             deliveryMethod,
             financeAccountId,
+            sellerPartnerUserId: sellerPartnerUserId || null,
             paymentStatus: finalPaymentStatus,
             paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "Método não definido"),
             paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
@@ -1824,6 +1879,38 @@ export default function CreateOrder({
         return [...base, { value: deliveryStatus, label: getDeliveryStatusMeta(deliveryStatus).label }]
     }, [deliveryMethod, deliveryStatus])
 
+    const responsibleOptions = useMemo(() => {
+        const opts = teamMembers.map((m) => {
+            const role = String(m.role || "").toUpperCase() as PartnerRole
+            const roleName = ROLE_LABELS[role] || m.role
+            const name = m.fullName || m.email || "Funcionário"
+            return {
+                value: m.id,
+                label: `${name} (${roleName})`,
+            }
+        })
+        if (sellerPartnerUserId && !opts.some((o) => o.value === sellerPartnerUserId)) {
+            const fallbackLabel = loadedOrderRef.current?.seller_name || "Responsável anterior"
+            opts.push({ value: sellerPartnerUserId, label: fallbackLabel })
+        }
+        return opts
+    }, [teamMembers, sellerPartnerUserId])
+
+    const handleDeliveryMethodChange = useCallback((method: 'delivery' | 'pickup') => {
+        setDeliveryMethod(method)
+        setDeliveryStatus(prev => {
+            if (method === "delivery") {
+                if (prev === "pickup_available") return "sent"
+                const isValid = DELIVERY_STATUS_OPTIONS.some(o => o.value === prev)
+                return isValid ? prev : "not_sent"
+            } else {
+                if (prev === "sent") return "pickup_available"
+                const isValid = PICKUP_STATUS_OPTIONS.some(o => o.value === prev)
+                return isValid ? prev : "not_sent"
+            }
+        })
+    }, [])
+
     const deliveryPeopleOptions = useMemo(() => {
         const baseOptions = deliveryPeople.map((person) => ({
             value: person.id,
@@ -1999,8 +2086,11 @@ export default function CreateOrder({
                                             setIsCustomerSheetOpen={setIsCustomerSheetOpen}
                                             setOrderDate={setOrderDate}
                                             setSalesChannel={setSalesChannel}
-                                            setDeliveryMethod={setDeliveryMethod}
+                                            setDeliveryMethod={handleDeliveryMethodChange}
                                             setDeliveryStatus={setDeliveryStatus}
+                                            sellerPartnerUserId={sellerPartnerUserId}
+                                            setSellerPartnerUserId={setSellerPartnerUserId}
+                                            responsibleOptions={responsibleOptions}
                                             setFinanceAccountId={setFinanceAccountId}
                                             onCreateAccount={() => {
                                                 setNewAccountName("")

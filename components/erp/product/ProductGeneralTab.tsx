@@ -10,7 +10,7 @@ import { Combobox } from "@/components/reusable"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useRouter } from "next/navigation"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDecimalInput } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import { usePermissions } from "@/lib/permission-context"
@@ -837,14 +837,33 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             <div className="pb-4">
                                 <div className="space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                                        <Input label="Peso Líquido (kg)" name="weight_net" value={productData.weight_net} onChange={handleFieldChange} disabled={!isEditing} />
-                                        <Input label="Peso Bruto (kg)" name="weight_gross" value={productData.weight_gross} onChange={handleFieldChange} disabled={!isEditing} />
+                                        <Input
+                                            label="Peso Líquido (kg)"
+                                            name="weight_net"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatDecimalInput(productData.weight_net)}
+                                            onChange={handleFieldChange}
+                                            disabled={!isEditing}
+                                            placeholder="Ex.: 0,5"
+                                        />
+                                        <Input
+                                            label="Peso Bruto (kg)"
+                                            name="weight_gross"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatDecimalInput(productData.weight_gross)}
+                                            onChange={handleFieldChange}
+                                            disabled={!isEditing}
+                                            placeholder="Ex.: 0,7"
+                                        />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <Input
                                                 label="Prazo de Preparação (dias)"
                                                 name="preparation_days"
-                                                type="number"
-                                                value={productData.preparation_days}
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={formatDecimalInput(productData.preparation_days)}
                                                 onChange={handleFieldChange}
                                                 disabled={!isEditing}
                                                 placeholder="0"
@@ -856,7 +875,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                                     { value: "cilinder", label: "Cilindro/Rolo" },
                                                     { value: "envelope", label: "Envelope" }
                                                 ]}
-                                                value={productData.packaging_type}
+                                                value={productData.packaging_type || "package"}
                                                 setValue={(v) => handleFieldChange({ target: { name: "packaging_type", value: v } })}
                                                 disabled={!isEditing}
                                                 width="w-full"
@@ -864,9 +883,36 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                                        <Input label="Largura (cm)" name="width" value={productData.width} onChange={handleFieldChange} disabled={!isEditing} />
-                                        <Input label="Altura (cm)" name="height" value={productData.height} onChange={handleFieldChange} disabled={!isEditing} />
-                                        <Input label="Profund. (cm)" name="length" value={productData.length} onChange={handleFieldChange} disabled={!isEditing} />
+                                        <Input
+                                            label="Largura (cm)"
+                                            name="width"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatDecimalInput(productData.width)}
+                                            onChange={handleFieldChange}
+                                            disabled={!isEditing}
+                                            placeholder="Ex.: 15"
+                                        />
+                                        <Input
+                                            label="Altura (cm)"
+                                            name="height"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatDecimalInput(productData.height)}
+                                            onChange={handleFieldChange}
+                                            disabled={!isEditing}
+                                            placeholder="Ex.: 10"
+                                        />
+                                        <Input
+                                            label="Profund. (cm)"
+                                            name="length"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatDecimalInput(productData.length)}
+                                            onChange={handleFieldChange}
+                                            disabled={!isEditing}
+                                            placeholder="Ex.: 20"
+                                        />
                                     </div>
                                 </div>
                             </div>

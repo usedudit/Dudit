@@ -546,7 +546,7 @@ export default function DeliveryDetailPage({
                         </div>
 
                         {/* Scrollable details */}
-                        <div className="flex-1 overflow-y-auto no-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
                             <div className="pt-4 pb-12 px-6 space-y-8">
                                 {linkedOrdersCard}
                                 {deliveryInfoMetrics}

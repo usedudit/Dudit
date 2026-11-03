@@ -1457,7 +1457,7 @@ export function CheckoutPageClient() {
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-line leading-snug">{partnerAddressLabel}</p>
                             {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1.5 font-medium">
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1.5">
                                     {getReadyDayLabel(preparationEstimate) === "hoje"
                                         ? `Pronto em ${preparationEstimate.readyInMinutes} min`
                                         : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`} • Retirar das {pickupStartLabel} às {pickupEndLabel}

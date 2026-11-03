@@ -14,6 +14,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, archiveProductAction, unarchiveProductAction } from "@/app/actions/erp/products"
 import { createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
+import { parseDecimalInput } from "@/lib/utils/formatters"
 import { useProductMetadata } from "@/lib/product-metadata-context"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
@@ -363,7 +364,15 @@ const AddProductPage: FC<AddProductPageProps> = ({
         const { name, value } = e.target
         setProductData((prev: any) => {
             if (BOOLEAN_FIELDS.has(name)) return { ...prev, [name]: value === true || value === "true" }
-            if (NUMERIC_FIELDS.has(name)) return { ...prev, [name]: value === "" || value === null ? prev[name] : Number(value) }
+            if (NUMERIC_FIELDS.has(name)) {
+                // Keep the raw text while typing so the user can clear the field
+                // and use both "," and "." as decimal separators. It is parsed
+                // into a number only when the product is saved.
+                if (value === null || value === undefined) return { ...prev, [name]: "" }
+                const raw = String(value)
+                if (raw === "") return { ...prev, [name]: "" }
+                return { ...prev, [name]: raw.replace(/[^\d,.-]/g, "") }
+            }
             if (name === "ncm") queueMicrotask(() => handleNcmChange(String(value)))
 
             // Special handling for category change to reset subcategory
@@ -753,7 +762,12 @@ const AddProductPage: FC<AddProductPageProps> = ({
             }
 
             const d = productData
-            const warranty = d.warranty_value > 0 ? `${d.warranty_value} ${d.warranty_period}` : undefined
+            const warrantyDays = Math.max(0, Math.round(parseDecimalInput(d.warranty_value)))
+            const warranty = warrantyDays > 0 ? `${warrantyDays} ${d.warranty_period}` : undefined
+            const promotionalPriceValue = d.promotional_price === "" || d.promotional_price === null || d.promotional_price === undefined
+                ? null
+                : parseDecimalInput(d.promotional_price)
+            const hasPromotionalPrice = promotionalPriceValue !== null && promotionalPriceValue > 0
 
             const hasVariants = (() => {
                 const val = d.variants
@@ -788,14 +802,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 productType: d.productType,
                 location: d.localizacao || d.location || null,
                 deliveryFormat: d.digital_format,
-                costPrice: (hasVariants || isDesapego) ? 0 : (Number(d.costPrice) || 0),
-                price: hasVariants ? 0 : Number(d.price),
-                promotionalPrice: (hasVariants || isDesapego) ? null : (d.promotional_price ? Number(d.promotional_price) : null),
-                minStock: isDesapego ? 0 : (Number(d.minStock) || 0),
-                maxStock: isDesapego ? 0 : (Number(d.maxStock) || 0),
-                stockQuantity: isDesapego ? (Number(d.stock) > 0 ? Number(d.stock) : 1) : Number(d.stock),
+                costPrice: (hasVariants || isDesapego) ? 0 : parseDecimalInput(d.costPrice),
+                price: hasVariants ? 0 : parseDecimalInput(d.price),
+                promotionalPrice: (hasVariants || isDesapego) ? null : (hasPromotionalPrice ? promotionalPriceValue : null),
+                minStock: isDesapego ? 0 : parseDecimalInput(d.minStock),
+                maxStock: isDesapego ? 0 : parseDecimalInput(d.maxStock),
+                stockQuantity: isDesapego ? (parseDecimalInput(d.stock) > 0 ? parseDecimalInput(d.stock) : 1) : parseDecimalInput(d.stock),
                 isActive: isDesapego ? true : d.is_active,
-                isOnPromotion: (hasVariants || isDesapego) ? false : !!d.promotional_price,
+                isOnPromotion: (hasVariants || isDesapego) ? false : hasPromotionalPrice,
                 showPriceInStore: !!d.show_price_in_store,
                 showInMarketplace: d.show_in_marketplace !== false,
                 images: cleanedFinalImages,
@@ -817,14 +831,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 product_situation: d.product_situation,
                 c_benef: d.c_benef,
                 inf_ad_prod: d.inf_ad_prod,
-                weight_gross: Number(d.weight_gross) || 0,
-                weight_net: Number(d.weight_net) || 0,
-                width: Number(d.width) || 0,
-                height: Number(d.height) || 0,
-                length: Number(d.length) || 0,
+                weight_gross: parseDecimalInput(d.weight_gross),
+                weight_net: parseDecimalInput(d.weight_net),
+                width: parseDecimalInput(d.width),
+                height: parseDecimalInput(d.height),
+                length: parseDecimalInput(d.length),
                 fciCode: d.fci_code,
-                packagingType: d.packaging_type,
-                preparationDays: Number(d.preparation_days) || 0,
+                packagingType: d.packaging_type || "package",
+                preparationDays: Math.max(0, Math.round(parseDecimalInput(d.preparation_days))),
                 allow_sell_without_stock: d.allow_sell_without_stock || false,
                 videoType: d.video_type || null,
                 videoUrl: d.video_url || null,
@@ -840,7 +854,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 accepts_offers: !!d.accepts_offers,
                 accepts_trades: !!d.accepts_trades,
                 warranty,
-                availability_value: Number(d.availability_value) || 0,
+                availability_value: Math.max(0, Math.round(parseDecimalInput(d.availability_value))),
                 availability_unit: d.availability_unit || "Dias",
                 tags: d.tags || [],
                 fulfillment_modes: Array.isArray(d.fulfillment_modes) && d.fulfillment_modes.length > 0
@@ -1028,7 +1042,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     setActiveTab(v)
                 }}
                     className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto custom-scrollbar w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">

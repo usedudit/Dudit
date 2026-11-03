@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
 
       paymentData = await createResponse.json()
 
+      const nextUpdatedAt = new Date().toISOString()
       await adminClient
         .from("orders")
         .update({
@@ -292,9 +293,10 @@ export async function POST(request: NextRequest) {
           mp_payment_id: paymentData.id.toString(),
           situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "payment_failed" : "pending")),
           payment_expires_at: paymentData.date_of_expiration,
-          updated_at: new Date().toISOString(),
+          updated_at: nextUpdatedAt,
         })
         .eq("id", order.id)
+      order.updated_at = nextUpdatedAt
     }
 
     // Extrai dados relevantes
@@ -333,6 +335,7 @@ export async function POST(request: NextRequest) {
       pixData,
       boletoData,
       ticketUrl,
+      updatedAt: order.updated_at,
       orderDetails: {
         orderNumber: order.order_number,
         sellerName: order.stores?.name,

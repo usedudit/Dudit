@@ -24,7 +24,7 @@ import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
-import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { getPaymentStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -73,6 +73,9 @@ interface OrderGeneralTabProps {
     deliveryStatus: string
     financeAccountId: string
     accountOptions: Array<{ value: string; label: string }>
+    sellerPartnerUserId?: string | null
+    setSellerPartnerUserId?: (val: string) => void
+    responsibleOptions?: Array<{ value: string; label: string }>
     remainingPaymentAmount?: number
     manualItemNameErrors?: Set<number>
     manualItemPriceErrors?: Set<number>
@@ -141,6 +144,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
     couponCode = "", couponDiscountAmount = 0,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, financeAccountId, accountOptions, isSaving,
+    sellerPartnerUserId, setSellerPartnerUserId, responsibleOptions,
     remainingPaymentAmount = 0,
     manualItemNameErrors = new Set<number>(),
     manualItemPriceErrors = new Set<number>(),
@@ -703,9 +707,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         {isPaidOrder ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                                <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                                <PaymentRow label="Responsável" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"}</span>} />
                                 {!hasOnlyServices && (
-                                    <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                    <>
+                                        <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                        <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod)}</span>} />
+                                    </>
                                 )}
                             </div>
                         ) : (
@@ -722,12 +729,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     }}
                                 />
 
-                                <FormDropdown
-                                    label="Origem da Venda"
-                                    disabled={isMarketplaceLocked}
-                                    value={salesChannel}
-                                    setValue={(val: any) => setSalesChannel(val)}
-                                    options={salesChannelOptions}
+                                <Combobox
+                                    label="Responsável"
+                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    value={sellerPartnerUserId || undefined}
+                                    dataField="sellerPartnerUserId"
+                                    placeholder="Selecione o funcionário..."
+                                    searchPlaceholder="Buscar funcionário..."
+                                    onChange={(val) => {
+                                        if (setSellerPartnerUserId) {
+                                            setSellerPartnerUserId(val)
+                                        }
+                                    }}
+                                    options={responsibleOptions || []}
                                 />
 
                                 {!hasOnlyServices && (
@@ -740,25 +754,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     />
                                 )}
 
-                                {!isQuickMode && (
-                                    <Combobox
-                                        label="Conta de recebimento"
+                                {!hasOnlyServices && (
+                                    <FormDropdown
+                                        label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"}
                                         disabled={isMarketplaceLocked && isPaidOrder}
-                                        value={financeAccountId || undefined}
-                                        dataField="financeAccountId"
-                                        onChange={(val) => {
-                                            setFinanceAccountId(val)
-                                            if (setFieldErrors) {
-                                                setFieldErrors((prev) => {
-                                                    const next = new Set(prev)
-                                                    next.delete("financeAccountId")
-                                                    return next
-                                                })
-                                            }
-                                        }}
-                                        options={accountOptions}
-                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
-                                        error={fieldErrors?.has("financeAccountId")}
+                                        value={deliveryStatus}
+                                        setValue={(val: any) => setDeliveryStatus(val)}
+                                        options={deliveryStatusOptions}
                                     />
                                 )}
                             </div>
@@ -1383,12 +1385,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     {isPaidOrder ? (
                         <div className="space-y-4 text-left">
                             <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                            <PaymentRow label="Origem da Venda" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>} />
+                            <PaymentRow label="Responsável" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"}</span>} />
                             {!hasOnlyServices && (
-                                <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                            )}
-                            {!isQuickMode && (
-                                <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                                <>
+                                    <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
+                                    <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod)}</span>} />
+                                </>
                             )}
                         </div>
                     ) : (
@@ -1405,12 +1407,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 }}
                             />
 
-                            <FormDropdown
-                                label="Origem da Venda"
-                                disabled={isMarketplaceLocked}
-                                value={salesChannel}
-                                setValue={(val: any) => setSalesChannel(val)}
-                                options={salesChannelOptions}
+                            <Combobox
+                                label="Responsável"
+                                disabled={isMarketplaceLocked && isPaidOrder}
+                                value={sellerPartnerUserId || undefined}
+                                dataField="sellerPartnerUserId"
+                                placeholder="Selecione o funcionário..."
+                                searchPlaceholder="Buscar funcionário..."
+                                onChange={(val) => {
+                                    if (setSellerPartnerUserId) {
+                                        setSellerPartnerUserId(val)
+                                    }
+                                }}
+                                options={responsibleOptions || []}
                             />
 
                             {!hasOnlyServices && (
@@ -1423,25 +1432,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 />
                             )}
 
-                            {!isQuickMode && (
-                                <Combobox
-                                    label="Conta de recebimento"
+                            {!hasOnlyServices && (
+                                <FormDropdown
+                                    label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"}
                                     disabled={isMarketplaceLocked && isPaidOrder}
-                                    value={financeAccountId || undefined}
-                                    dataField="financeAccountId"
-                                    onChange={(val) => {
-                                        setFinanceAccountId(val)
-                                        if (setFieldErrors) {
-                                            setFieldErrors((prev) => {
-                                                const next = new Set(prev)
-                                                next.delete("financeAccountId")
-                                                return next
-                                            })
-                                        }
-                                    }}
-                                    options={accountOptions}
-                                    actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
-                                    error={fieldErrors?.has("financeAccountId")}
+                                    value={deliveryStatus}
+                                    setValue={(val: any) => setDeliveryStatus(val)}
+                                    options={deliveryStatusOptions}
                                 />
                             )}
                         </div>

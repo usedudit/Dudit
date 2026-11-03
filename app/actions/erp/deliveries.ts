@@ -2130,6 +2130,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               order_number,
               customer_name,
               total_amount,
+              updated_at,
 
               delivery_fee,
               delivery_address,

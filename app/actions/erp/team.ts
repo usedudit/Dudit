@@ -181,6 +181,40 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
  * Requires pdv.sell permission instead of settings.settings_team,
  * so OPERADOR (cashier) roles can see and assign sellers.
  */
+/**
+ * Retorna os membros da equipe aptos a serem responsáveis pelo pedido no ERP.
+ * Exclui o cargo de entregador (DELIVERY) e retorna o partnerUserId do usuário logado
+ * para seleção padrão automática.
+ */
+export async function getOrderResponsiblesAction(): Promise<{
+    members: TeamMember[];
+    currentUserId?: string;
+    currentPartnerUserId?: string;
+    error?: string;
+}> {
+    try {
+        await requireUser()
+        const context = await getCurrentPartnerContext()
+        if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
+        await requirePermission(context.partnerId, "orders", "view")
+        const { members, error } = await fetchPartnerTeamMembers(context.partnerId)
+        if (error) return { members: [], error }
+
+        const nonDelivery = (members || []).filter(
+            (m) => String(m.role || "").toUpperCase() !== "DELIVERY"
+        )
+        const currentMember = (members || []).find((m) => m.userId === context.userId)
+
+        return {
+            members: nonDelivery,
+            currentUserId: context.userId,
+            currentPartnerUserId: currentMember?.id,
+        }
+    } catch (error: any) {
+        return { members: [], error: error.message }
+    }
+}
+
 export async function getPDVSellersAction(): Promise<{ members: TeamMember[]; error?: string }> {
     try {
         await requireUser()

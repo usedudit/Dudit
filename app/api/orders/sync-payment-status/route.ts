@@ -372,7 +372,7 @@ export async function POST(request: NextRequest) {
         .from("orders")
         .update(updateData)
         .eq("id", orderId)
-        .select("situation, paid_amount")
+        .select("situation, paid_amount, updated_at")
         .maybeSingle()
 
       if (updateError) {
@@ -495,6 +495,7 @@ export async function POST(request: NextRequest) {
         newStatus: newOrderStatus,
         paymentStatus: paymentData.status,
         updated: true,
+        updatedAt: updatedOrder?.updated_at || order.updated_at,
       })
     }
 
@@ -522,6 +523,7 @@ export async function POST(request: NextRequest) {
       newStatus: newOrderStatus,
       paymentStatus: paymentData.status,
       updated: false,
+      updatedAt: order.updated_at,
     })
   } catch (error: any) {
     SecureLogger.error("Error syncing payment status", {

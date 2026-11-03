@@ -99,6 +99,8 @@ const FIELD_LABELS: Record<string, string> = {
     delivery_method: "tipo de entrega",
     salesChannel: "canal de venda",
     sales_channel: "canal de venda",
+    sellerPartnerUserId: "responsável",
+    seller_partner_user_id: "responsável",
     situation: "situação",
     paymentStatus: "status de pagamento",
     deliveryStatus: "status de entrega",

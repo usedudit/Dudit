@@ -3271,6 +3271,21 @@ export async function getOrderDetailsAction(
     };
 
     const resolveSellerName = async () => {
+      if (data.seller_partner_user_id) {
+        const { data: pu } = await supabase
+          .from("partner_users")
+          .select("user_id")
+          .eq("id", data.seller_partner_user_id)
+          .maybeSingle();
+        if (pu?.user_id) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("full_name")
+            .eq("user_id", pu.user_id)
+            .maybeSingle();
+          if (profile?.full_name) return profile.full_name;
+        }
+      }
       if (!data.created_by) return null;
       const { data: sellerProfile } = await supabase
         .from("user_profiles")
@@ -3743,6 +3758,35 @@ export async function getOrderDetailsAction(
   };
 
   return { success: true, data: orderLike };
+}
+
+export async function getFreshOrderPaymentDataAction(orderId: string, partnerId: string) {
+  try {
+    const user = await requireUser();
+    if (!user) return { success: false, error: "Não autenticado" };
+    await requirePermission(partnerId, "orders", "view", user);
+    const supabase = createAdminClient();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+    let query = supabase
+      .from("orders")
+      .select("id, order_number, updated_at, situation, paid_amount, total_amount, payment_breakdown, payment_method, payment_provider, mp_payment_id, checkout_fulfillment")
+      .eq("partner_id", partnerId);
+
+    if (isUuid) {
+      query = query.eq("id", orderId);
+    } else {
+      query = query.eq("order_number", orderId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data) {
+      return { success: false, error: error?.message || "Pedido não encontrado" };
+    }
+    return { success: true, order: data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erro ao buscar dados do pedido" };
+  }
 }
 
 export async function getOrderHistoryAction(
@@ -4557,6 +4601,9 @@ export async function updateERPOrderAction(
         : (currentOrder as any).checkout_fulfillment || null,
     ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
     ...(preparationEstimate || {}),
+    ...(data.sellerPartnerUserId !== undefined
+      ? { seller_partner_user_id: data.sellerPartnerUserId || null }
+      : {}),
   };
 
   let orderUpdateResult = await supabase
@@ -5221,6 +5268,9 @@ async function syncOrderDeliveryStatusToDeliveries(
   }
 }
 
+import { areTimestampsEquivalent } from "@/lib/orders/order-utils";
+export { areTimestampsEquivalent };
+
 export async function updateOrdersStatusInBatchAction(payload: {
   orderIds: string[];
   partnerId: string;
@@ -5235,6 +5285,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
   paymentBreakdown?: any[];
   manualBalanceOverride?: boolean;
   expectedUpdatedAt?: string;
+  expectedPaidAmount?: number;
+  expectedTotalAmount?: number;
 }) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
@@ -5315,16 +5367,35 @@ export async function updateOrdersStatusInBatchAction(payload: {
     payload.actionType === "payment_status" &&
     (payload.paidAmount !== undefined || payload.paymentBreakdown !== undefined)
   ) {
-    const order = currentOrders[0] as any;
-    if (
-      payload.orderIds.length !== 1 ||
-      !payload.expectedUpdatedAt ||
-      payload.expectedUpdatedAt !== order.updated_at
-    ) {
+    if (payload.orderIds.length !== 1) {
       return {
         error:
-          "O pedido mudou desde que o pagamento foi aberto. Atualize o pedido e tente novamente.",
+          "A alteração de pagamento com detalhamento só pode ser feita em um pedido por vez.",
       };
+    }
+    const order = currentOrders[0] as any;
+    const timestampsMatch = areTimestampsEquivalent(
+      payload.expectedUpdatedAt,
+      order.updated_at,
+    );
+
+    if (payload.expectedUpdatedAt && !timestampsMatch) {
+      const isAlreadyPaid =
+        order.situation === "paid" && payload.statusValue !== "paid";
+      const isCancelled = order.situation === "cancelled";
+      const paidAmountConflict =
+        payload.expectedPaidAmount !== undefined &&
+        Math.abs(Number(order.paid_amount || 0) - Number(payload.expectedPaidAmount)) > 0.009;
+      const totalAmountConflict =
+        payload.expectedTotalAmount !== undefined &&
+        Math.abs(Number(order.total_amount || 0) - Number(payload.expectedTotalAmount)) > 0.009;
+
+      if (isAlreadyPaid || isCancelled || paidAmountConflict || totalAmountConflict) {
+        return {
+          error:
+            "O pedido mudou desde que o pagamento foi aberto. Atualize o pedido e tente novamente.",
+        };
+      }
     }
   }
 

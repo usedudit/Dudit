@@ -7,6 +7,7 @@ import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
+import { parseDecimalInput } from "@/lib/utils/formatters"
 import { sanitizeInput } from "@/lib/input-validator"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import {
@@ -764,13 +765,13 @@ export async function createProductComprehensiveAction(data: {
         }
 
         const logisticsData = {
-            weight_gross: data.weight_gross ?? 0,
-            weight_net: data.weight_net ?? 0,
-            width: data.width ?? 0,
-            height: data.height ?? 0,
-            length: data.length ?? 0,
+            weight_gross: parseDecimalInput(data.weight_gross),
+            weight_net: parseDecimalInput(data.weight_net),
+            width: parseDecimalInput(data.width),
+            height: parseDecimalInput(data.height),
+            length: parseDecimalInput(data.length),
             packaging_type: data.packagingType || "package",
-            preparation_days: data.preparationDays || 0,
+            preparation_days: Math.max(0, Math.round(parseDecimalInput(data.preparationDays))),
         }
 
         const supabase = await getSupabaseServerClient()
@@ -1137,7 +1138,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         })
 
         logisticsMapFields.forEach(field => {
-            if (dataRecord[field] !== undefined) logisticsPayload[field] = dataRecord[field]
+            if (dataRecord[field] !== undefined) logisticsPayload[field] = parseDecimalInput(dataRecord[field])
         })
 
         // Only fetch business_info when marketplace-related fields are being updated
@@ -1164,8 +1165,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if ((data as any).fulfillment_modes !== undefined) payload.fulfillment_modes = (data as any).fulfillment_modes
         if ((data as any).fulfillmentModes !== undefined) payload.fulfillment_modes = (data as any).fulfillmentModes
 
-        if (data.packagingType !== undefined) logisticsPayload.packaging_type = data.packagingType
-        if (data.preparationDays !== undefined) logisticsPayload.preparation_days = data.preparationDays
+        if (data.packagingType !== undefined) logisticsPayload.packaging_type = data.packagingType || "package"
+        if (data.preparationDays !== undefined) logisticsPayload.preparation_days = Math.max(0, Math.round(parseDecimalInput(data.preparationDays)))
 
         if (data.fciCode !== undefined) fiscalPayload.fci_code = data.fciCode
         if (data.allow_sell_without_stock !== undefined) payload.allow_sell_without_stock = data.allow_sell_without_stock
@@ -3046,18 +3047,40 @@ const fetchProductByIdStatic = unstable_cache(
         const supabase = getAdminClient()
         const { data: product, error } = await supabase
             .from("products")
-            .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand_rel:brands!brand_id(name), location_rel:storage_locations!location_id(name), variants:product_variants(*)")
+            .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand_rel:brands!brand_id(name), location_rel:storage_locations!location_id(name), variants:product_variants(*), product_fiscal_profiles(*), product_logistics(*)")
             .eq("id", productId)
             .single()
         if (error) throw error
         if (product) {
-            return {
+            const fiscal = Array.isArray((product as any).product_fiscal_profiles)
+                ? (product as any).product_fiscal_profiles[0]
+                : (product as any).product_fiscal_profiles
+            const logistics = Array.isArray((product as any).product_logistics)
+                ? (product as any).product_logistics[0]
+                : (product as any).product_logistics
+
+            const mapped: any = {
                 ...product,
                 category: product.category?.name || null,
                 subcategory: product.subcategory?.name || null,
                 brand: product.brand_rel?.name || (product as any).brand || null,
                 location: product.location_rel?.name || (product as any).location || null
             }
+
+            if (fiscal) Object.assign(mapped, fiscal)
+            if (logistics) {
+                Object.assign(mapped, logistics)
+                for (const field of ["weight_gross", "weight_net", "width", "height", "length"] as const) {
+                    if (mapped[field] !== null && mapped[field] !== undefined) mapped[field] = Number(mapped[field])
+                }
+                if (mapped.preparation_days !== null && mapped.preparation_days !== undefined) {
+                    mapped.preparation_days = Number(mapped.preparation_days)
+                }
+            }
+
+            delete mapped.product_fiscal_profiles
+            delete mapped.product_logistics
+            return mapped
         }
         return product
     },

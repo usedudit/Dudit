@@ -80,6 +80,7 @@ import { OrdersSuggestionsSheet } from "./OrdersSuggestionsSheet"
 // --- TYPES & INTERFACES ---
 
 interface Order {
+    id?: string;
     originalId: string;
     displayId: string;
     customer_name: string;
@@ -555,6 +556,7 @@ export default function OrdersPage({
                 }
 
                 return {
+                    id: o.id,
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
                     customer_name: resolvedCustomerName,
@@ -595,6 +597,7 @@ export default function OrdersPage({
                     returnCount: Number(o.return_count || 0),
                     canEdit: o.situation !== "cancelled",
                     paidAmount: Number(o.paid_amount || 0),
+                    updated_at: o.updated_at,
                     hasOnlyServices,
                     is_refunded: Boolean(o.is_refunded),
                     refunded_amount: Number(o.refunded_amount || 0),
@@ -1214,7 +1217,7 @@ export default function OrdersPage({
                                 const depositSummary = getOrderDepositSummary(order)
                                 if (canPaySinal(depositSummary)) {
                                     setSinalAction("keep")
-                                    setSinalActionModal({ open: true, order: { originalId: order.id, checkout_fulfillment: order.checkout_fulfillment, paidAmount: Number(order.paid_amount || 0), total_amount: Number(order.total_amount || 0), payment_expires_at: order.payment_expires_at } as any })
+                                    setSinalActionModal({ open: true, order: { originalId: order.id, checkout_fulfillment: order.checkout_fulfillment, paidAmount: Number(order.paid_amount || 0), total_amount: Number(order.total_amount || 0), payment_expires_at: order.payment_expires_at, updated_at: order.updated_at } as any })
                                     return
                                 }
                                 // Nothing received yet (no sinal, no payments)

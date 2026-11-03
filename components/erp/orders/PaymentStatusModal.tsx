@@ -9,6 +9,7 @@ import {
   Input,
   Badge,
   AlertModal,
+  Tooltip,
 } from "@/components/reusable";
 import {
   CheckCircleIcon,
@@ -22,7 +23,10 @@ import {
 } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/use-toast";
-import { updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders";
+import {
+  updateOrdersStatusInBatchAction,
+  getFreshOrderPaymentDataAction,
+} from "@/app/actions/erp/orders";
 import { getDepositBalanceManualPolicyAction } from "@/app/actions/erp/deposit-balance-policy";
 import {
   findReceivableLegIndex,
@@ -320,6 +324,35 @@ export default function PaymentStatusModal({
   const frozen =
     baseFrozen && !(depositSummary?.usesDeposit && totalRemaining > 0.009);
 
+  const targetOrderId = targetOrder?.id || targetOrder?.originalId;
+
+  useEffect(() => {
+    if (!isOpen || !targetOrderId) return;
+    let cancelled = false;
+
+    getFreshOrderPaymentDataAction(targetOrderId, partnerId)
+      .then((res) => {
+        if (!cancelled && res.success && res.order) {
+          setCurrentOrder((prev: any) => ({
+            ...(prev || {}),
+            ...res.order,
+            updated_at: res.order.updated_at,
+            paid_amount: res.order.paid_amount,
+            paidAmount: res.order.paid_amount,
+            total_amount: res.order.total_amount,
+            totalAmount: res.order.total_amount,
+            situation: res.order.situation,
+            payment_breakdown: res.order.payment_breakdown,
+          }));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, targetOrderId, partnerId]);
+
   const isMpOrder = Boolean(
     targetOrder?.payment_provider === "Mercado Pago" ||
     targetOrder?.mp_payment_id ||
@@ -390,6 +423,11 @@ export default function PaymentStatusModal({
             setMpPaymentData(data);
           } else {
             setMpPaymentData(null);
+          }
+          if (data?.updatedAt) {
+            setCurrentOrder((prev: any) =>
+              prev ? { ...prev, updated_at: data.updatedAt } : prev,
+            );
           }
         })
         .catch((err) => {
@@ -557,6 +595,11 @@ export default function PaymentStatusModal({
 
       if (res.ok) {
         const data = await res.json();
+        if (data?.updatedAt) {
+          setCurrentOrder((prev: any) =>
+            prev ? { ...prev, updated_at: data.updatedAt } : prev,
+          );
+        }
         if (
           data.newStatus === "paid" ||
           data.newStatus === "partially_paid" ||
@@ -823,6 +866,8 @@ export default function PaymentStatusModal({
         paymentBreakdown: finalBreakdown,
         manualBalanceOverride: isManualBalanceOverride || undefined,
         expectedUpdatedAt: targetOrder.updated_at,
+        expectedPaidAmount: totalPaid,
+        expectedTotalAmount: totalOrder,
       });
 
       if (res.success) {
@@ -1171,12 +1216,13 @@ export default function PaymentStatusModal({
                                 {mpPaymentData?.boletoData
                                   ? "Boleto Mercado Pago"
                                   : "Pix Mercado Pago"}
-                                <Badge
-                                  variant="orange"
-                                  className="whitespace-nowrap scale-90"
-                                >
-                                  Pendente
-                                </Badge>
+                                <Tooltip text="Pendente">
+                                  <Badge
+                                    variant="orange"
+                                    className="whitespace-nowrap scale-90 shrink-0"
+                                  >
+                                  </Badge>
+                                </Tooltip>
                               </h4>
                               <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
                                 {mpPaymentData?.boletoData

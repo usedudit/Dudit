@@ -128,6 +128,53 @@ export function formatYear(date: Date | string | number): string {
 }
 
 /**
+ * Parses a decimal value typed by the user. Accepts both pt-BR ("1,5")
+ * and en-US ("1.5") separators. Empty/invalid input resolves to 0.
+ */
+export function parseDecimalInput(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0
+  if (value === null || value === undefined) return 0
+
+  let str = String(value).trim()
+  if (!str) return 0
+
+  str = str.replace(/[^\d,.-]/g, "")
+  if (!str) return 0
+
+  const lastComma = str.lastIndexOf(",")
+  const lastDot = str.lastIndexOf(".")
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    // The last separator is the decimal one; the other is a thousands separator.
+    str = lastComma > lastDot
+      ? str.replace(/\./g, "").replace(",", ".")
+      : str.replace(/,/g, "")
+  } else if (lastComma >= 0) {
+    const parts = str.split(",")
+    str = parts.length === 2 ? `${parts[0]}.${parts[1]}` : str.replace(/,/g, "")
+  } else if ((str.match(/\./g) || []).length > 1) {
+    str = str.replace(/\./g, "")
+  }
+
+  const parsed = Number(str)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+/**
+ * Renders a value inside a decimal text input. Zero/empty values render as an
+ * empty string so the placeholder is shown instead of a fake "0".
+ */
+export function formatDecimalInput(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value === 0) return ""
+    return String(value).replace(".", ",")
+  }
+  const str = String(value).trim()
+  return str
+}
+
+/**
  * Formats a number with pt-BR separators.
  */
 export function formatNumber(

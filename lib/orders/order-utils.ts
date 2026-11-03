@@ -75,3 +75,22 @@ export function resolveOrderPaymentMethodLabel(order?: PaymentMethodSource | nul
 
   return "Não informado"
 }
+
+/**
+ * Compares two ISO timestamps or DB date strings for equivalence.
+ * Returns true if both represent the same point in time, tolerating timezone offset
+ * differences (+00:00 vs Z) and subsecond/microsecond precision truncation (up to 2000ms window).
+ */
+export function areTimestampsEquivalent(
+  t1?: string | null,
+  t2?: string | null,
+): boolean {
+  if (!t1 && !t2) return true;
+  if (!t1 || !t2) return false;
+  if (t1 === t2) return true;
+  const timeA = new Date(t1).getTime();
+  const timeB = new Date(t2).getTime();
+  if (Number.isNaN(timeA) || Number.isNaN(timeB)) return false;
+  return Math.abs(timeA - timeB) <= 2000;
+}
+

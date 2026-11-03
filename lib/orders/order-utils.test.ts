@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { normalizeOrderSource, resolveOrderPaymentMethodLabel } from "@/lib/orders/order-utils"
+import { normalizeOrderSource, resolveOrderPaymentMethodLabel, areTimestampsEquivalent } from "@/lib/orders/order-utils"
 import { canonicalDeliveryStatus } from "@/lib/orders/status"
 
 describe("normalizeOrderSource", () => {
@@ -86,3 +86,45 @@ describe("canonicalDeliveryStatus", () => {
         expect(canonicalDeliveryStatus("delivery_failed")).toBe("delivery_failed")
     })
 })
+
+describe("areTimestampsEquivalent", () => {
+    it("returns true for identical timestamp strings", () => {
+        const ts = "2026-11-03T14:30:00.000Z"
+        expect(areTimestampsEquivalent(ts, ts)).toBe(true)
+    })
+
+    it("returns true for both null or undefined", () => {
+        expect(areTimestampsEquivalent(null, null)).toBe(true)
+        expect(areTimestampsEquivalent(undefined, undefined)).toBe(true)
+    })
+
+    it("returns false if one is null and the other is defined", () => {
+        expect(areTimestampsEquivalent("2026-11-03T14:30:00.000Z", null)).toBe(false)
+        expect(areTimestampsEquivalent(null, "2026-11-03T14:30:00.000Z")).toBe(false)
+    })
+
+    it("handles ISO string with Z vs +00:00 offset seamlessly", () => {
+        const isoZ = "2026-11-03T14:30:00.123Z"
+        const isoOffset = "2026-11-03T14:30:00.123+00:00"
+        expect(areTimestampsEquivalent(isoZ, isoOffset)).toBe(true)
+    })
+
+    it("handles microsecond truncation between Postgres and JS Date", () => {
+        const postgresMicroseconds = "2026-11-03T14:30:00.123456+00:00"
+        const jsMilliseconds = "2026-11-03T14:30:00.123Z"
+        expect(areTimestampsEquivalent(postgresMicroseconds, jsMilliseconds)).toBe(true)
+    })
+
+    it("returns true for timestamps within 2000ms window (e.g. quick inline retry triggers)", () => {
+        const t1 = "2026-11-03T14:30:00.000Z"
+        const t2 = "2026-11-03T14:30:01.500Z"
+        expect(areTimestampsEquivalent(t1, t2)).toBe(true)
+    })
+
+    it("returns false for timestamps further apart (> 2000ms)", () => {
+        const t1 = "2026-11-03T14:30:00.000Z"
+        const t2 = "2026-11-03T14:30:03.000Z"
+        expect(areTimestampsEquivalent(t1, t2)).toBe(false)
+    })
+})
+
