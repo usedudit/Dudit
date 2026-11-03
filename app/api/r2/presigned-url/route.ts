@@ -39,9 +39,14 @@ export async function POST(req: NextRequest) {
     // 3. PARSE REQUEST BODY
     const { filename, contentType, fileSize } = await req.json()
 
-    if (!filename || !contentType) {
+    if (
+      !filename ||
+      !contentType ||
+      !Number.isSafeInteger(fileSize) ||
+      fileSize < 1
+    ) {
       return NextResponse.json(
-        { error: "filename e contentType são obrigatórios" },
+        { error: "filename, contentType e fileSize válidos são obrigatórios" },
         { status: 400 }
       )
     }
@@ -61,6 +66,7 @@ export async function POST(req: NextRequest) {
     const result = await generateSignedUploadUrl({
       fileName: filename,
       fileType: contentType,
+      contentLength: fileSize,
       userId: user.id,
       prefix: "products/",
       kind,

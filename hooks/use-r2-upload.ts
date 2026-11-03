@@ -74,6 +74,7 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
         const queryObj: Record<string, string> = {
           fileName: file.name,
           fileType: file.type,
+          fileSize: String(file.size),
         }
         if (options?.prefix) {
           queryObj.prefix = options.prefix

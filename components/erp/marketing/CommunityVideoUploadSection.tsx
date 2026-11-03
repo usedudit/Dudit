@@ -212,6 +212,7 @@ export default function CommunityVideoUploadSection({ video, onChange }: Communi
                     filename: uploadFile.name,
                     contentType: resolvedMime,
                     fileSize: uploadFile.size,
+                    thumbnailSize: thumbnailFile.size,
                     duration,
                     firstBytesBase64: bytesToBase64(firstBytes),
                 }),

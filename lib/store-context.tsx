@@ -215,7 +215,7 @@ export function StoreProvider({
 
   const storeChangeInFlight = useRef<string | null>(null)
 
-  const selectStore = (storeId: string) => {
+  const selectStore = useCallback((storeId: string) => {
     if (stores.length <= 1) return
     const store = stores.find((s) => s.id === storeId)
     if (store && selectedStore?.id !== storeId && storeChangeInFlight.current !== storeId) {
@@ -251,11 +251,11 @@ export function StoreProvider({
         }
       })
     }
-  }
+  }, [stores, selectedStore?.id, router])
 
-  const refreshStores = async () => {
+  const refreshStores = useCallback(async () => {
     await fetchStores()
-  }
+  }, [fetchStores])
 
   const contextValue = useMemo(() => ({
     selectedStore,
@@ -265,7 +265,7 @@ export function StoreProvider({
     hasError,
     selectStore,
     refreshStores
-  }), [selectedStore, stores, isLoading, hasError, selectStore])
+  }), [selectedStore, stores, isLoading, hasError, selectStore, refreshStores])
 
   return (
     <StoreContext.Provider value={contextValue}>

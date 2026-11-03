@@ -1222,17 +1222,35 @@ export async function getPresignedUploadUrlAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
 
-    const kind = getUploadKindFromMimeType(fileType) || "image"
+    const allowedPrefixes = new Set([
+      "service-orders",
+      "serviceOrderAttachments",
+      R2_PREFIXES.serviceOrderSignatures,
+      R2_PREFIXES.serviceOrderPdfs,
+    ])
+    if (!allowedPrefixes.has(prefix)) {
+      return { success: false, error: "Destino de upload inválido." }
+    }
+    const kind = getUploadKindFromMimeType(fileType)
+    if (!kind || kind === "video") {
+      return { success: false, error: "Este tipo de arquivo não é permitido em anexos de OS." }
+    }
+    if (!Number.isSafeInteger(fileSize) || fileSize < 1) {
+      return { success: false, error: "Tamanho de arquivo inválido." }
+    }
     const rules = getUploadValidationRules(kind)
-
     if (fileSize > rules.maxSize) {
       const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
       return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB.` }
     }
+    const { validateUploadRequest } = await import("@/lib/security/file-validator")
+    const validation = validateUploadRequest(fileName, fileType, fileSize)
+    if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." }
 
     const result = await generateSignedUploadUrl({
       fileName,
       fileType,
+      contentLength: fileSize,
       userId: user.id,
       prefix,
       kind,
@@ -1260,51 +1278,97 @@ export async function saveAttachmentAction(
   fileHash?: string,
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
     const admin = getAdminClient()
+    const supabase = await getSupabaseServerClient()
+    const { data: serviceOrder } = await supabase
+      .from("service_orders")
+      .select("id, partner_id, store_id")
+      .eq("id", serviceOrderId)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+    if (!serviceOrder) return { success: false, error: "Ordem de serviço não encontrada." }
+    if (serviceOrder.store_id) {
+      await requireStorePermission(serviceOrder.store_id, partnerId, "service_orders", "edit")
+    }
+
+    const { validateKeyOwnership } = await import("@/lib/r2/server")
+    if (
+      typeof fileKey !== "string" ||
+      !validateKeyOwnership(fileKey, user.id) ||
+      !new RegExp(`^users/${user.id}/(?:service-orders|serviceOrderAttachments)[^/]+$`).test(fileKey) ||
+      fileKey.includes("..") ||
+      fileKey.startsWith("/")
+    ) {
+      return { success: false, error: "Chave de arquivo inválida para este usuário." }
+    }
+    if (!Number.isSafeInteger(fileSize) || fileSize < 1) {
+      return { success: false, error: "Tamanho de arquivo inválido." }
+    }
+    if (category !== undefined && !["normal", "antes", "depois"].includes(category)) {
+      return { success: false, error: "Categoria de anexo inválida." }
+    }
+    const uploadKind = getUploadKindFromMimeType(fileType)
+    if (!uploadKind || uploadKind === "video") {
+      return { success: false, error: "Este tipo de arquivo não é permitido em anexos de OS." }
+    }
+    const { validateUploadRequest } = await import("@/lib/security/file-validator")
+    const uploadValidation = validateUploadRequest(fileName, fileType, fileSize)
+    if (!uploadValidation.success) {
+      return { success: false, error: uploadValidation.error || "Arquivo inválido." }
+    }
 
     // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
     const { getPartnerPlan } = await import("@/lib/services/subscription.service")
     const plan = await getPartnerPlan(partnerId)
     const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0
-
-    const { count, error: countErr } = await admin
-      .from("service_order_attachments")
-      .select("id", { count: "exact", head: true })
-      .eq("service_order_id", serviceOrderId)
-
-    if (countErr) throw countErr
-
-    if ((count || 0) >= limit) {
-      return { success: false, error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.` }
+    if (limit === 0) {
+      return { success: false, error: "Upload de anexos não permitido no seu plano." }
     }
 
-    // 1. Compute/verify file hash on server if not provided (fallback for small files)
-    let finalHash = fileHash || ""
-    if (!finalHash && fileSize < 5 * 1024 * 1024) {
-      try {
-        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-        const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
-        const serverConfig = getR2ServerConfig()
-        const s3 = new S3Client({
-          region: "auto",
-          credentials: {
-            accessKeyId: serverConfig.accessKeyId,
-            secretAccessKey: serverConfig.secretAccessKey,
-          },
-          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-        })
-        const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-        if (obj.Body) {
-          const bytes = await obj.Body.transformToByteArray()
-          const crypto = await import("crypto")
-          finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
-        }
-        s3.destroy()
-      } catch (e) {
-        console.error("Erro ao calcular hash do R2 no fallback:", e)
+    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
+    const { S3Client, HeadObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3")
+    const serverConfig = getR2ServerConfig()
+    const s3 = new S3Client({
+      region: "auto",
+      credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
+      endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+    })
+    let actualFileSize: number
+    let finalHash: string
+    try {
+      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+      actualFileSize = Number(head.ContentLength)
+      if (!Number.isSafeInteger(actualFileSize) || actualFileSize !== fileSize || head.ContentType !== fileType) {
+        return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
       }
+      const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+      if (!actualValidation.success) {
+        return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
+      }
+      if (fileHash !== undefined && !/^[a-f0-9]{64}$/i.test(fileHash)) {
+        return { success: false, error: "Hash do arquivo inválido." }
+      }
+      const object = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
+      if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
+      const crypto = await import("node:crypto")
+      const hash = crypto.createHash("sha256")
+      let hashedBytes = 0
+      for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+        hashedBytes += chunk.byteLength
+        hash.update(chunk)
+      }
+      if (hashedBytes !== actualFileSize) {
+        return { success: false, error: "O conteúdo do arquivo mudou durante a validação." }
+      }
+      finalHash = hash.digest("hex")
+      if (fileHash && fileHash.toLowerCase() !== finalHash) {
+        return { success: false, error: "O hash do arquivo não corresponde ao conteúdo enviado." }
+      }
+    } finally {
+      s3.destroy()
     }
 
     // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)
@@ -1313,22 +1377,22 @@ export async function saveAttachmentAction(
     const validatedFileType = canonicalMime || "application/octet-stream"
 
     // 3. Save to database
-    const { data, error } = await admin
-      .from("service_order_attachments")
-      .insert({
-        service_order_id: serviceOrderId,
-        file_key: fileKey,
-        file_name: fileName, // Stores original filename
-        file_type: validatedFileType, // Stores server-validated MIME
-        file_size: fileSize,
-        uploaded_by: user.id,
-        category: category || "normal",
-        file_hash: finalHash,
-      })
-      .select("*")
-      .single()
+    const { data: insertedRows, error } = await admin.rpc("register_service_order_attachment_atomic", {
+      p_partner_id: partnerId,
+      p_service_order_id: serviceOrderId,
+      p_uploaded_by: user.id,
+      p_file_key: fileKey,
+      p_file_name: fileName,
+      p_file_type: validatedFileType,
+      p_file_size: actualFileSize,
+      p_file_hash: finalHash,
+      p_category: category || "normal",
+      p_attachment_limit: limit,
+    })
 
     if (error) throw error
+    const data = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows
+    if (!data) throw new Error("Não foi possível registrar o anexo.")
 
     // 4. Audit Log
     const { auditLog } = await import("@/lib/security/audit-logger")

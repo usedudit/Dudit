@@ -125,7 +125,7 @@ export function SupabaseProvider({
     }), [supabase, user, isLoading, sessionData, isSessionLoading])
 
     return (
-        <SupabaseContext.Provider value={{ supabase, user, isLoading, sessionData, isSessionLoading }}>
+        <SupabaseContext.Provider value={contextValue}>
             <SWRConfig value={{
                 revalidateOnMount: false,
                 revalidateOnFocus: false,

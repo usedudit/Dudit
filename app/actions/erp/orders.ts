@@ -2556,7 +2556,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
       unitPrice: item.unitPrice,
       quantity: item.quantity,
     })),
-    shippingCost: Number(data.shippingCost || 0),
+    shippingCost: data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0),
     additionalCosts: Number(data.additionalCosts || 0),
     manualDiscount:
       data.discountValue > 0 && data.discountType !== "coupon"
@@ -2804,8 +2804,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     payment_method_fixed_fee_amount: paymentMethodFixedFeeAmount,
     store_credit_amount: paymentMethodStoreCreditAmount,
     coupon_id: couponIdToSave,
-    delivery_fee: serverShippingCost,
-    delivery_breakdown: (data.deliveryBreakdown as Record<string, unknown> | null) || null,
+    delivery_fee: data.deliveryMethod === "pickup" ? 0 : serverShippingCost,
+    delivery_breakdown: data.deliveryMethod === "pickup" ? null : ((data.deliveryBreakdown as Record<string, unknown> | null) || null),
     additional_costs: data.additionalCosts,
     notes: sanitizeNotes(data.notes),
     payment_method: paymentMethodSummary,
@@ -4161,7 +4161,7 @@ export async function updateERPOrderAction(
       Number(data.discountValue || 0),
     ) > 0.009 ||
     Math.abs(
-      Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0),
+      Number(currentOrder.delivery_fee || 0) - (data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0)),
     ) > 0.009 ||
     Math.abs(
       Number(currentOrder.additional_costs || 0) -
@@ -4223,7 +4223,7 @@ export async function updateERPOrderAction(
         Number(data.discountValue || 0),
       ) > 0.009 ||
       Math.abs(
-        Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0),
+        Number(currentOrder.delivery_fee || 0) - (data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0)),
       ) > 0.009 ||
       Math.abs(
         Number(currentOrder.additional_costs || 0) -
@@ -4259,7 +4259,7 @@ export async function updateERPOrderAction(
       unitPrice: item.unitPrice,
       quantity: item.quantity,
     })),
-    shippingCost: Number(data.shippingCost || 0),
+    shippingCost: data.deliveryMethod === "pickup" ? 0 : Number(data.shippingCost || 0),
     additionalCosts: Number(data.additionalCosts || 0),
     manualDiscount:
       data.discountValue > 0 && data.discountType !== "coupon"
@@ -4570,10 +4570,12 @@ export async function updateERPOrderAction(
     payment_method_interest_amount: updatePaymentMethodInterestAmount,
     payment_method_fee_amount: updatePaymentMethodFeeAmount,
     payment_method_fixed_fee_amount: updatePaymentMethodFixedFeeAmount,
-    delivery_fee: updateServerShipping,
-    delivery_breakdown: data.deliveryBreakdown !== undefined
-      ? ((data.deliveryBreakdown as Record<string, unknown>) || null)
-      : (currentOrder as any).delivery_breakdown || null,
+    delivery_fee: data.deliveryMethod === "pickup" ? 0 : updateServerShipping,
+    delivery_breakdown: data.deliveryMethod === "pickup"
+      ? null
+      : (data.deliveryBreakdown !== undefined
+        ? ((data.deliveryBreakdown as Record<string, unknown>) || null)
+        : (currentOrder as any).delivery_breakdown || null),
     delivery_payer: updateEffectiveDeliveryPayer,
     additional_costs: data.additionalCosts,
     notes: sanitizeNotes(data.notes),
@@ -6824,7 +6826,7 @@ export async function getERPOrdersPageAction(
                         customers(id, name, email, phone),
                         order_shipments(id, status, tracking_number, tracking_url, provider_slug, kind, created_at, carrier),
                         return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
-                        order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
+                        order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price),
                         payment_method, payment_breakdown, payment_provider,
                         delivery_breakdown,
                         checkout_fulfillment
@@ -7632,23 +7634,6 @@ export async function saveOrderAttachmentAction(
       return { success: false, error: "Upload de anexos não permitido no seu plano." };
     }
 
-    const { data: existingAttachments, error: countErr } = await admin
-      .from("order_attachments")
-      .select("file_type")
-      .eq("order_id", orderId);
-
-    if (countErr) throw countErr;
-
-    const sameKindCount = (existingAttachments || []).filter(
-      (attachment: any) => getUploadKindFromMimeType(String(attachment.file_type || "")) === uploadKind,
-    ).length;
-    if (sameKindCount >= limit) {
-      return {
-        success: false,
-        error: `Limite de anexos excedido para o seu plano (${limit} arquivo(s)). Faça upgrade para enviar mais.`,
-      };
-    }
-
     const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config");
     const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3");
     const serverConfig = getR2ServerConfig();
@@ -7670,40 +7655,41 @@ export async function saveOrderAttachmentAction(
       s3.destroy();
     }
 
-    // 1. Compute/verify hash on server if not provided (fallback for small files)
-    let finalHash = fileHash || "";
-    if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
-      try {
-        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config");
-        const { S3Client, GetObjectCommand } =
-          await import("@aws-sdk/client-s3");
-        const serverConfig = getR2ServerConfig();
-        const s3 = new S3Client({
-          region: "auto",
-          credentials: {
-            accessKeyId: serverConfig.accessKeyId,
-            secretAccessKey: serverConfig.secretAccessKey,
-          },
-          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-        });
-        const obj = await s3.send(
-          new GetObjectCommand({
-            Bucket: serverConfig.bucketName,
-            Key: fileKey,
-          }),
-        );
-        if (obj.Body) {
-          const bytes = await obj.Body.transformToByteArray();
-          const crypto = await import("crypto");
-          finalHash = crypto
-            .createHash("sha256")
-            .update(Buffer.from(bytes))
-            .digest("hex");
-        }
-        s3.destroy();
-      } catch (e) {
-        console.error("Erro ao calcular hash do R2 no fallback:", e);
+    // Hash the stored object, not the client supplied value. Stream it to keep
+    // memory use bounded even when documents approach the upload size limit.
+    if (fileHash !== undefined && !/^[a-f0-9]{64}$/i.test(fileHash)) {
+      return { success: false, error: "Hash do arquivo inválido." };
+    }
+    const { getR2ServerConfig: getHashR2Config } = await import("@/lib/r2/r2-server-config");
+    const { S3Client: HashS3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
+    const hashConfig = getHashR2Config();
+    const hashClient = new HashS3Client({
+      region: "auto",
+      credentials: { accessKeyId: hashConfig.accessKeyId, secretAccessKey: hashConfig.secretAccessKey },
+      endpoint: `https://${hashConfig.accountId}.r2.cloudflarestorage.com`,
+    });
+    let finalHash: string;
+    try {
+      const object = await hashClient.send(
+        new GetObjectCommand({ Bucket: hashConfig.bucketName, Key: fileKey }),
+      );
+      if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.");
+      const crypto = await import("node:crypto");
+      const hash = crypto.createHash("sha256");
+      let hashedBytes = 0;
+      for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+        hashedBytes += chunk.byteLength;
+        hash.update(chunk);
       }
+      if (hashedBytes !== actualFileSize) {
+        return { success: false, error: "O conteúdo do arquivo mudou durante a validação." };
+      }
+      finalHash = hash.digest("hex");
+      if (fileHash && fileHash.toLowerCase() !== finalHash) {
+        return { success: false, error: "O hash do arquivo não corresponde ao conteúdo enviado." };
+      }
+    } finally {
+      hashClient.destroy();
     }
 
     // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)
@@ -7715,21 +7701,21 @@ export async function saveOrderAttachmentAction(
     const validatedFileType = canonicalMime || "application/octet-stream";
 
     // 3. Save to database
-    const { data, error } = await admin
-      .from("order_attachments")
-      .insert({
-        order_id: orderId,
-        file_key: fileKey,
-        file_name: fileName,
-        file_type: validatedFileType,
-        file_size: actualFileSize,
-        uploaded_by: user.id,
-        file_hash: finalHash,
-      })
-      .select("*")
-      .single();
+    const { data: insertedRows, error } = await admin.rpc("register_order_attachment_atomic", {
+      p_partner_id: partnerId,
+      p_order_id: orderId,
+      p_uploaded_by: user.id,
+      p_file_key: fileKey,
+      p_file_name: fileName,
+      p_file_type: validatedFileType,
+      p_file_size: actualFileSize,
+      p_file_hash: finalHash,
+      p_attachment_limit: limit,
+    });
 
     if (error) throw error;
+    const data = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows;
+    if (!data) throw new Error("Não foi possível registrar o anexo.");
 
     // 4. Audit Log
     const { auditLog } = await import("@/lib/security/audit-logger");
@@ -7867,7 +7853,12 @@ export async function deleteOrderAttachmentAction(
 
     const { getAdminClient } = await import("@/lib/supabase/admin");
     const admin = getAdminClient();
-    await admin.from("order_attachments").delete().eq("id", attachmentId).eq("order_id", orderId);
+    const { error: deleteError } = await admin
+      .from("order_attachments")
+      .delete()
+      .eq("id", attachmentId)
+      .eq("order_id", orderId);
+    if (deleteError) throw deleteError;
 
     // Audit Log
     const { auditLog } = await import("@/lib/security/audit-logger");

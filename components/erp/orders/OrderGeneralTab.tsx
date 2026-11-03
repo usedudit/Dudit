@@ -25,6 +25,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
+import { getCarrierStatusLabel } from "@/lib/orders/carrier-status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -76,6 +77,7 @@ interface OrderGeneralTabProps {
     sellerPartnerUserId?: string | null
     setSellerPartnerUserId?: (val: string) => void
     responsibleOptions?: Array<{ value: string; label: string }>
+    isCarrierDelivery?: boolean
     remainingPaymentAmount?: number
     manualItemNameErrors?: Set<number>
     manualItemPriceErrors?: Set<number>
@@ -145,6 +147,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     couponCode = "", couponDiscountAmount = 0,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, financeAccountId, accountOptions, isSaving,
     sellerPartnerUserId, setSellerPartnerUserId, responsibleOptions,
+    isCarrierDelivery = false,
     remainingPaymentAmount = 0,
     manualItemNameErrors = new Set<number>(),
     manualItemPriceErrors = new Set<number>(),
@@ -711,7 +714,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {!hasOnlyServices && (
                                     <>
                                         <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                                        <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod)}</span>} />
+                                        <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))}</span>} />
                                     </>
                                 )}
                             </div>
@@ -756,7 +759,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 {!hasOnlyServices && (
                                     <FormDropdown
-                                        label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"}
+                                        label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"}
                                         disabled={isMarketplaceLocked && isPaidOrder}
                                         value={deliveryStatus}
                                         setValue={(val: any) => setDeliveryStatus(val)}
@@ -816,7 +819,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
                                 )}
 
-                                {(Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
+                                {deliveryMethod !== "pickup" && (Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                     <PaymentRow
                                         label="Valor da Entrega"
                                         value={
@@ -1027,7 +1030,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         </div>
                                     )}
 
-                                    {(parseFloat(shippingFee || "0") > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
+                                    {deliveryMethod !== "pickup" && (parseFloat(shippingFee || "0") > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                         <div className="flex justify-between items-center text-[15px]">
                                             <span className="text-brand-inactive-text font-medium">Entrega</span>
                                             <div className="text-right font-bold text-brand-dark dark:text-dark-heading">
@@ -1389,7 +1392,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             {!hasOnlyServices && (
                                 <>
                                     <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                                    <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod)}</span>} />
+                                    <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))}</span>} />
                                 </>
                             )}
                         </div>
@@ -1434,7 +1437,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                             {!hasOnlyServices && (
                                 <FormDropdown
-                                    label={deliveryMethod === "pickup" ? "Status da Retirada" : "Status de Entrega"}
+                                    label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"}
                                     disabled={isMarketplaceLocked && isPaidOrder}
                                     value={deliveryStatus}
                                     setValue={(val: any) => setDeliveryStatus(val)}
@@ -1495,7 +1498,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
                             )}
 
-                            {(Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
+                            {deliveryMethod !== "pickup" && (Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                 <PaymentRow
                                     label="Valor da Entrega"
                                     value={

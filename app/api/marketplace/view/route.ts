@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/auth/authorization"
 import { incrementMarketplaceView } from "@/lib/services/marketplace-metrics.service"
 
 const VALID_TYPES = new Set(["produto", "servico", "plano"])
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function POST(request: NextRequest) {
   try {
-    await requireUser()
-
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const entityType = String(body.entityType || "")
     const entityId = String(body.entityId || "")
 
-    if (!VALID_TYPES.has(entityType) || !entityId) {
+    if (!VALID_TYPES.has(entityType) || !UUID_REGEX.test(entityId)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
     }
 

@@ -11,9 +11,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { deleteFileFromR2, extractKeyFromR2Url, validateKeyOwnership } from "@/lib/r2/server"
 import { requireUser } from "@/lib/auth/authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRateLimit(RateLimitCategory.UPLOAD)
     // 1. STRICT AUTHENTICATION
     const user = await requireUser()
 
@@ -27,7 +30,7 @@ export async function DELETE(request: NextRequest) {
       key = extractKeyFromR2Url(publicUrl)
     }
 
-    if (!key) {
+    if (typeof key !== "string" || key.length > 1024) {
       return NextResponse.json(
         { error: "key ou publicUrl é obrigatório" },
         { status: 400 }

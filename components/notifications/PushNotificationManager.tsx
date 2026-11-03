@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import { isFirebaseClientConfigured } from "@/lib/notifications/firebase-config"
 import { registerPushSubscriptionAction } from "@/app/actions/notifications"
@@ -235,12 +234,11 @@ export function usePushNotificationStatus() {
  * a permissão já foi concedida pelo usuário.
  */
 export function PushNotificationManager() {
-  const pathname = usePathname()
   const { user } = useSupabase()
   const isSyncingRef = useRef(false)
 
   useEffect(() => {
-    if (pathname?.startsWith("/print")) return
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/print")) return
     if (typeof navigator !== "undefined" && navigator.userAgent.includes("Headless")) return
     if (!user?.id || !isFirebaseClientConfigured()) return
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("Notification" in window)) return
@@ -309,7 +307,7 @@ export function PushNotificationManager() {
       }
       if (unsubscribeForeground) unsubscribeForeground()
     }
-  }, [user?.id, pathname])
+  }, [user?.id])
 
   return null
 }

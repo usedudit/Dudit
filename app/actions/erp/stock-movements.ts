@@ -742,6 +742,7 @@ export async function getStockMovementPresignedUploadUrlAction(
     const uploadRes = await generateSignedUploadUrl({
       fileName,
       fileType,
+      contentLength: fileSize,
       userId: user.id,
       prefix: R2_PREFIXES.orderAttachments,
       kind: "document",
@@ -805,82 +806,30 @@ export async function saveStockMovementAttachmentAction(
     const maxCount = plan.slug.toLowerCase() === "crescer" ? 2 : 5
     const admin = createAdminClient()
 
-    const { count, error: countErr } = await admin
-      .from("stock_movement_attachments")
-      .select("id", { count: "exact", head: true })
-      .eq("stock_movement_id", movementId)
-
-    if (countErr) throw countErr
-
-    if ((count || 0) >= maxCount) {
-      return {
-        success: false,
-        error: `Limite de anexos excedido para o seu plano (${maxCount}). Remova algum para adicionar.`,
-      }
+    const { verifyUploadedObject } = await import("@/lib/r2/server")
+    const verified = await verifyUploadedObject(fileKey, fileSize, fileType, fileHash)
+    const actualFileSize = verified.contentLength
+    const finalHash = verified.sha256
+    const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+    if (!actualValidation.success) {
+      return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
     }
 
-    const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-    const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3")
-    const serverConfig = getR2ServerConfig()
-    const s3 = new S3Client({
-      region: "auto",
-      credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
-      endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+    const { data: insertedRows, error } = await admin.rpc("register_stock_movement_attachment_atomic", {
+      p_partner_id: partnerId,
+      p_movement_id: movementId,
+      p_uploaded_by: user.id,
+      p_file_key: fileKey,
+      p_file_name: fileName,
+      p_file_type: fileType,
+      p_file_size: actualFileSize,
+      p_file_hash: finalHash,
+      p_attachment_limit: maxCount,
     })
-    let actualFileSize: number
-    try {
-      const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-      actualFileSize = Number(head.ContentLength)
-      if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType) {
-        return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
-      }
-      const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
-      if (!actualValidation.success) return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
-    } finally {
-      s3.destroy()
-    }
-
-    let finalHash = fileHash || ""
-    if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
-      try {
-        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-        const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
-        const serverConfig = getR2ServerConfig()
-        const s3 = new S3Client({
-          region: "auto",
-          credentials: {
-            accessKeyId: serverConfig.accessKeyId,
-            secretAccessKey: serverConfig.secretAccessKey,
-          },
-          endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-        })
-        const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-        if (obj.Body) {
-          const bytes = await obj.Body.transformToByteArray()
-          const crypto = await import("crypto")
-          finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
-        }
-        s3.destroy()
-      } catch (e) {
-        console.error("Erro ao calcular hash do R2 no fallback:", e)
-      }
-    }
-
-    const { data, error } = await admin
-      .from("stock_movement_attachments")
-      .insert({
-        stock_movement_id: movementId,
-        file_key: fileKey,
-        file_name: fileName,
-        file_type: fileType,
-        file_size: actualFileSize,
-        uploaded_by: user.id,
-        file_hash: finalHash,
-      })
-      .select("*")
-      .single()
 
     if (error) throw error
+    const data = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows
+    if (!data) throw new Error("Não foi possível registrar o anexo.")
 
     const { logAuditEvent } = await import("@/lib/services/timeline.service")
     await logAuditEvent({

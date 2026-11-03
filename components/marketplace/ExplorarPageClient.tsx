@@ -27,7 +27,7 @@ import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/uti
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
-import citiesData from "@/lib/data/cities.json"
+import { getCitiesData } from "@/lib/data/cities-loader"
 import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
@@ -293,15 +293,21 @@ export function ExplorarPageClient({
 
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
+    const [citiesData, setCitiesData] = useState<string[]>([])
 
     // Resolve city accents from DB when modal opens
     const cityAccentFetchDoneRef = useRef(false)
     useEffect(() => {
-        if (!isCityModalOpen || cityAccentFetchDoneRef.current) return
-        cityAccentFetchDoneRef.current = true
-        resolveCityAccentBatch(citiesData.slice(0, 200)).then((resolved) => {
-            if (Object.keys(resolved).length > 0) {
-                setCityAccentCache((prev) => ({ ...prev, ...resolved }))
+        if (!isCityModalOpen) return
+        getCitiesData().then((cities) => {
+            setCitiesData(cities)
+            if (!cityAccentFetchDoneRef.current) {
+                cityAccentFetchDoneRef.current = true
+                resolveCityAccentBatch(cities.slice(0, 200)).then((resolved) => {
+                    if (Object.keys(resolved).length > 0) {
+                        setCityAccentCache((prev) => ({ ...prev, ...resolved }))
+                    }
+                }).catch(() => { })
             }
         }).catch(() => { })
     }, [isCityModalOpen])

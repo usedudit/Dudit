@@ -75,6 +75,47 @@ const evidenceSchema = z.object({
     metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
+async function verifyReturnEvidencePayload(evidence: z.infer<typeof evidenceSchema>[], ownerUserId: string) {
+    if (evidence.length === 0) return []
+    const [{ getR2PublicUrl }, { verifyUploadedObject }, { validateUploadRequest }] = await Promise.all([
+        import("@/lib/r2/r2-server-config"),
+        import("@/lib/r2/server"),
+        import("@/lib/security/file-validator"),
+    ])
+    const publicBase = getR2PublicUrl().replace(/\/+$/, "")
+    const expectedKeyPattern = new RegExp(`^users/${ownerUserId}/returns/[^/]+$`)
+    const verifiedEvidence = []
+
+    for (const item of evidence) {
+        const key = item.file_key
+        const fileName = item.file_name
+        const fileType = item.file_type
+        const fileSize = item.file_size
+        if (
+            !key || !expectedKeyPattern.test(key) || key.includes("..") ||
+            !fileName || !fileType || typeof fileSize !== "number" || !Number.isSafeInteger(fileSize) || fileSize < 1
+        ) {
+            throw new Error("Evidência inválida ou não pertence a este usuário.")
+        }
+        const expectedUrl = `${publicBase}/${key}`
+        if (item.file_url !== expectedUrl) {
+            throw new Error("A URL da evidência não corresponde ao arquivo enviado.")
+        }
+        const validation = validateUploadRequest(fileName, fileType, fileSize)
+        if (!validation.success) throw new Error(validation.error || "Arquivo de evidência inválido.")
+        const verified = await verifyUploadedObject(key, fileSize, fileType)
+        verifiedEvidence.push({
+            file_url: expectedUrl,
+            file_key: key,
+            file_name: fileName,
+            file_type: fileType,
+            file_size: verified.contentLength,
+            metadata: { fileHash: verified.sha256 },
+        })
+    }
+    return verifiedEvidence
+}
+
 const itemSchema = z.object({
     order_item_id: z.string().uuid(),
     quantity: z.number().int().positive().max(999),
@@ -640,6 +681,7 @@ export async function createReturnRequestAction(input: unknown) {
         }
 
         const ctx = await getCurrentPartnerContext()
+        const verifiedEvidence = await verifyReturnEvidencePayload(data.evidence, user.id)
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: data.partnerId,
             p_order_id: data.orderId,
@@ -649,7 +691,7 @@ export async function createReturnRequestAction(input: unknown) {
             p_reason: data.reason,
             p_message: data.message || null,
             p_items: data.items,
-            p_evidence: data.evidence,
+            p_evidence: verifiedEvidence,
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
             p_expires_at: data.expiresAt || null,
             p_request_type: data.resolution === "none" ? "return" : null,
@@ -801,6 +843,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             }
         }
 
+        const verifiedEvidence = await verifyReturnEvidencePayload(base.evidence, user.id)
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: order.partner_id,
             p_order_id: base.orderId,
@@ -810,7 +853,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             p_reason: base.reason,
             p_message: base.message || null,
             p_items: base.items,
-            p_evidence: base.evidence,
+            p_evidence: verifiedEvidence,
             p_idempotency_key: base.idempotencyKey || crypto.randomUUID(),
             p_expires_at: base.expiresAt || null,
             p_request_type: null,
@@ -2127,6 +2170,7 @@ export async function getReturnEvidencePresignedUploadUrlAction(
     | { success: false; error: string }
 > {
     try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const user = await requireUser()
         await requirePermission(partnerId, "orders", "edit")
 
@@ -2147,6 +2191,7 @@ export async function getReturnEvidencePresignedUploadUrlAction(
         const uploadRes = await generateSignedUploadUrl({
             fileName,
             fileType,
+            contentLength: fileSize,
             userId: user.id,
             prefix: R2_PREFIXES.orderAttachments,
             kind: "document",
@@ -2215,88 +2260,30 @@ export async function saveReturnEvidenceAction(
             return { success: false, error: uploadValidation.error || "Arquivo inválido." }
         }
 
-        const { count, error: countErr } = await admin
-            .from("return_evidence")
-            .select("id", { count: "exact", head: true })
-            .eq("return_request_id", returnRequestId)
-            .eq("partner_id", partnerId)
-
-        if (countErr) throw countErr
-
-        if ((count || 0) >= maxCount) {
-            return {
-                success: false,
-                error: `Limite de anexos excedido para o seu plano (${maxCount}). Remova algum para adicionar.`,
-            }
+        const { verifyUploadedObject } = await import("@/lib/r2/server")
+        const verified = await verifyUploadedObject(fileKey, fileSize, fileType, fileHash)
+        const actualFileSize = verified.contentLength
+        const finalHash = verified.sha256
+        const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+        if (!actualValidation.success) {
+            return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
         }
 
-        const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-        const { S3Client, HeadObjectCommand } = await import("@aws-sdk/client-s3")
-        const serverConfig = getR2ServerConfig()
-        const s3 = new S3Client({
-            region: "auto",
-            credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
-            endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+        const { data: insertedRows, error } = await admin.rpc("register_return_evidence_atomic", {
+            p_partner_id: partnerId,
+            p_return_request_id: returnRequestId,
+            p_uploaded_by: user.id,
+            p_file_key: fileKey,
+            p_file_name: fileName,
+            p_file_type: fileType,
+            p_file_size: actualFileSize,
+            p_file_hash: finalHash,
+            p_attachment_limit: maxCount,
         })
-        let actualFileSize: number
-        try {
-            const head = await s3.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-            actualFileSize = Number(head.ContentLength)
-            if (!Number.isSafeInteger(actualFileSize) || actualFileSize < 1 || head.ContentType !== fileType || actualFileSize !== fileSize) {
-                return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
-            }
-            const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
-            if (!actualValidation.success) return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
-        } finally {
-            s3.destroy()
-        }
-
-        let finalHash = fileHash || ""
-        if (!finalHash && actualFileSize < 5 * 1024 * 1024) {
-            try {
-                const { getR2ServerConfig } = await import("@/lib/r2/r2-server-config")
-                const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3")
-                const serverConfig = getR2ServerConfig()
-                const s3 = new S3Client({
-                    region: "auto",
-                    credentials: {
-                        accessKeyId: serverConfig.accessKeyId,
-                        secretAccessKey: serverConfig.secretAccessKey,
-                    },
-                    endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-                })
-                const obj = await s3.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: fileKey }))
-                if (obj.Body) {
-                    const bytes = await obj.Body.transformToByteArray()
-                    const crypto = await import("crypto")
-                    finalHash = crypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex")
-                }
-                s3.destroy()
-            } catch (e) {
-                console.error("Erro ao calcular hash do R2 no fallback:", e)
-            }
-        }
-
-        const fileUrl = fileKey.startsWith("http") ? fileKey : `https://img.dudit.com.br/${fileKey}`
-
-        const { data, error } = await admin
-            .from("return_evidence")
-            .insert({
-                return_request_id: returnRequestId,
-                partner_id: partnerId,
-                store_id: requestStoreId,
-                file_url: fileUrl,
-                file_key: fileKey,
-                file_name: fileName,
-                file_type: fileType,
-                file_size: actualFileSize,
-                uploaded_by: user.id,
-                metadata: { fileHash: finalHash }
-            })
-            .select("*")
-            .single()
 
         if (error) throw error
+        const data = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows
+        if (!data) throw new Error("Não foi possível registrar a evidência.")
 
         await logAuditEvent({
             partnerId,
@@ -2384,7 +2371,7 @@ export async function getReturnEvidenceAction(
 
         const { data: request } = await supabase
             .from("return_requests")
-            .select("id, partner_id, store_id, customer_user_id, orders!order_id(store_id)")
+            .select("id, partner_id, store_id, customer_user_id, created_by, orders!order_id(store_id)")
             .eq("id", returnRequestId)
             .maybeSingle()
         if (!request || (partnerId && request.partner_id !== partnerId)) {
@@ -2431,7 +2418,7 @@ export async function getReturnEvidenceUrlAction(
         const supabase = await getSupabaseServerClient()
         const { data: request } = await supabase
             .from("return_requests")
-            .select("id, partner_id, store_id, customer_user_id, orders!order_id(store_id)")
+            .select("id, partner_id, store_id, customer_user_id, created_by, orders!order_id(store_id)")
             .eq("id", returnRequestId)
             .maybeSingle()
         if (!request || (partnerId && request.partner_id !== partnerId)) {
@@ -2440,7 +2427,7 @@ export async function getReturnEvidenceUrlAction(
 
         const { data: evidenceRows } = await supabase
             .from("return_evidence")
-            .select("id, file_key, file_url")
+            .select("id, file_key, file_url, uploaded_by")
             .eq("return_request_id", returnRequestId)
         const evidence = evidenceRows?.find((row: any) => row.file_key === fileKey || row.file_url === fileKey)
         if (!evidence) return { success: false, error: "Arquivo não encontrado nesta solicitação." }
@@ -2456,8 +2443,17 @@ export async function getReturnEvidenceUrlAction(
             return { success: false, error: "Acesso negado ao arquivo." }
         }
 
-        const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
-        const downloadUrl = await generateSignedDownloadUrl(fileKey)
+        const { extractKeyFromR2Url, generateSignedDownloadUrl } = await import("@/lib/r2/server")
+        const registeredKey = evidence.file_key || extractKeyFromR2Url(evidence.file_url || "")
+        const fileOwnerId = evidence.uploaded_by || request.created_by
+        if (
+            !fileOwnerId ||
+            !new RegExp(`^users/${fileOwnerId}/(?:returns|orders/attachments)/[^/]+$`).test(registeredKey) ||
+            registeredKey.includes("..")
+        ) {
+            return { success: false, error: "A evidência registrada não pertence ao autor desta solicitação." }
+        }
+        const downloadUrl = await generateSignedDownloadUrl(registeredKey)
         return { success: true, downloadUrl }
     } catch (err: any) {
         return { success: false, error: err.message || "Erro ao obter URL de download" }

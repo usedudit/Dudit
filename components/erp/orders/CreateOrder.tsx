@@ -64,6 +64,9 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, getDeliveryStatusMeta } from "@/lib/orders/status"
+import { CARRIER_SHIPMENT_STATUS_OPTIONS } from "@/lib/services/shipping/superfrete"
+import { getCarrierStatusLabel, getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
+import { updateOrderCarrierStatusAction } from "@/app/actions/shipping/superfrete"
 import { diffChangedFields } from "@/lib/admin/changed-fields"
 
 type OrderAdminActionContext = {
@@ -481,12 +484,12 @@ export default function CreateOrder({
             unitPrice: Number(item.unitPrice || 0),
             quantity: Number(item.quantity || 0),
         })),
-        shippingCost: parseFloat(shippingFee || "0"),
+        shippingCost: deliveryMethod === "pickup" ? 0 : parseFloat(shippingFee || "0"),
         additionalCosts: parseFloat(otherCosts || "0"),
         manualDiscount: discountAmount > 0 ? { type: "fixed", value: discountAmount } : null,
         coupon: couponPricingData,
         promotions: orderPromotions,
-    }), [items, shippingFee, otherCosts, discountAmount, couponPricingData, orderPromotions])
+    }), [items, shippingFee, otherCosts, discountAmount, couponPricingData, orderPromotions, deliveryMethod])
 
     const effectiveCouponDiscountAmount = couponPricingData
         ? pricingPreview.couponDiscountAmount
@@ -617,8 +620,6 @@ export default function CreateOrder({
                         : null,
                 )
                 setOriginalPaymentExpiresAt(order.payment_expires_at || null)
-                setDeliveryStatus(order.delivery_status || "not_sent")
-                setOriginalDeliveryStatus(order.delivery_status || "not_sent")
                 if (order.platform_driver) setPlatformDriver(order.platform_driver)
                 if (order.platform_driver_id) setSelectedDeliveryPersonId(`platform:${order.platform_driver_id}`)
                 setDeliveryDate(order.created_at.split('T')[0])
@@ -639,7 +640,14 @@ export default function CreateOrder({
                         .filter((shipment: any) => shipment?.kind !== "return")
                         .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
                     : []
-                setExistingCarrierShipment(outboundShipments[0] || null)
+                const firstOutbound = outboundShipments[0] || null
+                setExistingCarrierShipment(firstOutbound)
+                const isOrderCarrier = (order.delivery_breakdown && typeof order.delivery_breakdown === "object" && (order.delivery_breakdown as any)?.source === "superfrete") || outboundShipments.length > 0
+                const resolvedInitialDeliveryStatus = isOrderCarrier && firstOutbound?.status
+                    ? firstOutbound.status
+                    : (order.delivery_status || "not_sent")
+                setDeliveryStatus(resolvedInitialDeliveryStatus)
+                setOriginalDeliveryStatus(resolvedInitialDeliveryStatus)
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
@@ -896,16 +904,24 @@ export default function CreateOrder({
     }, [deliveryMethod, selectedCustomer?.id, partnerId])
 
     useEffect(() => {
+        if (deliveryMethod === "pickup") {
+            setShippingFee("0")
+            setDeliveryBreakdown(null)
+            setIsCustomShipping(false)
+            return
+        }
+
         if (editOrderId) {
-            if (deliveryMethod === "pickup") {
-                setShippingFee("0")
-                setDeliveryBreakdown(null)
-            }
             return
         }
         let active = true
         const allItemsAreServices = items.length > 0 && items.every((item) => Boolean(item.isService))
-        if (deliveryMethod !== "delivery" || isCustomShipping || allItemsAreServices) {
+        if (allItemsAreServices) {
+            setShippingFee("0")
+            setDeliveryBreakdown(null)
+            return
+        }
+        if (deliveryMethod !== "delivery" || isCustomShipping) {
             return
         }
 
@@ -1530,8 +1546,8 @@ export default function CreateOrder({
             finalDeliveryStatus = deliveryMethod === "pickup" ? "pickup_available" : "not_sent";
         } else if (paymentOverrides?.deliveryStatus) {
             finalDeliveryStatus = paymentOverrides.deliveryStatus;
-        } else if (!editOrderId && isCarrierDelivery) {
-            finalDeliveryStatus = "not_sent";
+        } else if (isCarrierDelivery) {
+            finalDeliveryStatus = getDeliveryStatusForCarrier(deliveryStatus) || "not_sent";
         } else {
             finalDeliveryStatus = deliveryStatus || (deliveryMethod === "pickup" ? "not_sent" : "not_sent");
         }
@@ -1578,9 +1594,9 @@ export default function CreateOrder({
             couponCode: couponCode || undefined,
             couponId,
             couponDiscountAmount: effectiveCouponDiscountAmount,
-            shippingCost: parseFloat(shippingFee || "0"),
+            shippingCost: deliveryMethod === "pickup" ? 0 : parseFloat(shippingFee || "0"),
             additionalCosts: parseFloat(otherCosts || "0"),
-            deliveryBreakdown: deliveryBreakdown || undefined,
+            deliveryBreakdown: deliveryMethod === "pickup" ? undefined : (deliveryBreakdown || undefined),
             totalAmount,
             notes,
             csrf_token: csrfToken || undefined,
@@ -1628,7 +1644,7 @@ export default function CreateOrder({
             code,
             customerId: selectedCustomer?.id || null,
             subtotal,
-            shippingCost: parseFloat(shippingFee || "0"),
+            shippingCost: deliveryMethod === "pickup" ? 0 : parseFloat(shippingFee || "0"),
             items: items.map((item) => ({ productId: item.productId || null })),
         })
         try {
@@ -1719,6 +1735,12 @@ export default function CreateOrder({
                         attachmentPromise,
                     ])
                     if (!syncResult.success) notifyError("Pedido salvo, mas não foi possível atualizar o entregador Dudit", syncResult.error)
+                } else if (editOrderId && isCarrierDelivery && deliveryStatus !== originalDeliveryStatus) {
+                    const carrierPromise = updateOrderCarrierStatusAction({
+                        orderId: editOrderId,
+                        status: deliveryStatus,
+                    }).catch((err) => console.error("Error updating carrier status:", err))
+                    await Promise.all([carrierPromise, attachmentPromise])
                 } else {
                     await attachmentPromise
                 }
@@ -1870,23 +1892,27 @@ export default function CreateOrder({
     }))
 
     const deliveryStatusOptions = useMemo(() => {
-        const base = deliveryMethod === "pickup"
-            ? PICKUP_STATUS_OPTIONS
-            : DELIVERY_STATUS_OPTIONS
-        // Status legado fora da lista (ex.: "sent" em retirada) continua visível
-        // para não apagar informação ao salvar o pedido.
+        if (deliveryMethod === "pickup") {
+            const base = PICKUP_STATUS_OPTIONS
+            if (!deliveryStatus || base.some((o) => o.value === deliveryStatus)) return base
+            return [...base, { value: deliveryStatus, label: getDeliveryStatusMeta(deliveryStatus).label }]
+        }
+        if (isCarrierDelivery) {
+            const base = CARRIER_SHIPMENT_STATUS_OPTIONS
+            if (!deliveryStatus || base.some((o) => o.value === deliveryStatus)) return base
+            return [...base, { value: deliveryStatus, label: getCarrierStatusLabel(deliveryStatus) }]
+        }
+        const base = DELIVERY_STATUS_OPTIONS
         if (!deliveryStatus || base.some((o) => o.value === deliveryStatus)) return base
         return [...base, { value: deliveryStatus, label: getDeliveryStatusMeta(deliveryStatus).label }]
-    }, [deliveryMethod, deliveryStatus])
+    }, [deliveryMethod, isCarrierDelivery, deliveryStatus])
 
     const responsibleOptions = useMemo(() => {
         const opts = teamMembers.map((m) => {
-            const role = String(m.role || "").toUpperCase() as PartnerRole
-            const roleName = ROLE_LABELS[role] || m.role
             const name = m.fullName || m.email || "Funcionário"
             return {
                 value: m.id,
-                label: `${name} (${roleName})`,
+                label: name,
             }
         })
         if (sellerPartnerUserId && !opts.some((o) => o.value === sellerPartnerUserId)) {
@@ -1898,18 +1924,41 @@ export default function CreateOrder({
 
     const handleDeliveryMethodChange = useCallback((method: 'delivery' | 'pickup') => {
         setDeliveryMethod(method)
+        if (method === "pickup") {
+            setShippingFee("0")
+            setDeliveryBreakdown(null)
+            setIsCustomShipping(false)
+        }
         setDeliveryStatus(prev => {
             if (method === "delivery") {
+                if (isCarrierDelivery) {
+                    const isValid = CARRIER_SHIPMENT_STATUS_OPTIONS.some(o => o.value === prev)
+                    return isValid ? prev : (existingCarrierShipment?.status || "pending")
+                }
                 if (prev === "pickup_available") return "sent"
                 const isValid = DELIVERY_STATUS_OPTIONS.some(o => o.value === prev)
                 return isValid ? prev : "not_sent"
             } else {
-                if (prev === "sent") return "pickup_available"
+                if (prev === "sent" || prev === "posted" || prev === "in_transit") return "pickup_available"
                 const isValid = PICKUP_STATUS_OPTIONS.some(o => o.value === prev)
                 return isValid ? prev : "not_sent"
             }
         })
-    }, [])
+    }, [isCarrierDelivery, existingCarrierShipment?.status])
+
+    useEffect(() => {
+        if (deliveryMethod === "delivery") {
+            if (isCarrierDelivery) {
+                if (!CARRIER_SHIPMENT_STATUS_OPTIONS.some((o) => o.value === deliveryStatus)) {
+                    setDeliveryStatus(existingCarrierShipment?.status || "pending")
+                }
+            } else {
+                if (!DELIVERY_STATUS_OPTIONS.some((o) => o.value === deliveryStatus)) {
+                    setDeliveryStatus("not_sent")
+                }
+            }
+        }
+    }, [isCarrierDelivery, deliveryMethod, existingCarrierShipment?.status])
 
     const deliveryPeopleOptions = useMemo(() => {
         const baseOptions = deliveryPeople.map((person) => ({
@@ -2091,6 +2140,7 @@ export default function CreateOrder({
                                             sellerPartnerUserId={sellerPartnerUserId}
                                             setSellerPartnerUserId={setSellerPartnerUserId}
                                             responsibleOptions={responsibleOptions}
+                                            isCarrierDelivery={isCarrierDelivery}
                                             setFinanceAccountId={setFinanceAccountId}
                                             onCreateAccount={() => {
                                                 setNewAccountName("")

@@ -193,20 +193,76 @@ export async function getOrderResponsiblesAction(): Promise<{
     error?: string;
 }> {
     try {
-        await requireUser()
+        const user = await requireUser()
+        if (!user) return { members: [], error: "Não autenticado" }
         const context = await getCurrentPartnerContext()
         if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
         await requirePermission(context.partnerId, "orders", "view")
-        const { members, error } = await fetchPartnerTeamMembers(context.partnerId)
-        if (error) return { members: [], error }
 
-        const nonDelivery = (members || []).filter(
-            (m) => String(m.role || "").toUpperCase() !== "DELIVERY"
-        )
-        const currentMember = (members || []).find((m) => m.userId === context.userId)
+        const admin = getAdminClient()
+
+        const [{ data: partner }, { data: partnerUsers, error: puErr }] = await Promise.all([
+            admin.from("partners").select("user_id").eq("id", context.partnerId).single(),
+            admin.from("partner_users").select("id, user_id, role_id, created_at").eq("partner_id", context.partnerId).order("created_at", { ascending: true }),
+        ])
+        if (puErr) return { members: [], error: puErr.message }
+
+        const ownerUserId = partner?.user_id
+        let list = partnerUsers || []
+
+        if (ownerUserId && !list.some((pu: any) => pu.user_id === ownerUserId)) {
+            const { data: newPu } = await admin
+                .from("partner_users")
+                .insert({ partner_id: context.partnerId, user_id: ownerUserId, role_id: "owner" })
+                .select("id, user_id, role_id, created_at")
+                .single()
+            if (newPu) list = [newPu, ...list]
+        }
+
+        // Exclui entregadores (DELIVERY)
+        const nonDelivery = list.filter((pu: any) => String(pu.role_id || "").toLowerCase() !== "delivery")
+        const userIds = Array.from(new Set(nonDelivery.map((pu: any) => pu.user_id).filter(Boolean)))
+
+        const nameMap: Record<string, string> = {}
+        if (userIds.length > 0) {
+            const { data: profiles } = await admin
+                .from("user_profiles")
+                .select("user_id, full_name")
+                .in("user_id", userIds)
+            for (const p of profiles || []) {
+                if (p.full_name && typeof p.full_name === "string" && p.full_name.trim()) {
+                    nameMap[p.user_id] = p.full_name.trim()
+                }
+            }
+        }
+
+        if (user.id && !nameMap[user.id]) {
+            const meta = user.user_metadata || {}
+            const metaName = meta.full_name || meta.name || meta.display_name || user.email?.split("@")[0]
+            if (metaName && typeof metaName === "string" && metaName.trim()) {
+                nameMap[user.id] = metaName.trim()
+            }
+        }
+
+        const members: TeamMember[] = nonDelivery.map((pu: any) => {
+            const resolvedName = nameMap[pu.user_id] || "Funcionário"
+            return {
+                id: pu.id,
+                userId: pu.user_id,
+                email: "",
+                fullName: resolvedName,
+                avatarUrl: null,
+                role: String(pu.role_id || "operator").toUpperCase() as PartnerRole,
+                permissions: null,
+                createdAt: pu.created_at,
+                isOwner: pu.user_id === ownerUserId,
+            }
+        })
+
+        const currentMember = list.find((pu: any) => pu.user_id === context.userId)
 
         return {
-            members: nonDelivery,
+            members,
             currentUserId: context.userId,
             currentPartnerUserId: currentMember?.id,
         }

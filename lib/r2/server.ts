@@ -240,6 +240,58 @@ export async function generateSignedDownloadUrl(
   }
 }
 
+/** Verifies the stored object metadata and computes its SHA-256 without buffering the whole file. */
+export async function verifyUploadedObject(
+  key: string,
+  expectedSize: number,
+  expectedContentType: string,
+  expectedSha256?: string,
+): Promise<{ contentLength: number; sha256: string }> {
+  if (!key || key.includes("..") || key.startsWith("/")) {
+    throw new Error("Chave de arquivo inválida")
+  }
+  if (!Number.isSafeInteger(expectedSize) || expectedSize < 1) {
+    throw new Error("Tamanho de arquivo inválido")
+  }
+  if (expectedSha256 && !/^[a-f0-9]{64}$/i.test(expectedSha256)) {
+    throw new Error("Hash do arquivo inválido")
+  }
+
+  const serverConfig = getR2ServerConfig()
+  const client = createR2Client()
+  try {
+    const head = await client.send(new HeadObjectCommand({ Bucket: serverConfig.bucketName, Key: key }))
+    const contentLength = Number(head.ContentLength)
+    if (
+      !Number.isSafeInteger(contentLength) ||
+      contentLength !== expectedSize ||
+      head.ContentType !== expectedContentType
+    ) {
+      throw new Error("O arquivo enviado não corresponde aos dados informados.")
+    }
+
+    const object = await client.send(new GetObjectCommand({ Bucket: serverConfig.bucketName, Key: key }))
+    if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
+    const { createHash } = await import("node:crypto")
+    const hash = createHash("sha256")
+    let bytesRead = 0
+    for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+      bytesRead += chunk.byteLength
+      hash.update(chunk)
+    }
+    if (bytesRead !== contentLength) {
+      throw new Error("O conteúdo do arquivo mudou durante a validação.")
+    }
+    const sha256 = hash.digest("hex")
+    if (expectedSha256 && expectedSha256.toLowerCase() !== sha256) {
+      throw new Error("O hash do arquivo não corresponde ao conteúdo enviado.")
+    }
+    return { contentLength, sha256 }
+  } finally {
+    client.destroy()
+  }
+}
+
 export async function deleteFileFromR2(key: string) {
   // Validate key is not empty and doesn't contain traversal
   if (!key || key.includes("..") || key.startsWith("/")) {

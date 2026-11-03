@@ -60,13 +60,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Extensao nao corresponde ao tipo do arquivo." }, { status: 400 })
     }
 
-    if (typeof fileSize === "number" && (fileSize <= 0 || fileSize > MAX_FILE_SIZE)) {
+    if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MAX_FILE_SIZE) {
       return NextResponse.json({ error: "Tamanho do arquivo invalido." }, { status: 400 })
     }
 
     const result = await generateSignedUploadUrl({
       fileName: filename,
       fileType: contentType,
+      contentLength: fileSize,
       userId: user.id,
       prefix: "returns/",
       expiresIn: 120,

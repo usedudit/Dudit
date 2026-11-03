@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useRef, type FC, type ReactNode } from "react"
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo, type FC, type ReactNode } from "react"
 import { getProductMetadataAction } from "@/app/actions/erp/product-metadata"
 
 interface MetadataState {
@@ -70,7 +70,7 @@ export const ProductMetadataProvider: FC<ProductMetadataProviderProps> = ({ chil
     }, [fetchMetadata])
 
     return (
-        <MetadataContext.Provider value={{ metadata, isLoading, loadMetadata, refreshMetadata }}>
+        <MetadataContext.Provider value={useMemo(() => ({ metadata, isLoading, loadMetadata, refreshMetadata }), [metadata, isLoading, loadMetadata, refreshMetadata])}>
             {children}
         </MetadataContext.Provider>
     )

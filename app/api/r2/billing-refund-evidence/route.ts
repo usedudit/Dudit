@@ -73,13 +73,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Extensão não corresponde ao tipo do arquivo." }, { status: 400 })
         }
 
-        if (typeof fileSize === "number" && (fileSize <= 0 || fileSize > MAX_FILE_SIZE)) {
+        if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > MAX_FILE_SIZE) {
             return NextResponse.json({ error: "Tamanho do arquivo inválido." }, { status: 400 })
         }
 
         const result = await generateSignedUploadUrl({
             fileName: filename,
             fileType: contentType,
+            contentLength: fileSize,
             userId: user.id,
             prefix: "billing-refunds/",
             expiresIn: 180,

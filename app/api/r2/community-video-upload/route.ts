@@ -25,6 +25,7 @@ function getExt(filename: string) {
 }
 
 function validateFirstBytes(contentType: string, firstBytesBase64: string) {
+  if (typeof firstBytesBase64 !== "string" || firstBytesBase64.length > 128) return false
   const bytes = Buffer.from(firstBytesBase64 || "", "base64")
   if (bytes.length < 8) return false
   if (contentType === "video/webm") {
@@ -42,14 +43,16 @@ export async function POST(req: NextRequest) {
     const filename = String(body.filename || "")
     const contentType = resolveVideoUploadContentType(String(body.contentType || ""), filename)
     const fileSize = Number(body.fileSize || 0)
+    const thumbnailSize = Number(body.thumbnailSize || 0)
     const duration = Number(body.duration || 0)
     const firstBytesBase64 = String(body.firstBytesBase64 || "")
 
     if (!filename || !contentType) return jsonError("Arquivo inválido")
     if (!ALLOWED_VIDEO_MIME_TYPES.includes(contentType as any)) return jsonError("Formato não suportado")
     if (!ALLOWED_VIDEO_EXTENSIONS.includes(getExt(filename) as any)) return jsonError("Formato não suportado")
-    if (fileSize <= 0) return jsonError("Arquivo vazio não é permitido")
+    if (!Number.isSafeInteger(fileSize) || fileSize <= 0) return jsonError("Tamanho de arquivo inválido")
     if (fileSize > MAX_VIDEO_FILE_SIZE) return jsonError("Vídeo excede limite de 25MB")
+    if (!Number.isSafeInteger(thumbnailSize) || thumbnailSize <= 0 || thumbnailSize > MAX_FILE_SIZE) return jsonError("Miniatura inválida")
     if (!Number.isFinite(duration) || duration < 10 || duration > 60) return jsonError("Vídeo deve ter entre 10 e 60 segundos")
     if (!validateFirstBytes(contentType, firstBytesBase64)) return jsonError("Arquivo de vídeo inválido")
 
@@ -65,6 +68,7 @@ export async function POST(req: NextRequest) {
       generateSignedUploadUrl({
         fileName: `${videoId}.${ext}`,
         fileType: contentType,
+        contentLength: fileSize,
         userId: user.id,
         key: videoKey,
         allowedMimeTypes: ALLOWED_VIDEO_MIME_TYPES,
@@ -75,6 +79,7 @@ export async function POST(req: NextRequest) {
       generateSignedUploadUrl({
         fileName: `${videoId}-thumbnail.jpg`,
         fileType: "image/jpeg",
+        contentLength: thumbnailSize,
         userId: user.id,
         key: thumbnailKey,
         expiresIn: 120,

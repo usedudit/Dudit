@@ -462,7 +462,7 @@ O salvamento de evidências não comprovava que o pedido pertencia ao parceiro/l
 
 - [ ] Autenticação e contas: login, cadastro, recuperação, OTP, sessão, cookies, redirecionamentos, convites, alteração de credenciais e exclusão de conta.
 - [ ] Webhooks e jobs: ingress e reprocessamento receberam hardening local; falta implantar e validar em homologação os estados de assinatura, retry e armazenamento, além de auditar os demais jobs e webhooks.
-- [ ] Uploads e arquivos: validação, tamanho/tipo, nomes/caminhos, escopo de acesso e políticas do Storage.
+- [ ] Uploads e arquivos: o usuário informou que aplicou `20261103100000_atomic_order_attachment_registration.sql`, a versão corrigida de `20261103110000_atomic_other_attachment_registration.sql` e `20261103120000_restrict_attachment_table_writes.sql`; ainda falta verificar no catálogo, validar PUT assinado/R2 em homologação e revisar as políticas/configuração pública do bucket.
 - [ ] XSS e conteúdo: revisar o restante das superfícies de HTML/Markdown, atributos `style` aceitos e adotar CSP com nonce após mapear scripts de terceiros e requisitos de cache/renderização dinâmica.
 - [ ] Rate limiting e abuso: cobertura dos endpoints sensíveis, concorrência, repetição de operações e limites de payload/processamento.
 - [ ] Secrets e configuração: busca de credenciais no código, histórico/arquivos, logs, headers de segurança, CORS, CSP, `next.config`, proxy e configurações de deploy/CI.
@@ -555,3 +555,51 @@ O workspace também apresenta outras alterações e exclusões de documentação
 No registro original, a migration havia sido criada, mas não aplicada; nesta retomada, o usuário informou que aplicou também a migration corretiva de estorno. Esse estado não foi confirmado pelo ledger ou por consulta ao schema do banco. Antes de novas aplicações, confirmar ledger e ambiente e revisar as policies antigas e os papéis reais do schema. Como as migrations substituem policies para fechar acesso cruzado, um rollback que restaure policies permissivas pode reabrir a falha; se houver incompatibilidade, prefira uma migration corretiva/forward-fix. Não alterar policies em produção sem validação própria e plano operacional.
 
 **Conclusão deste registro:** há correções localizadas implementadas e testes focados aprovados, mas a auditoria permanece incompleta. Não usar este documento como declaração de que o Dudit está seguro ou pronto para lançamento.
+
+### Anexos de pedidos — 03/11/2026
+
+**Achados confirmados:** o limite por tipo de arquivo era conferido antes da gravação sem lock, permitindo que duas confirmações simultâneas ultrapassassem o limite do plano. `fileHash` era persistido diretamente do cliente e só havia cálculo de fallback para objetos pequenos; assim, o hash não comprovava o conteúdo armazenado. A exclusão do objeto R2 também ignorava erros retornados pela remoção da linha no banco. Na ação de anexos de OS, o ID do serviço não era conferido contra o parceiro antes de inserir com cliente admin, e o objeto no R2 não era verificado.
+
+**Correção local:** a confirmação de anexos de pedidos e OS agora lê o objeto no R2 em fluxo, calcula o SHA-256 do conteúdo efetivo e compara com o hash do cliente quando fornecido. Os IDs são conferidos contra parceiro e loja; limites/insert são transacionais por lock do pedido ou da OS e ficam restritos a `service_role`. A emissão de URL de OS aceita apenas prefixos usados pelo produto e valida tipo/tamanho. A migration já informada como aplicada criou índice único para chaves de anexos de pedidos. A exclusão de anexo de pedido agora verifica o erro da operação de banco.
+
+**Pendente:** os catálogos live agora confirmam o índice único em `order_attachments` e as RPCs de registro; o ledger ainda não lista as migrations de novembro. A migration de anexos ERP não cria índices únicos globais porque há chaves duplicadas legadas; uma função com advisory lock rejeita reutilização de chave nos novos registros. As URLs PUT assinam o tamanho esperado; comportamento no navegador/R2 precisa de upload em homologação. Não consultei objetos no R2.
+
+**Validação local:** `npx tsc --noEmit` e `git diff --check` passaram; sem testes ou chamadas ao banco/R2.
+
+### Outros anexos ERP — 03/11/2026
+
+**Achados confirmados:** anexos de movimentação, transação e devolução aceitavam o hash do cliente sem comparação obrigatória com o objeto no R2 e contavam registros antes do insert sem lock, permitindo ultrapassar o limite em chamadas concorrentes. A emissão de URL de evidência de devolução também não aplicava rate limit.
+
+**Correção local:** `verifyUploadedObject` confere tamanho e Content-Type no R2, calcula SHA-256 em streaming e compara o hash informado pelo cliente. As gravações de OS, movimentação, transação e devolução usam RPCs transacionais que bloqueiam o registro pai, revalidam o parceiro e aplicam o limite junto com o insert; execução das RPCs fica restrita a `service_role`. As URLs PUT passam a assinar o tamanho e a emissão de evidência recebeu rate limit. Uma função com advisory lock rejeita a reutilização de chaves novas e preserva as duplicatas legadas sem modificá-las.
+
+**Pendente:** a primeira tentativa de `20261103110000_atomic_other_attachment_registration.sql` falhou ao criar índice único devido a chaves duplicadas preexistentes em `stock_movement_attachments`. A versão corrigida está refletida nas RPCs live e o banco mantém 2 grupos de chaves duplicadas legadas sem índice global único. A auditoria de policies do Storage permanece aberta.
+
+**Validação local:** `npx tsc --noEmit` e `git diff --check` passaram; nenhum teste, SQL ou acesso ao R2 foi executado.
+
+### Rotas R2 e evidências de devolução — 03/11/2026
+
+**Achados confirmados:** o endpoint genérico `get-signed-url` não tinha rate limit, não exigia tamanho e aceitava também prefixos privados do ERP. Os uploads de devolução/reembolso não assinavam o tamanho informado. No fluxo de criação de devolução, a RPC recebia URL e chave de evidência controladas pelo cliente via ação de servidor privilegiada; a ação de download assinava a chave persistida sem confirmar que pertencia ao autor da evidência.
+
+**Correção local:** a rota genérica agora aplica rate limit, exige tamanho inteiro assinado e só aceita prefixos de mídia de cadastro usados pelo produto. O hook inclui o tamanho real. As rotas de evidência passam a exigir e assinar o tamanho; rotas de vídeo assinam tamanho do vídeo e miniatura e limitam o campo de primeiros bytes. A exclusão genérica de R2 recebeu rate limit. Antes de criar devoluções, as ações agora validam prefixo do autor, URL pública exata, metadados e conteúdo no R2; a leitura assina apenas a chave registrada e confirma que ela corresponde ao autor que enviou a evidência.
+
+**Pendente:** validar esses PUTs no navegador/R2 e verificar políticas/configuração de acesso do bucket. Não foi necessária migration nesta etapa; não consultei o R2 nem o banco.
+
+**Validação local:** `npx tsc --noEmit` e `git diff --check` passaram; nenhum teste foi executado.
+
+### Grants de escrita das tabelas de anexos — 03/11/2026
+
+**Achado confirmado:** as policies RLS de várias tabelas de anexos permitiam `FOR ALL` para usuários autenticados. Isso deixava um caminho PostgREST de escrita direta, capaz de contornar os novos controles das RPCs e cadastrar chaves de outros objetos. O importador XML também grava anexos com cliente admin e precisa continuar funcionando.
+
+**Correção local:** `20261103120000_restrict_attachment_table_writes.sql` revoga INSERT/UPDATE/DELETE dos papéis `PUBLIC`, `anon` e `authenticated`, concede DML a `service_role` e substitui policies `FOR ALL` por policies somente de leitura, preservando o filtro por parceiro/loja e a leitura do comprador.
+
+**Verificação live read-only:** usando a conexão do ambiente com `sslmode=require`, consultei catálogos PostgreSQL e uma contagem agregada de chaves duplicadas dentro de `BEGIN READ ONLY`, encerrando com `ROLLBACK`; nenhum valor de chave foi exibido. As cinco tabelas estão com RLS habilitado; `anon` e `authenticated` não têm INSERT/DELETE efetivos, e `service_role` mantém as gravações. As policies ativas das tabelas são somente `SELECT`; as policies `buyer_read` e `return_evidence_select_customer` estão como `PUBLIC`, mas exigem `auth.uid()` igual ao comprador/cliente. As quatro RPCs de anexos e `register_return_evidence_atomic` existem como `SECURITY DEFINER`; `EXECUTE` está restrito a `service_role`, e o helper de chave também não é executável por `anon`/`authenticated`. O certificado do servidor não foi validado nesse modo TLS.
+
+**Índices/dados live:** há índice único para chaves em `order_attachments` e `service_order_attachments`; não há índice global único nas outras tabelas, como planejado para preservar registros legados. A consulta encontrou 2 grupos de `file_key` duplicada em `stock_movement_attachments`, reforçando a necessidade do helper transacional que rejeita reutilização em novos registros.
+
+**Ledger:** `supabase_migrations.schema_migrations` tem 10 registros e o mais recente é `20261025162024`; não há entradas `20261103`. Os objetos/grants ativos acima confirmam que as mudanças de anexos estão presentes no banco consultado, mas o ledger não registra essas migrations. Antes de voltar a usar aplicação automática de migrations, alinhar o histórico com o procedimento operacional do projeto para evitar replay acidental. Para validar a identidade do servidor TLS em conexões futuras, configurar o certificado raiz do Supabase e `verify-full`.
+
+**Ainda pendente:** exercitar em homologação leitura legítima e os fluxos de criação/exclusão pela Server Action e importação XML via serviço. A inspeção dos catálogos não substitui esses testes de comportamento.
+
+**Storage/R2:** não encontrei migrations SQL locais que definam policies em `storage.objects`/`storage.buckets`. O repositório contém apenas o CORS de R2 (`docs/infrastructure/r2-bucket-cors.json`), que não informa se o bucket ou domínio `img.dudit.com.br` permite leitura pública. Essa configuração precisa ser conferida no painel Cloudflare; chaves em prefixos marcados como privados não devem ser servidas publicamente.
+
+**Incidente durante a inspeção local:** uma busca de configuração imprimiu acidentalmente uma linha do `.env` com credencial PostgreSQL na saída da ferramenta. O valor não foi copiado para este relatório. Rotacionar a senha do banco e atualizar os ambientes que usam essa credencial; não reutilizar a credencial atual para novas consultas.
