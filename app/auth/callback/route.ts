@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { ensureLegalConsents } from "@/app/actions/auth/legal-consent"
+import { getSafeRedirectPath } from "@/lib/security/safe-redirect"
 import type { EmailOtpType } from "@supabase/supabase-js"
 
 // Debounce/cache de códigos PKCE consumidos.
@@ -26,20 +27,12 @@ const PKCE_CACHE_TTL_MS = 30_000
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-// Só aceita caminhos internos para evitar open-redirect
-function getSafeNext(rawNext: string | null): string {
-  if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
-    return rawNext
-  }
-  return "/"
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
   const token_hash = searchParams.get("token_hash") || searchParams.get("token")
   const type = (searchParams.get("type") as EmailOtpType) || "signup"
-  const next = getSafeNext(searchParams.get("next"))
+  const next = getSafeRedirectPath(searchParams.get("next"))
   const errorParam = searchParams.get("error")
   const errorDescription = searchParams.get("error_description")
 

@@ -693,3 +693,94 @@ Foi criado `npm run migrate:r2-private`, que lista objetos no bucket público, c
 **Agendamento:** se `pg_cron`, `pg_net` e Supabase Vault estiverem habilitados, a migration agenda `process-r2-object-cleanup` a cada minuto e a retenção diária da outbox. Antes ou depois da migration, configurar no Vault `dudit_app_url` (URL de produção) e `dudit_r2_cleanup_cron_secret` (mesmo valor novo definido em `R2_CLEANUP_CRON_SECRET` no ambiente da aplicação). Foi usado segredo dedicado porque o pg_net mantém headers de requisições pendentes em sua fila; não reutilizar `INTERNAL_CRON_SECRET` geral. Se `pg_net` estiver desabilitado, habilitá-lo e criar/agendar o job após a migration.
 
 **Pendente para ativação:** aplicar a migration; configurar o segredo dedicado na aplicação e os dois segredos no Vault; confirmar os jobs em `cron.job`; implantar o código; depois rodar `npm run reconcile:r2` em modo dry-run e validar em homologação. Não consultei o R2 nem apliquei a migration, e não executei testes nesta rodada.
+
+
+### Estado live do banco, cron, Vault e R2 outbox — 04/11/2026
+
+**Inspeção read-only do banco de dados:**
+- **Histórico de Migrations:** a tabela `supabase_migrations.schema_migrations` contém 10 registros até `20261025162024`. As migrations mais recentes foram aplicadas diretamente via SQL Editor sem registrar entradas no ledger da CLI.
+- **Extensões ativas:** `pg_cron` (1.6.4, em `pg_catalog`), `pg_net` (0.20.0, em `extensions`) e `supabase_vault` (0.3.1, em `vault`).
+- **Supabase Vault:** os segredos `dudit_app_url` (tamanho 20, correspondente a `https://dudit.com.br`) e `dudit_r2_cleanup_cron_secret` (tamanho 64, token dedicado) estão cadastrados e ativos em `vault.decrypted_secrets`.
+- **Jobs em `cron.job`:** 25 jobs ativos. O worker `process-r2-object-cleanup` está agendado a cada minuto (`* * * * *`), invocando `net.http_post` apontando para o endpoint `/api/internal/jobs/process-r2-cleanup` com bearer do Vault. O job `purge-r2-cleanup-history` está agendado diariamente às 04:30. Os 23 jobs de expurgo e manutenção periódica também estão ativos.
+- **Execuções em `cron.job_run_details`:** o job `process-r2-object-cleanup` está sendo executado a cada minuto com status `succeeded`.
+- **Worker HTTP Responses em `net._http_response`:** o endpoint da aplicação em produção (`https://dudit.com.br/api/internal/jobs/process-r2-cleanup`) está respondendo com HTTP 200 (`application/json`), confirmando deploy em produção e comunicação bem-sucedida com autenticação válida.
+- **Fila `public.r2_object_deletion_jobs`:** tabela criada com RLS e restrita a `service_role`. Fila vazia no momento da checagem (0 registros).
+- **Triggers ativos:** triggers `queue_r2_cleanup` ativos em 13 tabelas (`billing_refund_requests`, `community_videos`, `customers`, `order_attachments`, `products`, `return_evidence`, `service_order_attachments`, `service_orders`, `services`, `stock_movement_attachments`, `stores`, `suppliers`, `transaction_attachments`).
+
+**Resultado da reconciliação R2 (`npm run reconcile:r2` em modo dry-run):**
+- Corrigido problema de execução em scripts TypeScript CommonJS (`scripts/reconcile-r2-objects.ts` e `scripts/migrate-r2-private-objects.ts` encapsulados em função assíncrona).
+- Bucket público `dudit`: 281 objetos escaneados; 104 chaves gerenciadas; 37 referenciadas no banco; 61 candidatos a órfãos (>30 dias); 6 não referenciadas recentes (<30 dias, preservadas); 177 não gerenciadas (preservadas).
+- Bucket privado `dudit-private`: 1 objeto escaneado; 1 gerenciado; 1 referenciado; 0 órfãos.
+- Verificação inversa de banco (`--check-db-references`): 45 referências gerenciadas no banco escaneadas; 7 ausentes em ambos os buckets; 27 no bucket inesperado (ainda no bucket público aguardando migração privada); 0 duplicadas entre buckets; 0 falhas de verificação.
+- Nenhum objeto foi excluído ou enfileirado.
+
+### Anexos de propostas/orçamentos (Quotes) — 04/11/2026
+
+**Achados confirmados nas Server Actions:**
+- `getQuoteAttachmentsAction` e `getQuoteAttachmentUrlAction` em `app/actions/erp/quotes.ts` aceitavam `quoteId` e usavam o cliente administrativo (`service_role`) para consultar e assinar anexos privados sem validar se o usuário pertencia ao parceiro proprietário do orçamento nem exigir permissão RBAC (`quotes.view`) ou escopo de loja (`store_id`), permitindo acesso indevido entre parceiros (IDOR).
+- `getPublicQuoteAttachmentUrlAction` não aplicava rate limiting e aceitava entradas arbitrárias sem validação de formato do token público e da chave R2.
+- `saveQuoteAttachmentAction` e `deleteQuoteAttachmentAction` não conferiam a permissão de loja quando o orçamento possuía `store_id`.
+- A tabela `public.quote_attachments` (criada recentemente) não possuía índice único em `file_key`, permitindo duplicidade de vínculos.
+- `public.r2_managed_key_from_value` não incluía o caminho `quotes/`, tratando anexos de orçamentos como não gerenciados.
+- `public.r2_managed_object_is_referenced` e `public.list_r2_referenced_managed_keys` não consultavam `quote_attachments`, o que faria a reconciliação e o outbox considerarem anexos de propostas como não referenciados.
+- A tabela `quote_attachments` não possuía trigger de captura para o outbox R2, deixando arquivos órfãos quando uma proposta é excluída (em cascata) ou quando um anexo é removido.
+
+**Correções locais aplicadas:**
+- `app/actions/erp/quotes.ts`:
+  - `getQuoteAttachmentsAction`: agora aplica rate limit (`ERP_GENERAL`), exige contexto autorizado do parceiro via `requireAuthorizedPartnerContext(partnerId, "quotes", "view")`, valida a existência e escopo do orçamento no parceiro e valida a permissão da loja via `requireStorePermission` quando houver `store_id`.
+  - `getQuoteAttachmentUrlAction`: aplica rate limit (`ERP_GENERAL`), exige `requireAuthorizedPartnerContext(partnerId, "quotes", "view")`, valida existência do orçamento no parceiro, confere permissão de loja e só assina URL se o anexo pertencer à proposta validada.
+  - `getPublicQuoteAttachmentUrlAction`: adicionado rate limit (`API_GENERAL`), validação estrita de formato de `publicToken` e `fileKey`.
+  - `getQuotePresignedUploadUrlAction`, `saveQuoteAttachmentAction` e `deleteQuoteAttachmentAction`: alinhados para usar `requireAuthorizedPartnerContext(partnerId, "quotes", "edit")` e validar escopo de loja (`requireStorePermission`).
+- **Migration preparada (pendente de aplicação autorizada):**
+  - Criada `migrations/20261104150000_integrate_quote_attachments_r2_outbox.sql` que:
+    1. Cria índice único `quote_attachments_file_key_uidx` em `public.quote_attachments(file_key)`.
+    2. Atualiza `public.r2_managed_key_from_value` para reconhecer `quotes/`.
+    3. Atualiza `public.assert_attachment_file_key_unused` para impedir reutilização de chaves de `quote_attachments`.
+    4. Atualiza `public.r2_managed_object_is_referenced` e `public.list_r2_referenced_managed_keys` para proteger chaves de `quote_attachments`.
+    5. Adiciona o trigger `queue_r2_cleanup` em `public.quote_attachments` para enfileirar chaves automaticamente em caso de `DELETE` ou `UPDATE of file_key`.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- Testes focados com `vitest`: 5 testes passaram em 2 suítes (`partner-roles.security.test.ts` e `order-financial-breakdown.test.ts`).
+- `git diff --check` passou sem erros de whitespace.
+- Nenhuma operação destrutiva foi executada. Nenhuma migration foi aplicada em produção nesta etapa.
+
+
+### Autenticação, Redirecionamentos, Bloqueios e Consentimento Legal — 04/11/2026
+
+**1. Proteção contra Open Redirect (CWE-601):**
+- **Vulnerabilidade identificada:** A lógica de validação `getSafeNext` em `app/auth/callback/route.ts`, `app/auth/login/page.tsx` e `components/auth/AuthView.tsx` utilizava uma checagem ingênua (`rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")`). Isso permitia payloads como `/\evil.com` ou `/%5cevil.com`, pois navegadores e analisadores de URL normalizam a barra invertida em relação à origem (`https://dudit.com.br/\evil.com` redireciona para `https://evil.com/`).
+- **Correção aplicada:**
+  - Criado o utilitário centralizado `lib/security/safe-redirect.ts` (`getSafeRedirectPath`), que valida URLs com `URL` parser estrito, rejeita barras duplas, barras invertidas literais e codificadas (`%5c`, `%5C`), caracteres de controle e esquemas de protocolo.
+  - Criada suíte de testes `lib/security/safe-redirect.test.ts` (6 testes passando).
+  - Atualizados `app/auth/callback/route.ts`, `app/auth/login/page.tsx` e `components/auth/AuthView.tsx` para usar exclusivamente `getSafeRedirectPath`.
+
+**2. Integridade e Tratamento de Senha (CWE-20 - Password Mangling):**
+- **Vulnerabilidade identificada:** A Server Action `changePasswordAction` em `app/actions/shared/password.ts` utilizava `sanitizeInput(data.newPassword, 128)` e `sanitizeInput(data.confirmPassword, 128)`. A função `sanitizeInput` invoca `stripHtml`, removendo trechos entre `<` e `>` e decodificando entidades HTML. Senhas complexas contendo `<senha>`, `&amp;` ou aspas eram alteradas silenciosamente no momento de salvar no Supabase Auth. Consequentemente, o usuário não conseguia mais fazer login no formulário de login padrão. Além disso, `isSessionFresh` usava decodificação base64 padrão em tokens JWT (que utilizam base64url por RFC 7519) e a ação não registrava log de auditoria.
+- **Correção aplicada:**
+  - Removido o sanitizador com `stripHtml` para senhas. Aplicada validação estrita de tipo (`typeof === "string"`), limites de tamanho (mínimo 8, máximo 128 caracteres para evitar DoS por complexidade de hash), exigência de força média/alta (`calculatePasswordScore >= 2`) e comparação exata de confirmação.
+  - Atualizada a decodificação de payload do JWT em `isSessionFresh` para `base64url`.
+  - Adicionado evento de auditoria `"auth.password_changed"` no logger unificado (`lib/security/audit-logger.ts`).
+
+**3. Proteção contra Bypass de Lockout de Conta (CWE-287 / CWE-307):**
+- **Vulnerabilidade identificada:** A Server Action `handleLoginResult` em `app/actions/auth/lockout.ts` recebia `(email, success)` e, quando `success === true`, chamava `clearFailedLogins(email)` incondicionalmente, sem verificar se a sessão atual pertencia àquele e-mail. Um invasor executando ataques de força bruta ou credential stuffing podia chamar `handleLoginResult(victimEmail, true)` externamente para resetar os contadores de bloqueio da vítima e prosseguir com o ataque. Além disso, a ação não possuía rate limiting, permitindo que o branch `success === false` fosse explorado para travar contas arbitrariamente.
+- **Correção aplicada:**
+  - Adicionado rate limit (`RateLimitCategory.AUTH_LOGIN`) na ação `handleLoginResult`.
+  - Quando `success === true`, a função agora valida que o usuário autenticado (`getCurrentUser()`) existe e que `user.email` corresponde exatamente ao e-mail informado antes de invocar `clearFailedLogins`.
+
+**4. Controle de Acesso e Prevenção de Forja em Consentimento Legal (CWE-284):**
+- **Vulnerabilidade identificada:** Em `app/actions/auth/legal-consent.ts`, a função `recordLegalConsent` aceitava `userId` opcional passado pelo cliente. Se fornecido, ele substituía `getCurrentUser()`. Isso permitia que um usuário autenticado registrasse termos legais em nome de outro `user_id`. Adicionalmente, quando chamado sem sessão ativa (no fluxo de cadastro pré-confirmação de e-mail), não havia limitação de taxa (rate limiting), abrindo brecha para inserção descontrolada na tabela `user_legal_consents`.
+- **Correção aplicada:**
+  - Adicionado rate limit (`RateLimitCategory.AUTH_REGISTER`) na ação `recordLegalConsent`.
+  - Se houver sessão autenticada (`user`), qualquer `providedUserId` divergente de `user.id` é rejeitado com erro 403 / "Acesso não autorizado".
+  - Se não houver sessão autenticada, `providedUserId` é verificado no banco e só é aceito se a conta tiver sido criada nos últimos 60 minutos (janela legítima de onboarding/signup).
+
+**5. Diagnóstico de 2FA Dormante:**
+- **Constatação:** O módulo `app/actions/two-factor-auth.ts` faz referência a tabelas legadas (`user_2fa_secrets`, `user_2fa_backup_codes`, `user_2fa_settings`) que foram removidas na migration `migrations/045_remove_2fa_tables.sql`. O componente `components/profile/TwoFactorView.tsx` exibe "Funcionalidade em desenvolvimento". Recomenda-se migrar para o módulo nativo de MFA do Supabase (`supabase.auth.mfa.*`) quando a funcionalidade for implementada.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- `vitest run lib/security/safe-redirect.test.ts` executado com sucesso (6 testes passando).
+- `vitest run lib/security/auth-security.test.ts` executado com sucesso (10 testes passando).
+- `git diff --check` verificado sem problemas de whitespace.
+- Nenhuma alteração destrutiva ou migration aplicada em produção nesta etapa.

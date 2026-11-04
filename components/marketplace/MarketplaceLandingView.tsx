@@ -344,7 +344,6 @@ export function MarketplaceLandingView({
                             Tudo organizado para você encontrar rápido o que precisa, perto de você.
                         </p>
                         <Button
-                            variant="outline"
                             onClick={handleBuyerFocus}
                             className="py-3 px-8 text-sm"
                         >

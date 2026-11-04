@@ -8,6 +8,7 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSupabase } from "@/providers/supabase-provider"
 import { getUserHasAnyPartnerAccess } from "@/app/actions/auth/partner-access"
+import { getSafeRedirectPath } from "@/lib/security/safe-redirect"
 import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 
 // Importação estática (Leve, carregamento imediato)
@@ -26,17 +27,11 @@ const PartnerWizard = dynamic(
 type PageMode = "auth" | "partner"
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
 
-// Só aceita caminhos internos para evitar open-redirect
-function getSafeNext(rawNext: string | null): string {
-  if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
-    return rawNext
-  }
-  return "/"
-}
+
 
 function RedirectToHome({ next }: { next: string }) {
   useLayoutEffect(() => {
-    window.location.replace(getSafeNext(next))
+    window.location.replace(getSafeRedirectPath(next))
   }, [next])
   return (
     <div className="min-h-screen flex items-center justify-center bg-brand-gray dark:bg-dark-background">

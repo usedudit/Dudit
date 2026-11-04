@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
-import { sanitizeInput } from "@/lib/input-validator"
+import { auditLog } from "@/lib/security/audit-logger"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { calculatePasswordScore } from "@/lib/utils"
@@ -55,7 +55,7 @@ async function isSessionFresh(): Promise<boolean> {
     // Decode the access token to get `iat`
     try {
         const payload = JSON.parse(
-            Buffer.from(session.access_token.split(".")[1], "base64").toString()
+            Buffer.from(session.access_token.split(".")[1], "base64url").toString()
         )
         const iat = payload.iat as number | undefined
         if (!iat) return false
@@ -131,12 +131,20 @@ export async function changePasswordAction(data: {
         }
     }
 
-    // 5. Input validation
-    const newPassword = sanitizeInput(data.newPassword, 128)
-    const confirmPassword = sanitizeInput(data.confirmPassword, 128)
+    // 5. Input validation (never HTML-strip passwords to prevent CWE-20 mangling)
+    if (typeof data.newPassword !== "string" || typeof data.confirmPassword !== "string") {
+        return { error: "Dados inválidos" }
+    }
+
+    const newPassword = data.newPassword
+    const confirmPassword = data.confirmPassword
 
     if (!newPassword || newPassword.length < 8) {
         return { error: "A nova senha deve ter pelo menos 8 caracteres" }
+    }
+
+    if (newPassword.length > 128) {
+        return { error: "A nova senha deve ter no máximo 128 caracteres" }
     }
 
     if (calculatePasswordScore(newPassword) < 2) {
@@ -179,6 +187,14 @@ export async function changePasswordAction(data: {
     if (updateError) {
         return { error: getErrorMessage(updateError) }
     }
+
+    await auditLog({
+        action: "auth.password_changed",
+        actorUserId: user.id,
+        metadata: {
+            hadExistingPassword: hasPassword,
+        },
+    })
 
     return { success: true }
 }

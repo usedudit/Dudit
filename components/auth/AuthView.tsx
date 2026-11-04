@@ -16,18 +16,10 @@ import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
+import { getSafeRedirectPath } from "@/lib/security/safe-redirect"
 
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
-
-// Só aceita caminhos internos para evitar open-redirect
-function getSafeNext(rawNext: string | null): string {
-    if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("://")) {
-        return rawNext
-    }
-    return "/"
-}
-
 
 // Otimização: Static Background Memoized
 const WavesBackground = React.memo(() => (
@@ -151,7 +143,7 @@ export default function AuthView({
                         setError(getErrorMessage(error))
                         setIsLoading(false)
                     } else if (data?.session) {
-                        window.location.assign(getSafeNext(nextParam))
+                        window.location.assign(getSafeRedirectPath(nextParam))
                     } else {
                         setIsLoading(false)
                     }
@@ -170,7 +162,7 @@ export default function AuthView({
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             await supabase.auth.signInWithOAuth({
                 provider: "google",
-                options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`, queryParams: { access_type: "offline", prompt: "consent" } },
+                options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeRedirectPath(nextParam))}`, queryParams: { access_type: "offline", prompt: "consent" } },
             })
         } catch (e: any) {
             console.error("[AUTH GOOGLE ERROR]", e)
@@ -209,7 +201,7 @@ export default function AuthView({
                     password,
                     options: {
                         data: { full_name: generateNameFromEmail(cleanEmail) },
-                        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`,
+                        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeRedirectPath(nextParam))}`,
                         captchaToken,
                     },
                 })
@@ -315,7 +307,7 @@ export default function AuthView({
                 }
 
                 // Hard navigation to ensure all server cookies, headers, and fresh layout state are synchronized
-                window.location.assign(getSafeNext(nextParam))
+                window.location.assign(getSafeRedirectPath(nextParam))
             }
         } catch (e: any) {
             console.error("[AUTH SUBMIT EXCEPTION]", e)
@@ -560,7 +552,7 @@ export default function AuthView({
                                 </div>
 
                                 {/* Divider */}
-                                <div className="relative md:w-[1px] bg-gray-200 dark:bg-dark-border my-6 md:my-0 flex items-center justify-center">
+                                <div className="relative md:w-[1px] bg-brand-border dark:bg-dark-border my-6 md:my-0 flex items-center justify-center">
                                     <span className="absolute bg-white dark:bg-dark-surface px-2 text-brand-inactive-text dark:text-dark-body text-xs uppercase">ou</span>
                                 </div>
 
@@ -649,7 +641,7 @@ export default function AuthView({
 
                     {(mode === "login" || mode === "signup") && (
                         <div className="mt-8 text-center space-y-4">
-                            <p className="text-gray-500 dark:text-dark-body text-[14px]">
+                            <p className="text-brand-ianctive-text dark:text-dark-body text-[14px]">
                                 {mode === "login" ? "Não tem uma conta?" : "Já tem uma conta?"}{" "}
                                 <button onClick={() => { setError(null); changeMode(mode === "login" ? "signup" : "login") }} className="text-brand-green font-bold hover:underline">
                                     {mode === "login" ? "Crie a sua" : "Entrar"}

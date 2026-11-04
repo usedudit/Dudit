@@ -3,6 +3,7 @@
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkAccountLockout, recordFailedLogin, clearFailedLogins } from "@/lib/security/account-lockout"
+import { getCurrentUser } from "@/lib/auth/authorization"
 
 export async function preCheckLogin(email: string): Promise<{ allowed: boolean; error?: string }> {
     try {
@@ -12,7 +13,9 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
     }
 
     try {
-        const cleanEmail = email.toLowerCase().trim()
+        const cleanEmail = (email || "").toLowerCase().trim()
+        if (!cleanEmail) return { allowed: true }
+
         const { locked, remainingSeconds } = await checkAccountLockout(cleanEmail)
         if (locked) {
             const mins = Math.ceil((remainingSeconds || 900) / 60)
@@ -21,12 +24,6 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
                 error: `Esta conta foi temporariamente bloqueada por segurança devido a múltiplas tentativas incorretas. Tente novamente em ${mins} minuto(s).`
             }
         }
-
-        // Account-deletion enforcement happens after authentication through the
-        // secure runtime-status RPC and the post-login deletion check. Do not
-        // query user_profiles by email here: email is owned by Supabase Auth,
-        // not by user_profiles, and this pre-auth lookup caused a 400 on every
-        // login attempt while adding no security boundary.
     } catch (err) {
         console.error("[PRECHECK] Error in checkAccountLockout:", err)
     }
@@ -36,11 +33,25 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
 
 export async function handleLoginResult(email: string, success: boolean): Promise<{ error?: string }> {
     try {
+        await requireRateLimit(RateLimitCategory.AUTH_LOGIN)
+    } catch {
+        return { error: "Muitas tentativas de acesso. Tente novamente em 15 minutos." }
+    }
+
+    const cleanEmail = (email || "").toLowerCase().trim()
+    if (!cleanEmail) return {}
+
+    try {
         if (success) {
-            await clearFailedLogins(email)
+            // SECURITY: Only clear failed logins if the current session belongs to this user.
+            // Prevents unauthenticated attackers from arbitrarily resetting lockout counters.
+            const user = await getCurrentUser()
+            if (user && user.email?.toLowerCase().trim() === cleanEmail) {
+                await clearFailedLogins(cleanEmail)
+            }
             return {}
         } else {
-            const { lockedNow } = await recordFailedLogin(email)
+            const { lockedNow } = await recordFailedLogin(cleanEmail)
             if (lockedNow) {
                 return {
                     error: "Sua conta foi bloqueada por 15 minutos devido a 10 tentativas malsucedidas consecutivas."

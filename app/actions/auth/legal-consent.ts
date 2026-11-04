@@ -18,6 +18,8 @@ import {
 } from "@/lib/legal/constants"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { traceServerAction } from "@/lib/observability/request-trace"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 const recordConsentSchema = z.object({
   tipo: z.enum(["terms", "privacy"]),
@@ -47,6 +49,12 @@ export async function recordLegalConsent(input: {
   origem?: LegalConsentOrigin
   userId?: string
 }): Promise<RecordLegalConsentResult> {
+  try {
+    await requireRateLimit(RateLimitCategory.AUTH_REGISTER)
+  } catch {
+    return { success: false, error: "Muitas tentativas. Aguarde alguns instantes." }
+  }
+
   const parsed = recordConsentSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: "Dados de consentimento inválidos." }
@@ -54,12 +62,18 @@ export async function recordLegalConsent(input: {
 
   const { tipo, versao, origem, userId: providedUserId } = parsed.data
 
-  let userId = providedUserId
-  if (!userId) {
-    const user = await getCurrentUser()
-    userId = user?.id
-  }
-  if (!userId) {
+  const user = await getCurrentUser()
+  let userId: string
+
+  if (user) {
+    // If authenticated, prevent recording consent for another user ID (CWE-284)
+    if (providedUserId && providedUserId !== user.id) {
+      return { success: false, error: "Acesso não autorizado." }
+    }
+    userId = user.id
+  } else if (providedUserId) {
+    userId = providedUserId
+  } else {
     return { success: false, error: "Usuário não autenticado." }
   }
 
@@ -69,6 +83,14 @@ export async function recordLegalConsent(input: {
   const { data: existingUser } = await admin.auth.admin.getUserById(userId)
   if (!existingUser?.user) {
     return { success: false, error: "Usuário não encontrado." }
+  }
+
+  // Se não autenticado, só permite consentimento pré-login para contas recém-criadas (1 hora)
+  if (!user) {
+    const createdAt = new Date(existingUser.user.created_at).getTime()
+    if (Date.now() - createdAt > 60 * 60 * 1000) {
+      return { success: false, error: "Sessão expirada. Faça login para registrar o consentimento." }
+    }
   }
 
   const { data: doc } = (await admin

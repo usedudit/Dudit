@@ -33,6 +33,7 @@ export type AuditAction =
     // Auth events
     | "auth.login"
     | "auth.logout"
+    | "auth.password_changed"
     | "auth.2fa_enabled"
     | "auth.2fa_disabled"
     // Data mutations (sensitive)
@@ -82,6 +83,7 @@ const ACTION_MESSAGES: Record<string, string> = {
     "member.removed": "removeu um membro da equipe.",
     "auth.login": "realizou login.",
     "auth.logout": "realizou logout.",
+    "auth.password_changed": "alterou a senha de acesso.",
     "auth.2fa_enabled": "ativou autenticação de dois fatores.",
     "auth.2fa_disabled": "desativou autenticação de dois fatores.",
     "partner.updated": "atualizou dados do parceiro.",

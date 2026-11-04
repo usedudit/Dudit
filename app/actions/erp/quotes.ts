@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -3034,8 +3034,26 @@ export async function getQuoteAttachmentsAction(
     partnerId?: string
 ): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-        const user = await requireUser()
-        const admin = getAdminClient()
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
+        const activePartnerId = quoteAccess.partnerId
+        const admin = quoteAccess.admin
+
+        const { data: quote } = await admin
+            .from("quotes")
+            .select("id, partner_id, store_id")
+            .eq("id", quoteId)
+            .eq("partner_id", activePartnerId)
+            .maybeSingle()
+
+        if (!quote) {
+            return { success: false, error: "Orçamento não encontrado." }
+        }
+
+        if (quote.store_id) {
+            await requireStorePermission(quote.store_id, activePartnerId, "quotes", "view")
+        }
+
         const { data, error } = await admin
             .from("quote_attachments")
             .select("*")
@@ -3055,8 +3073,26 @@ export async function getQuoteAttachmentUrlAction(
     fileKey: string
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
     try {
-        await requireUser()
-        const admin = getAdminClient()
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "view")
+        const activePartnerId = quoteAccess.partnerId
+        const admin = quoteAccess.admin
+
+        const { data: quote } = await admin
+            .from("quotes")
+            .select("id, partner_id, store_id")
+            .eq("id", quoteId)
+            .eq("partner_id", activePartnerId)
+            .maybeSingle()
+
+        if (!quote) {
+            return { success: false, error: "Orçamento não encontrado." }
+        }
+
+        if (quote.store_id) {
+            await requireStorePermission(quote.store_id, activePartnerId, "quotes", "view")
+        }
+
         const { data: attachment } = await admin
             .from("quote_attachments")
             .select("id")
@@ -3081,6 +3117,14 @@ export async function getPublicQuoteAttachmentUrlAction(
     fileKey: string
 ): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
     try {
+        await requireRateLimit(RateLimitCategory.API_GENERAL)
+        if (!publicToken || typeof publicToken !== "string" || publicToken.length > 255) {
+            return { success: false, error: "Token inválido." }
+        }
+        if (!fileKey || typeof fileKey !== "string" || fileKey.includes("..") || fileKey.startsWith("/")) {
+            return { success: false, error: "Chave inválida." }
+        }
+
         const admin = getAdminClient()
         const { data: quote } = await admin
             .from("quotes")
@@ -3123,8 +3167,8 @@ export async function getQuotePresignedUploadUrlAction(
 > {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-        await requirePermission(partnerId, "quotes", "edit")
-        const user = await requireUser()
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "edit")
+        const user = quoteAccess.user
 
         const { R2_PREFIXES, getUploadKindFromMimeType, getUploadValidationRules } = await import("@/lib/r2/config")
         const { generateSignedUploadUrl } = await import("@/lib/r2/server")
@@ -3177,18 +3221,23 @@ export async function saveQuoteAttachmentAction(
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-        await requirePermission(partnerId, "quotes", "edit")
-        const user = await requireUser()
-        const admin = getAdminClient()
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "edit")
+        const activePartnerId = quoteAccess.partnerId
+        const user = quoteAccess.user
+        const admin = quoteAccess.admin
 
         const { data: quote } = await admin
             .from("quotes")
             .select("id, partner_id, store_id")
             .eq("id", quoteId)
-            .eq("partner_id", partnerId)
+            .eq("partner_id", activePartnerId)
             .maybeSingle()
 
         if (!quote) return { success: false, error: "Orçamento não encontrado." }
+
+        if (quote.store_id) {
+            await requireStorePermission(quote.store_id, activePartnerId, "quotes", "edit")
+        }
 
         const { validateKeyOwnership } = await import("@/lib/r2/server")
         if (
@@ -3240,7 +3289,7 @@ export async function saveQuoteAttachmentAction(
         if (error) throw error
 
         await logAuditEvent({
-            partnerId,
+            partnerId: activePartnerId,
             actorUserId: user.id,
             entityType: "quote",
             entityId: quoteId,
@@ -3250,7 +3299,7 @@ export async function saveQuoteAttachmentAction(
         })
 
         try {
-            await revalidateQuotes(partnerId, quoteId)
+            await revalidateQuotes(activePartnerId, quoteId)
         } catch {}
 
         return { success: true, data }
@@ -3267,18 +3316,23 @@ export async function deleteQuoteAttachmentAction(
 ): Promise<{ success: true } | { success: false; error: string }> {
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-        await requirePermission(partnerId, "quotes", "edit")
-        const user = await requireUser()
-        const admin = getAdminClient()
+        const quoteAccess = await requireAuthorizedPartnerContext(partnerId, "quotes", "edit")
+        const activePartnerId = quoteAccess.partnerId
+        const user = quoteAccess.user
+        const admin = quoteAccess.admin
 
         const { data: quote } = await admin
             .from("quotes")
             .select("id, partner_id, store_id")
             .eq("id", quoteId)
-            .eq("partner_id", partnerId)
+            .eq("partner_id", activePartnerId)
             .maybeSingle()
 
         if (!quote) return { success: false, error: "Orçamento não encontrado." }
+
+        if (quote.store_id) {
+            await requireStorePermission(quote.store_id, activePartnerId, "quotes", "edit")
+        }
 
         const { data: attachment } = await admin
             .from("quote_attachments")
@@ -3302,7 +3356,7 @@ export async function deleteQuoteAttachmentAction(
         )
 
         await logAuditEvent({
-            partnerId,
+            partnerId: activePartnerId,
             actorUserId: user.id,
             entityType: "quote",
             entityId: quoteId,
@@ -3312,7 +3366,7 @@ export async function deleteQuoteAttachmentAction(
         })
 
         try {
-            await revalidateQuotes(partnerId, quoteId)
+            await revalidateQuotes(activePartnerId, quoteId)
         } catch {}
 
         return { success: true }
