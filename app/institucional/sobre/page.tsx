@@ -1,25 +1,15 @@
 "use client";
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
     Search,
     Store,
-    ShoppingBag,
-    Calendar,
-    ArrowRight,
     CheckCircle2,
-    MessageCircle,
-    Layout,
-    TrendingUp,
-    Users,
-    Package,
-    Heart,
-    Star
 } from 'lucide-react';
 import { Button } from '@/components/reusable/Button';
-import { GridLines, SectionHeader, Navbar, Footer, CTA } from '@/components/InstitucionalShared';
+import { GridLines, SectionHeader, Navbar, Footer, CTA, FaqSection } from '@/components/InstitucionalShared';
+import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
 
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
@@ -32,10 +22,10 @@ const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
                     transition={{ duration: 0.6 }}
                 >
                     <h1 className="text-5xl font-bold text-brand-dark mb-6">
-                        Um jeito mais simples de encontrar e oferecer o que você precisa.
+                        Um jeito mais simples de vender, gerenciar e ser encontrado em todo o Brasil.
                     </h1>
                     <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                        A Dudit conecta pessoas e negócios em um só lugar para descobrir, anunciar, comprar, agendar e organizar.
+                        A Dudit conecta pessoas e negócios para descobrir, comprar, agendar, vender no balcão físico, na sua cidade e enviar para todo o país com 0% de comissão.
                     </p>
                     <div className="flex flex-wrap gap-4">
                         <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
@@ -77,13 +67,13 @@ const PorQueExiste = () => {
                 <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
                         <p className="text-brand-dark text-lg md:text-xl font-medium leading-relaxed mb-6">
-                            Encontrar algo, vender algo ou divulgar um negócio nem sempre é simples.
+                            Vender produtos, oferecer serviços ou divulgar uma empresa nem sempre é simples.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed mb-6">
-                            Muitas vezes as pessoas procuram no Instagram, no WhatsApp, em grupos locais ou dependem apenas de indicações de conhecidos. Por outro lado, muitos negócios dependem somente de quem já passa na porta ou já é cliente.
+                            Muitas vezes as pessoas procuram no Instagram, no WhatsApp, em grupos ou dependem de marketplaces tradicionais com taxas abusivas de 12% a 20%. Por outro lado, quem vende fica refém de softwares caros ou limitados a clientes que passam na porta.
                         </p>
                         <p className="text-brand-inactive-text text-base leading-relaxed">
-                            <strong className="text-brand-dark">A Dudit nasceu para deixar essa conexão mais fácil:</strong> aproximar quem tem uma necessidade de quem tem a solução, de forma simples, direta e sem intermediários.
+                            <strong className="text-brand-dark">A Dudit nasceu para unir comércio de proximidade e alcance nacional com 0% de comissão:</strong> permita que clientes da sua cidade retirem no balcão ou recebam via motoboy, e envie pedidos para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.
                         </p>
                     </div>
 
@@ -91,15 +81,15 @@ const PorQueExiste = () => {
                         <div className="space-y-4">
                             <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">1</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem procura: acha produtos e serviços locais rápido</div>
+                                <div className="text-xs text-brand-dark font-semibold">Quem compra: acha produtos locais ou com entrega para todo o Brasil</div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
                                 <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">2</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem vende: ganha uma vitrine aberta 24h para a região</div>
+                                <div className="text-xs text-brand-dark font-semibold">Quem vende: ganha vitrine com 0% de comissão, entrega local e frete nacional</div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
                                 <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">3</div>
-                                <div className="text-xs text-brand-dark font-semibold">Quem organiza: tem ferramentas leves do seu jeito</div>
+                                <div className="text-xs text-brand-dark font-semibold">Quem organiza: PDV balcão, estoque com grade, OS e agendamentos</div>
                             </div>
                         </div>
                     </div>
@@ -114,19 +104,19 @@ const BentoPillars = () => {
         {
             title: "Para quem procura",
             subtitle: "DESCOBERTA",
-            description: "Encontrar produtos novos e usados, serviços, lojas e oportunidades na sua cidade.",
+            description: "Encontrar produtos locais ou com frete nacional para todo o Brasil, agendar serviços e comprar com contato direto.",
             type: "buy"
         },
         {
             title: "Para quem vende",
-            subtitle: "VISIBILIDADE",
-            description: "Mostrar produtos e serviços para mais pessoas sem depender apenas de indicação.",
+            subtitle: "VISIBILIDADE E ALCANCE",
+            description: "Vender presencialmente no PDV, online na sua região ou despachar para todo o país com 0% de comissão por venda.",
             type: "sell"
         },
         {
             title: "Para quem organiza",
-            subtitle: "SIMPLICIDADE",
-            description: "Ferramentas práticas para ajudar negócios no dia a dia sem complicações.",
+            subtitle: "GESTÃO COMPLETA",
+            description: "Frente de caixa (PDV), controle de estoque com variações, ordens de serviço e agendamentos sem complexidade.",
             type: "organize"
         }
     ];
@@ -166,8 +156,8 @@ const BentoPillars = () => {
                                                 <span className="text-brand-green font-bold">Perto de mim</span>
                                             </div>
                                             <div className="bg-gray-50 p-2 rounded flex justify-between font-medium">
-                                                <span>Profissionais & Serviços</span>
-                                                <span className="text-blue-600 font-bold">Agendamento</span>
+                                                <span>Envio Nacional</span>
+                                                <span className="text-blue-600 font-bold">Todo o Brasil</span>
                                             </div>
                                         </div>
                                     </div>
@@ -223,7 +213,7 @@ const SemComplicacao = () => {
                             A Dudit não precisa substituir tudo que você já usa.
                         </h2>
                         <p className="text-brand-inactive-text text-base md:text-lg mb-8 max-w-md leading-relaxed">
-                            Continue usando suas ferramentas favoritas. O Instagram para postar fotos, o WhatsApp para conversar. A Dudit é mais uma forma de ser encontrado e organizar o que precisar.
+                            Continue usando suas ferramentas favoritas. O Instagram para postar fotos, o WhatsApp para conversar. A Dudit é mais uma forma de ser encontrado, vender para qualquer lugar do Brasil e organizar o que precisar.
                         </p>
                     </div>
 
@@ -240,14 +230,14 @@ const SemComplicacao = () => {
                                 <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 font-bold">💬</div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark">WhatsApp</div>
-                                    <div className="text-[10px] text-brand-inactive-text">Receba contatos de clientes na hora</div>
+                                    <div className="text-[10px] text-brand-inactive-text">Receba pedidos organizados na hora</div>
                                 </div>
                             </div>
                             <div className="bg-white rounded-2xl p-4 flex items-center gap-3 shadow-md">
                                 <div className="w-10 h-10 rounded-full bg-brand-green/20 flex items-center justify-center text-brand-dark font-bold">🏪</div>
                                 <div>
                                     <div className="text-xs font-bold text-brand-dark">Dudit</div>
-                                    <div className="text-[10px] text-brand-inactive-text">Mais uma porta para ser descoberto</div>
+                                    <div className="text-[10px] text-brand-inactive-text">Vendas no balcão, na cidade e em todo o Brasil</div>
                                 </div>
                             </div>
                         </div>
@@ -281,6 +271,11 @@ export default function SobrePage() {
                 <PorQueExiste />
                 <BentoPillars />
                 <SemComplicacao />
+                <FaqSection
+                    title="Dúvidas Frequentes sobre a Dudit"
+                    description="Tire suas dúvidas sobre alcance local e nacional, taxas, entrega e ferramentas de gestão da Dudit."
+                    items={INSTITUTIONAL_FAQ}
+                />
                 <CTA onNavigate={onNavigate} />
             </main>
             <Footer onNavigate={onNavigate} />

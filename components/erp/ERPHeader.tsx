@@ -264,8 +264,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     {/* Mobile centered title */}
-                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 md:hidden">
-                        <h1 className="text-lg sm:text-xl font-bold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                    <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 md:hidden max-w-[calc(100%_-_8rem)]">
+                        <h1 className="text-lg sm:text-xl font-bold text-brand-dark dark:text-dark-heading truncate text-center">
                             {displayTitle}
                         </h1>
                     </div>

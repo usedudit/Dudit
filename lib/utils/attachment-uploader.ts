@@ -1,5 +1,6 @@
 import { getOrderPresignedUploadUrlAction, saveOrderAttachmentAction } from "@/app/actions/erp/orders"
 import { getPresignedUploadUrlAction, saveAttachmentAction } from "@/app/actions/erp/service-orders"
+import { R2_PREFIXES } from "@/lib/r2/config"
 import { getStockMovementPresignedUploadUrlAction, saveStockMovementAttachmentAction } from "@/app/actions/erp/stock-movements"
 import { getTransactionPresignedUploadUrlAction, saveTransactionAttachmentAction } from "@/app/actions/erp/transactions"
 import { getReturnEvidencePresignedUploadUrlAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
@@ -37,7 +38,7 @@ async function getPresignedUrl(
         case "order":
             return getOrderPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "service_order":
-            return getPresignedUploadUrlAction(partnerId, "service-orders", fileName, fileType, fileSize)
+            return getPresignedUploadUrlAction(partnerId, R2_PREFIXES.serviceOrderAttachments, fileName, fileType, fileSize)
         case "stock_movement":
             return getStockMovementPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "transaction":

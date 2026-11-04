@@ -14,10 +14,10 @@ import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
     title: "Dudit | Descubra. Anuncie. Organize.",
-    description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas. A Dudit ajuda pessoas a encontrarem o que precisam e negócios a serem encontrados.",
+    description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
     openGraph: {
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas. A Dudit ajuda pessoas a encontrarem o que precisam e negócios a serem encontrados.",
+        description: "Descubra produtos e serviços perto de você ou compre de pequenos negócios que enviam para todo o Brasil com 0% de comissão. Plataforma de vendas e gestão para pessoas físicas, autônomos e empresas.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -35,18 +35,21 @@ export const metadata: Metadata = {
         site: "@dudit",
         creator: "@dudit",
         title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Encontre produtos, serviços e negócios perto de você. E ajude seu negócio a ser descoberto por mais pessoas.",
+        description: "Descubra produtos e serviços perto de você ou compre de lojas que enviam para todo o Brasil com 0% de comissão.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br",
     },
     keywords: [
+        "comprar online brasil",
         "produtos perto de mim",
-        "serviços na minha cidade",
-        "comprar local",
-        "negócios locais",
-        "marketplace local brasil",
+        "lojas que entregam no brasil",
+        "sistema de vendas sem taxa",
+        "servicos na minha cidade",
+        "comercio local brasil",
+        "catalogo online gratis",
+        "dudit",
     ],
 }
 
@@ -211,7 +214,7 @@ export default async function HomePage() {
         "@type": "WebSite",
         name: "Dudit",
         url: "https://dudit.com.br",
-        description: "Encontre produtos, serviços e negócios perto de você. Descubra. Anuncie. Organize.",
+        description: "Encontre produtos e serviços locais e compre de lojas que enviam para todo o Brasil com 0% de comissão.",
         potentialAction: {
             "@type": "SearchAction",
             target: {

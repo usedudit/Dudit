@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { Button, FormSection, Accordion, IconPlaceholder, DefaultModal, AlertModal } from "@/components/reusable"
+import { Button, FormSection, IconPlaceholder, AlertModal } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -9,7 +9,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
 import { isGifFile } from "@/lib/security/file-validator"
-import { usePlanUpgrade, planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { getServiceOrderAttachmentUrlAction } from "@/app/actions/erp/service-orders"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
@@ -59,6 +59,11 @@ export default function AttachmentsTab({
         e.target.value = ""
         if (!file) return
 
+        if (!advancedEnabled) {
+            openPlanUpgrade("crescer")
+            return
+        }
+
         if (isGifFile(file)) {
             toast({ description: "Arquivos GIF não são permitidos no sistema." })
             return
@@ -100,12 +105,8 @@ export default function AttachmentsTab({
         }
     }
 
-    const handleRemoveImage = (category: "normal" | "antes" | "depois", index: number) => {
-        const categoryAttachments = localAttachments.filter(att => (att.category || "normal") === category)
-        const categoryImages = categoryAttachments.filter(att =>
-            att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")
-        )
-        const target = categoryImages[index]
+    const handleRemoveImage = (targetId: string) => {
+        const target = localAttachments.find(att => att.id === targetId)
         if (!target) return
 
         const updated = localAttachments.filter(att => att.id !== target.id)
@@ -115,6 +116,10 @@ export default function AttachmentsTab({
     }
 
     const handleDocUploadClick = (category: "normal" | "antes" | "depois") => {
+        if (!advancedEnabled) {
+            openPlanUpgrade("crescer")
+            return
+        }
         setPendingCategory(category)
         docInputRef.current?.click()
     }
@@ -181,21 +186,21 @@ export default function AttachmentsTab({
         }
     }
 
-    const grouped = (() => {
-        const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
-        for (const att of localAttachments || []) {
-            const cat = att.category || "normal"
-            if (!g[cat]) g[cat] = []
-            g[cat].push(att)
-        }
-        return g
-    })()
+    type AttachmentCategory = "normal" | "antes" | "depois"
 
-    const getImagesAndDocs = (items: any[]) => {
-        const images = items.filter(att => att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/"))
-        const docs = items.filter(att => !(att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")))
-        return { images, docs }
-    }
+    const isImageAttachment = (att: any) =>
+        att.file_type?.startsWith("image/") || att.file?.type?.startsWith("image/")
+
+    const getAttachmentsFor = (categories: AttachmentCategory[]) =>
+        (localAttachments || []).filter(att =>
+            categories.includes((att.category || "normal") as AttachmentCategory)
+        )
+
+    const getImagesFor = (categories: AttachmentCategory[]) =>
+        getAttachmentsFor(categories).filter(isImageAttachment)
+
+    const getDocsFor = (categories: AttachmentCategory[]) =>
+        getAttachmentsFor(categories).filter(att => !isImageAttachment(att))
 
     const renderDocsGrid = (docs: any[]) => {
         if (docs.length === 0) return null
@@ -241,8 +246,8 @@ export default function AttachmentsTab({
         )
     }
 
-    const renderDocsContent = (category: "normal" | "antes" | "depois") => {
-        const { docs } = getImagesAndDocs(grouped[category])
+    const renderDocsContent = (category: AttachmentCategory) => {
+        const docs = getDocsFor([category])
 
         if (docs.length === 0) {
             return isEditing ? (
@@ -281,15 +286,18 @@ export default function AttachmentsTab({
         )
     }
 
-    const renderImagesContent = (category: "normal" | "antes" | "depois") => {
-        const { images } = getImagesAndDocs(grouped[category])
+    const renderImagesContent = (categories: AttachmentCategory[], uploadCategory: AttachmentCategory) => {
+        const images = getImagesFor(categories)
         const imagesForSection = images.map(img => img.file || img.file_key)
 
         return (
             <ProductImagesSection
                 images={imagesForSection}
-                onImageUpload={(e) => handleImageUpload(category, e)}
-                onRemoveImage={(idx) => handleRemoveImage(category, idx)}
+                onImageUpload={(e) => handleImageUpload(uploadCategory, e)}
+                onRemoveImage={(idx) => {
+                    const target = images[idx]
+                    if (target) handleRemoveImage(target.id)
+                }}
                 onSetPrimaryImage={() => { }}
                 isEditing={isEditing}
             />
@@ -297,6 +305,7 @@ export default function AttachmentsTab({
     }
 
     const hasContent = localAttachments.length > 0
+    const isExistingOrder = !!serviceOrderId
 
     if (!advancedEnabled) {
         return (
@@ -319,148 +328,58 @@ export default function AttachmentsTab({
     return (
         <>
             <div className="space-y-6">
-                {/* Anexos (apenas documentos) */}
-                {(isEditing || getImagesAndDocs(grouped.normal).docs.length > 0) && (
-                    <FormSection title="Anexos">
-                        {renderDocsContent("normal")}
-                    </FormSection>
-                )}
-
-                {/* Imagens */}
-                {(isEditing || getImagesAndDocs(grouped.normal).images.length > 0) && (
-                    <FormSection title="Imagens">
-                        {renderImagesContent("normal")}
-                    </FormSection>
-                )}
-
-                {/* Antes/Depois: apenas para OS existentes (visualização/edição) */}
-                {!!serviceOrderId && (
+                {isExistingOrder ? (
                     <>
-                        {/* Antes Section */}
-                        {isEditing ? (
-                            advancedEnabled ? (
-                                <FormSection title="Antes">
-                                    {renderImagesContent("antes")}
-                                </FormSection>
-                            ) : (
-                                <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                    <Accordion
-                                        title={
-                                            <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                Antes
-                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                            </span>
-                                        }
-                                        defaultOpen={false}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                        onToggle={(isOpen) => {
-                                            if (isOpen) {
-                                                openPlanUpgrade("crescer")
-                                                return false
-                                            }
-                                        }}
-                                    >
-                                        <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                            Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                        </div>
-                                    </Accordion>
-                                </div>
-                            )
-                        ) : (
-                            getImagesAndDocs(grouped.antes).images.length > 0 && (
-                                advancedEnabled ? (
-                                    <FormSection title="Antes">
-                                        {renderImagesContent("antes")}
-                                    </FormSection>
-                                ) : (
-                                    <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                        <Accordion
-                                            title={
-                                                <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                    Antes
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                                </span>
-                                            }
-                                            defaultOpen={false}
-                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                            onToggle={(isOpen) => {
-                                                if (isOpen) {
-                                                    openPlanUpgrade("crescer")
-                                                    return false
-                                                }
-                                            }}
-                                        >
-                                            <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                                Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                            </div>
-                                        </Accordion>
-                                    </div>
-                                )
-                            )
+                        {/* Anexos (documentos) */}
+                        {(isEditing || getDocsFor(["normal"]).length > 0) && (
+                            <FormSection
+                                title="Anexos"
+                                description="Documentos em PDF, Word, Excel, etc."
+                            >
+                                {renderDocsContent("normal")}
+                            </FormSection>
                         )}
 
-                        {/* Depois Section */}
-                        {isEditing ? (
-                            advancedEnabled ? (
-                                <FormSection title="Depois">
-                                    {renderImagesContent("depois")}
-                                </FormSection>
-                            ) : (
-                                <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                    <Accordion
-                                        title={
-                                            <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                Depois
-                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                            </span>
-                                        }
-                                        defaultOpen={false}
-                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                        onToggle={(isOpen) => {
-                                            if (isOpen) {
-                                                openPlanUpgrade("crescer")
-                                                return false
-                                            }
-                                        }}
-                                    >
-                                        <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                            Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                        </div>
-                                    </Accordion>
-                                </div>
-                            )
-                        ) : (
-                            getImagesAndDocs(grouped.depois).images.length > 0 && (
-                                advancedEnabled ? (
-                                    <FormSection title="Depois">
-                                        {renderImagesContent("depois")}
-                                    </FormSection>
-                                ) : (
-                                    <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                        <Accordion
-                                            title={
-                                                <span className="text-md font-medium text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                    Depois
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                                </span>
-                                            }
-                                            defaultOpen={false}
-                                            triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left"
-                                            onToggle={(isOpen) => {
-                                                if (isOpen) {
-                                                    openPlanUpgrade("crescer")
-                                                    return false
-                                                }
-                                            }}
-                                        >
-                                            <div className="text-sm text-brand-inactive-text py-4 text-center">
-                                                Organizar anexos como "Antes" e "Depois" está disponível nos planos Crescer e Escalar.
-                                            </div>
-                                        </Accordion>
-                                    </div>
-                                )
-                            )
+                        {/* Imagens Antes da OS */}
+                        {(isEditing || getImagesFor(["normal", "antes"]).length > 0) && (
+                            <FormSection
+                                title="Imagens Antes da OS"
+                                description="Fotos do item antes da execução do serviço."
+                                hasSeparator
+                            >
+                                {renderImagesContent(["normal", "antes"], "antes")}
+                            </FormSection>
                         )}
+
+                        {/* Imagens Após a OS */}
+                        {(isEditing || getImagesFor(["depois"]).length > 0) && (
+                            <FormSection
+                                title="Imagens Após a OS"
+                                description="Fotos do item após a execução do serviço."
+                                hasSeparator
+                            >
+                                {renderImagesContent(["depois"], "depois")}
+                            </FormSection>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        {/* Criação: Anexos (documentos) */}
+                        <FormSection
+                            title="Anexos"
+                            description="Documentos em PDF, Word, Excel, etc."
+                        >
+                            {renderDocsContent("normal")}
+                        </FormSection>
+
+                        {/* Criação: Imagens (salvas como imagens "Antes da OS") */}
+                        <FormSection
+                            title="Imagens"
+                            description="Fotos do item antes do serviço. Elas serão exibidas em “Imagens Antes da OS”."
+                            hasSeparator
+                        >
+                            {renderImagesContent(["antes"], "antes")}
+                        </FormSection>
                     </>
                 )}
 

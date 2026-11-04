@@ -747,7 +747,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                         if (!saveRes.success) throw new Error(saveRes.error || "Erro ao salvar anexo")
                     } catch (err: any) {
                         console.error("Erro ao fazer upload de anexo:", err)
-                        toast({ description: `Erro ao fazer upload de ${att.file_name || att.file?.name}` })
+                        toast({
+                            title: "Erro no anexo",
+                            description: `Erro ao salvar ${att.file_name || att.file?.name}: ${err.message || "Falha no upload"}`,
+                            variant: "destructive"
+                        })
                     }
                 }))
             }

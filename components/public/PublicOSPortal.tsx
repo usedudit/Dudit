@@ -432,16 +432,31 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         }
     }
 
-    // Group attachments by category
+    // Group attachments by category. Legacy "normal" images are treated as "antes".
     const groupedAttachments = useMemo(() => {
-        const g: Record<string, any[]> = { normal: [], antes: [], depois: [] }
+        const groups: Record<string, any[]> = { normal: [], antes: [], depois: [] }
         for (const att of attachments || []) {
             const cat = att.category || "normal"
-            if (!g[cat]) g[cat] = []
-            g[cat].push(att)
+            if (!groups[cat]) groups[cat] = []
+            groups[cat].push(att)
         }
-        return g
-    }, [attachments])
+
+        const isImage = (att: any) => att.file_type?.startsWith("image/")
+
+        if (!beforeAfterEnabled) {
+            return {
+                antes: [] as any[],
+                depois: [] as any[],
+                anexos: [...groups.normal, ...groups.antes, ...groups.depois],
+            }
+        }
+
+        return {
+            antes: [...groups.normal.filter(isImage), ...groups.antes],
+            depois: groups.depois,
+            anexos: groups.normal.filter((att: any) => !isImage(att)),
+        }
+    }, [attachments, beforeAfterEnabled])
 
     return (
         <>
@@ -668,9 +683,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                             <div className="space-y-6 text-left">
                                                 {beforeAfterEnabled && (
                                                     <>
-                                                        <FormSection title="Antes">
+                                                        <FormSection title="Imagens Antes da OS">
                                                             {groupedAttachments.antes.length === 0 ? (
-                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum anexo registrado antes do serviço.</p>
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhuma imagem registrada antes da OS.</p>
                                                             ) : (
                                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                                     {groupedAttachments.antes.map((att: any, idx: number) => (
@@ -686,9 +701,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                             )}
                                                         </FormSection>
 
-                                                        <FormSection title="Depois" hasSeparator>
+                                                        <FormSection title="Imagens Após a OS" hasSeparator>
                                                             {groupedAttachments.depois.length === 0 ? (
-                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum anexo registrado depois do serviço.</p>
+                                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhuma imagem registrada após a OS.</p>
                                                             ) : (
                                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                                     {groupedAttachments.depois.map((att: any, idx: number) => (
@@ -706,10 +721,10 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     </>
                                                 )}
 
-                                                {groupedAttachments.normal.length > 0 && (
-                                                    <FormSection title={beforeAfterEnabled ? "Outros Anexos" : "Anexos"}>
+                                                {groupedAttachments.anexos.length > 0 && (
+                                                    <FormSection title="Anexos" hasSeparator={beforeAfterEnabled}>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                            {groupedAttachments.normal.map((att: any) => (
+                                                            {groupedAttachments.anexos.map((att: any) => (
                                                                 <div
                                                                     key={att.id || att.file_key}
                                                                     onClick={() => {
@@ -719,8 +734,12 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                                     }}
                                                                     className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
                                                                 >
-                                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                                                                        <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">
+                                                                        {att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
                                                                         <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">

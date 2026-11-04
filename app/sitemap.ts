@@ -37,6 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { url: "https://dudit.com.br/institucional/sobre", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/planos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/segmentos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+        { url: "https://dudit.com.br/mapa-do-site", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/termos", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
         { url: "https://dudit.com.br/institucional/privacidade", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
         { url: "https://dudit.com.br/institucional/estatisticas", lastModified: now, changeFrequency: "weekly", priority: 0.8 },

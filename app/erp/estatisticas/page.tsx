@@ -1,4 +1,4 @@
-import { Suspense } from "react"
+import { Suspense, type ReactNode } from "react"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
@@ -23,7 +23,6 @@ import {
     getSubscriptionReportData,
     getAppointmentsReportData,
 } from "@/lib/data/reports"
-import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { can } from "@/lib/permissions/can"
@@ -52,26 +51,25 @@ export default async function ERPEstatisticasPage(props: {
 
     const plan = await getPartnerPlan(partnerId)
 
-    const allAccess = await getAllUserPartnerAccess()
-    const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
     const businessInfo = normalizeBusinessInfo(context.businessInfo)
     const activeResources = resolveActiveResources(businessInfo)
 
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
-    const hasProducts = activeResources.includes("products")
     return (
         <>
-            <ERPPageHeader title={activeStore?.storeName ?? "Estatísticas"} />
+            <ERPPageHeader title="Estatísticas" />
             <FadeIn className="p-4">
                 <DashboardProvider>
                     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                            <div className="hidden xl:block" />
-                            <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                                <GlobalPeriodFilter />
-                            </Suspense>
-                        </header>
+                        <div className="hidden md:flex flex-col gap-2 pt-1">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                Estatísticas
+                            </h1>
+                            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                Acompanhe os indicadores e o desempenho do seu negócio.
+                            </p>
+                        </div>
 
                         <Suspense fallback={<ReportsSkeleton />}>
                             <ReportsContent
@@ -80,6 +78,11 @@ export default async function ERPEstatisticasPage(props: {
                                 period={period}
                                 planSlug={plan.slug}
                                 permissionContext={context as RbacUserLike}
+                                controls={
+                                    <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                        <GlobalPeriodFilter />
+                                    </Suspense>
+                                }
                             />
                         </Suspense>
                     </div>
@@ -95,12 +98,14 @@ async function ReportsContent({
     period,
     planSlug,
     permissionContext,
+    controls,
 }: {
     partnerId: string
     activeResources: string[]
     period: Period
     planSlug: string
     permissionContext: RbacUserLike
+    controls?: ReactNode
 }) {
     const hasProducts = activeResources.includes("products")
     const hasServices = activeResources.includes("services") || activeResources.includes("appointments")
@@ -160,6 +165,7 @@ async function ReportsContent({
             subscriptionData={subscriptionData}
             stockValue={stockValue}
             appointmentsData={appointmentsData}
+            controls={controls}
         />
     )
 }

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
  *
  * - **Modo entidade** (`?view=`, `?edit=`, `?create=`, `?duplicate=`):
  *   detalhe/criar/editar/duplicar. A página preenche 100% da região
- *   (`grid-rows-[minmax(0,1fr)]` + `min-h-0` no filho) e o scroll acontece
+ *   (ver `.erp-entity-region` em `app/globals.css`) e o scroll acontece
  *   dentro da própria página, logo abaixo do ERPHeader, usando a
  *   `custom-scrollbar`.
  */
@@ -38,7 +38,7 @@ export function ERPContentRegion({ children }: { children: React.ReactNode }) {
             className={cn(
                 "relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
                 isEntityPage
-                    ? "grid grid-rows-[minmax(0,1fr)] [&>*]:min-h-0"
+                    ? "flex flex-col erp-entity-region"
                     : "flex flex-col erp-content-flow",
             )}
         >

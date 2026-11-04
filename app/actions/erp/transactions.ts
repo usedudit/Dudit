@@ -3904,6 +3904,7 @@ export async function saveTransactionAttachmentAction(
 
         return { success: true, data }
     } catch (err: any) {
+        console.error("[saveTransactionAttachmentAction] Erro:", err);
         return { success: false, error: err.message || "Erro ao salvar anexo" }
     }
 }

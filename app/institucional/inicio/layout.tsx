@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { getInstitutionalFaqJsonLd } from "@/lib/constants/institutional-faq";
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
 
 export const metadata: Metadata = {
-    title: "Dudit | Descubra. Anuncie. Organize.",
-    description: "Encontre produtos, serviços, lojas e profissionais perto de você. Anuncie o que quiser ou organize seu negócio com a Dudit.",
+    title: "Dudit | Venda no Balcão, na Sua Cidade ou Para Todo o Brasil com 0% de Taxa",
+    description: "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo online, agendamento e ordens de serviço.",
     openGraph: {
-        title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Encontre produtos, serviços, lojas e profissionais perto de você. Anuncie o que quiser ou organize seu negócio com a Dudit.",
+        title: "Dudit | Venda no Balcão, na Sua Cidade ou Para Todo o Brasil com 0% de Taxa",
+        description: "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo online, agendamento e ordens de serviço.",
         url: "https://dudit.com.br/institucional/inicio",
         siteName: "Dudit",
         images: [
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
                 url: "https://img.dudit.com.br/static/og-image.png",
                 width: 1200,
                 height: 630,
-                alt: "Dudit - Descubra. Anuncie. Organize.",
+                alt: "Dudit - Gestão Comercial e Vendas Locais e Nacionais",
             },
         ],
         locale: "pt_BR",
@@ -21,23 +23,23 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Dudit | Descubra. Anuncie. Organize.",
-        description: "Encontre produtos, serviços, lojas e profissionais perto de você. Anuncie o que quiser ou organize seu negócio com a Dudit.",
+        title: "Dudit | Venda no Balcão, na Sua Cidade ou Para Todo o Brasil com 0% de Taxa",
+        description: "Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios. Catálogo online, agendamento e ordens de serviço.",
         images: ["https://img.dudit.com.br/static/og-image.png"],
     },
     alternates: {
         canonical: "https://dudit.com.br/institucional/inicio",
     },
     keywords: [
-        "produtos perto de mim",
-        "serviços na minha cidade",
-        "comprar produtos na minha cidade",
-        "anunciar produtos online",
-        "anunciar serviços",
-        "negócios locais",
-        "agenda online para serviços",
-        "vitrine digital para pequenos negócios",
-        "dudit",
+        "vender online brasil",
+        "sistema de gestao empresarial",
+        "envio correios transportadora",
+        "pdv balcao gratis",
+        "catalogo digital sem taxa",
+        "ordem de servico online",
+        "agenda para profissionais",
+        "comercio local e nacional",
+        "dudit brasil",
     ],
 };
 
@@ -46,5 +48,15 @@ export default function InstitucionalInicioLayout({
 }: {
     children: React.ReactNode;
 }) {
-    return <>{children}</>;
+    const faqJsonLd = getInstitutionalFaqJsonLd();
+
+    return (
+        <>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(faqJsonLd) }}
+            />
+            {children}
+        </>
+    );
 }

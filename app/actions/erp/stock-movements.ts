@@ -844,6 +844,7 @@ export async function saveStockMovementAttachmentAction(
 
     return { success: true, data }
   } catch (err: any) {
+    console.error("[saveStockMovementAttachmentAction] Erro:", err);
     return { success: false, error: err.message || "Erro ao salvar anexo" }
   }
 }

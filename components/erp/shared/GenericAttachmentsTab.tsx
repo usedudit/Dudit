@@ -11,6 +11,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { R2_PREFIXES } from "@/lib/r2/config"
 
 
 // Import order actions
@@ -104,7 +105,7 @@ const ACTIONS_MAP: Record<AttachmentEntityType, {
     },
     service_order: {
         fetch: getServiceOrderAttachmentsAction,
-        presigned: (pid, eid, name, type, size) => getPresignedUploadUrlAction(pid, "service-orders", name, type, size),
+        presigned: (pid, eid, name, type, size) => getPresignedUploadUrlAction(pid, R2_PREFIXES.serviceOrderAttachments, name, type, size),
         save: (pid, eid, key, name, type, size, hash) => saveAttachmentAction(pid, eid, key, name, type, size, "normal", hash),
         delete: deleteAttachmentAction,
         url: (entityId, key, partnerId) => getServiceOrderAttachmentUrlAction(partnerId || "", entityId, key)

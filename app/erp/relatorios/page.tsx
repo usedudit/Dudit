@@ -65,13 +65,10 @@ export default async function ERPReportsPage(props: {
         ? [context.activeStoreId]
         : []
   const storeId = selectedStoreIds.join(",")
-  const storeName = selectedStoreIds.length === 1
-    ? stores.find((store) => store.id === selectedStoreIds[0])?.name
-    : null
 
   return (
     <>
-      <ERPPageHeader title={storeName ?? "Relatórios"} />
+      <ERPPageHeader title="Relatórios" />
       <FadeIn className="p-4">
         <DashboardProvider>
           <Suspense key={`${period}-${storeId}`} fallback={<ReportsSkeleton />}>

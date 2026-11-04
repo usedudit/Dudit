@@ -257,14 +257,11 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         <div>
                             <h4 className="text-sm font-medium text-white mb-6">Institucional</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
+                                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça a Dudit</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
                                 <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Nossos Planos</Link></li>
-                                <li><Link href="/segmentos/oficinas-e-tecnicos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Oficinas e Técnicos</Link></li>
-                                <li><Link href="/segmentos/saloes-e-barbearias" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Salões e Barbearias</Link></li>
-                                <li><Link href="/segmentos/confeitarias-e-alimentacao" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Confeitarias</Link></li>
-                                <li><Link href="/segmentos/assistencia-tecnica-celulares" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Assistência Técnica e Celulares</Link></li>
-                                <li><Link href="/segmentos/lojas-de-roupas-e-calcados" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Lojas de Roupas e Calçados</Link></li>
+                                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Segmentos Atendidos</Link></li>
+                                <li><Link href="/mapa-do-site" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Mapa do Site</Link></li>
                             </ul>
                         </div>
 
@@ -297,10 +294,17 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 
                 {/* Barra Inferior: Legal + Redes Sociais */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
-                    <div className="text-center md:text-left order-2 md:order-1">
+                    <div className="text-center md:text-left order-2 md:order-1 flex flex-col md:flex-row items-center gap-2 md:gap-4">
                         <p className="text-gray-500 text-xs">
                             © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                         </p>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <Link href="/institucional/termos" prefetch={false} className="hover:text-gray-300 transition-colors">Termos</Link>
+                            <span>•</span>
+                            <Link href="/institucional/privacidade" prefetch={false} className="hover:text-gray-300 transition-colors">Privacidade</Link>
+                            <span>•</span>
+                            <Link href="/mapa-do-site" prefetch={false} className="hover:text-brand-green transition-colors">Mapa do Site</Link>
+                        </div>
                     </div>
 
                     {/* Redes Sociais com Links Reais e Target Blank */}

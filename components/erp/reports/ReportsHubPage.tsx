@@ -348,7 +348,13 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   }, [tabFromUrl])
   const selectedReport = reports.find((report) => report.id === activeReportId) || null
   const compare = searchParams.get("compare") || "none"
-  const visibleColumns = selectedReport?.columns.filter((column) => !(column.id === "previous" && compare === "none")) || []
+  // Keep this memoized: it feeds `exportSelected`, and a fresh array on every
+  // render would make the export-handler effect below update context state in
+  // an endless loop.
+  const visibleColumns = useMemo(
+    () => selectedReport?.columns.filter((column) => !(column.id === "previous" && compare === "none")) || [],
+    [selectedReport, compare],
+  )
   const [activeCategory, setActiveCategory] = useState<ReportCategory>(availableCategories[0]?.id || "vendas")
   const [page, setPage] = useState(1)
 
@@ -468,22 +474,21 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
 
   return (
     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading">Relatórios</h1>
-          <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">Consulte os dados do seu negócio, filtre os resultados e escolha uma análise.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {props.stores.length > 1 && storeFilter}
-          <GlobalPeriodFilter />
-        </div>
-      </header>
+      <div className="hidden md:flex flex-col gap-2 pt-1">
+        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Relatórios</h1>
+        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Consulte os dados do seu negócio, filtre os resultados e escolha uma análise.</p>
+      </div>
 
       {availableCategories.length > 0 ? (
         <Tabs value={activeCategory} onValueChange={(value) => setActiveCategory(value as ReportCategory)} className="w-full">
-          <TabsList className="mb-6">
+          <TabsList className="mb-4">
             {availableCategories.map((category) => <TabsTrigger key={category.id} value={category.id} icon={category.icon}>{category.label}</TabsTrigger>)}
           </TabsList>
+
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            {props.stores.length > 1 && storeFilter}
+            <GlobalPeriodFilter />
+          </div>
 
           {availableCategories.map((category) => (
             <TabsContent key={category.id} value={category.id} className="mt-0">
@@ -499,9 +504,15 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
           ))}
         </Tabs>
       ) : (
-        <div className="rounded-2xl border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface">
-          <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum relatório disponível para os recursos ativos desta conta.</p>
-        </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            {props.stores.length > 1 && storeFilter}
+            <GlobalPeriodFilter />
+          </div>
+          <div className="rounded-2xl border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface">
+            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum relatório disponível para os recursos ativos desta conta.</p>
+          </div>
+        </>
       )}
     </div>
   )

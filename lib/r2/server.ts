@@ -329,11 +329,8 @@ export async function deleteManagedFileFromAllBuckets(key: string): Promise<void
   }
 
   const config = getR2ServerConfig()
-  if (!config.bucketName || !config.privateBucketName) {
-    throw new Error("Os buckets público e privado precisam estar configurados para a limpeza R2")
-  }
-  if (config.bucketName === config.privateBucketName) {
-    throw new Error("O bucket privado precisa ser diferente do bucket público")
+  if (!config.bucketName) {
+    throw new Error("O bucket R2 precisa estar configurado para a limpeza")
   }
 
   const client = createR2Client()

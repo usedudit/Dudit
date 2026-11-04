@@ -2318,6 +2318,7 @@ export async function saveReturnEvidenceAction(
 
         return { success: true, data }
     } catch (err: any) {
+        console.error("[saveReturnEvidenceAction] Erro:", err);
         return { success: false, error: err.message || "Erro ao salvar evidência" }
     }
 }

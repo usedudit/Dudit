@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Dudit | Descubra. Anuncie. Organize.',
     short_name: 'Dudit',
     description:
-      'A Dudit é a plataforma onde pessoas e negócios descobrem oportunidades, anunciam o que fazem e organizam o dia a dia em um só lugar.',
+      'Sistema completo de gestão comercial e vendas com 0% de comissão: venda no balcão (PDV), online na sua cidade ou envie para todo o Brasil via transportadoras e Correios.',
     start_url: '/',
     display: 'standalone',
     background_color: '#003229',

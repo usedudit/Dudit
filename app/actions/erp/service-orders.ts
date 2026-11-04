@@ -1222,11 +1222,16 @@ export async function getPresignedUploadUrlAction(
     await requirePermission(partnerId, "service_orders", "edit")
     const user = await requireUser()
 
-    const allowedPrefixes = new Set([
+    const normalizedPrefix = (prefix === "service-orders" || prefix === "serviceOrderAttachments")
+      ? R2_PREFIXES.serviceOrderAttachments
+      : prefix
+
+    const allowedPrefixes = new Set<string>([
       R2_PREFIXES.serviceOrderAttachments,
       R2_PREFIXES.serviceOrderSignatures,
     ])
-    if (!allowedPrefixes.has(prefix)) {
+    if (!allowedPrefixes.has(normalizedPrefix)) {
+      console.error("[getPresignedUploadUrlAction] Destino de upload inválido:", prefix)
       return { success: false, error: "Destino de upload inválido." }
     }
     const kind = getUploadKindFromMimeType(fileType)
@@ -1250,7 +1255,7 @@ export async function getPresignedUploadUrlAction(
       fileType,
       contentLength: fileSize,
       userId: user.id,
-      prefix,
+      prefix: normalizedPrefix,
       kind,
     })
 
@@ -1318,12 +1323,16 @@ export async function saveAttachmentAction(
       return { success: false, error: uploadValidation.error || "Arquivo inválido." }
     }
 
-    // Enforce plan-based attachment count limits: Max 2 for crescer, Max 5 for escalar
+    // Enforce plan-based attachment count limits: Crescer (5 images, 5 docs), Escalar (15 images, 15 docs)
     const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const { getPlanImageAttachmentLimit } = await import("@/lib/subscription/plan-tier")
     const plan = await getPartnerPlan(partnerId)
-    const limit = plan.slug === "crescer" ? 2 : plan.slug === "escalar" ? 5 : 0
+    const limit = uploadKind === "image"
+      ? getPlanImageAttachmentLimit(plan.slug)
+      : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 15 : 0
     if (limit === 0) {
-      return { success: false, error: "Upload de anexos não permitido no seu plano." }
+      console.error("[saveAttachmentAction] Plano não permite anexos:", plan.slug)
+      return { success: false, error: "Upload de anexos não permitido no seu plano. Faça upgrade para Crescer ou Escalar." }
     }
 
     const { getR2ServerConfig, getR2BucketNameForKey } = await import("@/lib/r2/r2-server-config")
@@ -1425,6 +1434,7 @@ export async function saveAttachmentAction(
     revalidatePath("/erp/ordens-de-servico")
     return { success: true, data }
   } catch (err: any) {
+    console.error("[saveAttachmentAction] Erro ao salvar anexo:", err)
     return { success: false, error: err.message || "Erro ao salvar anexo" }
   }
 }

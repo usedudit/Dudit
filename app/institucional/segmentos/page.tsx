@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/reusable/Button';
 import {
@@ -14,34 +15,40 @@ import { useRouter } from 'next/navigation';
 
 const segments = [
   {
-    title: "Lojas e Comércio",
-    description: "Produtos novos e usados, roupas, eletrônicos, móveis e acessórios com vitrine pronta.",
-    type: "fashion"
+    title: "Lojas de Roupas e Comércio",
+    description: "Controle de estoque por grade (tamanho e cor), etiquetas com código de barras, vitrine online e PDV balcão com 0% de comissão.",
+    type: "fashion",
+    href: "/segmentos/lojas-de-roupas-e-calcados"
   },
   {
-    title: "Salões e Barbearias",
-    description: "Agenda online disponível 24h para seus clientes. Sem ligações, sem confusão de horários.",
-    type: "beauty"
+    title: "Salões de Beleza e Barbearias",
+    description: "Agenda online disponível 24h para seus clientes, controle de horários de profissionais e fechamento de caixa sem confusão.",
+    type: "beauty",
+    href: "/segmentos/saloes-e-barbearias"
   },
   {
-    title: "Oficinas e Técnicos",
-    description: "Emita ordens de serviço digitais e envie orçamentos claros para seus clientes.",
-    type: "technical"
+    title: "Oficinas Mecânicas e Auto Centers",
+    description: "Emissão de ordens de serviço digitais com fotos, controle de peças e orçamentos claros enviados direto pelo WhatsApp.",
+    type: "technical",
+    href: "/segmentos/oficinas-e-tecnicos"
   },
   {
-    title: "Confeitarias e Alimentação",
-    description: "Receba pedidos e encomendas de forma organizada, sem se perder nas conversas do WhatsApp.",
-    type: "confectionery"
+    title: "Assistência Técnica e Celulares",
+    description: "Checklist de entrada do aparelho, fotos antes/depois, laudo técnico, termo de garantia e acompanhamento de OS online.",
+    type: "technical",
+    href: "/segmentos/assistencia-tecnica-celulares"
   },
   {
-    title: "Autônomos e Prestadores",
-    description: "Crie orçamentos profissionais em PDF e envie para seus clientes com apenas um clique.",
-    type: "freelance"
+    title: "Confeitarias, Docerias e Marmitas",
+    description: "Receba pedidos e encomendas de forma organizada, monte cardápio digital sem taxas de entrega e controle insumos.",
+    type: "confectionery",
+    href: "/segmentos/confeitarias-e-alimentacao"
   },
   {
-    title: "Casa e Reformas",
-    description: "Eletricistas, encanadores, marcenaria e reformas com contato direto e fácil.",
-    type: "home"
+    title: "Autônomos e Prestadores de Serviços",
+    description: "Crie orçamentos profissionais em PDF, envie para clientes com um clique e receba pagamentos com 100% do lucro seu.",
+    type: "freelance",
+    href: "/auth/login?mode=partner"
   }
 ];
 
@@ -233,15 +240,19 @@ const SegmentsGrid = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: idx * 0.1 }}
-            className="group"
           >
-            <div className="bg-brand-gray border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6">
-              <SegmentMockup type={segment.type} />
-            </div>
-            <div>
-              <h4 className="text-xl font-bold text-brand-dark mb-2">{segment.title}</h4>
-              <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
-            </div>
+            <Link href={segment.href} className="group block h-full">
+              <div className="bg-brand-gray border border-brand-border h-64 rounded-xl overflow-hidden relative p-6 flex items-center justify-center mb-6 group-hover:border-brand-green/40 transition-colors">
+                <SegmentMockup type={segment.type} />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xl font-bold text-brand-dark group-hover:text-brand-green transition-colors">{segment.title}</h4>
+                  <span className="text-brand-green text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Ver solução →</span>
+                </div>
+                <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
+              </div>
+            </Link>
           </motion.div>
         ))}
       </div>

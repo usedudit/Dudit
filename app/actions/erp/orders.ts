@@ -7751,6 +7751,7 @@ export async function saveOrderAttachmentAction(
     revalidatePath("/erp/pedidos");
     return { success: true, data };
   } catch (err: any) {
+    console.error("[saveOrderAttachmentAction] Erro:", err);
     return { success: false, error: err.message || "Erro ao salvar anexo" };
   }
 }

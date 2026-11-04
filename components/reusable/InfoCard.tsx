@@ -89,7 +89,7 @@ export function InfoCard({ title, message, color = "orange", className = "", rig
           // classNames needed). The `hover:` shade dims slightly on hover.
           <div
             data-infocard-bottom
-            className={`shrink-0 flex items-center justify-start ${c.text} ${c.linkHover}`}
+            className={`shrink-0 flex items-center justify-start !px-0 !py-0 mt-2 ${c.text} ${c.linkHover}`}
           >
             {bottomElement}
           </div>

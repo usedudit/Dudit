@@ -99,6 +99,7 @@ interface ReportsPageProps {
     goalData: GoalReportData | null
     subscriptionData: SubscriptionReportData | null
     stockValue: number
+    controls?: React.ReactNode
 }
 
 function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
@@ -226,11 +227,17 @@ export function ReportsPage(props: ReportsPageProps) {
 
     return (
         <Tabs defaultValue={initialTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="mb-8">
+            <TabsList className="mb-4">
                 {availableTabs.map(tab => (
                     <TabsTrigger key={tab.id} value={tab.id} icon={tab.icon}>{tab.label}</TabsTrigger>
                 ))}
             </TabsList>
+
+            {props.controls ? (
+                <div className="mb-8 flex flex-wrap items-center gap-2">
+                    {props.controls}
+                </div>
+            ) : null}
             <TabsContent value="vendas"><SalesSection {...props} productsData={props.productsData} /></TabsContent>
             {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} salesData={props.salesData} /></TabsContent>}
             {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
