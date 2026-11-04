@@ -14,6 +14,7 @@ import {
     FormSection,
 } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { FileIcon } from "@/lib/icons"
 import { adminProcessRefundAction, adminRejectRefundAction } from "@/app/actions/billing/refunds"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import {
@@ -28,7 +29,6 @@ import {
     Store,
     Eye,
 } from "lucide-react"
-import { FileIcon } from "@/lib/icons"
 
 function formatFileSize(bytes?: number): string {
     if (!bytes || bytes <= 0) return ""

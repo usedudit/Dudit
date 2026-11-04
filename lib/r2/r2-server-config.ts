@@ -8,30 +8,31 @@ import { isKeyPrivate } from "./config"
  * Protected by "server-only" guard.
  */
 export function getR2ServerConfig() {
+  const mainBucket = process.env.CLOUDFLARE_R2_BUCKET || "dudit"
+  const rawPrivateBucket = process.env.CLOUDFLARE_R2_PRIVATE_BUCKET?.trim()
+  // Falls back to mainBucket if private bucket is not configured
+  const privateBucketName = rawPrivateBucket || mainBucket
+
   return {
     accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID || "",
-    bucketName: process.env.CLOUDFLARE_R2_BUCKET || "",
-    privateBucketName: process.env.CLOUDFLARE_R2_PRIVATE_BUCKET || "",
+    bucketName: mainBucket,
+    privateBucketName,
   }
 }
 
 /**
  * Select the storage bucket by data classification.
- * If privateBucketName is configured, use it. Otherwise, fallback to the main bucket
- * so operations remain fully functional without requiring a multi-bucket setup.
+ * If privateBucketName is configured, use it.
+ * Otherwise, fallback to the main bucket so operations always succeed.
  */
 export function getR2BucketNameForKey(key: string): string {
   const config = getR2ServerConfig()
   if (isKeyPrivate(key)) {
-    if (config.privateBucketName) {
-      return config.privateBucketName
-    }
-    return config.bucketName
+    return config.privateBucketName || config.bucketName || "dudit"
   }
-  if (!config.bucketName) throw new Error("CLOUDFLARE_R2_BUCKET não está configurado")
-  return config.bucketName
+  return config.bucketName || "dudit"
 }
 
 /**

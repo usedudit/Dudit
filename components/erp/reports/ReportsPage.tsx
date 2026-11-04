@@ -234,7 +234,7 @@ export function ReportsPage(props: ReportsPageProps) {
             </TabsList>
 
             {props.controls ? (
-                <div className="mb-8 flex flex-wrap items-center gap-2">
+                <div className="w-full lg:hidden mb-8">
                     {props.controls}
                 </div>
             ) : null}

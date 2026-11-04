@@ -173,6 +173,8 @@ export const R2_PREFIXES = {
   serviceOrderAttachments: "service-orders/attachments/",
   serviceOrderSignatures: "service-orders/signatures/",
   serviceOrderPdfs: "service-orders/pdfs/",
+  quotes: "quotes/",
+  quoteAttachments: "quotes/attachments/",
   
   communityVideos: "community-videos/",
 } as const
@@ -197,6 +199,8 @@ export const PRIVATE_PREFIXES = [
   "service-orders/attachments/",
   "service-orders/signatures/",
   "service-orders/pdfs/",
+  "quotes/",
+  "quotes/attachments/",
   "returns/",
   "temp/",
 ] as const

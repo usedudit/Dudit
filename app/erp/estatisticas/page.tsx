@@ -62,14 +62,24 @@ export default async function ERPEstatisticasPage(props: {
             <FadeIn className="p-4">
                 <DashboardProvider>
                     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-                        <div className="hidden md:flex flex-col gap-2 pt-1">
-                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Estatísticas
-                            </h1>
-                            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                Acompanhe os indicadores e o desempenho do seu negócio.
-                            </p>
-                        </div>
+                        {/* Desktop: título/subtítulo e filtros na mesma linha */}
+                        <header className="hidden lg:flex items-start justify-between gap-4">
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Estatísticas
+                                    </h1>
+                                </div>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Acompanhe os indicadores e o desempenho do seu negócio.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                    <GlobalPeriodFilter />
+                                </Suspense>
+                            </div>
+                        </header>
 
                         <Suspense fallback={<ReportsSkeleton />}>
                             <ReportsContent
@@ -79,9 +89,11 @@ export default async function ERPEstatisticasPage(props: {
                                 planSlug={plan.slug}
                                 permissionContext={context as RbacUserLike}
                                 controls={
-                                    <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
-                                        <GlobalPeriodFilter />
-                                    </Suspense>
+                                    <div className="w-full">
+                                        <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-full bg-brand-gray/40 dark:bg-dark-border/20" />}>
+                                            <GlobalPeriodFilter />
+                                        </Suspense>
+                                    </div>
                                 }
                             />
                         </Suspense>

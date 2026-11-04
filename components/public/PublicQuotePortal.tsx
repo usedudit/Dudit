@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from "react"
 import {
     getPublicQuoteAction,
     approvePublicQuoteAction,
-    rejectPublicQuoteAction
+    rejectPublicQuoteAction,
+    getPublicQuoteAttachmentUrlAction
 } from "@/app/actions/erp/quotes"
 import { useTimezone } from "@/lib/date"
 import {
@@ -19,12 +20,15 @@ import {
     DefaultModal,
     Input,
     FormTextarea,
-    InfoCard
+    InfoCard,
+    ListItem
 } from "@/components/reusable"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { maskEmail } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
+import { FileIcon } from "@/lib/icons"
+import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 import { useSupabase } from "@/providers/supabase-provider"
 
 interface PublicQuotePortalProps {
@@ -65,6 +69,26 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const [quote, setQuote] = useState(initialData.quote)
     const [snapshot, setSnapshot] = useState(initialData.snapshot)
     const [activeTab, setActiveTab] = useState("Dados Gerais")
+
+    const quoteAttachments = useMemo(() => quote?.attachments || [], [quote?.attachments])
+
+    const groupedAttachments = useMemo(() => {
+        const antes = quoteAttachments.filter((att: any) => att.category === "antes" || (att.file_type?.startsWith("image/") && att.category !== "depois"))
+        const depois = quoteAttachments.filter((att: any) => att.category === "depois")
+        const docs = quoteAttachments.filter((att: any) => !att.file_type?.startsWith("image/") && att.category !== "antes" && att.category !== "depois")
+        return { antes, depois, docs }
+    }, [quoteAttachments])
+
+    const handleDownloadDoc = async (fileKey: string) => {
+        try {
+            const res = await getPublicQuoteAttachmentUrlAction(token, fileKey)
+            if (res.success && res.downloadUrl) {
+                window.open(res.downloadUrl, "_blank")
+            }
+        } catch (err) {
+            console.error("Erro ao abrir anexo:", err)
+        }
+    }
 
     // Approval Modals
     const [showApproveModal, setShowApproveModal] = useState(false)
@@ -444,6 +468,52 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                         )}
 
                                     </div>
+
+                                        {/* ─── TAB: ANEXOS ─── */}
+                                        {activeTab === "Anexos" && (
+                                            <div className="space-y-6 text-left">
+                                                {groupedAttachments.antes.length > 0 && (
+                                                    <FormSection title="Imagens Antes da Proposta">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                            {groupedAttachments.antes.map((att: any, idx: number) => (
+                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                    <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </FormSection>
+                                                )}
+
+                                                {groupedAttachments.depois.length > 0 && (
+                                                    <FormSection title="Imagens Após a Proposta" hasSeparator={groupedAttachments.antes.length > 0}>
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                            {groupedAttachments.depois.map((att: any, idx: number) => (
+                                                                <div key={idx} className="rounded-xl overflow-hidden border border-brand-border relative bg-white aspect-square flex items-center justify-center">
+                                                                    <img src={getR2ImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </FormSection>
+                                                )}
+
+                                                {groupedAttachments.docs.length > 0 && (
+                                                    <FormSection title="Anexos" hasSeparator={groupedAttachments.antes.length > 0 || groupedAttachments.depois.length > 0}>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                            {groupedAttachments.docs.map((att: any) => (
+                                                                <ListItem
+                                                                    key={att.id || att.file_key}
+                                                                    icon={FileIcon}
+                                                                    title={att.file_name || "Documento"}
+                                                                    description={att.file_size ? formatFileSize(att.file_size) : undefined}
+                                                                    onClick={() => handleDownloadDoc(att.file_key)}
+                                                                    className="p-3.5"
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </FormSection>
+                                                )}
+                                            </div>
+                                        )}
 
                                     {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
                                     <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>

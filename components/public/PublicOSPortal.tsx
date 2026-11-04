@@ -22,7 +22,8 @@ import {
     Input,
     InfoCard,
     IconPlaceholder,
-    FormTextarea
+    FormTextarea,
+    ListItem
 } from "@/components/reusable"
 import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -725,31 +726,24 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     <FormSection title="Anexos" hasSeparator={beforeAfterEnabled}>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                                             {groupedAttachments.anexos.map((att: any) => (
-                                                                <div
+                                                                <ListItem
                                                                     key={att.id || att.file_key}
+                                                                    icon={
+                                                                        att.file_type?.startsWith("image/") ? (
+                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover rounded-full" />
+                                                                        ) : (
+                                                                            FileIcon
+                                                                        )
+                                                                    }
+                                                                    title={att.file_name || "Documento"}
+                                                                    description={att.file_size ? formatFileSize(att.file_size) : undefined}
                                                                     onClick={() => {
                                                                         if (att.file_key) {
                                                                             window.open(buildImageUrl(att.file_key), "_blank")
                                                                         }
                                                                     }}
-                                                                    className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
-                                                                >
-                                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">
-                                                                        {att.file_type?.startsWith("image/") ? (
-                                                                            <img src={buildImageUrl(att.file_key)} alt="" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                            {att.file_name || "Anexo"}
-                                                                        </p>
-                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                            {att.file_size ? formatFileSize(att.file_size) : ""}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
+                                                                    className="p-3.5"
+                                                                />
                                                             ))}
                                                         </div>
                                                     </FormSection>

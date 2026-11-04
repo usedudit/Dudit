@@ -2494,7 +2494,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsContent>
 
                         <TabsContent value="attachments" className="mt-0 focus-visible:ring-0">
-                            <FormSection title="Anexos do Pedido">
+                            <FormSection title="Anexos" description="Documentos em PDF, Word, Excel, CSV, etc.">
                                 {loadingAttachments ? (
                                     <div className="flex justify-center py-8">
                                         <ThreeDotsLoader />
@@ -2508,23 +2508,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {attachments.map((att) => (
-                                            <div
+                                            <ListItem
                                                 key={att.id}
+                                                icon={FileIcon}
+                                                title={att.file_name || "Documento"}
+                                                description={formatFileSize(att.file_size)}
                                                 onClick={() => handleDownloadAttachment(att.file_key, att.file_name)}
-                                                className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors"
-                                            >
-                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                                                    <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {att.file_name || "Documento"}
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        {formatFileSize(att.file_size)}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                                className="p-3.5"
+                                            />
                                         ))}
                                     </div>
                                 )}

@@ -6,6 +6,7 @@ import { Button, Dropdown, DropdownItem, IconPlaceholder, ListItem, Tabs, TabsCo
 import Pagination from "@/components/reusable/Pagination"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
+import { useSidebar } from "@/lib/sidebar-context"
 import ReportListRow, { type ReportListColumn, type ReportListRowData } from "@/components/erp/reports/ReportListRow"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
 import { pushUrl } from "@/lib/navigation/history"
@@ -337,6 +338,7 @@ function withReportUrl(tab?: string) {
 export function ReportsHubPage(props: ReportsHubPageProps) {
   const router = useRouter()
   const { setExportHandler } = useDashboard()
+  const { setHeaderOverride } = useSidebar()
   const searchParams = useSearchParams()
   const { openPlanUpgrade } = usePlanUpgrade()
   const reports = useMemo(() => createReports(props), [props])
@@ -402,10 +404,21 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
     pushUrl(withReportUrl(report.id))
   }
 
-  const closeReport = () => {
+  const closeReport = useCallback(() => {
     setActiveReportId(null)
     pushUrl(withReportUrl())
-  }
+  }, [])
+
+  // No desktop o título do relatório fica na própria tela; no tablet/mobile ele
+  // passa a ser o título do ERPHeader (junto com o botão de voltar).
+  useEffect(() => {
+    if (selectedReport) {
+      setHeaderOverride({ title: selectedReport.title, onBack: closeReport, isSubPage: true })
+    } else {
+      setHeaderOverride({ title: "Relatórios" })
+    }
+  }, [selectedReport?.title, closeReport, setHeaderOverride])
+
   const selectStore = (storeId: string) => {
     const url = new URL(window.location.href)
     if (storeId) url.searchParams.set("store", storeId)
@@ -432,21 +445,30 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
   if (selectedReport) {
     return (
       <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-        <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        {/* Desktop: voltar + título/subtítulo e filtros na mesma linha */}
+        <header className="hidden lg:flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <Button variant="filled" size="icon" onClick={closeReport} className="mt-1 h-10 w-10 shrink-0" aria-label="Voltar">
               <ChevronLeftIcon size={18} />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading">{selectedReport.title}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{selectedReport.title}</h1>
+              </div>
               <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">{selectedReport.description}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-3">
             {props.stores.length > 1 && storeFilter}
             <GlobalPeriodFilter />
           </div>
         </header>
+
+        {/* Tablet/mobile: título e voltar ficam só no ERPHeader */}
+        <div className="w-full space-y-2 lg:hidden">
+          {props.stores.length > 1 && <div>{storeFilter}</div>}
+          <GlobalPeriodFilter />
+        </div>
 
         {currentRows.length > 0 ? <>
         <div className="w-full overflow-hidden rounded-xl">
@@ -474,10 +496,19 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
 
   return (
     <div className="w-full space-y-6 pt-4 px-4 md:px-8">
-      <div className="hidden md:flex flex-col gap-2 pt-1">
-        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Relatórios</h1>
-        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Consulte os dados do seu negócio, filtre os resultados e escolha uma análise.</p>
-      </div>
+      {/* Desktop: título/subtítulo e filtros na mesma linha */}
+      <header className="hidden lg:flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Relatórios</h1>
+          </div>
+          <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Consulte os dados do seu negócio, filtre os resultados e escolha uma análise.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {props.stores.length > 1 && storeFilter}
+          <GlobalPeriodFilter />
+        </div>
+      </header>
 
       {availableCategories.length > 0 ? (
         <Tabs value={activeCategory} onValueChange={(value) => setActiveCategory(value as ReportCategory)} className="w-full">
@@ -485,8 +516,9 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
             {availableCategories.map((category) => <TabsTrigger key={category.id} value={category.id} icon={category.icon}>{category.label}</TabsTrigger>)}
           </TabsList>
 
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            {props.stores.length > 1 && storeFilter}
+          {/* Tablet/mobile: filtros abaixo das tabs, ocupando toda a largura */}
+          <div className="w-full space-y-2 lg:hidden">
+            {props.stores.length > 1 && <div>{storeFilter}</div>}
             <GlobalPeriodFilter />
           </div>
 
@@ -505,8 +537,8 @@ export function ReportsHubPage(props: ReportsHubPageProps) {
         </Tabs>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {props.stores.length > 1 && storeFilter}
+          <div className="w-full space-y-2 lg:hidden">
+            {props.stores.length > 1 && <div>{storeFilter}</div>}
             <GlobalPeriodFilter />
           </div>
           <div className="rounded-2xl border border-brand-border bg-white p-8 text-center dark:border-dark-border dark:bg-dark-surface">

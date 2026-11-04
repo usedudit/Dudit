@@ -177,9 +177,16 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                     }
                 }
 
+                const { data: attachments } = await supabase
+                    .from("quote_attachments")
+                    .select("*")
+                    .eq("quote_id", quoteId)
+                    .order("created_at", { ascending: false })
+
                 return {
                     ...quote,
                     items: mappedItems,
+                    attachments: attachments || [],
                     user_profiles: userProfile
                 }
             },

@@ -17,6 +17,7 @@ import Pagination from '@/components/reusable/Pagination';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
+import QuoteAttachmentsTab from "./QuoteAttachmentsTab"
 import { type HistoryEntry as QuoteHistoryEntryRow } from "@/components/erp/shared/HistoryTimeline"
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
@@ -96,6 +97,13 @@ const QuoteItem = ({ image, name, sku, qty, price, total, unit }: any) => (
 
 const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote, initialQuote }: QuoteDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
+
+    const refreshQuote = async () => {
+        const res = await getQuoteDetailsAction(quoteId, partnerId);
+        if (res.success && res.data) {
+            setQuote(res.data);
+        }
+    };
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isFullQuote = Boolean(initialQuote && (initialQuote.items || initialQuote.quote_items) && !initialQuote.__partial);
     const [quote, setQuote] = useState<any>(initialQuote || null);
@@ -930,6 +938,18 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 </div>
                                             </div>
                                         </div>
+                                    </FadeIn>
+                                </TabsContent>
+
+                                <TabsContent value="Anexos" className="mt-0 focus-visible:outline-none">
+                                    <FadeIn>
+                                        <QuoteAttachmentsTab
+                                            partnerId={partnerId}
+                                            quoteId={quote.id}
+                                            attachments={quote.attachments || []}
+                                            isEditing={!quote.converted && quote.status !== 'converted_to_order'}
+                                            onMutation={refreshQuote}
+                                        />
                                     </FadeIn>
                                 </TabsContent>
 

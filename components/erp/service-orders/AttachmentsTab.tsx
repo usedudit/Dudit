@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { Button, FormSection, IconPlaceholder, AlertModal } from "@/components/reusable"
+import { Button, FormSection, IconPlaceholder, AlertModal, ListItem } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
@@ -278,7 +278,7 @@ export default function AttachmentsTab({
                             className="text-xs gap-1.5"
                         >
                             <UploadIcon className="w-4 h-4" />
-                            Adicionar Documento (PDF, etc.)
+                            Adicionar Documento
                         </Button>
                     </div>
                 )}
@@ -416,8 +416,8 @@ export default function AttachmentsTab({
                     isOpen={deleteModalOpen}
                     onClose={() => setDeleteModalOpen(false)}
                     title="Excluir Anexo"
-                    message="Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita."
-                    confirmText="Excluir"
+                    description="Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita."
+                    confirmText="Confirmar Exclusão"
                     variant="danger"
                     onConfirm={confirmDeleteDoc}
                 />

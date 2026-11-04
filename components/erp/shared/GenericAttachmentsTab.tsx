@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection } from "@/components/reusable"
+import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection, ListItem } from "@/components/reusable"
 import { UploadIcon, TrashIcon, FileIcon, XIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
@@ -501,7 +501,7 @@ export function GenericAttachmentsTab({
                 <>
                     {/* Seção 1: Anexos (Documentos) */}
                     {(canEdit || dbDocAttachments.length > 0 || currentStagedFiles.length > 0) && (
-                        <FormSection title="Anexos">
+                        <FormSection title="Anexos" description="Documentos em PDF, Word, Excel, CSV, Zip, etc.">
                             {dbDocAttachments.length === 0 && currentStagedFiles.length === 0 ? (
                                 canEdit && (
                                     <div className="flex flex-col items-center justify-center text-center py-8">
@@ -593,7 +593,7 @@ export function GenericAttachmentsTab({
                                                 className="text-xs gap-1.5"
                                             >
                                                 <UploadIcon className="w-4 h-4" />
-                                                Adicionar Documento (PDF, Word, Excel, etc.)
+                                                Adicionar Documento
                                             </Button>
                                         </div>
                                     )}

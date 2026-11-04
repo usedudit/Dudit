@@ -178,7 +178,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     <div className="flex items-center gap-3">
                         {showBackButton ? (
                             <button
-                                className="text-brand-dark dark:text-dark-heading md:hidden"
+                                className="text-brand-dark dark:text-dark-heading lg:hidden"
                                 onClick={() => {
                                     if (isPDV) {
                                         router.push("/erp/inicio")

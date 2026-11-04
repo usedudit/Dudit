@@ -606,7 +606,7 @@ export const ShowcaseSubPage = ({
                         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
                             <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
                                 <TabsTrigger value="general">Dados Gerais</TabsTrigger>
-                                <TabsTrigger value="gallery"><ImageIcon size={16} />Galeria de Fotos</TabsTrigger>
+                                <TabsTrigger value="gallery">Galeria de Fotos</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="general" className="mt-0 focus-visible:outline-none">

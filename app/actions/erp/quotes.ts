@@ -3025,3 +3025,294 @@ export async function rejectPublicQuoteAction(
         }
     })
 }
+
+
+// ─── QUOTE ATTACHMENTS ACTIONS ──────────────────────────────────────────────
+
+export async function getQuoteAttachmentsAction(
+    quoteId: string,
+    partnerId?: string
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+        const user = await requireUser()
+        const admin = getAdminClient()
+        const { data, error } = await admin
+            .from("quote_attachments")
+            .select("*")
+            .eq("quote_id", quoteId)
+            .order("created_at", { ascending: false })
+
+        if (error) throw error
+        return { success: true, data: data || [] }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao listar anexos da proposta" }
+    }
+}
+
+export async function getQuoteAttachmentUrlAction(
+    partnerId: string,
+    quoteId: string,
+    fileKey: string
+): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
+    try {
+        await requireUser()
+        const admin = getAdminClient()
+        const { data: attachment } = await admin
+            .from("quote_attachments")
+            .select("id")
+            .eq("quote_id", quoteId)
+            .eq("file_key", fileKey)
+            .maybeSingle()
+
+        if (!attachment) {
+            return { success: false, error: "Anexo não encontrado nesta proposta." }
+        }
+
+        const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+        const downloadUrl = await generateSignedDownloadUrl(fileKey)
+        return { success: true, downloadUrl }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao obter URL do anexo." }
+    }
+}
+
+export async function getPublicQuoteAttachmentUrlAction(
+    publicToken: string,
+    fileKey: string
+): Promise<{ success: true; downloadUrl: string } | { success: false; error: string }> {
+    try {
+        const admin = getAdminClient()
+        const { data: quote } = await admin
+            .from("quotes")
+            .select("id")
+            .eq("public_token", publicToken)
+            .maybeSingle()
+
+        if (!quote) {
+            return { success: false, error: "Proposta não encontrada." }
+        }
+
+        const { data: attachment } = await admin
+            .from("quote_attachments")
+            .select("id")
+            .eq("quote_id", quote.id)
+            .eq("file_key", fileKey)
+            .maybeSingle()
+
+        if (!attachment) {
+            return { success: false, error: "Anexo não encontrado nesta proposta." }
+        }
+
+        const { generateSignedDownloadUrl } = await import("@/lib/r2/server")
+        const downloadUrl = await generateSignedDownloadUrl(fileKey)
+        return { success: true, downloadUrl }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao obter URL do anexo." }
+    }
+}
+
+export async function getQuotePresignedUploadUrlAction(
+    partnerId: string,
+    prefix: string,
+    fileName: string,
+    fileType: string,
+    fileSize: number
+): Promise<
+    | { success: true; uploadUrl: string; publicUrl: string | null; key: string }
+    | { success: false; error: string }
+> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        await requirePermission(partnerId, "quotes", "edit")
+        const user = await requireUser()
+
+        const { R2_PREFIXES, getUploadKindFromMimeType, getUploadValidationRules } = await import("@/lib/r2/config")
+        const { generateSignedUploadUrl } = await import("@/lib/r2/server")
+
+        const kind = getUploadKindFromMimeType(fileType)
+        if (!kind || kind === "video") {
+            return { success: false, error: "Este tipo de arquivo não é permitido em anexos de orçamento." }
+        }
+        if (!Number.isSafeInteger(fileSize) || fileSize < 1) {
+            return { success: false, error: "Tamanho de arquivo inválido." }
+        }
+        const rules = getUploadValidationRules(kind)
+        if (fileSize > rules.maxSize) {
+            const maxMB = (rules.maxSize / (1024 * 1024)).toFixed(0)
+            return { success: false, error: `Arquivo muito grande. Máximo: ${maxMB}MB.` }
+        }
+        const { validateUploadRequest } = await import("@/lib/security/file-validator")
+        const validation = validateUploadRequest(fileName, fileType, fileSize)
+        if (!validation.success) return { success: false, error: validation.error || "Arquivo inválido." }
+
+        const result = await generateSignedUploadUrl({
+            fileName,
+            fileType,
+            contentLength: fileSize,
+            userId: user.id,
+            prefix: R2_PREFIXES.quoteAttachments,
+            kind,
+        })
+
+        return {
+            success: true,
+            uploadUrl: result.uploadUrl,
+            publicUrl: result.publicUrl,
+            key: result.key,
+        }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao gerar URL de upload" }
+    }
+}
+
+export async function saveQuoteAttachmentAction(
+    partnerId: string,
+    quoteId: string,
+    fileKey: string,
+    fileName: string,
+    fileType: string,
+    fileSize: number,
+    category?: "normal" | "antes" | "depois",
+    fileHash?: string
+): Promise<{ success: true; data: any } | { success: false; error: string }> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        await requirePermission(partnerId, "quotes", "edit")
+        const user = await requireUser()
+        const admin = getAdminClient()
+
+        const { data: quote } = await admin
+            .from("quotes")
+            .select("id, partner_id, store_id")
+            .eq("id", quoteId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+
+        if (!quote) return { success: false, error: "Orçamento não encontrado." }
+
+        const { validateKeyOwnership } = await import("@/lib/r2/server")
+        if (
+            typeof fileKey !== "string" ||
+            !validateKeyOwnership(fileKey, user.id) ||
+            !new RegExp(`^users/${user.id}/quotes/attachments/[^/]+$`).test(fileKey) ||
+            fileKey.includes("..") ||
+            fileKey.startsWith("/")
+        ) {
+            return { success: false, error: "Chave de arquivo inválida para este usuário." }
+        }
+
+        const { getUploadKindFromMimeType, ALL_MIME_TO_EXT } = await import("@/lib/r2/config")
+        const uploadKind = getUploadKindFromMimeType(fileType)
+        if (!uploadKind || uploadKind === "video") {
+            return { success: false, error: "Tipo de arquivo inválido para anexos." }
+        }
+
+        const { validateUploadRequest } = await import("@/lib/security/file-validator")
+        const uploadValidation = validateUploadRequest(fileName, fileType, fileSize)
+        if (!uploadValidation.success) {
+            return { success: false, error: uploadValidation.error || "Arquivo inválido." }
+        }
+
+        const extension = fileKey.substring(fileKey.lastIndexOf(".")).toLowerCase()
+        const canonicalMime = Object.entries(ALL_MIME_TO_EXT).find(([_, ext]) => `.${ext}` === extension)?.[0]
+        const validatedFileType = canonicalMime || "application/octet-stream"
+
+        const { data, error } = await admin
+            .from("quote_attachments")
+            .insert({
+                quote_id: quoteId,
+                file_key: fileKey,
+                file_name: fileName,
+                file_type: validatedFileType,
+                file_size: fileSize,
+                category: category || "normal",
+                uploaded_by: user.id,
+                file_hash: fileHash || null,
+            })
+            .select("*")
+            .single()
+
+        if (error) throw error
+
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "quote",
+            entityId: quoteId,
+            actionType: "attachment_created",
+            source: "manual",
+            changeLines: [`Anexo adicionado: ${fileName}`],
+        })
+
+        try {
+            await revalidateQuotes(partnerId, quoteId)
+        } catch {}
+
+        return { success: true, data }
+    } catch (err: any) {
+        console.error("[saveQuoteAttachmentAction] Error:", err)
+        return { success: false, error: err.message || "Erro ao salvar anexo" }
+    }
+}
+
+export async function deleteQuoteAttachmentAction(
+    partnerId: string,
+    attachmentId: string,
+    quoteId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        await requirePermission(partnerId, "quotes", "edit")
+        const user = await requireUser()
+        const admin = getAdminClient()
+
+        const { data: quote } = await admin
+            .from("quotes")
+            .select("id, partner_id, store_id")
+            .eq("id", quoteId)
+            .eq("partner_id", partnerId)
+            .maybeSingle()
+
+        if (!quote) return { success: false, error: "Orçamento não encontrado." }
+
+        const { data: attachment } = await admin
+            .from("quote_attachments")
+            .select("id, file_key, file_name")
+            .eq("id", attachmentId)
+            .eq("quote_id", quoteId)
+            .maybeSingle()
+
+        if (!attachment) return { success: false, error: "Anexo não encontrado." }
+
+        const { error: deleteErr } = await admin
+            .from("quote_attachments")
+            .delete()
+            .eq("id", attachmentId)
+
+        if (deleteErr) throw deleteErr
+
+        const { deleteFileFromR2 } = await import("@/lib/r2/server")
+        await deleteFileFromR2(attachment.file_key).catch((e) =>
+            console.warn("[deleteQuoteAttachmentAction] Warning deleting file from R2:", e)
+        )
+
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "quote",
+            entityId: quoteId,
+            actionType: "attachment_deleted",
+            source: "manual",
+            changeLines: [`Anexo removido: ${attachment.file_name || "Arquivo"}`],
+        })
+
+        try {
+            await revalidateQuotes(partnerId, quoteId)
+        } catch {}
+
+        return { success: true }
+    } catch (err: any) {
+        console.error("[deleteQuoteAttachmentAction] Error:", err)
+        return { success: false, error: err.message || "Erro ao excluir anexo" }
+    }
+}

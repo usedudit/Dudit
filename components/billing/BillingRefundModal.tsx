@@ -403,7 +403,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                             </FormSection>
 
                             {/* Seção de Documentos PDF */}
-                            <FormSection title="Documentos em PDF" description="Anexe até 3 documentos ou comprovantes adicionais em formato PDF." hasSeparator>
+                            <FormSection title="Anexos" description="Anexe até 3 documentos ou comprovantes adicionais (PDF, etc.)." hasSeparator>
                                 <div className="space-y-3">
                                     {stagedDocs.length < 3 && (
                                         <label
