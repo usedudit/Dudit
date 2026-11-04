@@ -4,8 +4,9 @@ import { R2_PREFIXES } from "@/lib/r2/config"
 import { getStockMovementPresignedUploadUrlAction, saveStockMovementAttachmentAction } from "@/app/actions/erp/stock-movements"
 import { getTransactionPresignedUploadUrlAction, saveTransactionAttachmentAction } from "@/app/actions/erp/transactions"
 import { getReturnEvidencePresignedUploadUrlAction, saveReturnEvidenceAction } from "@/app/actions/erp/returns"
+import { getQuotePresignedUploadUrlAction, saveQuoteAttachmentAction } from "@/app/actions/erp/quotes"
 
-export type AttachmentEntityType = "order" | "service_order" | "stock_movement" | "transaction" | "return"
+export type AttachmentEntityType = "order" | "service_order" | "stock_movement" | "transaction" | "return" | "quote"
 
 interface PresignedUploadResult {
     success: boolean
@@ -45,6 +46,8 @@ async function getPresignedUrl(
             return getTransactionPresignedUploadUrlAction(partnerId, entityId, fileName, fileType, fileSize)
         case "return":
             return getReturnEvidencePresignedUploadUrlAction(partnerId, fileName, fileType, fileSize)
+        case "quote":
+            return getQuotePresignedUploadUrlAction(partnerId, "quotes/attachments", fileName, fileType, fileSize)
         default:
             return { success: false, error: "Tipo de entidade inválido" }
     }
@@ -71,6 +74,8 @@ async function saveAttachmentRecord(
             return saveTransactionAttachmentAction(partnerId, entityId, fileKey, fileName, fileType, fileSize, fileHash)
         case "return":
             return saveReturnEvidenceAction(partnerId, entityId, fileKey, fileName, fileType, fileSize, fileHash)
+        case "quote":
+            return saveQuoteAttachmentAction(partnerId, entityId, fileKey, fileName, fileType, fileSize, "normal", fileHash)
         default:
             return { success: false, error: "Tipo de entidade inválido" }
     }
@@ -94,20 +99,21 @@ export async function uploadSingleFile({
             return { success: false, error: "Arquivos GIF não são permitidos no sistema." }
         }
 
-        const presigned = await getPresignedUrl(
-            entityType,
-            partnerId,
-            entityId,
-            file.name,
-            file.type || "application/octet-stream",
-            file.size
-        )
+        const [presigned, fileHash] = await Promise.all([
+            getPresignedUrl(
+                entityType,
+                partnerId,
+                entityId,
+                file.name,
+                file.type || "application/octet-stream",
+                file.size
+            ),
+            calculateFileHash(file)
+        ])
 
         if (!presigned.success || !presigned.uploadUrl || !presigned.key) {
             return { success: false, error: presigned.error || "Falha ao gerar URL de upload" }
         }
-
-        const fileHash = await calculateFileHash(file)
 
         const uploadRes = await fetch(presigned.uploadUrl, {
             method: "PUT",

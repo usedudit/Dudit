@@ -3207,8 +3207,13 @@ export async function saveQuoteAttachmentAction(
             return { success: false, error: "Tipo de arquivo inválido para anexos." }
         }
 
+        const { verifyUploadedObject } = await import("@/lib/r2/server")
+        const verified = await verifyUploadedObject(fileKey, fileSize, fileType, fileHash)
+        const actualFileSize = verified.contentLength
+        const finalHash = verified.sha256
+
         const { validateUploadRequest } = await import("@/lib/security/file-validator")
-        const uploadValidation = validateUploadRequest(fileName, fileType, fileSize)
+        const uploadValidation = validateUploadRequest(fileName, fileType, actualFileSize)
         if (!uploadValidation.success) {
             return { success: false, error: uploadValidation.error || "Arquivo inválido." }
         }
@@ -3224,10 +3229,10 @@ export async function saveQuoteAttachmentAction(
                 file_key: fileKey,
                 file_name: fileName,
                 file_type: validatedFileType,
-                file_size: fileSize,
+                file_size: actualFileSize,
                 category: category || "normal",
                 uploaded_by: user.id,
-                file_hash: fileHash || null,
+                file_hash: finalHash || null,
             })
             .select("*")
             .single()

@@ -5,6 +5,7 @@ import { Button, FormSection, IconPlaceholder, AlertModal, ListItem } from "@/co
 import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { dataUrlToFile } from "@/lib/utils/image-resize"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
 import { isGifFile } from "@/lib/security/file-validator"
@@ -89,12 +90,23 @@ export default function QuoteAttachmentsTab({
         setShowCropper(false)
         setImageForCrop(null)
         try {
-            const blob = await (await fetch(croppedDataUrl)).blob()
-            const file = new File([blob], `quote-attachment-${Date.now()}.png`, { type: "image/png" })
+            const file = dataUrlToFile(croppedDataUrl, "quote-attachment")
 
             if (quoteId) {
-                // Direct upload
-                const presignedRes = await getQuotePresignedUploadUrlAction(partnerId, "quotes/attachments", file.name, file.type, file.size)
+                // Direct upload with parallelized presigned URL and client hash
+                const [presignedRes, fileHash] = await Promise.all([
+                    getQuotePresignedUploadUrlAction(partnerId, "quotes/attachments", file.name, file.type, file.size),
+                    (async () => {
+                        try {
+                            const buffer = await file.arrayBuffer()
+                            const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer)
+                            const hashArray = Array.from(new Uint8Array(hashBuffer))
+                            return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
+                        } catch {
+                            return ""
+                        }
+                    })()
+                ])
                 if (!presignedRes.success) {
                     toast({ description: presignedRes.error || "Erro ao preparar upload da imagem." })
                     return
@@ -113,7 +125,8 @@ export default function QuoteAttachmentsTab({
                     file.name,
                     file.type,
                     file.size,
-                    pendingCategory
+                    pendingCategory,
+                    fileHash
                 )
 
                 if (saveRes.success) {
@@ -195,7 +208,19 @@ export default function QuoteAttachmentsTab({
 
         if (quoteId) {
             try {
-                const presignedRes = await getQuotePresignedUploadUrlAction(partnerId, "quotes/attachments", file.name, file.type, file.size)
+                const [presignedRes, fileHash] = await Promise.all([
+                    getQuotePresignedUploadUrlAction(partnerId, "quotes/attachments", file.name, file.type, file.size),
+                    (async () => {
+                        try {
+                            const buffer = await file.arrayBuffer()
+                            const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer)
+                            const hashArray = Array.from(new Uint8Array(hashBuffer))
+                            return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
+                        } catch {
+                            return ""
+                        }
+                    })()
+                ])
                 if (!presignedRes.success) {
                     toast({ description: presignedRes.error || "Erro ao preparar upload do documento." })
                     return
@@ -214,7 +239,8 @@ export default function QuoteAttachmentsTab({
                     file.name,
                     file.type,
                     file.size,
-                    pendingCategory
+                    pendingCategory,
+                    fileHash
                 )
 
                 if (saveRes.success) {

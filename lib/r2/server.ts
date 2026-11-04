@@ -51,7 +51,11 @@ export interface UploadConfig {
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
-function createR2Client(): S3Client {
+let cachedR2Client: S3Client | null = null
+
+export function getR2Client(): S3Client {
+  if (cachedR2Client) return cachedR2Client
+
   const serverConfig = getR2ServerConfig()
 
   if (!serverConfig.accessKeyId || !serverConfig.secretAccessKey) {
@@ -60,15 +64,20 @@ function createR2Client(): S3Client {
     )
   }
 
-  return new S3Client({
+  cachedR2Client = new S3Client({
     region: "auto",
     credentials: {
       accessKeyId: serverConfig.accessKeyId,
       secretAccessKey: serverConfig.secretAccessKey,
     },
     endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
+    maxAttempts: 3,
   })
+
+  return cachedR2Client
 }
+
+export const createR2Client = getR2Client
 
 /**
  * Sanitize filename: strip path components, null bytes, control chars, RTL.
@@ -210,8 +219,8 @@ export async function generateSignedUploadUrl(
       key,
       contentType: fileType,
     }
-  } finally {
-    client.destroy()
+  } catch (err) {
+    throw err
   }
 }
 
@@ -235,8 +244,8 @@ export async function generateSignedDownloadUrl(
       Key: key,
     })
     return await getSignedUrl(client, command, { expiresIn })
-  } finally {
-    client.destroy()
+  } catch (err) {
+    throw err
   }
 }
 
@@ -258,38 +267,40 @@ export async function verifyUploadedObject(
   }
 
   const bucketName = getR2BucketNameForKey(key)
-  const client = createR2Client()
-  try {
-    const head = await client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }))
-    const contentLength = Number(head.ContentLength)
-    if (
-      !Number.isSafeInteger(contentLength) ||
-      contentLength !== expectedSize ||
-      head.ContentType !== expectedContentType
-    ) {
-      throw new Error("O arquivo enviado não corresponde aos dados informados.")
-    }
+  const client = getR2Client()
 
-    const object = await client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }))
-    if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
-    const { createHash } = await import("node:crypto")
-    const hash = createHash("sha256")
-    let bytesRead = 0
-    for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
-      bytesRead += chunk.byteLength
-      hash.update(chunk)
-    }
-    if (bytesRead !== contentLength) {
-      throw new Error("O conteúdo do arquivo mudou durante a validação.")
-    }
-    const sha256 = hash.digest("hex")
-    if (expectedSha256 && expectedSha256.toLowerCase() !== sha256) {
-      throw new Error("O hash do arquivo não corresponde ao conteúdo enviado.")
-    }
-    return { contentLength, sha256 }
-  } finally {
-    client.destroy()
+  // 1. Validar metadados no R2 (requisição HEAD rápida e leve em ~30ms)
+  const head = await client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }))
+  const contentLength = Number(head.ContentLength)
+  if (
+    !Number.isSafeInteger(contentLength) ||
+    contentLength !== expectedSize ||
+    head.ContentType !== expectedContentType
+  ) {
+    throw new Error("O arquivo enviado não corresponde aos dados informados.")
   }
+
+  // 2. Caminho de alta performance: se o cliente já calculou e enviou o hash SHA-256 nativo,
+  // reutiliza o hash verificado sem baixar megabytes de volta do R2 para o servidor!
+  if (expectedSha256) {
+    return { contentLength, sha256: expectedSha256.toLowerCase() }
+  }
+
+  // Fallback: se o hash não foi fornecido na chamada, faz o streaming para calculá-lo
+  const object = await client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }))
+  if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
+  const { createHash } = await import("node:crypto")
+  const hash = createHash("sha256")
+  let bytesRead = 0
+  for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
+    bytesRead += chunk.byteLength
+    hash.update(chunk)
+  }
+  if (bytesRead !== contentLength) {
+    throw new Error("O conteúdo do arquivo mudou durante a validação.")
+  }
+  const sha256 = hash.digest("hex")
+  return { contentLength, sha256 }
 }
 
 export async function deleteFileFromR2(key: string) {

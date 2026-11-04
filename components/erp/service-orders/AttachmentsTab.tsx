@@ -6,6 +6,7 @@ import { UploadIcon, TrashIcon, FileIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { dataUrlToFile } from "@/lib/utils/image-resize"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
 import { isGifFile } from "@/lib/security/file-validator"
@@ -83,12 +84,11 @@ export default function AttachmentsTab({
         setShowCropper(true)
     }
 
-    const handleCropComplete = async (croppedDataUrl: string) => {
+    const handleCropComplete = (croppedDataUrl: string) => {
         setShowCropper(false)
         setImageForCrop(null)
         try {
-            const blob = await (await fetch(croppedDataUrl)).blob()
-            const file = new File([blob], `attachment-${Date.now()}.png`, { type: "image/png" })
+            const file = dataUrlToFile(croppedDataUrl, "attachment")
 
             const newAtt = {
                 id: `new-${Date.now()}-${Math.random()}`,

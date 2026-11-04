@@ -11,6 +11,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
+import { dataUrlToFile } from "@/lib/utils/image-resize"
 import { R2_PREFIXES } from "@/lib/r2/config"
 
 
@@ -426,8 +427,7 @@ export function GenericAttachmentsTab({
 
     const handleCropComplete = async (croppedDataUrl: string) => {
         try {
-            const blob = await (await fetch(croppedDataUrl)).blob()
-            const croppedFile = new File([blob], `attachment-${Date.now()}.png`, { type: "image/png" })
+            const croppedFile = dataUrlToFile(croppedDataUrl, "attachment")
             await processCroppedImage(croppedFile)
         } catch (err) {
             toast({ description: "Erro ao recortar imagem." })

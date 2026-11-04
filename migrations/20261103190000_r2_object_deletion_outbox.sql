@@ -590,12 +590,27 @@ BEGIN
     RAISE NOTICE 'pg_net or Supabase Vault is unavailable; add the cron schedule after enabling both.';
     RETURN;
   END IF;
+  -- The extension's extnamespace is not necessarily the namespace where its
+  -- API functions are installed. Resolve the schema from the extension-owned
+  -- http_post function itself (for example, pg_net may be registered in
+  -- `extensions` while exposing its API under `net`).
   SELECT n.nspname INTO v_net_schema
-  FROM pg_extension e
-  JOIN pg_namespace n ON n.oid = e.extnamespace
-  WHERE e.extname = 'pg_net';
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  JOIN pg_depend d
+    ON d.classid = 'pg_proc'::regclass
+   AND d.objid = p.oid
+   AND d.refclassid = 'pg_extension'::regclass
+   AND d.refobjid = (SELECT oid FROM pg_extension WHERE extname = 'pg_net')
+   AND d.deptype = 'e'
+  WHERE p.proname = 'http_post'
+    AND p.pronargs = 5
+    AND p.prorettype = 'bigint'::regtype
+    AND p.proargnames[1:5] = ARRAY['url', 'body', 'params', 'headers', 'timeout_milliseconds']::TEXT[]
+  ORDER BY n.nspname
+  LIMIT 1;
   IF v_net_schema IS NULL THEN
-    RAISE NOTICE 'pg_net schema could not be determined; add the worker cron job manually.';
+    RAISE NOTICE 'pg_net http_post function could not be located; add the worker cron job after resolving the extension installation.';
     RETURN;
   END IF;
 

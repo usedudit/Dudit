@@ -1335,48 +1335,13 @@ export async function saveAttachmentAction(
       return { success: false, error: "Upload de anexos não permitido no seu plano. Faça upgrade para Crescer ou Escalar." }
     }
 
-    const { getR2ServerConfig, getR2BucketNameForKey } = await import("@/lib/r2/r2-server-config")
-    const { S3Client, HeadObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3")
-    const serverConfig = getR2ServerConfig()
-    const s3 = new S3Client({
-      region: "auto",
-      credentials: { accessKeyId: serverConfig.accessKeyId, secretAccessKey: serverConfig.secretAccessKey },
-      endpoint: `https://${serverConfig.accountId}.r2.cloudflarestorage.com`,
-    })
-    let actualFileSize: number
-    let finalHash: string
-    try {
-      const bucketName = getR2BucketNameForKey(fileKey)
-      const head = await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: fileKey }))
-      actualFileSize = Number(head.ContentLength)
-      if (!Number.isSafeInteger(actualFileSize) || actualFileSize !== fileSize || head.ContentType !== fileType) {
-        return { success: false, error: "O arquivo enviado não corresponde aos dados informados." }
-      }
-      const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
-      if (!actualValidation.success) {
-        return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
-      }
-      if (fileHash !== undefined && !/^[a-f0-9]{64}$/i.test(fileHash)) {
-        return { success: false, error: "Hash do arquivo inválido." }
-      }
-      const object = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: fileKey }))
-      if (!object.Body) throw new Error("Objeto enviado não possui conteúdo.")
-      const crypto = await import("node:crypto")
-      const hash = crypto.createHash("sha256")
-      let hashedBytes = 0
-      for await (const chunk of object.Body as AsyncIterable<Uint8Array>) {
-        hashedBytes += chunk.byteLength
-        hash.update(chunk)
-      }
-      if (hashedBytes !== actualFileSize) {
-        return { success: false, error: "O conteúdo do arquivo mudou durante a validação." }
-      }
-      finalHash = hash.digest("hex")
-      if (fileHash && fileHash.toLowerCase() !== finalHash) {
-        return { success: false, error: "O hash do arquivo não corresponde ao conteúdo enviado." }
-      }
-    } finally {
-      s3.destroy()
+    const { verifyUploadedObject } = await import("@/lib/r2/server")
+    const verified = await verifyUploadedObject(fileKey, fileSize, fileType, fileHash)
+    const actualFileSize = verified.contentLength
+    const finalHash = verified.sha256
+    const actualValidation = validateUploadRequest(fileName, fileType, actualFileSize)
+    if (!actualValidation.success) {
+      return { success: false, error: actualValidation.error || "Arquivo excede os limites permitidos." }
     }
 
     // 2. Resolve safe Content-Type based on extension (ignore browser Content-Type)

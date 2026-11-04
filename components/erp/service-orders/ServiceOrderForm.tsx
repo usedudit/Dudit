@@ -718,9 +718,23 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 await Promise.all(newAttachments.map(async (att) => {
                     try {
                         const file = att.file
-                        const urlRes = await getPresignedUploadUrlAction(
-                            partnerId, R2_PREFIXES.serviceOrderAttachments, file.name, file.type, file.size
-                        )
+                        // Parallelize presigned URL request and client-side SHA-256 hash calculation
+                        const [urlRes, fileHash] = await Promise.all([
+                            getPresignedUploadUrlAction(
+                                partnerId, R2_PREFIXES.serviceOrderAttachments, file.name, file.type, file.size
+                            ),
+                            (async () => {
+                                try {
+                                    const buffer = await file.arrayBuffer()
+                                    const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer)
+                                    const hashArray = Array.from(new Uint8Array(hashBuffer))
+                                    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
+                                } catch (hashErr) {
+                                    console.error("Erro ao calcular hash no cliente:", hashErr)
+                                    return ""
+                                }
+                            })()
+                        ])
                         if (!urlRes.success) throw new Error(urlRes.error || "Erro ao gerar URL")
 
                         const uploadRes = await fetch(urlRes.uploadUrl, {
@@ -729,17 +743,6 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                             body: file,
                         })
                         if (!uploadRes.ok) throw new Error("Erro ao fazer upload para R2")
-
-                        // Calculate SHA-256 hash on client to optimize performance and prevent server traffic
-                        let fileHash = ""
-                        try {
-                            const buffer = await file.arrayBuffer()
-                            const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer)
-                            const hashArray = Array.from(new Uint8Array(hashBuffer))
-                            fileHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
-                        } catch (hashErr) {
-                            console.error("Erro ao calcular hash no cliente:", hashErr)
-                        }
 
                         const saveRes = await saveAttachmentAction(
                             partnerId, orderId, urlRes.key, file.name, file.type, file.size, att.category || "normal", fileHash
