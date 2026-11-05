@@ -79,7 +79,7 @@ export function AdminAuditDetailView({
             return `/ddt-admin/users?view=${log.target_id}`
         }
         if (log.target_type === "order") {
-            return `/ddt-admin/orders/${log.target_id}`
+            return `/ddt-admin/orders?view=${log.target_id}`
         }
         if (log.target_type === "return_request") {
             return `/ddt-admin/returns?view=${log.target_id}`

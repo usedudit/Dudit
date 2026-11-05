@@ -3,9 +3,10 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { StoreIcon, ReturnIcon } from "@/lib/icons"
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
+import { StoreIcon, ReturnIcon, TruckIcon, UserIcon } from "@/lib/icons"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
+import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 
 interface OrderListRowProps {
     order: any
@@ -13,49 +14,19 @@ interface OrderListRowProps {
     onDetail: (order: any) => void
 }
 
-function formatDeliveryLabel(status?: string, type?: string): string {
-    const s = String(status || "").toLowerCase()
-    const t = String(type || "").toLowerCase()
-    const statusMap: Record<string, string> = {
-        pending: "Pendente",
-        preparing: "Em preparo",
-        ready_for_pickup: "Pronto p/ retirada",
-        sent: "Enviado",
-        in_transit: "Em trânsito",
-        delivered: "Entregue",
-        failed: "Falhou",
-        returned: "Devolvido",
-        cancelled: "Cancelado",
-    }
-    const typeMap: Record<string, string> = {
-        standard: "Padrão",
-        express: "Expressa",
-        pickup: "Retirada",
-        delivery: "Entrega",
-        same_day: "Mesmo dia",
-        scheduled: "Agendada",
-    }
-    const statusText = statusMap[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : "-")
-    const typeText = typeMap[t]
-    return typeText ? `${statusText} (${typeText})` : statusText
-}
-
 const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowProps) => {
     const returns = Array.isArray(order.return_requests) ? order.return_requests : []
     const exchangeOrder = order.exchange_parent_order_id || order.exchange_return_request_id
 
-    const situationBadge = (situation: string) => {
-        switch (situation) {
-            case "paid": return <Badge variant="green">Pago</Badge>
-            case "pending": return <Badge variant="orange">Pendente</Badge>
-            case "cancelled": return <Badge variant="red">Cancelado</Badge>
-            case "delivered": return <Badge variant="blue">Entregue</Badge>
-            case "processing": return <Badge variant="blue">Processando</Badge>
-            case "shipped": return <Badge variant="blue">Enviado</Badge>
-            case "refunded": return <Badge variant="purple">Reembolsado</Badge>
-            default: return <Badge variant="gray">{situation}</Badge>
-        }
-    }
+    // Use shared payment status meta (same as ERP)
+    const paymentMeta = getPaymentStatusMeta(order.situation)
+    const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
+    const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
+
+    // Seller/Partner name from the joined data
+    const store = order.stores || {}
+    const partner = order.partners || {}
+    const sellerName = partner.trade_name || partner.name || store.name || "—"
 
     return (
         <motion.tr
@@ -70,7 +41,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                         {order.order_number || order.id.slice(0, 8)}
                     </span>
                     <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                        {formatDate(order.created_at)}
+                        {formatDate(order.created_at)} - {formatTime(order.created_at)}
                     </span>
                 </div>
             </td>
@@ -84,11 +55,24 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
-                        {order.stores?.name || order.partners?.store_name || "-"}
+                        {store.name || "—"}
                     </span>
-                    {order.store_id && (
+                    {store.id && (
                         <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                            ID: {order.store_id.slice(0, 8)}...
+                            ID: {store.id.slice(0, 8)}...
+                        </span>
+                    )}
+                </div>
+            </td>
+
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                <div className="flex flex-col min-w-0">
+                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                        {sellerName}
+                    </span>
+                    {partner.id && (
+                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                            Vendedor ID: {partner.id.slice(0, 8)}...
                         </span>
                     )}
                 </div>
@@ -96,7 +80,9 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center gap-1">
-                    {situationBadge(order.situation)}
+                    <Badge variant={paymentMeta.variant}>
+                        {paymentMeta.label}
+                    </Badge>
                     {(() => {
                         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
                         const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing);
@@ -119,7 +105,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
 
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                    {formatDeliveryLabel(order.delivery_status, order.delivery_type)}
+                    {deliveryMeta} • {deliveryTypeLabel}
                 </span>
             </td>
 

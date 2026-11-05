@@ -1,22 +1,26 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
+import { useState, useTransition, useMemo, useCallback, useEffect } from "react"
+import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination, Checkbox } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import OrderListRow from "./OrderListRow"
 import OrdersPageControls, { type OrderFilterState } from "./OrdersPageControls"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { PackageIcon, StoreIcon, ExportFileIcon } from "@/lib/icons"
+import { PackageIcon, StoreIcon, ExportFileIcon, ReturnIcon, TruckIcon, UserIcon, CancelCircleIcon, ShoppingCartIcon, ClockIcon, CheckCircleIcon, MoneyIcon } from "@/lib/icons"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
 import { getAdminMarketplaceOrders, getAdminMarketplaceOrdersStats, type AdminOrderStats } from "@/app/actions/admin/marketplace-ops"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } from "@/lib/utils/filter-date-period"
 import { toast } from "@/hooks/use-notification"
+import { useEntityState } from "@/hooks/use-entity-state"
+import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
+import { ActionsDropdown } from "@/components/reusable/ActionsDropdown"
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
+import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 
-type SortKey = "order_number" | "customer" | "store" | "date" | "total" | "status"
+type SortKey = "order_number" | "customer" | "store" | "seller" | "date" | "total" | "status"
 type SortDirection = "asc" | "desc"
 
 interface OrdersListProps {
@@ -34,16 +38,23 @@ const INITIAL_FILTERS: OrderFilterState = {
     datePeriod: { ...EMPTY_DATE_PERIOD },
 }
 
+const STATUS_FILTER_OPTIONS = ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise", "Parcialmente Pago", "Entregue"]
+const DELIVERY_STATUS_FILTER_OPTIONS = [
+    { value: "not_sent", label: "Não enviado" },
+    { value: "preparing", label: "Em preparação" },
+    { value: "sent", label: "Enviado" },
+    { value: "pickup_available", label: "Pronto para retirada" },
+    { value: "delivered", label: "Entregue" },
+    { value: "delivery_failed", label: "Falha na entrega" },
+]
+
 export default function OrdersList({ initialData, initialStats }: OrdersListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-    const router = useRouter()
-    const openOrderDetail = useCallback(
-        (orderId: string) => router.push(`/ddt-admin/orders/${orderId}`),
-        [router],
-    )
+    const isTablet = useMediaQuery("(max-width: 1023px)")
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
     const [activeTab, setActiveTab] = useState<string>("all")
-    const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isTablet ? "grid" : "list")
     const [isPending, startTransition] = useTransition()
 
     // Stats
@@ -62,6 +73,10 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         direction: "desc",
     })
 
+    // Selection state
+    const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
+    const [showSelectionBanner, setShowSelectionBanner] = useState(false)
+
     // Data State (initialized from SSR)
     const [orders, setOrders] = useState<any[]>(initialData?.data || [])
     const [isLoading, setIsLoading] = useState(false)
@@ -74,6 +89,31 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             }
             return { key, direction: "desc" }
         })
+    }
+
+    // Selection handlers
+    const toggleSelectAll = () => {
+        if (selectedOrders.size === filteredOrders.length) {
+            setSelectedOrders(new Set())
+            setShowSelectionBanner(false)
+        } else {
+            setSelectedOrders(new Set(filteredOrders.map(o => o.id)))
+            setShowSelectionBanner(true)
+        }
+    }
+
+    const toggleSelectOrder = (orderId: string) => {
+        setSelectedOrders(prev => {
+            const next = new Set(prev)
+            if (next.has(orderId)) next.delete(orderId)
+            else next.add(orderId)
+            return next
+        })
+    }
+
+    const clearSelection = () => {
+        setSelectedOrders(new Set())
+        setShowSelectionBanner(false)
     }
 
     // Silent background refresh (only called manually or after mutations)
@@ -92,36 +132,36 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         })
     }, [])
 
-    // Filter Config for FilterSheet
+    // Filter Config for FilterSheet - matching ERP
     const filterSections: FilterSectionConfig[] = useMemo(() => [
         {
+            id: "datePeriod",
+            title: "Data do pedido",
+            type: "date-period",
+        },
+        {
             id: "status",
-            title: "Situação do Pedido",
+            title: "Status do pagamento",
             type: "checkbox-list",
-            options: ["Pendente", "Pago", "Enviado", "Cancelado"],
+            options: STATUS_FILTER_OPTIONS,
         },
         {
             id: "deliveryStatus",
-            title: "Status de Entrega",
+            title: "Status de entrega",
             type: "checkbox-list",
-            options: ["not_sent", "in_transit", "delivered", "ready_for_pickup"],
+            options: DELIVERY_STATUS_FILTER_OPTIONS.map(o => o.value),
         },
         {
             id: "paymentMethod",
-            title: "Método de Pagamento",
+            title: "Método de pagamento",
             type: "checkbox-list",
             options: ["credit_card", "pix", "boleto", "Mercado Pago"],
         },
         {
             id: "channel",
-            title: "Origem / Canal",
+            title: "Origem",
             type: "checkbox-list",
             options: ["Marketplace", "Loja Virtual", "PDV", "Manual"],
-        },
-        {
-            id: "datePeriod",
-            title: "Período do Pedido",
-            type: "date-period",
         },
     ], [])
 
@@ -137,7 +177,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         )
     }, [search, activeTab, filters])
 
-    // Instant in-memory filtering (0ms)
+    // Instant in-memory filtering (0ms) - matching ERP logic
     const filteredOrders = useMemo(() => {
         const term = search.trim().toLowerCase()
         const dateBounds = isDatePeriodFilterActive(filters.datePeriod)
@@ -145,24 +185,25 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             : { startYmd: null, endYmd: null }
 
         let result = orders.filter((order) => {
-            // Tab filter
+            // Tab filter - matching ERP
             if (activeTab === "pending" && order.situation !== "pending") return false
             if (activeTab === "paid" && order.situation !== "paid") return false
-            if (activeTab === "delivered" && order.delivery_status !== "delivered") return false
+            if (activeTab === "shipped" && !["sent", "in_transit", "delivered"].includes(order.delivery_status)) return false
             if (activeTab === "cancelled" && order.situation !== "cancelled") return false
 
-            // Search filter
+            // Search filter - matching ERP
             if (term) {
                 const num = String(order.order_number || order.id || "").toLowerCase()
                 const cust = String(order.customer_name || "").toLowerCase()
                 const st = String(order.stores?.name || "").toLowerCase()
+                const seller = String(order.partners?.trade_name || order.partners?.name || "").toLowerCase()
                 const itemNames = (order.order_items || []).map((i: any) => String(i.product_name || "").toLowerCase()).join(" ")
-                if (!num.includes(term) && !cust.includes(term) && !st.includes(term) && !itemNames.includes(term)) {
+                if (!num.includes(term) && !cust.includes(term) && !st.includes(term) && !seller.includes(term) && !itemNames.includes(term)) {
                     return false
                 }
             }
 
-            // FilterSheet status
+            // FilterSheet status - matching ERP
             if (filters.status.length > 0) {
                 const s = order.situation
                 const matches = filters.status.some(opt => {
@@ -170,6 +211,9 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                     if (opt === "Pago") return s === "paid"
                     if (opt === "Cancelado") return s === "cancelled"
                     if (opt === "Enviado") return ["sent", "in_transit", "delivered"].includes(order.delivery_status)
+                    if (opt === "Entregue") return s === "delivered"
+                    if (opt === "Em análise") return s === "in_process"
+                    if (opt === "Parcialmente Pago") return s === "partially_paid"
                     return s === opt
                 })
                 if (!matches) return false
@@ -215,6 +259,10 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         aVal = (a.stores?.name || "").toLowerCase()
                         bVal = (b.stores?.name || "").toLowerCase()
                         break
+                    case "seller":
+                        aVal = (a.partners?.trade_name || a.partners?.name || "").toLowerCase()
+                        bVal = (b.partners?.trade_name || b.partners?.name || "").toLowerCase()
+                        break
                     case "date":
                         aVal = new Date(a.created_at).getTime()
                         bVal = new Date(b.created_at).getTime()
@@ -237,7 +285,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         return result
     }, [orders, activeTab, search, filters, sortConfig])
 
-    // Pagination (Strict 8 items)
+    // Pagination (Strict 8 items) - matching ERP
     const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ITEMS_PER_PAGE))
     const paginatedItems = useMemo(() => {
         const start = (page - 1) * ITEMS_PER_PAGE
@@ -248,6 +296,171 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     useMemo(() => {
         setPage(1)
     }, [activeTab, search, filters])
+
+    // If viewing detail of a specific order via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        return (
+            <AdminOrderDetailClientWrapper
+                orderId={entityState.entityId}
+                onBack={closeEntity}
+            />
+        )
+    }
+
+    // Grid card component (inline, matching ERP OrderGridCard)
+    const renderGridCard = (order: any) => {
+        const paymentMeta = getPaymentStatusMeta(order.situation)
+        const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
+        const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
+        const returns = Array.isArray(order.return_requests) ? order.return_requests : []
+        const store = order.stores || {}
+        const partner = order.partners || {}
+        const sellerName = partner.trade_name || partner.name || store.name || "—"
+        const isSelected = selectedOrders.has(order.id)
+
+        return (
+            <div
+                key={order.id}
+                onClick={() => openEntity("view", order.id)}
+                className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col h-full relative group"
+            >
+                <div className="flex gap-4 mb-2">
+                    {/* Order Visual Indicator */}
+                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                        <ShoppingCartIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                        {/* Row 1: ID + Badges + Checkbox */}
+                        <div className="flex justify-between items-start gap-1">
+                            <div className="flex items-center gap-2 min-w-0 pr-1">
+                                <h3
+                                    className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0"
+                                >
+                                    #{order.order_number || order.id.slice(0, 8)}
+                                </h3>
+                                {returns.length > 0 && (
+                                    <Badge variant="purple" icon={<ReturnIcon />} className="whitespace-nowrap" />
+                                )}
+                                <div className="flex items-center gap-1 shrink-0">
+                                    {order.situation === "cancelled" ? (
+                                        <Badge variant="red" icon={<CancelCircleIcon />} className="whitespace-nowrap" />
+                                    ) : (
+                                        <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} className="whitespace-nowrap" />
+                                    )}
+                                    {!order.hasOnlyServices && order.situation !== "cancelled" && (
+                                        <Badge variant="blue" icon={
+                                            order.delivery_type === "pickup"
+                                                ? <StoreIcon />
+                                                : <TruckIcon />
+                                        } className="whitespace-nowrap">
+                                            {deliveryMeta}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Checkbox for selection */}
+                            <div className="shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox checked={isSelected} onChange={() => toggleSelectOrder(order.id)} />
+                            </div>
+                        </div>
+
+                        {/* Row 2: Stats (Payment Method • Total) */}
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex items-center">
+                                {(() => {
+                                    const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                                    const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing)
+                                    const paidMethodEntries = methodEntries.filter((b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009)
+                                    const paidLabels = Array.from(new Set(paidMethodEntries.map((b: any) => String(b?.method || "").toLowerCase().trim()).filter(Boolean)))
+                                    let pmLabel: string | null = null
+
+                                    if (paidLabels.length > 1) {
+                                        pmLabel = "Múltiplos meios"
+                                    } else if (paidMethodEntries.length === 1) {
+                                        pmLabel = paidMethodEntries[0]?.method || order.payment_method || null
+                                    } else {
+                                        pmLabel = methodEntries[0]?.method || order.payment_method || null
+                                    }
+
+                                    if (pmLabel && methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
+                                        pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`
+                                    }
+                                    return <PaymentMethodIndicator label={pmLabel} provider={order.payment_provider} simplify compact />
+                                })()}
+                            </div>
+                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                            <span className="text-sm font-bold text-brand-primary">
+                                {formatCurrency(Number(order.amount_paid || order.paid_amount || order.total_amount || 0))}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Info Rows */}
+                <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                    {/* Row 1: Cliente & Data */}
+                    <div className="flex justify-between items-end gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {order.customer_name || "Cliente"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 items-end shrink-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
+                            <div className="flex flex-col items-end text-right">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                    {formatDate(order.created_at)} - {formatTime(order.created_at)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Row 2: Loja & Vendedor & Actions */}
+                    <div className="flex justify-between items-end gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Loja</span>
+                            <div className="flex items-center gap-1.5">
+                                <StoreIcon size={12} className="shrink-0" />
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                    {store.name || "—"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vendedor</span>
+                            <div className="flex items-center gap-1.5">
+                                <UserIcon size={12} className="shrink-0" />
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                    {sellerName}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Actions button at same height as info */}
+                        <div
+                            className="shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <ActionsDropdown
+                                onPrint={() => toast.info("Imprimir não implementado")}
+                                onEdit={() => openEntity("edit", order.id)}
+                                onCancel={() => toast.info("Cancelar não implementado")}
+                                onPaymentStatus={() => toast.info("Status pagamento não implementado")}
+                                onDeliveryStatus={() => toast.info("Status entrega não implementado")}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -296,7 +509,13 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     hasActiveFilters={hasActiveFilters}
-                    tabCounts={stats}
+                    tabCounts={{
+                        total: stats?.total,
+                        pending: stats?.pending,
+                        paid: stats?.paid,
+                        shipped: stats?.shipped,
+                        cancelled: stats?.cancelled,
+                    }}
                 />
 
                 {/* List Content */}
@@ -325,54 +544,72 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                             <FadeIn key="list" className="w-full space-y-4">
                                 {/* Mobile View (Cards) */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {paginatedItems.map((order) => (
-                                        <div
-                                            key={order.id}
-                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
-                                            onClick={() => openOrderDetail(order.id)}
-                                        >
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        #{order.order_number || order.id.slice(0, 8)}
-                                                    </span>
-                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                        {order.customer_name || "Consumidor"}
+                                    {paginatedItems.map((order) => {
+                                        const paymentMeta = getPaymentStatusMeta(order.situation)
+                                        const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
+                                        const store = order.stores || {}
+                                        const partner = order.partners || {}
+                                        const sellerName = partner.trade_name || partner.name || store.name || "—"
+                                        return (
+                                            <div
+                                                key={order.id}
+                                                className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
+                                                onClick={() => openEntity("view", order.id)}
+                                            >
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            #{order.order_number || order.id.slice(0, 8)}
+                                                        </span>
+                                                        <span className="text-xs text-brand-inactive-text truncate">
+                                                            {order.customer_name || "Consumidor"}
+                                                        </span>
+                                                    </div>
+                                                    <Badge variant={paymentMeta.variant}>
+                                                        {paymentMeta.label}
+                                                    </Badge>
+                                                </div>
+
+                                                <div className="flex items-center justify-between text-xs text-brand-inactive-text">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <StoreIcon size={12} className="shrink-0" />
+                                                        <span className="truncate">{store.name || "-"}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 min-w-0 ml-2">
+                                                        <UserIcon size={12} className="shrink-0" />
+                                                        <span className="truncate">{sellerName}</span>
+                                                    </div>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm shrink-0">
+                                                        {formatCurrency(Number(order.amount_paid || order.paid_amount || order.total_amount || 0))}
                                                     </span>
                                                 </div>
-                                                <Badge variant={order.situation === "paid" ? "green" : order.situation === "cancelled" ? "red" : "orange"}>
-                                                    {order.situation === "paid" ? "Pago" : order.situation === "cancelled" ? "Cancelado" : "Pendente"}
-                                                </Badge>
-                                            </div>
 
-                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    <StoreIcon size={12} className="shrink-0" />
-                                                    <span className="truncate">{order.stores?.name || "-"}</span>
+                                                <div className="flex items-center justify-between text-[11px] text-brand-inactive-text pt-1">
+                                                    <span>{formatDate(order.created_at)} - {formatTime(order.created_at)}</span>
+                                                    <span>{order.order_items?.length || 0} produto(s)</span>
                                                 </div>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm shrink-0">
-                                                    {formatCurrency(Number(order.amount_paid || order.paid_amount || order.total_amount || 0))}
-                                                </span>
                                             </div>
-
-                                            <div className="flex items-center justify-between text-[11px] text-brand-inactive-text pt-1">
-                                                <span>{formatDate(order.created_at)}</span>
-                                                <span>{order.order_items?.length || 0} produto(s)</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
 
                                 {/* Desktop View: Table */}
                                 {viewMode === "list" ? (
                                     <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
                                         <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1300px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                        <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                            <Checkbox
+                                                                checked={selectedOrders.size === paginatedItems.length && paginatedItems.length > 0}
+                                                                indeterminate={selectedOrders.size > 0 && selectedOrders.size < paginatedItems.length}
+                                                                onChange={toggleSelectAll}
+                                                            />
+                                                        </th>
                                                         <th
                                                             onClick={() => handleSort("order_number")}
-                                                            className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                         >
                                                             Pedido {sortConfig?.key === "order_number" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                         </th>
@@ -386,7 +623,13 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                             onClick={() => handleSort("store")}
                                                             className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                         >
-                                                            Loja / Seller {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                            Loja {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("seller")}
+                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Vendedor {sortConfig?.key === "seller" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                         </th>
                                                         <th
                                                             onClick={() => handleSort("status")}
@@ -394,7 +637,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                         >
                                                             Pagamento {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
                                                         </th>
-                                                        <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Entrega</th>
+                                                        <th className="py-3 px-2 w-36 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Entrega</th>
                                                         <th
                                                             onClick={() => handleSort("total")}
                                                             className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
@@ -411,7 +654,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                             key={order.id}
                                                             order={order}
                                                             isPending={isPending}
-                                                            onDetail={() => openOrderDetail(order.id)}
+                                                            onDetail={() => openEntity("view", order.id)}
                                                         />
                                                     ))}
                                                 </tbody>
@@ -419,45 +662,9 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         </div>
                                     </div>
                                 ) : (
-                                    /* Desktop View: Grid */
+                                    /* Desktop View: Grid - matching ERP */
                                     <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {paginatedItems.map((order) => (
-                                            <div
-                                                key={order.id}
-                                                onClick={() => openOrderDetail(order.id)}
-                                                className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col justify-between gap-4"
-                                            >
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                            #{order.order_number || order.id.slice(0, 8)}
-                                                        </h3>
-                                                        <p className="text-xs text-brand-inactive-text mt-0.5">{order.customer_name || "Cliente"}</p>
-                                                    </div>
-                                                    <Badge variant={order.situation === "paid" ? "green" : order.situation === "cancelled" ? "red" : "orange"}>
-                                                        {order.situation === "paid" ? "Pago" : order.situation === "cancelled" ? "Cancelado" : "Pendente"}
-                                                    </Badge>
-                                                </div>
-
-                                                <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <StoreIcon size={12} />
-                                                        <span className="truncate">{order.stores?.name || "-"}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>Itens: {order.order_items?.length || 0}</span>
-                                                        <span>{formatDate(order.created_at)}</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-xs text-brand-inactive-text">Valor total</span>
-                                                    <span className="font-bold text-base text-brand-green">
-                                                        {formatCurrency(Number(order.amount_paid || order.paid_amount || order.total_amount || 0))}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                        {paginatedItems.map((order) => renderGridCard(order))}
                                     </div>
                                 )}
 
@@ -475,20 +682,20 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
 
-            {/* Filter Drawer / Sheet */}
-            <FilterSheet
-                isOpen={isFilterSheetOpen}
-                onClose={() => setIsFilterSheetOpen(false)}
-                sections={filterSections}
-                filters={filters}
-                setFilters={setFilters}
-                onClear={() => {
-                    setFilters(INITIAL_FILTERS)
-                    setIsFilterSheetOpen(false)
-                }}
-            />
+                {/* Filter Drawer / Sheet */}
+                <FilterSheet
+                    isOpen={isFilterSheetOpen}
+                    onClose={() => setIsFilterSheetOpen(false)}
+                    sections={filterSections}
+                    filters={filters}
+                    setFilters={setFilters}
+                    onClear={() => {
+                        setFilters(INITIAL_FILTERS)
+                        setIsFilterSheetOpen(false)
+                    }}
+                />
+            </div>
         </FadeIn>
     )
 }

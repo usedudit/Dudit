@@ -362,7 +362,7 @@ export function AdminUserDetailView({
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
-                                                    <FormSection title="Dados Pessoais & Conta" hasSeparator>
+                                                    <FormSection title="Dados Pessoais & Conta">
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                                             <div>
                                                                 <span className="text-xs font-semibold text-brand-inactive-text block">Nome Completo</span>
@@ -483,7 +483,7 @@ export function AdminUserDetailView({
                                                                             {o.situation === "paid" ? "Pago" : o.situation === "cancelled" ? "Cancelado" : "Pendente"}
                                                                         </Badge>
                                                                         <Link
-                                                                            href={`/ddt-admin/orders/${o.id}`}
+                                                                            href={`/ddt-admin/orders?view=${o.id}`}
                                                                             className="text-xs font-bold text-brand-green hover:underline"
                                                                         >
                                                                             Ver Pedido →

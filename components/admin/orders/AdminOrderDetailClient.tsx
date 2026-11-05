@@ -14,6 +14,11 @@ import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 interface AdminOrderDetailClientProps {
     /** Pedido completo de getAdminMarketplaceOrderDetail (order + stores + buyer_profile + audit_events). */
     detail: any
+    /**
+     * Callback de retorno. Quando omitido, volta para a listagem de pedidos
+     * via router (comportamento da rota /ddt-admin/orders/[id]).
+     */
+    onBack?: () => void
 }
 
 type OrderAdminActionContext = {
@@ -29,7 +34,7 @@ type OrderAdminActionContext = {
  * "Comprador e Loja" e "Histórico & Auditoria" e o AdminActionModal antes
  * de salvar (motivo + risk score + notificação ao vendedor).
  */
-export default function AdminOrderDetailClient({ detail }: AdminOrderDetailClientProps) {
+export default function AdminOrderDetailClient({ detail, onBack }: AdminOrderDetailClientProps) {
     const router = useRouter()
     const { modal: actionModal, runAction } = useAdminActionModal()
 
@@ -37,7 +42,10 @@ export default function AdminOrderDetailClient({ detail }: AdminOrderDetailClien
     const store = detail.stores || null
     const buyer = detail.buyer_profile || {}
 
-    const handleBack = () => router.push("/ddt-admin/orders")
+    const handleBack = useCallback(
+        () => (onBack ? onBack() : router.push("/ddt-admin/orders")),
+        [onBack, router],
+    )
 
     const adminActionGate = useCallback(
         async (changedFields: string[]): Promise<{ cancelled?: boolean; ctx?: OrderAdminActionContext }> => {

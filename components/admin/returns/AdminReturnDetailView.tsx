@@ -401,7 +401,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                                                 Número: #{request?.order_number_snapshot || request?.orders?.order_number || "-"}
                                                             </p>
                                                             <Link
-                                                                href={`/ddt-admin/orders/${request.order_id}`}
+                                                                href={`/ddt-admin/orders?view=${request.order_id}`}
                                                                 className="inline-block text-xs font-bold text-brand-green hover:underline mt-2"
                                                             >
                                                                 Ver pedido completo →

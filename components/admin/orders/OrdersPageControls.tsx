@@ -50,7 +50,7 @@ interface OrdersPageControlsProps {
         total: number
         pending: number
         paid: number
-        delivered: number
+        shipped: number
         cancelled: number
     }
 }
@@ -133,47 +133,31 @@ export default function OrdersPageControls({
         </AnimatePresence>
     )
 
+    // ERP-style tabs: Todos | Pendentes | Pagos | Enviados | Cancelados
+    const tabs = [
+        { value: "all", label: "Todos", icon: ShoppingCartIcon, variant: "gray" as const, count: tabCounts?.total },
+        { value: "pending", label: "Pendentes", icon: ClockIcon, variant: "yellow" as const, count: tabCounts?.pending },
+        { value: "paid", label: "Pagos", icon: CheckCircleIcon, variant: "green" as const, count: tabCounts?.paid },
+        { value: "shipped", label: "Enviados", icon: TruckIcon, variant: "blue" as const, count: tabCounts?.shipped },
+        { value: "cancelled", label: "Cancelados", icon: CancelCircleIcon, variant: "red" as const, count: tabCounts?.cancelled },
+    ]
+
     return (
         <>
             {/* --- TABS --- */}
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="px-0">
-                        <TabsTrigger
-                            value="all"
-                            icon={ShoppingCartIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.total} variant="gray" />}
-                        >
-                            Todos
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="pending"
-                            icon={ClockIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.pending} variant="yellow" />}
-                        >
-                            Pendentes
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="paid"
-                            icon={CheckCircleIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.paid} variant="green" />}
-                        >
-                            Pagos
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="delivered"
-                            icon={TruckIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.delivered} variant="blue" />}
-                        >
-                            Entregues
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="cancelled"
-                            icon={CancelCircleIcon}
-                            badge={tabCounts && <TabCountBadge count={tabCounts.cancelled} variant="red" />}
-                        >
-                            Cancelados
-                        </TabsTrigger>
+                        {tabs.map((tab) => (
+                            <TabsTrigger
+                                key={tab.value}
+                                value={tab.value}
+                                icon={tab.icon}
+                                badge={tab.count !== undefined && <TabCountBadge count={tab.count} variant={tab.variant} />}
+                            >
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
                     </TabsList>
                 </Tabs>
             </div>

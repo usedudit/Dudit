@@ -472,7 +472,7 @@ export function AdminDeliveryDriverDetailView({
                                                                                 </td>
                                                                                 <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
                                                                                     <Link
-                                                                                        href={`/ddt-admin/orders/${a.order_id}`}
+                                                                                        href={`/ddt-admin/orders?view=${a.order_id}`}
                                                                                         className="text-xs font-bold text-brand-green hover:underline"
                                                                                     >
                                                                                         Ver Pedido →
@@ -504,7 +504,7 @@ export function AdminDeliveryDriverDetailView({
                                                                     </div>
                                                                     <div className="flex items-center justify-between text-xs pt-2 border-t border-brand-border dark:border-dark-border">
                                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(a.delivery_fee || 0))}</span>
-                                                                        <Link href={`/ddt-admin/orders/${a.order_id}`} className="font-bold text-brand-green">
+                                                                        <Link href={`/ddt-admin/orders?view=${a.order_id}`} className="font-bold text-brand-green">
                                                                             Ver Pedido →
                                                                         </Link>
                                                                     </div>

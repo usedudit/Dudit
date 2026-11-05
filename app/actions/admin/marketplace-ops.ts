@@ -14,6 +14,7 @@ export interface AdminOrderStats {
     total: number
     pending: number
     paid: number
+    shipped: number
     delivered: number
     cancelled: number
 }
@@ -24,10 +25,11 @@ export async function getAdminMarketplaceOrdersStats(): Promise<AdminOrderStats>
 
     const admin = getAdminClient()
 
-    const [totalRes, pendingRes, paidRes, deliveredRes, cancelledRes] = await Promise.all([
+    const [totalRes, pendingRes, paidRes, shippedRes, deliveredRes, cancelledRes] = await Promise.all([
         admin.from("orders").select("id", { count: "exact", head: true }),
         admin.from("orders").select("id", { count: "exact", head: true }).eq("situation", "pending"),
         admin.from("orders").select("id", { count: "exact", head: true }).eq("situation", "paid"),
+        admin.from("orders").select("id", { count: "exact", head: true }).in("delivery_status", ["sent", "in_transit"]),
         admin.from("orders").select("id", { count: "exact", head: true }).eq("delivery_status", "delivered"),
         admin.from("orders").select("id", { count: "exact", head: true }).eq("situation", "cancelled"),
     ])
@@ -36,6 +38,7 @@ export async function getAdminMarketplaceOrdersStats(): Promise<AdminOrderStats>
         total: totalRes.count || 0,
         pending: pendingRes.count || 0,
         paid: paidRes.count || 0,
+        shipped: shippedRes.count || 0,
         delivered: deliveredRes.count || 0,
         cancelled: cancelledRes.count || 0,
     }
@@ -79,7 +82,8 @@ export async function getAdminMarketplaceOrders(
             amount_paid,
             order_source,
             created_at,
-            stores!left(id, name, logo_url, phone),
+            stores!left(id, name, logo_url, phone, partner_id),
+            partners!left(id, name, trade_name),
             order_items(id, product_name, quantity),
             return_requests!order_id(id, status)
         `)

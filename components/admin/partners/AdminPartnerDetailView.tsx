@@ -968,7 +968,7 @@ export function AdminPartnerDetailView({
                                                                         </td>
                                                                         <td className="py-3 px-3 pr-4 text-center">
                                                                             <Link
-                                                                                href={`/ddt-admin/orders/${o.id}`}
+                                                                                href={`/ddt-admin/orders?view=${o.id}`}
                                                                                 className="text-xs font-bold text-brand-green hover:underline"
                                                                             >
                                                                                 Ver Pedido →
@@ -989,7 +989,7 @@ export function AdminPartnerDetailView({
                                                                 </div>
                                                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                                                     <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(o.total_amount || 0))}</span>
-                                                                    <Link href={`/ddt-admin/orders/${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                    <Link href={`/ddt-admin/orders?view=${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
                                                                 </div>
                                                             </div>
                                                         ))}

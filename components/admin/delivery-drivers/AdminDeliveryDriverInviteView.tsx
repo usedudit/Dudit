@@ -133,7 +133,7 @@ export function AdminDeliveryDriverInviteView({ onBack, onSuccess }: AdminDelive
             <div className="w-full max-w-[1000px] mx-auto px-4 md:px-8 py-6 space-y-6">
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <FormSection title="Dados Pessoais & Contato" hasSeparator>
+                    <FormSection title="Dados Pessoais & Contato">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Input
                                 label="Nome Completo"
