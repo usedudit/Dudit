@@ -2,6 +2,7 @@ import "server-only"
 
 import { createHash, createHmac, timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { timingSafeStringEqual } from "@/lib/security/timing-safe"
 import { SecureLogger } from "@/lib/secure-logger"
 import { logAuditEvent } from "./timeline.service"
 
@@ -35,12 +36,7 @@ export function verifyMetaWebhookSignature(rawBody: string, signature: string | 
   if (!signature || !appSecret) return false
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex")
   const received = signature.replace(/^sha256=/, "")
-  if (expected.length !== received.length) return false
-  try {
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
-  } catch {
-    return false
-  }
+  return timingSafeStringEqual(expected, received)
 }
 
 function stableHash(value: unknown): string {

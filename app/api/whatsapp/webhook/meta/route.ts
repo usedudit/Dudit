@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { handleWhatsappWebhookPayload, verifyMetaWebhookSignature } from "@/lib/services/whatsapp-webhook.service"
+import { timingSafeStringEqual } from "@/lib/security/timing-safe"
 import { SecureLogger } from "@/lib/secure-logger"
 
 /**
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 })
   }
 
-  if (token !== platformVerifyToken) {
+  if (!timingSafeStringEqual(token, platformVerifyToken)) {
     SecureLogger.warn("[whatsapp meta webhook] Verification rejected")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }

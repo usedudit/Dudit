@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { SecureLogger } from "@/lib/secure-logger"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getOrderDepositSummary, patchDepositCheckoutOnPayment, resolveSituationFromPaid } from "@/lib/payments/order-financial-state"
 import { buildOrderPaymentMethodLabel, hasReceivedAmount } from "@/lib/payments/payment-ledger"
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
 
         try {
             await requirePermission(order.partner_id, "orders", "edit", user)
+            if (order.store_id) await requireStorePermission(order.store_id, order.partner_id, "orders", "edit")
         } catch {
             return NextResponse.json({ error: "Sem permissão para confirmar o sinal" }, { status: 403 })
         }

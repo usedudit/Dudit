@@ -1,3 +1,4 @@
+import { isValidBearerToken } from "@/lib/security/timing-safe"
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { expireAllExpiredOrders } from "@/lib/services/order-expiration"
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization")
     const secret = process.env.CRON_SECRET
-    if (!secret || authHeader !== `Bearer ${secret}`) {
+    if (!isValidBearerToken(authHeader, secret)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

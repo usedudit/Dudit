@@ -1,3 +1,4 @@
+import { isValidBearerToken } from "@/lib/security/timing-safe"
 import { NextResponse } from "next/server"
 import { runDueRecurringSubscriptionsAction, sweepExpiredPriceChangeWindowsAction } from "@/app/actions/erp/recurring-subscriptions"
 
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization")
     const secret = process.env.CRON_SECRET
-    if (!secret || authHeader !== `Bearer ${secret}`) {
+    if (!isValidBearerToken(authHeader, secret)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

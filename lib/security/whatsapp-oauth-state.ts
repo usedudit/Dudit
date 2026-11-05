@@ -1,15 +1,20 @@
 "use server"
 
-import { createHmac, timingSafeEqual, randomBytes } from "crypto"
+import { createHmac, randomBytes } from "crypto"
+import { timingSafeStringEqual } from "@/lib/security/timing-safe"
 import { cookies } from "next/headers"
 
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET
 
 function getOAuthSecret() {
-  if (!OAUTH_STATE_SECRET) {
+  const secret = process.env.OAUTH_STATE_SECRET
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("OAUTH_STATE_SECRET must be configured in production.")
+    }
     return "build-time-placeholder"
   }
-  return OAUTH_STATE_SECRET
+  return secret
 }
 
 const WA_OAUTH_STATE_COOKIE = "wa_oauth_state"
@@ -38,9 +43,7 @@ function verifySignedState(state: string, expectedUserId: string): WhatsappOAuth
   const payload = `${partnerId}:${userId}:${timestamp}:${nonce}`
   const expectedHmac = createHmac("sha256", getOAuthSecret()).update(payload).digest("hex")
 
-  const hmacBuffer = Buffer.from(hmac)
-  const expectedBuffer = Buffer.from(expectedHmac)
-  if (hmacBuffer.length !== expectedBuffer.length || !timingSafeEqual(hmacBuffer, expectedBuffer)) {
+  if (!timingSafeStringEqual(hmac, expectedHmac)) {
     return { valid: false, error: "Invalid state signature" }
   }
 

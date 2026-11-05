@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
 import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile, revalidateServices } from '@/lib/utils/revalidation'
+import { isValidBearerToken } from '@/lib/security/timing-safe'
 
 // Secret header to prevent unauthorized access
 const WEBHOOK_SECRET = process.env.SUPABASE_WEBHOOK_SECRET
@@ -75,7 +76,7 @@ function hasMeaningfulPartnerChanges(record: any, oldRecord: any): boolean {
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization')
-    if (!WEBHOOK_SECRET || authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    if (!isValidBearerToken(authHeader, WEBHOOK_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

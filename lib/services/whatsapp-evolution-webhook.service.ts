@@ -2,6 +2,7 @@ import "server-only"
 
 import { timingSafeEqual } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { timingSafeStringEqual } from "@/lib/security/timing-safe"
 import { SecureLogger } from "@/lib/secure-logger"
 import { decrypt } from "@/lib/cryptoService"
 import { decryptWhatsappSecret } from "@/lib/whatsapp/secrets"
@@ -19,10 +20,7 @@ export function verifyEvolutionWebhookSecret(
   try {
     const plaintextExpected = decryptWhatsappSecret(expectedSecret)
     if (!plaintextExpected) return false
-    return timingSafeEqual(
-      Buffer.from(receivedSecret),
-      Buffer.from(plaintextExpected),
-    )
+    return timingSafeStringEqual(receivedSecret, plaintextExpected)
   } catch {
     return false
   }

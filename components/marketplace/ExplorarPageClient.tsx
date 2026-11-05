@@ -1718,6 +1718,11 @@ export function ExplorarPageClient({
 
     const showExploreSections = pageMode === "sections" && !selectedSection
 
+    // Check if we're in a completely empty state (no results at all)
+    const isCompletelyEmpty = useMemo(() => {
+        return rawItems.length === 0 && !isCategoryMode && moreDistantItems.length === 0 && moreDistantSellers.length === 0
+    }, [rawItems.length, isCategoryMode, moreDistantItems.length, moreDistantSellers.length])
+
     // ─── Themed rotating sections ───────────────────────────────────────
     const CATEGORY_THEMES = [
         { id: "alimentacao", title: "Sabores da região", slug: "alimentacao", category: "Alimentação", emoji: "🍽️" },
@@ -1822,8 +1827,8 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
-                    {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
-                    {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && (
+                    {/* CATEGORIAS EM CÍRCULOS (type-aware) - Hide when completely empty */}
+                    {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isCompletelyEmpty && (
                         <div className="mb-6 lg:mb-8">
                             <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -1848,7 +1853,7 @@ export function ExplorarPageClient({
                     )}
 
                     {/* ─── SECTIONS MODE: Discover sections on top ─── */}
-                    {showExploreSections && (
+                    {showExploreSections && !isCompletelyEmpty && (
                         <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
                             {/* 3. VÍDEOS DA COMUNIDADE */}
                             {showCommunityVideos && (
@@ -1893,11 +1898,11 @@ export function ExplorarPageClient({
                     )}
 
                     {/* ─── CATEGORY DISCOVERY SECTIONS ─── */}
-                    {renderCategoryDiscoverSections()}
+                    {!isCompletelyEmpty && renderCategoryDiscoverSections()}
 
                     <div className="min-w-0 flex-1">
-                        {/* Title Section - ABOVE BANNER */}
-                        {!isLandingPage && (
+                        {/* Title Section - ABOVE BANNER - Hide when completely empty */}
+                        {!isLandingPage && !isCompletelyEmpty && (
                             <ExplorarHeaderSection
                                 title={pageTitle}
                                 resultsCount={filteredResults.length}
@@ -1919,8 +1924,8 @@ export function ExplorarPageClient({
                             />
                         )}
 
-                        {/* Filtros / Ordenar - fixos logo abaixo do título */}
-                        {!isLandingPage && (
+                        {/* Filtros / Ordenar - fixos logo abaixo do título - Hide when completely empty */}
+                        {!isLandingPage && !isCompletelyEmpty && (
                             <ExplorarViewControls
                                 onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
                                 onOpenSort={() => setIsSortBottomSheetOpen(true)}

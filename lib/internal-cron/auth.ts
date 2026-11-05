@@ -3,6 +3,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import { cronLogger } from "./logger"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
+import { isValidBearerToken } from "@/lib/security/timing-safe"
 
 /**
  * Result of cron request validation.
@@ -50,9 +51,9 @@ export function validateCronRequest(req: Request, jobName: string): CronAuthResu
     }
   }
 
-  // 3. Bearer token validation
+  // 3. Constant-time bearer token validation (CWE-208 prevention)
   const authHeader = req.headers.get("Authorization") || req.headers.get("authorization")
-  if (!authHeader || authHeader !== `Bearer ${secret}`) {
+  if (!isValidBearerToken(authHeader, secret)) {
     cronLogger.warn(jobName, "Unauthorized cron request", {
       hasHeader: !!authHeader,
       ip: getTrustedClientIP(req.headers),

@@ -784,3 +784,96 @@ Foi criado `npm run migrate:r2-private`, que lista objetos no bucket público, c
 - `vitest run lib/security/auth-security.test.ts` executado com sucesso (10 testes passando).
 - `git diff --check` verificado sem problemas de whitespace.
 - Nenhuma alteração destrutiva ou migration aplicada em produção nesta etapa.
+
+
+### Checkout, Pagamentos, Webhooks e Jobs Agendados — 05/11/2026
+
+**Decisão do usuário:** Não será executada a migração dos 27 objetos privados no bucket R2; o usuário informou que o conteúdo de teste será apagado antes do lançamento.
+
+**1. Isolamento de Loja na Confirmação de Sinal (CWE-284 / IDOR de Loja):**
+- **Vulnerabilidade identificada:** Em `app/api/orders/confirm-deposit/route.ts`, a rota validava apenas `requirePermission(order.partner_id, "orders", "edit")`, mas omitia a verificação de escopo de loja `requireStorePermission(order.store_id, ...)`. Um operador com acesso restrito à Loja B conseguia confirmar manualmente o recebimento de sinal de pedidos da Loja A pertencente ao mesmo parceiro.
+- **Correção aplicada:**
+  - Adicionado `if (order.store_id) await requireStorePermission(order.store_id, order.partner_id, "orders", "edit")` em `app/api/orders/confirm-deposit/route.ts`, espelhando a proteção já existente em `cancel-deposit/route.ts`.
+
+**2. Mitigação de Ataques de Temporização em Tokens Bearer de Cron e Webhooks (CWE-208):**
+- **Vulnerabilidade identificada:**
+  - Em `lib/internal-cron/auth.ts`, a verificação de `INTERNAL_CRON_SECRET` era feita por comparação de strings simples (`authHeader !== 'Bearer ' + secret`).
+  - Em todas as 8 rotas em `app/api/cron/*` (`expire-orders`, `cart-abandonment-sweep`, `notification-reminders`, `reconcile-subscriptions`, `recurring-subscriptions`, `recurring-transactions`, `superfrete-reconcile`, `sync-redis`), a checagem de `CRON_SECRET` utilizava `authHeader !== 'Bearer ' + secret`.
+  - Em `app/api/webhooks/supabase/route.ts`, a checagem de `SUPABASE_WEBHOOK_SECRET` também utilizava comparação de strings simples.
+  - Comparações com operador de desigualdade (`!==`) no V8 interrompem no primeiro byte divergente, criando discrepâncias observáveis de tempo de resposta.
+- **Correção aplicada:**
+  - Criado o utilitário `lib/security/timing-safe.ts` (`isValidBearerToken`), que calcula o hash SHA-256 de ambos os valores antes de compará-los com `crypto.timingSafeEqual`. Como os hashes possuem tamanho fixo de 32 bytes, a comparação é estritamente de tempo constante, imune a exceções de tamanho e a vazamentos de caracteres.
+  - Criada suíte de testes unitários `lib/security/timing-safe.test.ts` (6 testes passando).
+  - Atualizados `lib/internal-cron/auth.ts`, `app/api/webhooks/supabase/route.ts` e todas as 8 rotas de `app/api/cron/*` para usar `isValidBearerToken`.
+
+**3. Blindagem do Webhook do SuperFrete (CWE-306 / CWE-799):**
+- **Vulnerabilidade identificada:** Em `app/api/shipping/superfrete/webhook/route.ts`:
+  - Não havia limitação de taxa (rate limit).
+  - O endpoint não validava a presença do cabeçalho `X-ME-Signature` antes de consultar o banco de dados.
+  - Quando a remessa não era encontrada no banco, o endpoint retornava HTTP 200 `{ message: "Shipment not found, skipping" }` sem checagem de assinatura, permitindo que um invasor externo diferenciasse remessas existentes de inexistentes (oráculo de existência de remessas).
+- **Correção aplicada:**
+  - Adicionado rate limiting (`checkRateLimitForAPI(RateLimitCategory.WEBHOOK, "superfrete-webhook")`).
+  - Rejeição imediata com 401 caso o cabeçalho `X-ME-Signature` não esteja presente.
+  - Retorno uniforme e genérico (`{ received: true }`, HTTP 200) em casos onde a remessa não é localizada, eliminando o oráculo de enumeração.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- `vitest` executado com sucesso em 3 suítes:
+  - `lib/security/safe-redirect.test.ts` (6 testes)
+  - `lib/security/timing-safe.test.ts` (6 testes)
+  - `lib/security/auth-security.test.ts` (10 testes)
+  - Total: 22 testes passando.
+- `git diff --check` verificado sem problemas de whitespace.
+- Nenhuma operação destrutiva nem alteração em produção realizada.
+
+### Vendas, PDV e Mensageria (WhatsApp, Webhooks e OAuth) — 05/11/2026
+
+**1. Módulo de Vendas e PDV:**
+- **Auditoria de `app/actions/erp/pdv.ts`:**
+  - Verificação de controle de descontos (`can_apply_discount` e respeito estrito a `salesSettingsResult.data.maxDiscountPercent`).
+  - Checagem de isolamento multi-loja e verificação obrigatória de sessão de caixa aberta (`hasFinancial`).
+  - Movimentação de estoque atômica executada via PostgreSQL RPC `create_batch_stock_movement`.
+- **Auditoria de `app/actions/erp/orders.ts`:**
+  - Exclusão em lote (`deleteOrdersInBatchAction`) exige validação de escopo de loja (`requireStorePermission`) e valida ausência de anexos ativos antes de permitir deleção.
+- **Auditoria de `app/actions/erp/cash-register.ts`:**
+  - Abertura de caixa (`openCashSessionAction`), sangrias/reforços (`createCashMovementAction`), estornos (`reverseCashMovementAction`) e fechamento de caixa (`closeCashSessionAction`) exigem checagem dupla de permissões RBAC (`requirePermission` e `requireStorePermission`).
+  - Todas as mutações financeiras de caixa invocam procedures atômicas (`erp_create_cash_manual_movement`, `erp_reverse_cash_manual_movement`, `erp_close_cash_session_atomic`).
+  - A leitura de sessões e histórico resolve e valida a loja ativa via `resolveCashReadStoreId`.
+- **Auditoria de `app/actions/erp/sales-settings.ts`:**
+  - `getSalesSettingsAction`, `updateSalesSettingsAction`, `getReceiptSettingsAction` e `updateReceiptSettingsAction` restringem alterações estritamente a administradores e proprietários (`roleId === "owner" || roleId === "admin"`).
+  - Sanitização rígida de limites (`maxDiscountPercent`, `defaultMarginPercent`, `quoteValidityDays`, etc.).
+- **Auditoria de `app/actions/erp/quotes.ts`:**
+  - Visualização e aprovação pública (`getPublicQuoteAction`, `approvePublicQuoteAction`) operam sob limitação de taxa (`requireRateLimit`), token público imprevisível e resolução segura de aprovador via RPC `approve_public_quote`.
+- **Auditoria de `app/actions/erp/confirm-pickup-payment.ts`:**
+  - Limitação de taxa de pagamento (`RateLimitCategory.PAYMENT`), verificação de permissão no parceiro e loja (`orders.edit`), atualização atômica baseada no status `awaiting_pickup_payment`, sincronização financeira e log de auditoria.
+
+**2. Módulo de Integrações de Mensageria (WhatsApp, Evolution API, Meta Cloud API e OAuth):**
+- **Mitigação de Ataques de Temporização em Webhooks de WhatsApp (CWE-208):**
+  - **Vulnerabilidade identificada:**
+    - Em `app/api/whatsapp/webhook/route.ts` e `app/api/whatsapp/webhook/meta/route.ts`, a verificação de `hub.verify_token` no método `GET` utilizava `token !== platformVerifyToken` (comparação padrão não constante).
+    - Em `lib/services/whatsapp-evolution-webhook.service.ts`, `verifyEvolutionWebhookSecret` realizava `timingSafeEqual(Buffer.from(receivedSecret), Buffer.from(plaintextExpected))`, disparando `RangeError` capturado por `try/catch` quando os buffers divergiam em tamanho.
+    - Em `lib/services/whatsapp-webhook.service.ts`, `verifyMetaWebhookSignature` executava checagem prévia `if (expected.length !== received.length) return false`, introduzindo vazamento observável de tamanho de assinatura.
+  - **Correção aplicada:**
+    - Expandido o módulo `lib/security/timing-safe.ts` para exportar a função `timingSafeStringEqual(a, b)`, que aplica SHA-256 em ambos os valores antes de compará-los com `crypto.timingSafeEqual` (garantindo buffers de exatamente 32 bytes em tempo estritamente constante).
+    - Atualizados `app/api/whatsapp/webhook/route.ts`, `app/api/whatsapp/webhook/meta/route.ts`, `lib/services/whatsapp-evolution-webhook.service.ts` e `lib/services/whatsapp-webhook.service.ts` para validar tokens, segredos e assinaturas com `timingSafeStringEqual`.
+- **Proteção contra Forjamento de Estado OAuth e Falha Silenciosa de Segredo (CWE-345 / CWE-1188):**
+  - **Vulnerabilidade identificada:**
+    - Em `lib/security/whatsapp-oauth-state.ts` e `lib/security/oauth-state.ts`, caso a variável de ambiente `OAUTH_STATE_SECRET` não estivesse definida, a função `getOAuthSecret()` retornava silenciosamente `"build-time-placeholder"`. Em produção, isso permitiria que qualquer atacante forjasse assinaturas HMAC de state OAuth para qualquer `partnerId` e `userId`.
+    - A comparação de cookies e assinaturas HMAC verificava comprimentos previamente antes de chamar `timingSafeEqual`.
+  - **Correção aplicada:**
+    - `getOAuthSecret()` em ambos os módulos agora lança uma exceção imediata caso `OAUTH_STATE_SECRET` esteja ausente em ambiente de produção (`NODE_ENV === "production"`).
+    - A validação de `cookieState` e a checagem da assinatura HMAC do token de estado foram migradas para `timingSafeStringEqual`.
+- **Auditoria de `app/actions/whatsapp.ts` e `app/actions/emails.ts`:**
+  - Todas as Server Actions de gerenciamento de instâncias, QR Codes e credenciais WhatsApp exigem `requireUser()`, permissão explícita `can_manage_integrations` e plano mínimo "escalar" (`requireMinimumPlan`).
+  - O envio de e-mails em `app/actions/emails.ts` restringe remetentes globais estritamente à role de administrador do sistema (`requireAdmin("admin")`), prevenindo uso indevido da plataforma como open relay de spam.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- `vitest` executado com sucesso em 4 suítes:
+  - `lib/security/timing-safe.test.ts` (10 testes)
+  - `lib/security/safe-redirect.test.ts` (6 testes)
+  - `lib/security/auth-security.test.ts` (10 testes)
+  - `lib/services/whatsapp-webhook.service.test.ts` (5 testes)
+  - Total: 31 testes passando.
+- `git diff --check` verificado sem problemas de whitespace.
+- Nenhuma operação destrutiva nem alteração em produção realizada.

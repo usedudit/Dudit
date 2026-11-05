@@ -4,12 +4,26 @@ import { verifySuperFreteWebhookSignature } from "@/lib/services/shipping/superf
 import { decrypt } from "@/lib/cryptoService"
 import { captureError } from "@/lib/monitoring/sentry"
 import { applySuperFreteShipmentStatus } from "@/lib/services/shipping/superfrete-status-sync"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 const SUPERFRETE_PROVIDER = "superfrete"
 
 export async function POST(req: Request) {
-  const body = await req.text()
+  const rateLimitResult = await checkRateLimitForAPI(
+    RateLimitCategory.WEBHOOK,
+    "superfrete-webhook",
+  )
+  if (rateLimitResult.limited) {
+    return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
+  }
+
   const signature = req.headers.get("X-ME-Signature") || ""
+  if (!signature) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const body = await req.text()
 
   let parsed: any
   try {
@@ -38,7 +52,7 @@ export async function POST(req: Request) {
       .eq("external_label_id", superfreteOrderId)
 
     if (!shipments || shipments.length === 0) {
-      return NextResponse.json({ message: "Shipment not found, skipping" }, { status: 200 })
+      return NextResponse.json({ received: true }, { status: 200 })
     }
 
     for (const shipment of shipments) {
