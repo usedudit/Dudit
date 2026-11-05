@@ -184,10 +184,17 @@ export async function priceMarketplaceCartCheckout(
       const cep =
         String(params.destinationPostalCode || "").replace(/\D/g, "") ||
         extractPostalCodeFromAddress(params.deliveryAddress)
+      const carrierItems = resolvedLines
+        .filter((l) => Boolean(l.productId))
+        .map((l) => ({
+          productId: l.productId,
+          quantity: l.quantity,
+        }))
       const carrier = await quoteCarrierFreightFee(adminClient, {
         partnerId,
         toPostalCode: cep,
         serviceId: params.carrierServiceId,
+        items: carrierItems,
       })
       if (carrier.success) {
         deliveryFee = carrier.fee

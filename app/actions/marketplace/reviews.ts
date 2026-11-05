@@ -334,6 +334,9 @@ export async function createReviewAction(data: {
 
   // Moderação do comentário antes de gravar
   if (data.comment && data.comment.trim()) {
+    if (data.comment.length > 2000) {
+      return { error: "O comentário deve ter no máximo 2000 caracteres" }
+    }
     const moderation = await moderateReviewContent({ comment: data.comment, userId })
     if (!moderation.valid) {
       return { error: moderation.error || "Comentário não aprovado pela moderação" }
@@ -424,6 +427,17 @@ export async function updateReviewAction(reviewId: string, data: {
 
   if (!review || review.user_id !== user.id) {
     return { error: "Você não tem permissão para editar esta avaliação" }
+  }
+
+  // Moderação do comentário antes de atualizar
+  if (data.comment && data.comment.trim()) {
+    if (data.comment.length > 2000) {
+      return { error: "O comentário deve ter no máximo 2000 caracteres" }
+    }
+    const moderation = await moderateReviewContent({ comment: data.comment, userId: user.id })
+    if (!moderation.valid) {
+      return { error: moderation.error || "Comentário não aprovado pela moderação" }
+    }
   }
 
   const { error } = await adminSupabase

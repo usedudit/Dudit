@@ -467,10 +467,17 @@ async function handler(request: NextRequest) {
           const cep =
             String(body.checkoutPricing?.destinationPostalCode || "").replace(/\D/g, "") ||
             extractPostalCodeFromAddress(body.deliveryAddress)
+          const carrierItems = (body.items || [])
+            .filter((i: any) => !resolveServiceId(i) && (i.id || i.product_id))
+            .map((i: any) => ({
+              productId: i.id || i.product_id,
+              quantity: Math.max(1, Number(i.quantity || 1)),
+            }))
           const carrier = await quoteCarrierFreightFee(adminClient, {
             partnerId,
             toPostalCode: cep,
             serviceId: carrierServiceId,
+            items: carrierItems,
           })
           if (carrier.success) {
             deliveryFee = carrier.fee

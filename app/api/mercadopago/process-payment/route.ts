@@ -820,10 +820,17 @@ async function handler(request: NextRequest) {
           const cep =
             String(body.checkoutPricing?.destinationPostalCode || "").replace(/\D/g, "") ||
             extractPostalCodeFromAddress(deliveryAddress)
+          const carrierItems = (body.items || [])
+            .filter((i: any) => (i.id || i.product_id) && !serviceIds.includes(i.service_id || i.id))
+            .map((i: any) => ({
+              productId: i.id || i.product_id,
+              quantity: Math.max(1, Number(i.quantity || 1)),
+            }))
           const carrier = await quoteCarrierFreightFee(adminClient, {
             partnerId,
             toPostalCode: cep,
             serviceId: carrierServiceId,
+            items: carrierItems,
           })
           if (!carrier.success) {
             return NextResponse.json({ error: carrier.error }, { status: 400 })

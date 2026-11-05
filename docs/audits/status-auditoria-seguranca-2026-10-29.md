@@ -877,3 +877,46 @@ Foi criado `npm run migrate:r2-private`, que lista objetos no bucket público, c
   - Total: 31 testes passando.
 - `git diff --check` verificado sem problemas de whitespace.
 - Nenhuma operação destrutiva nem alteração em produção realizada.
+
+### Marketplace & Checkout (Carrinho, Preços, Frete, Avaliações e Assinaturas Recorrentes) — 05/11/2026
+
+**1. Auditoria de Carrinho e Checkout (`app/actions/marketplace/cart.ts` e `cart-extensions.ts`):**
+- **Verificações de Integridade de Preço e Fraude:**
+  - `checkoutCartAction`: O servidor não confia nos preços, descontos de cupons nem taxas de frete enviados pelo cliente. Todos os preços são recalculados via `calculateOrderPricing` e o frete de transportadora é recalculado via `quoteCarrierFreightFee` (SuperFrete) antes da inserção em `orders` e `order_items`.
+  - Reserva de estoque atômica executada no checkout via `reserveOrderInventory` antes de prosseguir com a criação do pedido.
+  - Prevenção de autofraude e compras em loja própria: `assertCanBuyFromStore` bloqueia compras pelo dono da loja ou membros da equipe da loja.
+  - Verificação de aceitação de pedidos (`canStoreAcceptOrders`) e bloqueio de fluxos com cotas esgotadas (`resolveMarketplaceCapabilities`).
+  - Proteção CSRF obrigatória (`requireCSRF`) em todas as mutações de sacola (`addToCartAction`, `addServiceBookingToCartAction`, `addSubscriptionToCartAction`).
+
+**2. Bypass de Moderação em Avaliações (CWE-862 / CWE-79):**
+- **Vulnerabilidade identificada:** Em `app/actions/marketplace/reviews.ts`, `createReviewAction` executava moderação de conteúdo (`moderateReviewContent`), porém `updateReviewAction` não executava nenhuma moderação nem limitava o tamanho do comentário. Isso permitia que um usuário enviasse uma avaliação legítima e posteriormente editasse inserindo links maliciosos, conteúdo abusivo ou payload arbitrário.
+- **Correção aplicada:**
+  - `updateReviewAction` agora impõe moderação obrigatória (`moderateReviewContent`) e limite de 2.000 caracteres no comentário, alinhado com `createReviewAction`.
+
+**3. Falha de Autorização e Vínculo de Cliente em Assinaturas Recorrentes (CWE-285):**
+- **Vulnerabilidade identificada:**
+  - No Dudit, compradores de marketplace vinculam-se a registros da tabela `customers` prioritariamente através da coluna `marketplace_user_id` (com constraint UNIQUE `(partner_id, marketplace_user_id)`). Clientes pré-existentes na base do lojista (ERP) que compram no marketplace têm `marketplace_user_id` preenchido, mas `user_id` mantido como `NULL`.
+  - Nas Server Actions de cliente de assinaturas (`app/actions/marketplace/recurring-subscriptions.ts`):
+    - `getMyRecurringSubscriptionsAction` e `getMyRecurringCreditsAction` realizavam `.eq("user_id", user.id)`, retornando lista vazia para compradores com cadastro preenchido apenas por `marketplace_user_id`.
+    - `getMyRecurringSubscriptionExecutionsAction`, `updateMySubscriptionStatus` (pausa/cancelamento), `skipMyNextRecurringExecutionAction`, `updateMySubscriptionShippingAddressAction`, `changeMySubscriptionPaymentMethodAction`, `decideSubscriptionPriceChangeAction` e `bookServiceWithCreditAction` verificavam `customers!inner(user_id)` com `sub.customers?.user_id !== user.id`. Clientes legítimos eram rejeitados com erro "Assinatura não encontrada".
+  - Em `lib/services/recurring/price-consent.ts`, a notificação de mudança de preço era ignorada quando `user_id` estava nulo, mesmo havendo `marketplace_user_id`.
+  - Em `lib/services/recurring-execution.service.ts` e `app/actions/erp/recurring-subscriptions.ts`, os pedidos gerados pela recorrência gravavam `buyer_id: null` caso o cliente possuísse apenas `marketplace_user_id`, dificultando o acompanhamento pelo comprador.
+- **Correção aplicada:**
+  - Em `app/actions/marketplace/recurring-subscriptions.ts`, implementado helper uniforme `isCustomerOwner(customer, userId)` que valida tanto `customer.user_id === userId` quanto `customer.marketplace_user_id === userId`.
+  - Atualizadas todas as consultas de `recurring_subscriptions` para selecionar `(user_id, marketplace_user_id)` e aplicar `isCustomerOwner`.
+  - Atualizadas as buscas em `customers` para usar `.or('user_id.eq.${user.id},marketplace_user_id.eq.${user.id}')`.
+  - Atualizados `price-consent.ts`, `recurring-execution.service.ts` e `app/actions/erp/recurring-subscriptions.ts` para resolver `buyer_id` e `customerUserId` com fallback para `marketplace_user_id`.
+
+**4. Divulgação de Dados Internos de Lojistas em Páginas de Produtos (CWE-200):**
+- **Vulnerabilidade identificada:** Em `app/actions/marketplace/products.ts`, ao buscar os dados públicos do produto (`_getMarketplaceProductBase`), a consulta unia a tabela `partners` com `user_id` e `partner_integrations`. Diferente de `services.ts` (que expurgava essas propriedades), `products.ts` mantinha `user_id` (UUID interno da conta do lojista) e o array de integrações no objeto serializado para visitantes públicos.
+- **Correção aplicada:**
+  - Adicionada exclusão explícita de `p.user_id` e `p.partner_integrations` antes de retornar o produto para o cliente, prevenindo enumeração e vazamento de metadados.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- `vitest` executado com sucesso em 2 suítes:
+  - `lib/security/timing-safe.test.ts` (10 testes)
+  - `lib/services/marketplace-customer.test.ts` (8 testes)
+  - Total: 18 testes passando.
+- `git diff --check` verificado sem problemas de whitespace.
+- Nenhuma operação destrutiva nem alteração em produção realizada.

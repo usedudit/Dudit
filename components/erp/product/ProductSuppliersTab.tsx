@@ -577,7 +577,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                 </div>
             ) : (
                 /* Desktop Standard ERP Table */
-                <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                <div className="w-full overflow-hidden bg-white dark:bg-dark-surface">
                     <div className="overflow-x-auto custom-scrollbar">
                         <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
                             <thead>

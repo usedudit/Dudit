@@ -1329,6 +1329,12 @@ export async function checkoutCartAction(
     const canUseLocalDelivery = allFlowLinesAllowLocalDelivery(resolvedLines)
     const canUseCarrier = allFlowLinesAllowShipping(resolvedLines)
     const carrierServiceId = checkoutPricingSnapshot?.carrierServiceId ?? null
+    const carrierItems = resolvedLines
+      .filter((l) => Boolean(l.productId))
+      .map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+      }))
 
     const applyCarrier = async () => {
       const cep =
@@ -1338,6 +1344,7 @@ export async function checkoutCartAction(
         partnerId,
         toPostalCode: cep,
         serviceId: carrierServiceId as number,
+        items: carrierItems,
       })
       if (!carrier.success) return carrier.error
       deliveryFee = carrier.fee

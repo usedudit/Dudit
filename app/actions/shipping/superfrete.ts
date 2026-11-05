@@ -33,6 +33,7 @@ import {
 } from "@/lib/services/shipping/superfrete"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { clearCarrierQuoteCache } from "@/lib/services/shipping/carrier-checkout"
 import { cancelCarrierLabelForOrder } from "@/lib/services/shipping/superfrete-label-cancel"
 
 const SUPERFRETE_WEBHOOK_URL = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL}/api/shipping/superfrete/webhook`
@@ -216,6 +217,7 @@ export async function connectSuperFreteAction(payload: {
       console.warn("[SuperFrete] Webhook registration failed (non-blocking):", webhookErr.message)
     }
 
+    clearCarrierQuoteCache(ctx.partnerId)
     await safeRevalidateTag(TAGS.partner(ctx.partnerId))
     revalidatePath("/erp/configuracoes/integracoes")
 
@@ -291,6 +293,7 @@ export async function disconnectSuperFreteAction(): Promise<{ success: boolean; 
       return { success: false, error: error.message }
     }
 
+    clearCarrierQuoteCache(ctx.partnerId)
     await safeRevalidateTag(TAGS.partner(ctx.partnerId))
     revalidatePath("/erp/configuracoes/integracoes")
 
@@ -352,6 +355,7 @@ export async function saveSuperFreteConfigAction(config: SuperFreteConfig): Prom
       return { success: false, error: error.message }
     }
 
+    clearCarrierQuoteCache(ctx.partnerId)
     await safeRevalidateTag(TAGS.partner(ctx.partnerId))
 
     return { success: true }

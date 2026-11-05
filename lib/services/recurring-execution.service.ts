@@ -731,7 +731,7 @@ export async function processPreapprovalPaymentWebhook(params: {
     .from("recurring_subscriptions")
     .select(`
       id, partner_id, customer_id, recurring_plan_id, status, billing_mode, next_execution_at, delivery_type, delivery_address,
-      customers(id, name, user_id),
+      customers(id, name, user_id, marketplace_user_id),
       recurring_plans(id, name, billing_mode)
     `)
     .eq("id", params.subscriptionId)
@@ -830,7 +830,7 @@ export async function processPreapprovalPaymentWebhook(params: {
       customer: {
         id: sub.customer_id,
         name: (sub.customers as any)?.name || "Cliente",
-        user_id: (sub.customers as any)?.user_id || null,
+        user_id: (sub.customers as any)?.marketplace_user_id || (sub.customers as any)?.user_id || null,
       },
       financeAccountId,
       situation: "paid",

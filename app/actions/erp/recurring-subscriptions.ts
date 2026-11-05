@@ -724,7 +724,7 @@ export async function scheduleSubscriptionServiceAction(input: {
       .from("recurring_subscriptions")
       .select(`
         id, partner_id, store_id, status, delivery_address, next_execution_at,
-        customers(id, name, user_id)
+        customers(id, name, user_id, marketplace_user_id)
       `)
       .eq("id", subscriptionId)
       .eq("partner_id", partnerId)
@@ -834,7 +834,7 @@ export async function scheduleSubscriptionServiceAction(input: {
         partner_id: partnerId,
         store_id: storeId,
         customer_id: customerId,
-        buyer_id: (sub as any).customers?.user_id || null,
+        buyer_id: (sub as any).customers?.marketplace_user_id || (sub as any).customers?.user_id || null,
         customer_name: (sub as any).customers?.name || "Cliente",
         order_source: "Assinatura",
         delivery_type: "pickup",
@@ -985,7 +985,7 @@ export async function createSubscriptionDeliveryOrderAction(input: {
       .from("recurring_subscriptions")
       .select(`
         id, partner_id, store_id, status, delivery_type, delivery_address,
-        finance_account_id, customers(id, name, user_id)
+        finance_account_id, customers(id, name, user_id, marketplace_user_id)
       `)
       .eq("id", subscriptionId)
       .eq("partner_id", partnerId)
@@ -1102,7 +1102,7 @@ export async function createSubscriptionDeliveryOrderAction(input: {
         partner_id: partnerId,
         store_id: sub.store_id || null,
         customer_id: customerId,
-        buyer_id: (sub as any).customers?.user_id || null,
+        buyer_id: (sub as any).customers?.marketplace_user_id || (sub as any).customers?.user_id || null,
         customer_name: (sub as any).customers?.name || "Cliente",
         order_source: "Assinatura",
         delivery_type: deliveryType,

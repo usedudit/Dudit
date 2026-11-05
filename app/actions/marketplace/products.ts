@@ -150,6 +150,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       p.banner_url = p.banner_url || null
       p.city = p.city || p.addresses?.[0]?.city || null
       p.state = p.state || p.addresses?.[0]?.state || null
+      delete p.user_id
+      delete p.partner_integrations
     }
     data.partners = p
 

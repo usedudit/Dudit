@@ -41,7 +41,7 @@ export async function detectPlanPriceChange(
       .from("recurring_subscriptions")
       .select(
         `id, partner_id, store_id, customer_id, price_change_expires_at,
-         customers(user_id, name),
+         customers(user_id, marketplace_user_id, name),
          recurring_plans(name),
          stores(name)`,
       )
@@ -51,7 +51,8 @@ export async function detectPlanPriceChange(
     if (!sub) continue
 
     const expiresAt = sub.price_change_expires_at ? String(sub.price_change_expires_at) : null
-    const customerUserId = (sub.customers as { user_id?: string | null } | null)?.user_id
+    const cust = sub.customers as { user_id?: string | null; marketplace_user_id?: string | null } | null
+    const customerUserId = cust?.marketplace_user_id || cust?.user_id
 
     if (customerUserId && expiresAt) {
       try {

@@ -17,6 +17,14 @@ import { updateMpPreapprovalAmount } from "@/lib/services/mercadopago/partner-pr
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { normalizeFulfillmentModes } from "@/lib/commerce/capabilities"
 
+function isCustomerOwner(
+  customer: { user_id?: string | null; marketplace_user_id?: string | null } | null | undefined,
+  userId: string,
+): boolean {
+  if (!customer || !userId) return false
+  return customer.user_id === userId || customer.marketplace_user_id === userId
+}
+
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
   try {
@@ -226,7 +234,7 @@ export async function getMyRecurringSubscriptionsAction() {
     const { data: customers } = await admin
       .from("customers")
       .select("id")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},marketplace_user_id.eq.${user.id}`)
 
     const customerIds = (customers || []).map((c: any) => c.id)
     if (customerIds.length === 0) return { success: true, data: [] }
@@ -307,12 +315,11 @@ export async function getMyRecurringSubscriptionExecutionsAction(subscriptionId:
 
     const { data: sub } = await admin
       .from("recurring_subscriptions")
-      .select("id, customer_id, customers!inner(user_id)")
+      .select("id, customer_id, customers!inner(user_id, marketplace_user_id)")
       .eq("id", subscriptionId)
       .maybeSingle()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
 
@@ -365,12 +372,11 @@ async function updateMySubscriptionStatus(
 
     const { data: sub } = await admin
       .from("recurring_subscriptions")
-      .select("id, partner_id, customer_id, customers!inner(user_id)")
+      .select("id, partner_id, customer_id, customers!inner(user_id, marketplace_user_id)")
       .eq("id", subscriptionId)
       .maybeSingle()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
 
@@ -545,14 +551,13 @@ export async function skipMySubscriptionCycleAction(subscriptionId: string) {
       .from("recurring_subscriptions")
       .select(`
         id, partner_id, next_execution_at, mp_preapproval_id,
-        customers!inner(user_id),
+        customers!inner(user_id, marketplace_user_id),
         recurring_plans(frequency_type, frequency_interval)
       `)
       .eq("id", subscriptionId)
       .single()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
 
@@ -708,14 +713,13 @@ export async function updateMySubscriptionDetailsAction(
       .select(`
         id, partner_id, delivery_type, delivery_address, status,
         shipping_amount, shipping_source, mp_preapproval_id,
-        customers!inner(user_id),
+        customers!inner(user_id, marketplace_user_id),
         recurring_plans(price, shipping_mode, shipping_flat_amount)
       `)
       .eq("id", subscriptionId)
       .single()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
 
@@ -836,14 +840,13 @@ export async function confirmMySubscriptionAddressChangeAction(
       .select(`
         id, partner_id, status, pending_address, pending_shipping_amount,
         shipping_amount, mp_preapproval_id,
-        customers!inner(user_id),
+        customers!inner(user_id, marketplace_user_id),
         recurring_plans(price, shipping_mode, shipping_flat_amount)
       `)
       .eq("id", subscriptionId)
       .single()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
 
@@ -927,7 +930,7 @@ export async function getMySubscriptionCreditsAction(subscriptionId?: string) {
     const { data: customers } = await admin
       .from("customers")
       .select("id")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},marketplace_user_id.eq.${user.id}`)
 
     const customerIds = (customers || []).map((c: any) => c.id)
     if (customerIds.length === 0) return { success: true, data: [] }
@@ -1010,14 +1013,13 @@ export async function respondToMySubscriptionPriceChangeAction(
         id, partner_id, store_id, status, billing_mode, mp_preapproval_id,
         shipping_amount, price_change_decision, price_change_expires_at,
         pending_cancellation_reason,
-        customers!inner(user_id, name),
+        customers!inner(user_id, marketplace_user_id, name),
         recurring_plans(name, price)
       `)
       .eq("id", subscriptionId)
       .single()
 
-    const customerUserId = (sub as any)?.customers?.user_id
-    if (!sub?.id || customerUserId !== user.id) {
+    if (!sub?.id || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
     if (sub.price_change_decision || !sub.price_change_expires_at) {
@@ -1171,13 +1173,13 @@ export async function bookServiceWithCreditAction(input: {
       .from("recurring_subscriptions")
       .select(`
         id, partner_id, store_id, status, delivery_address, next_execution_at,
-        customers!inner(user_id, id, name),
+        customers!inner(user_id, marketplace_user_id, id, name),
         recurring_plans(credit_expiration_policy)
       `)
       .eq("id", subscriptionId)
       .single()
 
-    if (!sub || (sub as any).customers?.user_id !== user.id) {
+    if (!sub || !isCustomerOwner((sub as any)?.customers, user.id)) {
       return { success: false, error: "Assinatura não encontrada." }
     }
     if (!["active", "awaiting_restock"].includes(sub.status)) {

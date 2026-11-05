@@ -98,13 +98,13 @@ export type CheckoutFulfillmentPanelProps = {
   addressProps: AddressBlockProps
   schedulingLines: Array<{ name: string; summary: string | null }>
   lines?: MarketplaceCheckoutDisplayLine[]
-   onFulfillmentModesSave?: (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => Promise<void>
-   /** Parceiro responsável pelo carrinho (para validar raio de atendimento). */
-   partnerId?: string
-   /** Endereço selecionado pelo cliente (validado contra o raio de atendimento do serviço). */
-   deliveryAddress?: string
-   /** Coordenadas do endereço selecionado (evita geocodificar de novo). */
-   destinationCoords?: { lat: number; lng: number } | null
+  onFulfillmentModesSave?: (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => Promise<void>
+  /** Parceiro responsável pelo carrinho (para validar raio de atendimento). */
+  partnerId?: string
+  /** Endereço selecionado pelo cliente (validado contra o raio de atendimento do serviço). */
+  deliveryAddress?: string
+  /** Coordenadas do endereço selecionado (evita geocodificar de novo). */
+  destinationCoords?: { lat: number; lng: number } | null
 }
 
 export function CheckoutFulfillmentPanel({
@@ -422,9 +422,9 @@ export function CheckoutFulfillmentPanel({
           </AnimatePresence>
 
           {!isPickup && canShowShipping && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
-    <div className="space-y-6">
+            <div className="space-y-4">
               <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                Envio nacional (transportadora)
+                Método de entrega
               </p>
               {carrierQuoteLoading && (
                 <div className="flex items-center gap-2 text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
@@ -575,24 +575,24 @@ export function CheckoutFulfillmentPanel({
                     onChange={() => handleDraftChange(line.lineId, "on_site")}
                   />
                 </div>
-                 <div className="w-28 flex flex-col items-center justify-center">
-                   <RadioButton
-                     name={`modal-${line.lineId}`}
-                     value="customer_location"
-                     checked={currentDraft === "customer_location"}
-                     onChange={() => handleDraftChange(line.lineId, "customer_location")}
-                   />
-                   {serviceAttendance[line.lineId]?.error && (
-                     <p className="text-[10px] text-brand-red text-center mt-1 leading-tight">
-                       {serviceAttendance[line.lineId].error}
-                     </p>
-                   )}
-                   {serviceAttendance[line.lineId]?.distanceKm != null && serviceAttendance[line.lineId]?.covered && (
-                     <p className="text-[10px] text-brand-inactive-text text-center mt-1">
-                       {Number(serviceAttendance[line.lineId].distanceKm).toFixed(2)} km
-                     </p>
-                   )}
-                 </div>
+                <div className="w-28 flex flex-col items-center justify-center">
+                  <RadioButton
+                    name={`modal-${line.lineId}`}
+                    value="customer_location"
+                    checked={currentDraft === "customer_location"}
+                    onChange={() => handleDraftChange(line.lineId, "customer_location")}
+                  />
+                  {serviceAttendance[line.lineId]?.error && (
+                    <p className="text-[10px] text-brand-red text-center mt-1 leading-tight">
+                      {serviceAttendance[line.lineId].error}
+                    </p>
+                  )}
+                  {serviceAttendance[line.lineId]?.distanceKm != null && serviceAttendance[line.lineId]?.covered && (
+                    <p className="text-[10px] text-brand-inactive-text text-center mt-1">
+                      {Number(serviceAttendance[line.lineId].distanceKm).toFixed(2)} km
+                    </p>
+                  )}
+                </div>
               </div>
             )
           })}

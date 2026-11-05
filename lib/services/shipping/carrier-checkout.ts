@@ -66,17 +66,28 @@ export function carrierReasonMessage(reason: CarrierUnavailableReason): string {
   }
 }
 
-// Cotação SuperFrete é a parte mais lenta do checkout (roundtrip à API).
-// Cache em memória por parceiro + CEPs + parâmetros do pacote torna
-// instantâneas as repetições: troca de serviço (PAC/SEDEX), recálculo de
-// totais, reabertura do checkout e submit. Sucesso de até 30min; se a
-// API falhar depois, servimos o último resultado de até 1h (stale-if-error).
-// Requisições concorrentes da mesma chave compartilham um único roundtrip.
-const CARRIER_QUOTE_TTL_MS = 30 * 60 * 1000
-const CARRIER_QUOTE_STALE_MS = 60 * 60 * 1000
+// Cotação SuperFrete: cache em memória curto (3min) por parceiro + CEPs + itens
+// torna instantâneas as repetições (troca de modalidade, recálculo de totais, reabertura
+// do checkout). Se a API falhar depois, servimos o último resultado de até 15min.
+const CARRIER_QUOTE_TTL_MS = 3 * 60 * 1000
+const CARRIER_QUOTE_STALE_MS = 15 * 60 * 1000
 const CARRIER_QUOTE_CACHE_MAX = 100
 const carrierQuoteCache = new Map<string, { at: number; result: CarrierQuoteResult }>()
 const carrierQuoteInflight = new Map<string, Promise<CarrierQuoteResult>>()
+
+export function clearCarrierQuoteCache(partnerId?: string): void {
+  if (partnerId) {
+    for (const key of carrierFastCache.keys()) {
+      if (key.startsWith(`${partnerId}|`)) carrierFastCache.delete(key)
+    }
+    for (const key of carrierQuoteCache.keys()) {
+      if (key.startsWith(`${partnerId}|`)) carrierQuoteCache.delete(key)
+    }
+  } else {
+    carrierFastCache.clear()
+    carrierQuoteCache.clear()
+  }
+}
 
 function pruneCarrierQuoteCache(now: number): void {
   for (const [key, entry] of carrierQuoteCache) {
@@ -340,7 +351,12 @@ export async function quoteCarrierFreightOptions(
 
 export async function quoteCarrierFreightFee(
   supabase: SupabaseClient,
-  input: { partnerId: string; toPostalCode: string; serviceId: number },
+  input: {
+    partnerId: string
+    toPostalCode: string
+    serviceId: number
+    items?: CarrierQuoteItemInput[]
+  },
 ): Promise<
   | { success: true; fee: number; breakdown: Record<string, unknown> }
   | { success: false; error: string; reason: CarrierUnavailableReason }
@@ -348,6 +364,7 @@ export async function quoteCarrierFreightFee(
   const quoted = await quoteCarrierFreightOptions(supabase, {
     partnerId: input.partnerId,
     toPostalCode: input.toPostalCode,
+    items: input.items,
   })
   if (!quoted.available) {
     return { success: false, error: carrierReasonMessage(quoted.reason), reason: quoted.reason }
