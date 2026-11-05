@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react"
 import { XIcon, TruckIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox, InfoCard, ListItem, FormDropdown } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { quoteCarrierFreightAction } from "@/app/actions/marketplace/carrier-shipping"
 import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
+import { DELIVERY_STATUS_OPTIONS } from "@/lib/orders/status"
+import { CARRIER_SHIPMENT_STATUS_OPTIONS } from "@/lib/services/shipping/superfrete"
+import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
 import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -78,11 +81,16 @@ interface POSShippingSheetProps {
         distanceKm?: number | null
         breakdown?: Record<string, unknown> | null
         deliveryAddress?: ShippingAddress
+        /** Status de entrega/envio escolhido (valor cru da opção selecionada). */
+        deliveryStatus?: string | null
+        isCustom?: boolean
     }) => void
     /** Força a exibição da seção de transportadora (edição de pedido já carrier). */
     preferCarrier?: boolean
     /** Serviço de transportadora pré-selecionado. */
     initialCarrierServiceId?: number | null
+    /** Status de entrega/envio atual (edição de pedido). */
+    initialDeliveryStatus?: string | null
     /** Itens do pedido para cálculo exato de cubagem e peso via product_logistics. */
     items?: Array<{ productId?: string | null; product_id?: string | null; id?: string | null; quantity?: number; [key: string]: any }>
 }
@@ -101,6 +109,7 @@ export default function POSShippingSheet({
     onApply,
     preferCarrier = false,
     initialCarrierServiceId = null,
+    initialDeliveryStatus = null,
     items = [],
 }: POSShippingSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
@@ -122,8 +131,11 @@ export default function POSShippingSheet({
     const [carrierLoading, setCarrierLoading] = useState(false)
     const [carrierError, setCarrierError] = useState<string | null>(null)
     const [selectedCarrierServiceId, setSelectedCarrierServiceId] = useState<number | null>(null)
+    const [carrierRetryNonce, setCarrierRetryNonce] = useState(0)
     const carrierFetchedCepRef = useRef<string | null>(null)
     const carrierFetchIdRef = useRef(0)
+
+    const [deliveryStatus, setDeliveryStatus] = useState<string>(initialDeliveryStatus || "")
 
     const [zipCode, setZipCode] = useState("")
     const [street, setStreet] = useState("")
@@ -146,8 +158,20 @@ export default function POSShippingSheet({
     const activeAddress = (useOrderAddress && hasOrderAddress) ? deliveryAddress : customerDetails?.address
     const activeHasStreet = !!activeAddress?.street?.trim()
 
+    // O reset deve acontecer apenas na transição fechado → aberto. Se ele
+    // rodasse a cada mudança de `currentShippingFee`/`hasOrderAddress` (o pai
+    // recalcula o frete ao preencher o endereço), o aviso de "fora do raio" e
+    // as opções de transportadora já carregadas eram apagados no meio da
+    // primeira abertura - só voltavam ao fechar e abrir de novo.
+    const wasOpenRef = useRef(false)
     useEffect(() => {
-        if (!isOpen) return
+        if (!isOpen) {
+            wasOpenRef.current = false
+            return
+        }
+        if (wasOpenRef.current) return
+        wasOpenRef.current = true
+
         setShippingInput(Number(currentShippingFee || 0))
         setShippingFree(false)
         setIsCustomShipping(false)
@@ -158,10 +182,13 @@ export default function POSShippingSheet({
         setCarrierLoading(false)
         setCarrierError(null)
         setSelectedCarrierServiceId(null)
+        setDeliveryStatus(initialDeliveryStatus || "")
         carrierFetchedCepRef.current = null
         carrierFetchIdRef.current++
-        if (hasOrderAddress) setUseOrderAddress(true)
-    }, [isOpen, currentShippingFee, hasOrderAddress])
+        // Por padrão usa o endereço do cliente. A aba de endereço do pedido
+        // só é usada quando o usuário ativa o checkbox manualmente.
+        setUseOrderAddress(false)
+    }, [isOpen, currentShippingFee, initialDeliveryStatus])
 
     useEffect(() => {
         if (!customerDetails?.address) return
@@ -218,7 +245,6 @@ export default function POSShippingSheet({
     const hasStreet = !!customerDetails?.address?.street?.trim()
 
     const isStoreSubsidizedBySettings = (breakdown as any)?.deliveryPayer === "seller"
-    const isSubsidized = isCustomShipping ? shippingFree : isStoreSubsidizedBySettings
 
     const calculatedOriginalFee = Number((breakdown as any)?.originalFee || (breakdown as any)?.baseFee || 0)
     const isFreeByThreshold = Boolean((breakdown as any)?.isFreeByThreshold)
@@ -233,6 +259,17 @@ export default function POSShippingSheet({
         ? (carrierOptions.find((o) => o.serviceId === selectedCarrierServiceId) || carrierOptions[0])
         : null
     const useCarrier = carrierSectionVisible && !isCustomShipping && Boolean(effectiveCarrierOption)
+    const isSubsidized = useCarrier ? false : (isCustomShipping ? shippingFree : isStoreSubsidizedBySettings)
+
+    // Status muda conforme a modalidade: transportadora usa o ciclo do envio
+    // (postagem/trânsito) e a entrega própria usa o ciclo de entrega.
+    const deliveryStatusOptions = useCarrier
+        ? CARRIER_SHIPMENT_STATUS_OPTIONS
+        : DELIVERY_STATUS_OPTIONS
+    const defaultDeliveryStatus = useCarrier ? "released" : "not_sent"
+    const effectiveDeliveryStatus = deliveryStatusOptions.some((option) => option.value === deliveryStatus)
+        ? deliveryStatus
+        : defaultDeliveryStatus
 
     const feeToDisplay = isCustomShipping
         ? Math.max(0, Number(shippingInput || calculatedFee || 0))
@@ -264,7 +301,9 @@ export default function POSShippingSheet({
         const destinationAddress = `${activeAddress?.street || ""}, ${activeAddress?.number || ""} - ${activeAddress?.neighborhood || ""}, ${activeAddress?.city || ""} - ${activeAddress?.state || ""}, ${activeAddress?.zipCode || ""}`
         setIsQuoteLoading(true)
         setDeliveryError(null)
-        setOutsideRadiusWarning(null)
+        // Não limpamos o aviso de raio antes da resposta: se a cotação for
+        // reexecutada (ex.: coordenadas do cliente chegaram depois), a seção
+        // de transportadora não "pisca" nem some no meio da abertura.
         // Debounce: evita disparar a cotação a cada tecla/atualização de estado.
         const timer = setTimeout(() => {
             ; (async () => {
@@ -310,10 +349,18 @@ export default function POSShippingSheet({
         useOrderAddress,
         customerDetails?.id,
         customerDetails?.address?.street,
+        customerDetails?.address?.number,
+        customerDetails?.address?.neighborhood,
+        customerDetails?.address?.city,
+        customerDetails?.address?.state,
         customerDetails?.address?.zipCode,
         customerDetails?.address?.latitude,
         customerDetails?.address?.longitude,
         deliveryAddress?.street,
+        deliveryAddress?.number,
+        deliveryAddress?.neighborhood,
+        deliveryAddress?.city,
+        deliveryAddress?.state,
         deliveryAddress?.zipCode,
         orderSubtotal,
     ])
@@ -370,7 +417,7 @@ export default function POSShippingSheet({
             setCarrierLoading(false)
             setCarrierError("Informe o CEP para cotar a transportadora.")
         }
-    }, [isOpen, hasSelectedCustomer, activeHasStreet, destinationCep, partnerId])
+    }, [isOpen, hasSelectedCustomer, activeHasStreet, destinationCep, partnerId, carrierRetryNonce])
 
     const content = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -386,6 +433,7 @@ export default function POSShippingSheet({
                     <TabsList className="w-full">
                         <TabsTrigger value="cliente">Cliente</TabsTrigger>
                         <TabsTrigger value="valores">Valores</TabsTrigger>
+                        <TabsTrigger value="status">Status</TabsTrigger>
                     </TabsList>
                     <TabsContent value="cliente" className="mt-4 space-y-4">
                         {!hasSelectedCustomer && (
@@ -440,32 +488,59 @@ export default function POSShippingSheet({
                                     </p>
                                 )}
                                 {!carrierLoading && carrierError && (
-                                    <p className="text-xs text-brand-red">{carrierError}</p>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs text-brand-red">{carrierError}</p>
+                                        {destinationCep.length === 8 && (
+                                            <Button
+                                                variant="link"
+                                                type="button"
+                                                className="shrink-0"
+                                                onClick={() => {
+                                                    carrierFetchedCepRef.current = null
+                                                    setCarrierError(null)
+                                                    setCarrierRetryNonce((value) => value + 1)
+                                                }}
+                                            >
+                                                Tentar novamente
+                                            </Button>
+                                        )}
+                                    </div>
                                 )}
                                 {!carrierLoading && !carrierError && carrierOptions.map((opt) => {
                                     const isSelected = !isCustomShipping && (effectiveCarrierOption?.serviceId === opt.serviceId)
                                     return (
-                                        <button
+                                        <ListItem
                                             key={opt.serviceId}
-                                            type="button"
                                             onClick={() => setSelectedCarrierServiceId(opt.serviceId)}
-                                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
-                                                ? "border-brand-green bg-green-50/40 dark:bg-green-900/10"
-                                                : "border-brand-border dark:border-dark-border hover:border-brand-green/60 dark:hover:border-brand-green/40"
+                                            className={`px-4 py-3 ${isSelected
+                                                ? "border-brand-green ring-1 ring-brand-green/40"
+                                                : "hover:border-brand-green/60 dark:hover:border-brand-green/40"
                                                 }`}
-                                        >
-                                            <span className="min-w-0">
-                                                <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                    {[opt.companyName, opt.serviceName].filter(Boolean).join(" - ")}
-                                                </span>
-                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    {formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
-                                                </span>
-                                            </span>
-                                            <span className="shrink-0 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(opt.price)}
-                                            </span>
-                                        </button>
+                                            left={(
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
+                                                    <img
+                                                        src={getCarrierBrandIcon(opt.companyName, opt.serviceName)}
+                                                        alt={opt.companyName || "Transportadora"}
+                                                        className="h-7 w-7 object-contain"
+                                                    />
+                                                </div>
+                                            )}
+                                            title={[opt.companyName, opt.serviceName].filter(Boolean).join(" - ")}
+                                            description={formatDeliveryDaysRange(opt.deliveryMinDays, opt.deliveryMaxDays)}
+                                            right={(
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(opt.price)}
+                                                    </span>
+                                                    <span
+                                                        className={`h-4 w-4 rounded-full border transition-colors ${isSelected
+                                                            ? "border-brand-green bg-brand-green"
+                                                            : "border-brand-border dark:border-dark-border"
+                                                            }`}
+                                                    />
+                                                </div>
+                                            )}
+                                        />
                                     )
                                 })}
                             </div>
@@ -503,18 +578,22 @@ export default function POSShippingSheet({
                                     <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Distância</span>
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa base</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa por distância</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Ajuste por horário</span>
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span>
-                                </div>
+                                {!useCarrier && (
+                                    <>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa base</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa por distância</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Ajuste por horário</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
 
                                 <div className="flex items-center justify-between gap-2 text-sm mt-2 pt-2 border-t border-brand-border dark:border-dark-border">
                                     <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Taxa do envio</span>
@@ -561,6 +640,32 @@ export default function POSShippingSheet({
                             </div>
                         )}
                     </TabsContent>
+                    <TabsContent value="status" className="mt-4 space-y-4">
+                        {!hasSelectedCustomer ? (
+                            <p className="text-sm text-brand-inactive-text">
+                                Selecione um cliente no PDV para configurar o envio.
+                            </p>
+                        ) : (
+                            <>
+                                <FormDropdown
+                                    label={useCarrier ? "Status do envio (transportadora)" : "Status de entrega"}
+                                    options={deliveryStatusOptions}
+                                    value={effectiveDeliveryStatus}
+                                    setValue={setDeliveryStatus}
+                                />
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    {useCarrier
+                                        ? "As opções acompanham o ciclo da transportadora (postagem, trânsito e entrega)."
+                                        : "Use para informar se a entrega já saiu para rota ou foi concluída."}
+                                </p>
+                                {carrierSectionVisible && carrierLoading && (
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Calculando transportadora...
+                                    </p>
+                                )}
+                            </>
+                        )}
+                    </TabsContent>
                 </Tabs>
             </div>
 
@@ -571,7 +676,7 @@ export default function POSShippingSheet({
                     </Button>
                     <Button
                         className="h-12 flex-1"
-                        disabled={!hasSelectedCustomer || !activeHasStreet}
+                        disabled={!hasSelectedCustomer || !activeHasStreet || (carrierSectionVisible && carrierLoading)}
                         onClick={() => {
                             const carrier = useCarrier ? effectiveCarrierOption : null
                             const effectiveDeliveryPayer = carrier
@@ -607,6 +712,8 @@ export default function POSShippingSheet({
                                         deliverySubsidy: effectiveDeliveryPayer === "seller" ? effectiveOriginalFee : 0,
                                     },
                                 deliveryAddress: activeAddress || null,
+                                deliveryStatus: effectiveDeliveryStatus,
+                                isCustom: isCustomShipping,
                             })
                         }}
                     >

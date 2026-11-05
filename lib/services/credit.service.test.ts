@@ -6,6 +6,12 @@ import {
 } from "./credit.service"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+let currentMockClient: any = null
+
+vi.mock("@/lib/supabase/admin", () => ({
+  getAdminClient: () => currentMockClient,
+}))
+
 function createSupabaseMock() {
   const tableResponses: Record<string, any[]> = {}
   let rpcResponse: any = { data: true, error: null }
@@ -40,6 +46,7 @@ function createSupabaseMock() {
     }),
     rpc: vi.fn().mockImplementation(async () => rpcResponse),
   }
+  currentMockClient = client
 
   return {
     client: client as unknown as SupabaseClient,

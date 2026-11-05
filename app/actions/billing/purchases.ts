@@ -155,11 +155,10 @@ export async function createPurchaseAction(
         if (!user) return { success: false, error: "Não autenticado" }
 
         const adminUser = await getAdminRole()
-        if (adminUser) {
-            await requireAdminScope("billing_control", "admin")
-        } else {
-            await requirePartnerAccess(input.partner_id, user)
+        if (!adminUser) {
+            return { success: false, error: "Apenas administradores podem criar faturas manualmente" }
         }
+        await requireAdminScope("billing_control", "admin")
 
         const admin = getAdminClient()
         const totalAmount = input.total_amount ?? input.amount
@@ -325,7 +324,11 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
             .limit(1)
             .maybeSingle()
 
-        if (bySaaSCompleted) return { success: true, data: bySaaSCompleted }
+        if (bySaaSCompleted) {
+            const scope = await resolveBillingPartnerScope(user, bySaaSCompleted.partner_id)
+            if (!scope.allowed) return { success: false, error: "Acesso negado" }
+            return { success: true, data: bySaaSCompleted }
+        }
 
         // 2. Busca por subscription_id (qualquer status)
         const { data: bySaaS } = await admin
@@ -336,7 +339,11 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
             .limit(1)
             .maybeSingle()
 
-        if (bySaaS) return { success: true, data: bySaaS }
+        if (bySaaS) {
+            const scope = await resolveBillingPartnerScope(user, bySaaS.partner_id)
+            if (!scope.allowed) return { success: false, error: "Acesso negado" }
+            return { success: true, data: bySaaS }
+        }
 
         // 3. Fallback: Busca se subscriptionId for da tabela SaaS subscriptions mas com partner_id
         const { data: saasSub } = await admin
@@ -356,7 +363,11 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
                 .limit(1)
                 .maybeSingle()
 
-            if (byPartner) return { success: true, data: byPartner }
+            if (byPartner) {
+                const scope = await resolveBillingPartnerScope(user, byPartner.partner_id)
+                if (!scope.allowed) return { success: false, error: "Acesso negado" }
+                return { success: true, data: byPartner }
+            }
         }
 
         // 4. Fallback: Busca por recurring_subscription_id (marketplace customer subscriptions)
@@ -368,7 +379,11 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
             .limit(1)
             .maybeSingle()
 
-        if (byRecurring) return { success: true, data: byRecurring }
+        if (byRecurring) {
+            const scope = await resolveBillingPartnerScope(user, byRecurring.partner_id)
+            if (!scope.allowed) return { success: false, error: "Acesso negado" }
+            return { success: true, data: byRecurring }
+        }
 
         return { success: false, error: "Nenhuma fatura encontrada para esta assinatura." }
     } catch (error: any) {
@@ -382,6 +397,9 @@ export async function getLatestCompletedPurchaseForPartnerAction(partnerId: stri
         if (!user) return { success: false, error: "Não autenticado" }
 
         if (!partnerId) return { success: false, error: "ID do parceiro não fornecido" }
+
+        const scope = await resolveBillingPartnerScope(user, partnerId)
+        if (!scope.allowed) return { success: false, error: "Acesso negado" }
 
         const admin = getAdminClient()
         const { data: purchase } = await admin

@@ -4,6 +4,9 @@ import { randomBytes, createHash } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -26,6 +29,7 @@ function inviteUrl(token: string) {
 }
 
 export async function listDeliveryDriversAdminAction(params?: { limit?: number; cursor?: string | null }) {
+  await requireRateLimit(RateLimitCategory.ADMIN_READ)
   await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const limit = Math.min(Math.max(Number(params?.limit || 25), 1), 50)
@@ -76,20 +80,24 @@ export async function listDeliveryDriversAdminAction(params?: { limit?: number; 
 }
 
 export async function getDeliveryDriverAdminAction(driverId: string) {
+  await requireRateLimit(RateLimitCategory.ADMIN_READ)
   await requireAdminScope("user_enforcement", "admin")
+  const safeDriverId = sanitizeUUID(driverId)
+  if (!safeDriverId) return { success: false as const, error: "ID de entregador inválido." }
+
   const admin = getAdminClient()
   const { data: driver, error } = await admin
     .from("delivery_drivers")
     .select("user_id, city, neighborhood, vehicle_type, availability_status, is_active, notes, terms_accepted_at, terms_version, created_at, updated_at")
-    .eq("user_id", driverId)
+    .eq("user_id", safeDriverId)
     .maybeSingle()
   if (error || !driver) return { success: false as const, error: "Entregador não encontrado." }
 
   const [{ data: profile }, authResult, { data: assignments }, { data: links }] = await Promise.all([
-    admin.from("user_profiles").select("user_id, full_name, phone, avatar_url").eq("user_id", driverId).maybeSingle(),
-    admin.auth.admin.getUserById(driverId),
-    admin.from("delivery_assignments").select("id, order_id, partner_id, status, delivery_fee, assigned_at, completed_at, failure_reason, payment_confirmed_at").eq("driver_id", driverId).order("assigned_at", { ascending: false }).limit(100),
-    admin.from("delivery_driver_partners").select("id, partner_id, is_active, created_at").eq("driver_id", driverId).order("created_at", { ascending: false }),
+    admin.from("user_profiles").select("user_id, full_name, phone, avatar_url").eq("user_id", safeDriverId).maybeSingle(),
+    admin.auth.admin.getUserById(safeDriverId),
+    admin.from("delivery_assignments").select("id, order_id, partner_id, status, delivery_fee, assigned_at, completed_at, failure_reason, payment_confirmed_at").eq("driver_id", safeDriverId).order("assigned_at", { ascending: false }).limit(100),
+    admin.from("delivery_driver_partners").select("id, partner_id, is_active, created_at").eq("driver_id", safeDriverId).order("created_at", { ascending: false }),
   ])
 
   const partnerIds = Array.from(new Set((links || []).map((row: any) => String(row.partner_id)).filter(Boolean)))
@@ -138,6 +146,7 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
   latitude?: number | null
   longitude?: number | null
 }) {
+  await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
   const adminUser = await requireAdminScope("user_enforcement", "admin")
   const email = clean(input.email, 254).toLowerCase()
   const fullName = clean(input.fullName)
@@ -233,7 +242,12 @@ export async function updateDeliveryDriverAdminAction(input: {
   latitude?: number | null
   longitude?: number | null
 }) {
+  await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
   const adminUser = await requireAdminScope("user_enforcement", "admin")
+  const safeDriverId = sanitizeUUID(input.driverId)
+  if (!safeDriverId) {
+    return { success: false as const, error: "ID de entregador inválido." }
+  }
   const city = clean(input.city, 100)
   const neighborhood = clean(input.neighborhood, 100)
   const zipCode = clean(input.zipCode, 20) || null
@@ -244,7 +258,7 @@ export async function updateDeliveryDriverAdminAction(input: {
   const latitude = typeof input.latitude === "number" && !isNaN(input.latitude) ? input.latitude : null
   const longitude = typeof input.longitude === "number" && !isNaN(input.longitude) ? input.longitude : null
 
-  if (!input.driverId || !city || !neighborhood || !(["moto", "carro"] as string[]).includes(input.vehicleType)) {
+  if (!city || !neighborhood || !(["moto", "carro"] as string[]).includes(input.vehicleType)) {
     return { success: false as const, error: "Dados do entregador inválidos." }
   }
   const admin = getAdminClient()
@@ -264,13 +278,13 @@ export async function updateDeliveryDriverAdminAction(input: {
     updated_at: new Date().toISOString(),
   }
   if (!input.isActive) patch.availability_status = "offline"
-  const { error } = await admin.from("delivery_drivers").update(patch).eq("user_id", input.driverId)
+  const { error } = await admin.from("delivery_drivers").update(patch).eq("user_id", safeDriverId)
   if (error) return { success: false as const, error: "Não foi possível atualizar o entregador." }
   await adminAuditLog({
     adminUserId: adminUser.userId,
     actionType: input.isActive ? AdminActionType.DELIVERY_DRIVER_UPDATE : AdminActionType.DELIVERY_DRIVER_DEACTIVATE,
     targetType: "user",
-    targetId: input.driverId,
+    targetId: safeDriverId,
     metadata: { city, neighborhood, vehicleType: input.vehicleType, isActive: !!input.isActive },
   })
   revalidatePath("/ddt-admin/entregadores")
@@ -278,6 +292,7 @@ export async function updateDeliveryDriverAdminAction(input: {
 }
 
 export async function getDeliveryDriverStatsAdminAction() {
+  await requireRateLimit(RateLimitCategory.ADMIN_READ)
   await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const [totalRes, activeRes, inactiveRes, availableRes, offlineRes, invitesRes] = await Promise.all([
@@ -299,6 +314,7 @@ export async function getDeliveryDriverStatsAdminAction() {
 }
 
 export async function listDeliveryDriverInvitationsAdminAction(params?: { limit?: number }) {
+  await requireRateLimit(RateLimitCategory.ADMIN_READ)
   await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
@@ -320,13 +336,18 @@ export async function listDeliveryDriverInvitationsAdminAction(params?: { limit?
 }
 
 export async function revokeDeliveryDriverInvitationAdminAction(invitationId: string) {
+  await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
   const adminUser = await requireAdminScope("user_enforcement", "admin")
+  const safeInvitationId = sanitizeUUID(invitationId)
+  if (!safeInvitationId) {
+    return { success: false as const, error: "ID de convite inválido." }
+  }
   const admin = getAdminClient()
 
   const { error } = await admin
     .from("delivery_driver_invitations")
     .update({ revoked_at: new Date().toISOString() })
-    .eq("id", invitationId)
+    .eq("id", safeInvitationId)
 
   if (error) {
     return { success: false as const, error: "Não foi possível revogar o convite." }
@@ -336,8 +357,8 @@ export async function revokeDeliveryDriverInvitationAdminAction(invitationId: st
     adminUserId: adminUser.userId,
     actionType: AdminActionType.DELIVERY_DRIVER_INVITE_REVOKE,
     targetType: "system",
-    targetId: invitationId,
-    metadata: { invitationId },
+    targetId: safeInvitationId,
+    metadata: { invitationId: safeInvitationId },
   })
 
   revalidatePath("/ddt-admin/entregadores")
@@ -345,13 +366,18 @@ export async function revokeDeliveryDriverInvitationAdminAction(invitationId: st
 }
 
 export async function resendDeliveryDriverInvitationAdminAction(invitationId: string) {
+  await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
   const adminUser = await requireAdminScope("user_enforcement", "admin")
+  const safeInvitationId = sanitizeUUID(invitationId)
+  if (!safeInvitationId) {
+    return { success: false as const, error: "Convite não encontrado." }
+  }
   const admin = getAdminClient()
 
   const { data: inv, error } = await admin
     .from("delivery_driver_invitations")
     .select("id, email, full_name, phone, city, neighborhood, vehicle_type, notes")
-    .eq("id", invitationId)
+    .eq("id", safeInvitationId)
     .maybeSingle()
 
   if (error || !inv) {
@@ -369,7 +395,7 @@ export async function resendDeliveryDriverInvitationAdminAction(invitationId: st
       revoked_at: null,
       used_at: null,
     })
-    .eq("id", invitationId)
+    .eq("id", safeInvitationId)
 
   const url = inviteUrl(token)
   const templateId = SMTP2GO_TEMPLATE_IDS.deliveryDriverInvitation || undefined
@@ -392,8 +418,8 @@ export async function resendDeliveryDriverInvitationAdminAction(invitationId: st
     adminUserId: adminUser.userId,
     actionType: AdminActionType.DELIVERY_DRIVER_INVITE_RESEND,
     targetType: "system",
-    targetId: invitationId,
-    metadata: { invitationId, email: inv.email, emailSent: emailResult.success },
+    targetId: safeInvitationId,
+    metadata: { invitationId: safeInvitationId, email: inv.email, emailSent: emailResult.success },
   })
   return { success: true as const, emailSent: emailResult.success, inviteUrl: url }
 }

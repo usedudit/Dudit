@@ -39,17 +39,15 @@ export default function POSCashClosedView({
     }, [])
 
     const timeString = useMemo(() => {
-        return formatInTz(now, tz, "dd/MM/yyyy '•' HH:mm:ss")
+        return formatInTz(now, tz, "dd/MM/yyyy '•' HH:mm")
     }, [now, tz])
 
     const difference = lastSession ? Number(lastSession.difference_amount || 0) : null
-    const hasDifference = difference !== null && Math.abs(difference) > 0.01
 
     return (
         <div className="flex h-full flex-col items-center justify-center gap-6 px-4 py-8">
             {/* Date/Time */}
-            <div className="flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body">
-                <ClockIcon className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-2xl font-bold text-brand-dark dark:text-dark-heading">
                 <span>{timeString}</span>
             </div>
 
@@ -80,6 +78,7 @@ export default function POSCashClosedView({
                 isOpen={isOpenCashModalOpen}
                 onClose={() => setIsOpenCashModalOpen(false)}
                 title="Abrir caixa"
+                maxWidth="sm"
                 footer={
                     <div className="flex w-full items-center gap-3">
                         <Button

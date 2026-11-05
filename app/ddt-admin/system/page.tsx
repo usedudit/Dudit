@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { AdminHeader } from "@/components/admin/admin-header"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { getMaintenanceConfig, getGlobalAnnouncementConfig } from "@/lib/services/system-settings.service"
 import { SystemMaintenancePage } from "@/components/admin/system/SystemMaintenancePage"
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminSystemPage() {
-  await requireAdmin("admin")
+  await requireAdminScope("system_settings", "admin")
 
   const [maintenance, announcement] = await Promise.all([
     getMaintenanceConfig(),

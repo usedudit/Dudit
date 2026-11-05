@@ -920,3 +920,99 @@ Foi criado `npm run migrate:r2-private`, que lista objetos no bucket público, c
   - Total: 18 testes passando.
 - `git diff --check` verificado sem problemas de whitespace.
 - Nenhuma operação destrutiva nem alteração em produção realizada.
+
+### Assinaturas da Plataforma SaaS Dudit (Mercado Pago, Planos, Upgrades/Downgrades, Faturas e Reconciliação) — 05/11/2026
+
+**1. Auditoria do Ciclo de Vida de Assinaturas SaaS (`app/actions/erp/subscriptions.ts` e `lib/services/mercadopago/subscriptions.ts`):**
+- **Arquitetura de Pagamentos:**
+  - O faturamento dos planos SaaS da Dudit (Começar, Crescer, Escalar) é processado com credenciais de plataforma do Mercado Pago (`MP_SUBSCRIPTION_CLIENT_ID` / `MP_SUBSCRIPTION_CLIENT_SECRET`), sem uso de intermediários externos (como Asaas).
+  - Isolamento estrito de proprietário: `requirePartner()` exige validação em profundidade `partner.user_id === user.id`. Membros de equipe (não proprietários) são bloqueados de criar, cancelar ou alterar planos da empresa.
+  - Upgrades mantêm o plano atual ativo até a confirmação do pagamento do novo plano pelo webhook do Mercado Pago (evitando interrupção prematura de serviço).
+  - Downgrades e cancelamentos respeitam o ciclo vigente (`cancel_at_period_end`), preservando o acesso pago até `current_period_end`, momento em que o agendamento rotaciona o plano na mesma linha e arquiva recursos excedentes de forma segura via `enforcePlanLimitsAndArchiveExcess`.
+- **Reconciliação e Inadimplência:**
+  - O cron job `app/api/cron/reconcile-subscriptions/route.ts` autentica chamadas com `isValidBearerToken` em tempo constante.
+  - `lib/billing/reconcile-subscriptions.ts` valida tanto o status do preapproval quanto as cobranças reais em `authorized_payments`. Inadimplência inicia grace period de 3 dias (`PAST_DUE_GRACE_PERIOD_DAYS`), após o qual a assinatura é cancelada e os recursos excedentes são arquivados para o plano gratuito.
+
+**2. IDOR e Ausência de Verificação de Tenant em Consultas de Fatura Recente (CWE-639 / CWE-285):**
+- **Vulnerabilidade identificada:**
+  - Em `app/actions/billing/purchases.ts`, as Server Actions `getLatestCompletedPurchaseForPartnerAction` e `getLatestPurchaseForSubscriptionAction` recebiam `partnerId` ou `subscriptionId` e retornavam a fatura mais recente de `billing_purchases` sem validar se o usuário autenticado possuía permissão sobre aquele parceiro ou assinatura.
+  - Isso permitia que qualquer usuário autenticado na plataforma consultasse dados financeiros, valores e descrições de compras de qualquer outra empresa cadastrada.
+- **Correção aplicada:**
+  - Integrada a validação de escopo via `resolveBillingPartnerScope(user, partnerId)` em ambas as funções. Consultas para parceiros fora do escopo do usuário autenticado são imediatamente rejeitadas com erro `Acesso negado`.
+
+**3. Criação de Faturas Arbitrárias por Usuários Não Administradores (CWE-285 / CWE-20):**
+- **Vulnerabilidade identificada:**
+  - Em `app/actions/billing/purchases.ts`, `createPurchaseAction` permitia que usuários comuns com acesso ao parceiro criassem registros em `billing_purchases` informando `input.amount` e `input.total_amount` arbitrários.
+  - No fluxo do sistema, faturas e cobranças são geradas estritamente de forma determinística pelo motor de faturamento (`recordSubscriptionCharge`) e webhooks.
+- **Correção aplicada:**
+  - `createPurchaseAction` agora exige estritamente a permissão administrativa global `requireAdminScope("billing_control", "admin")`.
+
+**4. Endurecimento contra Fallback Silencioso de Credenciais do Mercado Pago (CWE-1188):**
+- **Vulnerabilidade identificada:**
+  - Em `lib/services/mercadopago/subscriptions.ts`, a função `getMpPlatformAccessToken` retornava a string estática `"build-time-placeholder-token"` se as variáveis de ambiente `MP_SUBSCRIPTION_CLIENT_ID` ou `MP_SUBSCRIPTION_CLIENT_SECRET` não estivessem definidas.
+  - Em ambiente de produção, a ausência acidental dessas credenciais causava chamadas HTTP com token inválido e falhas obscuras na API do Mercado Pago em vez de alertar a falha de configuração imediatamente.
+- **Correção aplicada:**
+  - `getMpPlatformAccessToken` agora lança uma exceção imediata em ambiente de produção (`NODE_ENV === "production"`), prevenindo requisições degradadas e viabilizando diagnóstico imediato.
+
+**5. Segurança no Processamento de Reembolsos de Assinatura (`app/actions/billing/refunds.ts`):**
+- **Verificado:** Exigência de Step-Up Authentication com validação de senha do administrador, confirmação explícita da palavra "ESTORNAR", escopo administrativo `billing_control`, auditoria detalhada (`logBillingAdminAudit`) e anexos com URLs assinadas via R2.
+
+### Painel de Administração Global, Moderação e Enforcement — 05/11/2026
+
+**1. Auditoria da Arquitetura do Painel Administrativo (`app/ddt-admin/*` e `app/actions/admin/*`):**
+- **Autenticação e Hierarquia de Papéis:**
+  - O painel global opera sob a rota `/ddt-admin/*`, protegido pelo `AdminLayout` (`app/ddt-admin/layout.tsx`) com `await requireAdmin()`.
+  - Modelo RBAC baseado no banco de dados (`admin_roles`), sem confiar em claims do cliente.
+  - Papéis estruturados em hierarquia: `moderator` (1), `admin` (2), `super_admin` (3), combinados com controle granular de escopos (`moderation`, `user_enforcement`, `billing_control`, `audit_access`, `system_settings`).
+  - Guards de autoproteção ativos: `assertNotSelf` (impede auto-banimento e auto-suspensão), `assertNotProtected` (protege contas de sistema e super_admins protegidos), `assertNotLastAdmin` (impede exclusão do último administrador do sistema).
+  - Step-up re-authentication (`lib/admin/step-up-auth.ts`): consome atomicamente tokens de sessão de 5 minutos gerados por reautenticação de senha para ações destrutivas (banimentos, desativações de tenant, cancelamentos de faturamento).
+
+**2. IDOR em Busca de Reembolsos de Assinatura (`app/actions/billing/refunds.ts` — CWE-639):**
+- **Vulnerabilidade identificada:**
+  - `getActiveRefundForPartnerAction` recebia `partnerId` e consultava a tabela `billing_refund_requests` verificando apenas se o usuário estava autenticado (`getCurrentUser()`), sem validar se pertencia à empresa indicada. Qualquer usuário logado podia consultar solicitações de estorno ativas, valores e motivos de outros parceiros.
+- **Correção aplicada:**
+  - Integrada a validação `resolveBillingPartnerScope(user, partnerId)`. Se `!scope.allowed`, a ação retorna `{ success: false, error: "Acesso não autorizado." }`.
+
+**3. Corrupção de Sessão do Cliente Service-Role em Processamento de Estornos (`app/actions/billing/refunds.ts` — CWE-250):**
+- **Vulnerabilidade identificada:**
+  - Em `adminProcessRefundAction`, a reautenticação de senha (step-up) invocava `supabase.auth.signInWithPassword({ email, password })` diretamente na instância do cliente `createAdminClient()`.
+  - Como o Supabase JS SDK muta os headers de autorização internos ao invocar mutações de autenticação, o token de serviço (`service_role`) era substituído pela sessão do usuário para as operações subsequentes naquele contexto de execução.
+- **Correção aplicada:**
+  - A verificação de senha foi desacoplada para um cliente Supabase temporário, não persistente (`createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } })`), preservando a integridade da conexão do `service_role`.
+  - Adicionado `await requireRateLimit(RateLimitCategory.ADMIN_ACTION)` em `adminProcessRefundAction` e `adminRejectRefundAction`.
+
+**4. Comparação em Tempo Constante e Rate Limiting no Bypass de Manutenção (`app/actions/admin/system.ts` — CWE-208):**
+- **Vulnerabilidade identificada:**
+  - A ação `setBypassCookieAction` comparava a chave de bypass informada pelo administrador através do operador padrão `!==`, expondo o sistema a ataques de canal lateral baseados em tempo (timing attacks).
+  - Não havia limitação de taxa (`requireRateLimit`) nas ações de controle de manutenção, anúncios globais e broadcast.
+- **Correção aplicada:**
+  - Substituída a comparação por `timingSafeStringEqual(token.trim(), config.bypass_token.trim())`.
+  - Adicionado `await requireRateLimit(RateLimitCategory.ADMIN_ACTION)` em `setBypassCookieAction`, `updateMaintenanceModeAdminAction`, `updateGlobalAnnouncementAdminAction` e `sendMaintenanceBroadcastAdminAction`, e `RateLimitCategory.ADMIN_READ` em `getSystemSettingsAdminAction`.
+  - Em `app/ddt-admin/system/page.tsx`, substituído `requireAdmin("admin")` por `requireAdminScope("system_settings", "admin")` para consistência em profundidade com as Server Actions.
+
+**5. Proteção de Disparo em Lote de Notificações Administrativas (`app/actions/admin/notifications.ts` — CWE-770):**
+- **Vulnerabilidade identificada:**
+  - `sendAdminAnnouncementAction` executava o envio em massa de anúncios e notificações para toda a base da plataforma sem rate limiting.
+- **Correção aplicada:**
+  - Adicionado `await requireRateLimit(RateLimitCategory.ADMIN_ACTION)` para conter abusos automatizados.
+
+**6. Rate Limiting e Sanitização de Identificadores no Portal do Entregador (`app/actions/admin/delivery-drivers.ts`):**
+- **Vulnerabilidade identificada:**
+  - As ações administrativas de entregadores (listagem, estatísticas, criação/reenvio de convites via SMTP2GO e revogações) operavam sem `requireRateLimit`. Além disso, identificadores (`driverId`, `invitationId`) não passavam por sanitização estrita de UUID.
+- **Correção aplicada:**
+  - Adicionado `requireRateLimit(RateLimitCategory.ADMIN_ACTION)` em mutações e envios de e-mail e `requireRateLimit(RateLimitCategory.ADMIN_READ)` nas consultas.
+  - Aplicado `sanitizeUUID` em todos os parâmetros de identificadores recebidos.
+
+**7. Desativação Completa de Catálogo na Moderação V2 e Clamping de Risk Score (`app/actions/admin/moderation-v2.ts`):**
+- **Vulnerabilidade identificada:**
+  - Em `deleteModerationTarget`, ao remover produtos ou serviços pela interface de moderação, apenas a coluna `deleted_at` era atualizada, deixando `is_active: true`, `status: "ativo"`, e omitindo `deleted_by` e `deleted_reason`. Consultas que filtrassem apenas por `is_active = true` continuavam localizando o item.
+  - Em `updatePartnerRiskScore`, o novo valor era limitado apenas superiormente (`Math.min(newScore, 100)`), permitindo valores negativos ou não-numéricos (`NaN`).
+- **Correção aplicada:**
+  - `deleteModerationTarget` agora atualiza de forma consistente `is_active: false`, `status: "deleted"`, `deleted_by: admin.userId` e `deleted_reason`.
+  - `updatePartnerRiskScore` agora normaliza o score com `Math.min(Math.max(Math.round(Number(newScore) || 0), 0), 100)`.
+
+**Validação desta rodada:**
+- `npx tsc --noEmit` executado com sucesso (código 0, zero erros de tipo).
+- `vitest` executado com sucesso em 92 suítes (931 testes passando no total, incluindo 12 novos testes em `lib/admin/admin-security-hardening.test.ts` e 11 testes em `lib/services/credit.service.test.ts`).
+- `git diff --check` verificado sem problemas de formatação.
+- Nenhuma operação destrutiva nem alteração em produção realizada.

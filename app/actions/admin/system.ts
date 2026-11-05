@@ -3,6 +3,9 @@
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { requireAdminScope } from "@/lib/auth/admin-authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
+import { timingSafeStringEqual } from "@/lib/security/timing-safe"
 import {
   getMaintenanceConfig,
   updateMaintenanceConfig,
@@ -29,6 +32,7 @@ export async function getSystemSettingsAdminAction(): Promise<{
   error?: string
 }> {
   try {
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
     await requireAdminScope("system_settings", "admin")
     const [maintenance, announcement] = await Promise.all([
       getMaintenanceConfig(),
@@ -54,6 +58,7 @@ export async function updateMaintenanceModeAdminAction(
   data: Partial<MaintenanceConfig>
 ): Promise<{ success: boolean; config?: MaintenanceConfig; error?: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await updateMaintenanceConfig(data, adminUser)
 
@@ -76,6 +81,7 @@ export async function updateGlobalAnnouncementAdminAction(
   data: Partial<GlobalAnnouncementConfig>
 ): Promise<{ success: boolean; config?: GlobalAnnouncementConfig; error?: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await updateGlobalAnnouncementConfig(data, adminUser)
 
@@ -98,6 +104,7 @@ export async function sendMaintenanceBroadcastAdminAction(
   data: MaintenanceBroadcastInput
 ): Promise<{ success: boolean; sentCount?: number; pushCount?: number; error?: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await dispatchMaintenanceBroadcast(data, adminUser)
     return result
@@ -112,13 +119,14 @@ export async function sendMaintenanceBroadcastAdminAction(
  */
 export async function setBypassCookieAction(token: string): Promise<{ success: boolean; error?: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireAdminScope("system_settings", "admin")
     const config = await getMaintenanceConfig()
     if (!config.allow_admin_bypass) {
       return { success: false, error: "Bypass de manutenção está desativado pelo sistema." }
     }
 
-    if (!token || token.trim() === LEGACY_DEFAULT_BYPASS_TOKEN || token.trim() !== config.bypass_token.trim()) {
+    if (!token || token.trim() === LEGACY_DEFAULT_BYPASS_TOKEN || !timingSafeStringEqual(token.trim(), config.bypass_token.trim())) {
       return { success: false, error: "Chave de bypass inválida." }
     }
 

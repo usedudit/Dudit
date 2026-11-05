@@ -789,10 +789,11 @@ export async function updatePartnerRiskScore(
         if (!store) return { success: false, error: "Loja do parceiro não encontrada" }
 
         const previousScore = store.risk_score || 0
+        const clampedScore = Math.min(Math.max(Math.round(Number(newScore) || 0), 0), 100)
 
         const { error } = await fetchAdmin
             .from("stores")
-            .update({ risk_score: Math.min(newScore, 100) })
+            .update({ risk_score: clampedScore })
             .eq("partner_id", partnerId)
 
         if (error) return { success: false, error: error.message }
@@ -805,8 +806,8 @@ export async function updatePartnerRiskScore(
             targetId: partnerId,
             fieldName: "risk_score",
             previousValue: String(previousScore),
-            newValue: String(newScore),
-            riskScoreIncrement: newScore - previousScore,
+            newValue: String(clampedScore),
+            riskScoreIncrement: clampedScore - previousScore,
             notes,
         })
 
@@ -816,13 +817,13 @@ export async function updatePartnerRiskScore(
             const teamUserIds = await getPartnerTeamUserIds(partnerId)
 
             if (teamUserIds.length > 0) {
-                const notifTitle = customTitle?.trim() || (newScore > previousScore
+                const notifTitle = customTitle?.trim() || (clampedScore > previousScore
                     ? `Aviso: Atualização no Score de Risco da loja ${store.name || "Parceiro"}`
                     : `Ajuste no Score de Risco da loja ${store.name || "Parceiro"}`)
 
                 const notifMessage = notes?.trim()
                     ? notes.trim()
-                    : `O score de risco da loja foi ajustado de ${previousScore} para ${newScore} pontos.`
+                    : `O score de risco da loja foi ajustado de ${previousScore} para ${clampedScore} pontos.`
 
                 await createNotificationsForUsers(teamUserIds, (uid) => ({
                     userId: uid,
@@ -836,12 +837,12 @@ export async function updatePartnerRiskScore(
                         store_id: store.id,
                         store_name: store.name,
                         old_score: previousScore,
-                        new_score: newScore,
+                        new_score: clampedScore,
                         reason: notes?.trim() || null,
                         audience: "seller",
                         url: "/erp/configuracoes",
                     },
-                    idempotencyKey: `risk_score_partner:${partnerId}:${newScore}:${Date.now()}:${uid}`,
+                    idempotencyKey: `risk_score_partner:${partnerId}:${clampedScore}:${Date.now()}:${uid}`,
                     origin: "system",
                 }))
             }
@@ -979,12 +980,24 @@ export async function deleteModerationTarget(
         switch (type) {
             case "product": {
                 actionType = AdminActionType.PRODUCT_SOFT_DELETE
-                await fetchAdmin.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", id)
+                await fetchAdmin.from("products").update({
+                    deleted_at: new Date().toISOString(),
+                    deleted_reason: notes?.trim() || "Removido pela moderação",
+                    deleted_by: admin.userId,
+                    is_active: false,
+                    status: "deleted",
+                }).eq("id", id)
                 break
             }
             case "service": {
                 actionType = AdminActionType.SERVICE_SOFT_DELETE
-                await fetchAdmin.from("services").update({ deleted_at: new Date().toISOString() }).eq("id", id)
+                await fetchAdmin.from("services").update({
+                    deleted_at: new Date().toISOString(),
+                    deleted_reason: notes?.trim() || "Removido pela moderação",
+                    deleted_by: admin.userId,
+                    is_active: false,
+                    status: "deleted",
+                }).eq("id", id)
                 break
             }
             case "recurring_plan": {

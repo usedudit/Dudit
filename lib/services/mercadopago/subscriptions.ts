@@ -77,6 +77,9 @@ export async function getMpPlatformAccessToken(): Promise<string> {
   const clientSecret = process.env.MP_SUBSCRIPTION_CLIENT_SECRET
 
   if (!clientId || !clientSecret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Missing MP_SUBSCRIPTION_CLIENT_ID or MP_SUBSCRIPTION_CLIENT_SECRET in production")
+    }
     return "build-time-placeholder-token"
   }
 

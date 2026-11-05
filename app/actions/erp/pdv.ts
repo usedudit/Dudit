@@ -45,6 +45,8 @@ import { listStoreServices } from "@/lib/store-services";
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities";
 import { checkLimit } from "@/lib/services/subscription.service";
 import { enrichAddressData } from "@/lib/services/location.service";
+import { DELIVERY_STATUS_OPTIONS } from "@/lib/orders/status";
+import { getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status";
 
 type DraftItemInput = {
   productId?: string | null;
@@ -126,6 +128,8 @@ type FinalizePreSaleInput = {
   paymentMethod?: string | null;
   paymentBreakdown?: FinalizePaymentEntry[];
   isPendingDelivery?: boolean;
+  /** Status escolhido na sheet de envio do PDV (valor cru da opção). */
+  deliveryStatus?: string | null;
   paymentProvider?: string;
   mpPaymentId?: string | null;
   sellerId?: string | null;
@@ -1794,11 +1798,30 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   const customerName: string | undefined =
     customerNameResult.data?.name?.trim() || undefined;
 
-  const hasShipping = Number(preSaleDraft.shipping_fee || 0) > 0;
-  let finalDeliveryStatus: "delivered" | "preparing" | "pickup_available" =
-    hasShipping ? "preparing" : "delivered";
+  const hasShipping =
+    Number(preSaleDraft.shipping_fee || 0) > 0 ||
+    Boolean(preSaleDraft.delivery_breakdown);
+  let finalDeliveryStatus: string = hasShipping ? "preparing" : "delivered";
   if (input.isPendingDelivery) {
     finalDeliveryStatus = hasShipping ? "preparing" : "pickup_available";
+  }
+
+  // Status escolhido manualmente na sheet de envio do PDV. Para
+  // transportadora o valor é o status do envio (postado, em trânsito...) e
+  // precisa ser convertido para o status canônico do pedido.
+  const requestedDeliveryStatus = String(input.deliveryStatus || "").trim();
+  if (requestedDeliveryStatus) {
+    const draftBreakdown = preSaleDraft.delivery_breakdown as any;
+    if (draftBreakdown?.source === "superfrete") {
+      finalDeliveryStatus = getDeliveryStatusForCarrier(requestedDeliveryStatus);
+    } else if (
+      DELIVERY_STATUS_OPTIONS.some(
+        (option) => option.value === requestedDeliveryStatus,
+      ) ||
+      ["pickup_available", "cancelled"].includes(requestedDeliveryStatus)
+    ) {
+      finalDeliveryStatus = requestedDeliveryStatus;
+    }
   }
 
   // Map draft items to ERPItemPayload
@@ -1870,7 +1893,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     customerName: customerName || "Consumidor final",
     salesChannel: "Presencial",
     deliveryMethod: hasShipping ? "delivery" : "pickup",
-    deliveryStatus: finalDeliveryStatus,
+    deliveryStatus: finalDeliveryStatus as any,
     paymentStatus: derivedPaymentStatus,
     paidAmount: totalPaidAmount,
     totalAmount: totalSaleTarget,

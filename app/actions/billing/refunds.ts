@@ -11,6 +11,7 @@ import { logBillingAudit, logBillingAdminAudit } from "@/lib/billing/audit"
 import { notifyPartnerTeam } from "@/lib/billing/notifications"
 import { createRefundPublicToken, hashRefundPublicToken, isRefundPublicTokenFormat } from "@/lib/security/refund-public-token"
 import { decryptCpfIfEncrypted } from "@/lib/crypto"
+import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 
@@ -255,6 +256,11 @@ export async function getActiveRefundForPartnerAction(partnerId: string, subscri
     try {
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado." }
+
+        const scope = await resolveBillingPartnerScope(user, partnerId)
+        if (!scope.allowed) {
+            return { success: false, error: "Acesso não autorizado." }
+        }
 
         const supabase = createAdminClient()
 
@@ -531,6 +537,7 @@ export async function adminListRefundRequestsAction(params?: {
 // ─── 4. PROCESSAR ESTORNO VIA ADMIN (STEP-UP AUTH & MERCADO PAGO) ─────────────
 
 export async function adminProcessRefundAction(input: z.input<typeof adminProcessRefundSchema>) {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     const supabase = createAdminClient()
     const nowIso = new Date().toISOString()
 
@@ -553,7 +560,13 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
             return { error: "Email do administrador não identificado." }
         }
 
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
+        const { createClient } = await import("@supabase/supabase-js")
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        const authVerifyClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+        })
+        const { error: signInErr } = await authVerifyClient.auth.signInWithPassword({
             email: adminEmail,
             password: data.refundPassword,
         })
@@ -783,6 +796,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
 // ─── 5. RECUSAR REEMBOLSO VIA ADMIN ───────────────────────────────────────────
 
 export async function adminRejectRefundAction(input: z.input<typeof adminRejectRefundSchema>) {
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     const supabase = createAdminClient()
     const nowIso = new Date().toISOString()
 

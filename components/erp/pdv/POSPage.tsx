@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronRightIcon, XIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { getDeliveryStatusForCarrier } from "@/lib/orders/carrier-status"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
@@ -228,7 +229,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const [shippingFee, setShippingFee] = useState(0)
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, unknown> | null>(null)
+    const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null)
     const hasDelivery = shippingFee > 0 || deliveryDistanceKm !== null || deliveryBreakdown !== null
+    const isCarrierDelivery = (deliveryBreakdown as any)?.source === "superfrete"
     const [otherCosts] = useState(0)
     const [notes, setNotes] = useState("")
     const [cart, setCart] = useState<CartItem[]>([])
@@ -1074,6 +1077,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         setShippingFee(Number(preSale.shipping_fee || 0))
         setDeliveryDistanceKm(Number((preSale as any).distance_km || 0) || null)
         setDeliveryBreakdown((preSale as any).delivery_breakdown || null)
+        setDeliveryStatus(null)
         setCart(items)
         setLastSavedOrderSignature(buildOrderSignature({
             selectedCustomerId: preSale.customer_id || undefined,
@@ -1105,6 +1109,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         setShippingFee(0)
         setDeliveryDistanceKm(null)
         setDeliveryBreakdown(null)
+        setDeliveryStatus(null)
         setCart([])
         setSelectedSellerId(defaultSellerPartnerUserIdRef.current)
         setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
@@ -1250,6 +1255,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 paymentMethod: paymentData.paymentMethod || "Método não definido",
                 paymentBreakdown,
                 isPendingDelivery: paymentData.isPendingDelivery,
+                deliveryStatus: deliveryStatus
+                    ? (isCarrierDelivery ? getDeliveryStatusForCarrier(deliveryStatus) : deliveryStatus)
+                    : null,
                 paymentProvider: paymentData.paymentProvider,
                 mpPaymentId: paymentData.mpPaymentId,
                 sellerId: selectedSellerId || null,
@@ -1600,6 +1608,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         setShippingFee(0)
         setDeliveryDistanceKm(null)
         setDeliveryBreakdown(null)
+        setDeliveryStatus(null)
         setShippingCustomerDetails(null)
         setIsRemoveShippingAlertOpen(false)
         notifySuccess("Entrega removida com sucesso.")
@@ -2595,11 +2604,13 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         storeId={activeStoreId || null}
                         orderSubtotal={subtotal}
                         items={cart.map(c => ({ productId: c.productId, quantity: c.qty }))}
+                        initialDeliveryStatus={deliveryStatus ?? (isCarrierDelivery ? "released" : "preparing")}
                         onCreateAddress={handleCreateShippingAddress}
-                        onApply={({ shippingFee: fee, distanceKm, breakdown }) => {
+                        onApply={({ shippingFee: fee, distanceKm, breakdown, deliveryStatus: nextDeliveryStatus }) => {
                             setShippingFee(Math.max(0, Number(fee || 0)))
                             setDeliveryDistanceKm(distanceKm ?? null)
                             setDeliveryBreakdown((breakdown as Record<string, unknown>) || null)
+                            setDeliveryStatus(nextDeliveryStatus || null)
                             setIsShippingSheetOpen(false)
                         }}
                     />

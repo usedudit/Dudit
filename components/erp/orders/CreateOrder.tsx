@@ -2986,6 +2986,7 @@ export default function CreateOrder({
                     initialCarrierServiceId={
                         isCarrierDelivery ? Number((deliveryBreakdown as any)?.serviceId || 0) || null : null
                     }
+                    initialDeliveryStatus={deliveryStatus}
                     onCreateAddress={async (payload: any) => {
                         const result = await createPOSCustomerAddressAction({
                             partnerId,
@@ -3018,11 +3019,12 @@ export default function CreateOrder({
 
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
-                    onApply={({ shippingFee: fee, isCustom, breakdown, deliveryAddress: addr }: any) => {
+                    onApply={({ shippingFee: fee, isCustom, breakdown, deliveryAddress: addr, deliveryStatus: nextDeliveryStatus }: any) => {
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
                         setIsCustomShipping(!!isCustom)
                         setDeliveryBreakdown(breakdown || null)
                         setDeliveryMethod("delivery")
+                        if (nextDeliveryStatus) setDeliveryStatus(nextDeliveryStatus)
                         const source = addr || shippingCustomerDetails?.address
                         if (source) {
                             setCep(String(source.zipCode || ""))
