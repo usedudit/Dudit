@@ -9,6 +9,8 @@ import { ThreeDotsLoader } from "@/components/reusable"
 interface ReturnHistoryTabProps {
     events: ReturnEvent[]
     loading?: boolean
+    /** Painel admin: revela qual membro da equipe Dudit executou a ação. */
+    showAdminActor?: boolean
 }
 
 function getReturnStatusLabel(status: string) {
@@ -39,10 +41,16 @@ function getStatusActionLabel(actionType: string) {
     }
 }
 
-function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
+function mapReturnEventToHistoryEntry(event: ReturnEvent, showAdminActor = false): HistoryEntry {
     const changeLines: string[] = []
     const metadata = event.metadata || {}
     const actionType = event.event_type || "updated"
+    const isDuditAction = Boolean(metadata.dudit_action) || event.source === "admin"
+    const actorName = isDuditAction
+        ? (showAdminActor && metadata.admin_actor_name
+            ? String(metadata.admin_actor_name)
+            : "Equipe Dudit")
+        : (event.actor_name || "Sistema")
 
     if (event.previous_status && event.new_status && event.previous_status !== event.new_status) {
         changeLines.push(`alterou status: ${getReturnStatusLabel(event.previous_status)} → ${getReturnStatusLabel(event.new_status)}`)
@@ -112,14 +120,15 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
 
     return {
         id: event.id,
-        actor_name: event.actor_name || "Sistema",
+        actor_name: actorName,
         change_lines: changeLines,
         created_at: event.created_at,
         entry_type: "return_event",
+        highlight: isDuditAction,
     }
 }
 
-export function ReturnHistoryTab({ events, loading = false }: ReturnHistoryTabProps) {
+export function ReturnHistoryTab({ events, loading = false, showAdminActor = false }: ReturnHistoryTabProps) {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full min-h-[200px] w-full">
@@ -128,7 +137,7 @@ export function ReturnHistoryTab({ events, loading = false }: ReturnHistoryTabPr
         )
     }
 
-    const entries = (events || []).map(mapReturnEventToHistoryEntry)
+    const entries = (events || []).map((event) => mapReturnEventToHistoryEntry(event, showAdminActor))
 
     return (
         <FadeIn>

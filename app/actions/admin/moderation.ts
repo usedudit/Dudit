@@ -311,7 +311,7 @@ export async function getModerationQueue(
         partner_id: r.partner_id,
         owner_user_name: returnOwnerMap.get(r.partners?.user_id) || "",
         moderation_status: "pending_moderation",
-        risk_score: r.partners?.risk_score || 0,
+        risk_score: r.stores?.[0]?.risk_score || 0,
         created_at: r.created_at,
     }))
 

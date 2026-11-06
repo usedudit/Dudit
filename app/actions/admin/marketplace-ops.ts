@@ -5,6 +5,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
+import { normalizeAdminReturnRow } from "@/lib/returns/normalize-admin-return"
 
 function sanitizeIlike(input: string): string {
     return input.replace(/[%_\\]/g, c => `\\${c}`)
@@ -82,7 +83,7 @@ export async function getAdminMarketplaceOrders(
             amount_paid,
             order_source,
             created_at,
-            stores!left(id, name, logo_url, phone, partner_id, partners!left(id, name, trade_name)),
+            stores!left(id, name, logo_url, phone, partner_id, partners!left(id)),
             order_items(id, product_name, quantity),
             return_requests!order_id(id, status)
         `)
@@ -155,11 +156,11 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         .from("orders")
         .select(`
             *,
-            stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id, partners!left(id, name, trade_name)),
+            stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id, partners!left(id)),
             order_items(*, products(id, name, sku, images, unit, price), product_variants(id, variant_name, sku), services(id, name, images, price)),
             return_requests!order_id(
                 id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at,
-                return_items(id, product_name_snapshot, quantity, net_item_value_snapshot, reason)
+                return_items!return_items_return_request_id_fkey(id, product_name_snapshot, quantity, net_item_value_snapshot, reason)
             )
         `)
         .eq("id", orderId)
@@ -329,10 +330,10 @@ export async function getAdminReturnRequestsStats(): Promise<AdminReturnStats> {
 
     const [totalRes, pendingRes, approvedRes, rejectedRes, completedRes] = await Promise.all([
         admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null),
-        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["pending", "under_review", "requested"]),
-        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["approved", "authorized", "item_shipped", "received"]),
-        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "rejected"),
-        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["completed", "refunded", "closed"]),
+        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["PENDING_REVIEW"]),
+        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"]),
+        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "REJECTED"),
+        admin.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", ["RESOLVED", "EXPIRED"]),
     ])
 
     return {
@@ -379,6 +380,7 @@ export async function getAdminReturnRequests(
             customer_reason,
             customer_details,
             customer_name_snapshot,
+            customer_email_snapshot,
             order_number_snapshot,
             eligibility_status,
             sla_status,
@@ -390,9 +392,9 @@ export async function getAdminReturnRequests(
             order_id,
             customer_id,
             exchange_order_id,
-            stores!left(id, name, person_type, logo_url, risk_score),
-            orders!order_id(id, order_number, situation, delivery_status, total_amount, amount_paid, payment_method, payment_provider, store_id),
-            return_items!return_items_return_request_id_fkey(id, product_name_snapshot, quantity, net_item_value_snapshot, reason, condition),
+            stores!left(id, name, person_type, logo_url, risk_score, phone, cnpj, partners!left(id)),
+            orders!order_id(id, order_number, customer_name, situation, delivery_status, delivery_address, total_amount, amount_paid, paid_amount, payment_method, payment_provider, store_id),
+            return_items!return_items_return_request_id_fkey(id, order_item_id, product_id, variant_id, product_name_snapshot, quantity, ordered_quantity, unit_price_snapshot, net_item_value_snapshot, reason, condition),
             return_evidence(id, file_url, file_type, file_name, created_at)
         `)
         .is("deleted_at", null)
@@ -403,16 +405,17 @@ export async function getAdminReturnRequests(
     }
 
     if (filters?.status && filters.status !== "all" && filters.status !== "Todos") {
+        const rawStatus = filters.status.toUpperCase()
         if (filters.status === "pending" || filters.status === "Pendentes") {
-            query = query.in("status", ["pending", "under_review", "requested"])
+            query = query.in("status", ["PENDING_REVIEW"])
         } else if (filters.status === "approved" || filters.status === "Aprovados") {
-            query = query.in("status", ["approved", "authorized", "item_shipped", "received"])
+            query = query.in("status", ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"])
         } else if (filters.status === "rejected" || filters.status === "Recusados") {
-            query = query.eq("status", "rejected")
+            query = query.eq("status", "REJECTED")
         } else if (filters.status === "completed" || filters.status === "Concluídos") {
-            query = query.in("status", ["completed", "refunded", "closed"])
+            query = query.in("status", ["RESOLVED", "EXPIRED"])
         } else {
-            query = query.eq("status", filters.status)
+            query = query.eq("status", rawStatus)
         }
     }
     if (filters?.type && filters.type !== "all") {
@@ -437,7 +440,7 @@ export async function getAdminReturnRequests(
     const { data, error } = await query
     if (error) throw error
 
-    const items = (data || []) as any[]
+    const items = ((data || []) as any[]).map((row) => normalizeAdminReturnRow(row))
     const hasMore = items.length > pageSize
 
     return {

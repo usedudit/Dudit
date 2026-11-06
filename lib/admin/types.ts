@@ -66,6 +66,9 @@ export enum AdminActionType {
     // Orders (admin editing seller orders)
     ORDER_UPDATE = "order.update",
 
+    // Returns (admin editing seller return requests)
+    RETURN_UPDATE = "return.update",
+
     // Catalog admin editing (admin acting on seller catalog)
     CATALOG_PRODUCT_UPDATE = "catalog.product_update",
     CATALOG_PRODUCT_CREATE = "catalog.product_create",

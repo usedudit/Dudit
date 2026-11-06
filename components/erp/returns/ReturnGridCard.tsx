@@ -16,11 +16,13 @@ interface ReturnGridCardProps {
   onPrint?: () => void
   onDelete?: () => void
   canManage: boolean
+  /** Permite editar mesmo em status finalizados (painel admin). */
+  canEditLocked?: boolean
   selected?: boolean
   onSelect?: () => void
 }
 
-const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, onDelete, canManage, selected, onSelect }: ReturnGridCardProps) => {
+const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, onDelete, canManage, canEditLocked, selected, onSelect }: ReturnGridCardProps) => {
   const statusMeta = getReturnStatusMeta(returnRequest.status)
   const resolutionLabel = getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")
   const totalQuantity = returnRequest.items.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
@@ -100,6 +102,18 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, 
           </div>
         </div>
 
+        {/* Loja (painel admin) */}
+        {returnRequest.storeName && (
+          <div className="flex justify-between items-end gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Loja</span>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                {returnRequest.storeName}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Row 2: Quantidade & Actions */}
         <div className="flex justify-between items-end gap-2">
           <div className="flex flex-col gap-0.5">
@@ -118,7 +132,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onPrint, 
           >
             <ActionsDropdown
               onPrint={onPrint}
-              onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? onEdit : undefined}
+              onEdit={canManage && (canEditLocked || !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status)) ? onEdit : undefined}
             />
           </div>
         </div>

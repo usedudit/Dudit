@@ -4,6 +4,7 @@ import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { normalizeAdminReturnRow } from "@/lib/returns/normalize-admin-return"
 
 export async function getAdminReturnRequestDetail(returnRequestId: string) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -16,14 +17,14 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
     .select(`
       *,
       partners(id, is_active, user_id),
-      stores(id, name, risk_score, person_type),
+      stores(id, name, risk_score, person_type, logo_url, phone, cnpj, partners!left(id)),
       orders!order_id(
-        id, order_number, situation, delivery_status, total_amount, amount_paid,
-        paid_amount, payment_method, payment_provider, created_at, return_policy_snapshot,
+        id, order_number, customer_name, customer_id, buyer_id, situation, delivery_status, delivery_address,
+        total_amount, amount_paid, paid_amount, payment_method, payment_provider, created_at, return_policy_snapshot,
         order_items(id, product_name, product_price, quantity, subtotal, net_item_value)
       ),
       return_items!return_items_return_request_id_fkey(
-        id, product_name_snapshot, sku_snapshot, quantity, ordered_quantity,
+        id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot, quantity, ordered_quantity,
         net_item_value_snapshot, reason, condition, unit_price_snapshot
       ),
       return_evidence(id, file_url, file_type, file_name, created_at),
@@ -37,8 +38,9 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
   if (!request) return null
 
   const partnerId = request.partner_id as string
+  const customerId = request.customer_id || request.orders?.customer_id || request.orders?.buyer_id || null
 
-  const [{ data: riskEvents }, { data: moderationActions }, { data: relatedReports }, { data: auditEvents }] = await Promise.all([
+  const [{ data: riskEvents }, { data: moderationActions }, { data: relatedReports }, { data: auditEvents }, { data: buyerProfile }] = await Promise.all([
     admin
       .from("partner_risk_events")
       .select("id, source_type, points, metadata, created_at, reverted_at")
@@ -63,6 +65,13 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
       .eq("entity_type", "return_request")
       .eq("entity_id", returnRequestId)
       .order("created_at", { ascending: true }),
+    customerId
+      ? admin
+        .from("customers")
+        .select("id, name, email, phone, cpf, image_url, person_type")
+        .eq("id", customerId)
+        .maybeSingle()
+      : Promise.resolve({ data: null } as any),
   ])
 
   const returnEvents = (auditEvents || []).map((e: any) => ({
@@ -77,8 +86,26 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
     actor_name: e.actor_name || "Sistema"
   }))
 
+  const normalized = normalizeAdminReturnRow({ ...request, auditLogs: returnEvents })
+
   return {
-    request: { ...request, auditLogs: returnEvents },
+    request: {
+      ...normalized,
+      stores: request.stores || null,
+      orders: request.orders || null,
+      return_messages: request.return_messages || [],
+    },
+    buyerProfile: buyerProfile
+      ? {
+        id: buyerProfile.id,
+        full_name: buyerProfile.name,
+        email: buyerProfile.email,
+        phone: buyerProfile.phone,
+        cpf: buyerProfile.cpf,
+        avatar_url: buyerProfile.image_url,
+        person_type: buyerProfile.person_type,
+      }
+      : null,
     riskEvents: riskEvents || [],
     moderationActions: moderationActions || [],
     relatedReports: relatedReports || [],

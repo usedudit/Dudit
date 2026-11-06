@@ -1,23 +1,25 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback } from "react"
-import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination } from "@/components/reusable"
-import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import ReturnListRow from "./ReturnListRow"
-import ReturnsPageControls, { type ReturnFilterState } from "./ReturnsPageControls"
-import AdminReturnDetailView from "./AdminReturnDetailView"
-import { FadeIn } from "@/components/animations/FadeIn"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
-import { StoreIcon, ExportFileIcon } from "@/lib/icons"
+import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { ExportFileIcon } from "@/lib/icons"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
 import { getAdminReturnRequests, getAdminReturnRequestsStats, type AdminReturnStats } from "@/app/actions/admin/marketplace-ops"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } from "@/lib/utils/filter-date-period"
-import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
+import { toast } from "@/hooks/use-notification"
+import ReturnListRow, { getReturnStatusMeta } from "@/components/erp/returns/ReturnListRow"
+import ReturnGridCard from "@/components/erp/returns/ReturnGridCard"
+import ReturnPageControls from "@/components/erp/returns/ReturnPageControls"
+import type { ReturnRequest } from "@/components/erp/returns/types"
+import { getReturnResolutionLabel } from "@/lib/returns/types"
+import AdminReturnDetailClientWrapper from "./AdminReturnDetailClientWrapper"
 
-type SortKey = "id" | "order_number" | "customer" | "date" | "refund_type" | "status"
+type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados"
+type SortKey = "id" | "order_number" | "store" | "customer" | "date" | "refund_type" | "status"
 type SortDirection = "asc" | "desc"
 
 interface ReturnsListProps {
@@ -27,183 +29,163 @@ interface ReturnsListProps {
 
 const ITEMS_PER_PAGE = 8
 
-const INITIAL_FILTERS: ReturnFilterState = {
-    status: [],
-    type: [],
-    source: [],
-    datePeriod: { ...EMPTY_DATE_PERIOD },
+const COLUMNS = [
+    { id: "id", label: "Código", align: "left" as const, width: "160px" },
+    { id: "order_number", label: "Pedido", align: "left" as const, width: "160px" },
+    { id: "store", label: "Loja", align: "left" as const, width: "180px" },
+    { id: "customer", label: "Cliente", align: "left" as const, width: "220px" },
+    { id: "date", label: "Data", align: "left" as const, width: "160px" },
+    { id: "refund_type", label: "Resolução", align: "left" as const, width: "160px" },
+    { id: "status", label: "Status", align: "left" as const, width: "160px" },
+    { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
+]
+
+interface FilterState {
+    status: string[]
+    resolutionType: string[]
+    reason: string[]
+    condition: string[]
+    refundRange: { min: string; max: string }
+    storeCreditRange: { min: string; max: string }
+    hasEvidence: boolean
 }
 
-export default function ReturnsList({ initialData, initialStats }: ReturnsListProps) {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+const INITIAL_FILTERS: FilterState = {
+    status: [],
+    resolutionType: [],
+    reason: [],
+    condition: [],
+    refundRange: { min: "", max: "" },
+    storeCreditRange: { min: "", max: "" },
+    hasEvidence: false,
+}
+
+export default function ReturnsList({ initialData }: ReturnsListProps) {
+    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
-    const [activeTab, setActiveTab] = useState<string>("all")
-    const [isPending, startTransition] = useTransition()
-
-    // Stats
-    const [stats, setStats] = useState<AdminReturnStats | undefined>(initialStats)
-
-    // Filters & Modals
-    const [filters, setFilters] = useState<ReturnFilterState>(INITIAL_FILTERS)
-    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
-
-    // Search state
+    const [requests, setRequests] = useState<ReturnRequest[]>(
+        ((initialData?.data || []) as ReturnRequest[]),
+    )
+    const [isLoading, setIsLoading] = useState(false)
     const [search, setSearch] = useState("")
-
-    // Sorting state
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [activeTab, setActiveTab] = useState<ActiveTab>("Todos")
+    const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
+    const [page, setPage] = useState(1)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "date",
         direction: "desc",
     })
+    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
-    // Data State (initialized from SSR)
-    const [requests, setRequests] = useState<any[]>(initialData?.data || [])
-    const [isLoading, setIsLoading] = useState(false)
-    const [page, setPage] = useState(1)
-
-    const handleSort = (key: SortKey) => {
-        setSortConfig((prev) => {
-            if (prev?.key === key) {
-                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-            }
-            return { key, direction: "desc" }
-        })
-    }
-
-    // Background refresh
-    const refreshRequests = useCallback(() => {
-        startTransition(async () => {
-            try {
-                const [res, statsRes] = await Promise.all([
-                    getAdminReturnRequests(null, 100),
-                    getAdminReturnRequestsStats(),
-                ])
-                setRequests(res.data || [])
-                setStats(statsRes)
-            } catch (err) {
-                console.error("Failed to refresh admin returns:", err)
-            }
-        })
+    const refreshRequests = useCallback(async () => {
+        setIsLoading(true)
+        try {
+            const [res] = await Promise.all([
+                getAdminReturnRequests(null, 100),
+                getAdminReturnRequestsStats().catch(() => null),
+            ])
+            setRequests((res.data || []) as ReturnRequest[])
+        } catch (err) {
+            console.error("Failed to refresh admin returns:", err)
+        } finally {
+            setIsLoading(false)
+        }
     }, [])
 
-    // Filter Config for FilterSheet
-    const filterSections: FilterSectionConfig[] = useMemo(() => [
-        {
-            id: "status",
-            title: "Status da Solicitação",
-            type: "checkbox-list",
-            options: ["pending", "approved", "rejected", "completed"],
-        },
-        {
-            id: "type",
-            title: "Tipo",
-            type: "checkbox-list",
-            options: ["exchange", "return", "complaint"],
-        },
-        {
-            id: "source",
-            title: "Origem",
-            type: "checkbox-list",
-            options: ["customer_portal", "admin_override", "store_panel"],
-        },
-        {
-            id: "datePeriod",
-            title: "Período",
-            type: "date-period",
-        },
-    ], [])
+    useEffect(() => {
+        void refreshRequests()
+    }, [refreshRequests])
 
-    const hasActiveFilters = useMemo(() => {
-        return (
-            search.trim().length > 0 ||
-            activeTab !== "all" ||
-            filters.status.length > 0 ||
-            filters.type.length > 0 ||
-            filters.source.length > 0 ||
-            isDatePeriodFilterActive(filters.datePeriod)
-        )
-    }, [search, activeTab, filters])
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(timer)
+    }, [search])
 
-    // Instant in-memory filtering (0ms)
-    const filteredRequests = useMemo(() => {
-        const term = search.trim().toLowerCase()
-        const dateBounds = isDatePeriodFilterActive(filters.datePeriod)
-            ? resolveDatePeriodBounds(filters.datePeriod)
-            : { startYmd: null, endYmd: null }
+    useEffect(() => {
+        setPage(1)
+    }, [debouncedSearch, activeTab, filters])
 
-        let result = requests.filter((req) => {
-            // Tab filter
-            const st = String(req.status || "").toLowerCase()
-            if (activeTab === "pending" && !["pending", "pending_review"].includes(st)) return false
-            if (activeTab === "approved" && !["approved", "completed", "resolved"].includes(st)) return false
-            if (activeTab === "rejected" && st !== "rejected") return false
-            if (activeTab === "completed" && !["completed", "resolved"].includes(st)) return false
+    const filteredReturns = useMemo(() => {
+        const term = debouncedSearch.trim().toLowerCase()
+        let result = requests.filter((item) => {
+            const matchesSearch =
+                !term ||
+                item.orderNumber.toLowerCase().includes(term) ||
+                item.customerName.toLowerCase().includes(term) ||
+                String(item.storeName || "").toLowerCase().includes(term) ||
+                `dvl-${item.id}`.toLowerCase().includes(term)
 
-            // Search filter
-            if (term) {
-                const idStr = String(req.id || "").toLowerCase()
-                const orderNum = String(req.order_number_snapshot || req.orders?.order_number || "").toLowerCase()
-                const cust = String(req.customer_name_snapshot || req.customers?.name || req.buyer_profile?.full_name || "").toLowerCase()
-                const stName = String(req.stores?.name || "").toLowerCase()
-                const reason = String(req.customer_reason || "").toLowerCase()
+            let matchesTab = true
+            if (activeTab === "Pendentes") matchesTab = item.status === "PENDING_REVIEW"
+            else if (activeTab === "Analise") matchesTab = ["UNDER_ANALYSIS", "ESCALATED"].includes(item.status)
+            else if (activeTab === "AguardandoCliente") matchesTab = item.status === "WAITING_CUSTOMER"
+            else if (activeTab === "Aprovados") matchesTab = ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(item.status)
+            else if (activeTab === "Finalizados") matchesTab = ["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status)
 
-                if (!idStr.includes(term) && !orderNum.includes(term) && !cust.includes(term) && !stName.includes(term) && !reason.includes(term)) {
-                    return false
-                }
-            }
+            const statusLabel = getReturnStatusMeta(item.status).label
+            const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
-            // FilterSheet status
-            if (filters.status.length > 0 && !filters.status.includes(st)) {
-                return false
-            }
+            const resolutionLabel = getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "")
+            const resolutionMatch = filters.resolutionType.length === 0 || filters.resolutionType.includes(resolutionLabel)
 
-            // FilterSheet type
-            if (filters.type.length > 0 && !filters.type.includes(req.request_type)) {
-                return false
-            }
+            const itemReason = item.items[0]?.reason || ""
+            const reasonMatch = filters.reason.length === 0 || filters.reason.includes(itemReason)
 
-            // FilterSheet source
-            if (filters.source.length > 0 && !filters.source.includes(req.source)) {
-                return false
-            }
+            const itemCondition = item.items[0]?.condition || ""
+            const conditionMatch = filters.condition.length === 0 || filters.condition.includes(itemCondition)
 
-            // Date Period
-            if (dateBounds.startYmd && new Date(req.created_at) < new Date(dateBounds.startYmd)) return false
-            if (dateBounds.endYmd && new Date(req.created_at) > new Date(dateBounds.endYmd + "T23:59:59")) return false
+            const refundValue = Number(item.refundValue || 0)
+            const minRefund = filters.refundRange.min ? Number(filters.refundRange.min) : 0
+            const maxRefund = filters.refundRange.max ? Number(filters.refundRange.max) : Number.POSITIVE_INFINITY
+            const refundMatch = refundValue >= minRefund && refundValue <= maxRefund
 
-            return true
+            const storeCreditValue = Number(item.storeCreditValue || 0)
+            const minCredit = filters.storeCreditRange.min ? Number(filters.storeCreditRange.min) : 0
+            const maxCredit = filters.storeCreditRange.max ? Number(filters.storeCreditRange.max) : Number.POSITIVE_INFINITY
+            const creditMatch = storeCreditValue >= minCredit && storeCreditValue <= maxCredit
+
+            const evidenceMatch = !filters.hasEvidence || (item.items[0]?.evidence?.length > 0)
+
+            return matchesSearch && matchesTab && statusMatch && resolutionMatch && reasonMatch && conditionMatch && refundMatch && creditMatch && evidenceMatch
         })
 
-        // In-memory sorting
         if (sortConfig) {
             result = [...result].sort((a, b) => {
                 let aVal: any = ""
                 let bVal: any = ""
                 switch (sortConfig.key) {
                     case "id":
-                        aVal = a.id || ""
-                        bVal = b.id || ""
+                        aVal = a.id
+                        bVal = b.id
                         break
                     case "order_number":
-                        aVal = a.order_number_snapshot || a.orders?.order_number || ""
-                        bVal = b.order_number_snapshot || b.orders?.order_number || ""
+                        aVal = a.orderNumber
+                        bVal = b.orderNumber
+                        break
+                    case "store":
+                        aVal = a.storeName || ""
+                        bVal = b.storeName || ""
                         break
                     case "customer":
-                        aVal = (a.customer_name_snapshot || "").toLowerCase()
-                        bVal = (b.customer_name_snapshot || "").toLowerCase()
+                        aVal = a.customerName
+                        bVal = b.customerName
                         break
                     case "date":
-                        aVal = new Date(a.created_at).getTime()
-                        bVal = new Date(b.created_at).getTime()
+                        aVal = new Date(a.createdAt).getTime()
+                        bVal = new Date(b.createdAt).getTime()
                         break
                     case "refund_type":
-                        aVal = a.resolution_type || a.desired_resolution || ""
-                        bVal = b.resolution_type || b.desired_resolution || ""
+                        aVal = getReturnResolutionLabel(a.approvedResolution || a.desiredResolution || "")
+                        bVal = getReturnResolutionLabel(b.approvedResolution || b.desiredResolution || "")
                         break
                     case "status":
-                        aVal = a.status || ""
-                        bVal = b.status || ""
+                        aVal = getReturnStatusMeta(a.status).label
+                        bVal = getReturnStatusMeta(b.status).label
                         break
                 }
                 if (aVal === bVal) return 0
@@ -213,229 +195,200 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
         }
 
         return result
-    }, [requests, activeTab, search, filters, sortConfig])
+    }, [requests, debouncedSearch, activeTab, sortConfig, filters])
 
-    // Pagination (Strict 8 items)
-    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / ITEMS_PER_PAGE))
-    const paginatedItems = useMemo(() => {
-        const start = (page - 1) * ITEMS_PER_PAGE
-        return filteredRequests.slice(start, start + ITEMS_PER_PAGE)
-    }, [filteredRequests, page])
+    const filterSections = useMemo<FilterSectionConfig[]>(() => {
+        const data = requests
+        if (data.length === 0) return []
 
-    // Reset to page 1 on filter/tab/search change
-    useMemo(() => {
-        setPage(1)
-    }, [activeTab, search, filters])
+        const statusLabels = [...new Set(data.map(item => getReturnStatusMeta(item.status).label))]
+        const resolutionLabels = [...new Set(data.map(item => getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "")).filter(Boolean))]
+        const reasons = [...new Set(data.map(item => item.items[0]?.reason).filter(Boolean))]
+        const conditions = [...new Set(data.map(item => item.items[0]?.condition).filter(Boolean))]
+        const hasEvidence = data.some(item => item.items[0]?.evidence?.length > 0)
+        const hasRefund = data.some(item => Number(item.refundValue || 0) > 0)
+        const hasStoreCredit = data.some(item => Number(item.storeCreditValue || 0) > 0)
 
-    // If viewing detail of a specific return via URL (?view=id)
-    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-        const currentReq = requests.find(r => r.id === entityState.entityId)
+        const sections: FilterSectionConfig[] = []
+
+        if (statusLabels.length > 1) sections.push({ id: "status", title: "Status", type: "checkbox-list", options: statusLabels })
+        if (resolutionLabels.length > 1) sections.push({ id: "resolutionType", title: "Tipo de Resolução", type: "checkbox-list", options: resolutionLabels })
+        if (reasons.length > 1) sections.push({ id: "reason", title: "Motivo", type: "checkbox-list", options: reasons })
+        if (conditions.length > 1) sections.push({ id: "condition", title: "Condição do Item", type: "checkbox-list", options: conditions })
+        if (hasRefund) sections.push({ id: "refundRange", title: "Valor Reembolso", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } })
+        if (hasStoreCredit) sections.push({ id: "storeCreditRange", title: "Valor Vale-Compra", type: "range", rangeConfig: { minKey: "min", maxKey: "max", minPlaceholder: "Mín (R$)", maxPlaceholder: "Máx (R$)" } })
+        if (hasEvidence) sections.push({ id: "hasEvidence", title: "Tem Evidências", type: "switch", switchLabel: "Apenas com evidências" })
+
+        return sections
+    }, [requests])
+
+    const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE))
+    const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
+    const hasActiveFilters =
+        debouncedSearch.length > 0 ||
+        activeTab !== "Todos" ||
+        filters.status.length > 0 ||
+        filters.resolutionType.length > 0 ||
+        filters.reason.length > 0 ||
+        filters.condition.length > 0 ||
+        !!filters.refundRange.min ||
+        !!filters.refundRange.max ||
+        !!filters.storeCreditRange.min ||
+        !!filters.storeCreditRange.max ||
+        filters.hasEvidence
+
+    const handleClearFilters = useCallback(() => {
+        setSearch("")
+        setFilters(INITIAL_FILTERS)
+        setActiveTab("Todos")
+    }, [])
+
+    if (entityState.isOpen && entityState.entityId) {
         return (
-            <AdminReturnDetailView
-                detail={{ request: currentReq, id: entityState.entityId }}
+            <AdminReturnDetailClientWrapper
+                returnId={entityState.entityId}
                 onBack={closeEntity}
             />
         )
     }
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .hide-scrollbar::-webkit-scrollbar { display: none; }
-                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
-
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* Desktop Header */}
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Trocas & Devoluções
-                        </h1>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Monitore e resolva disputas, trocas e solicitações de estorno de clientes.
-                        </p>
+        <>
+            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                    <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                        <div className="flex flex-col gap-2 pt-1">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                Trocas e devoluções
+                            </h1>
+                            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                Gerencie trocas, devoluções, créditos e reembolsos de todas as lojas.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="outline"
+                                onClick={() => toast.success("Exportação iniciada em segundo plano")}
+                                leftIcon={<ExportFileIcon size={18} />}
+                            >
+                                Exportar
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => toast.success("Exportação iniciada em segundo plano")}
-                            leftIcon={<ExportFileIcon size={18} />}
-                        >
-                            Exportar
-                        </Button>
+                    <div className="mb-6 px-4 md:px-8">
+                        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ActiveTab)}>
+                            <TabsList className="px-0">
+                                <TabsTrigger value="Todos">Todos</TabsTrigger>
+                                <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
+                                <TabsTrigger value="Analise">Análise</TabsTrigger>
+                                <TabsTrigger value="AguardandoCliente">Aguardando cliente</TabsTrigger>
+                                <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
+                                <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </div>
-                </div>
 
-                {/* Page Controls */}
-                <ReturnsPageControls
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    search={search}
-                    onSearchChange={setSearch}
-                    onOpenFilter={() => setIsFilterSheetOpen(true)}
-                    filters={filters}
-                    setFilters={setFilters}
-                    hasActiveFilters={hasActiveFilters}
-                    tabCounts={stats}
-                />
+                    <ReturnPageControls
+                        search={search}
+                        onSearchChange={setSearch}
+                        onOpenFilter={() => setIsFilterSheetOpen(true)}
+                        viewMode={effectiveViewMode}
+                        onViewModeChange={setViewModeState}
+                    />
 
-                {/* List Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
-                    <AnimatePresence mode="wait">
-                        {paginatedItems.length === 0 ? (
-                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
-                                    imageAlt="Nenhuma solicitação"
-                                    title="Nenhuma solicitação encontrada"
-                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhuma solicitação de troca ou devolução nesta categoria."}
-                                    itemButton={hasActiveFilters ? {
-                                        text: "Limpar Filtros",
-                                        action: () => {
-                                            setSearch("")
-                                            setFilters(INITIAL_FILTERS)
-                                            setActiveTab("all")
-                                        },
-                                        variant: "outline",
-                                    } : undefined}
-                                />
-                            </FadeIn>
-                        ) : (
-                            <FadeIn key="list" className="w-full space-y-4">
-                                {/* Mobile View (Cards) */}
-                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {paginatedItems.map((req) => (
-                                        <div
-                                            key={req.id}
-                                            className="py-4 flex flex-col gap-2.5 cursor-pointer active:bg-brand-gray/50 dark:active:bg-dark-border/20 transition-colors"
-                                            onClick={() => openEntity("view", req.id)}
-                                        >
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                        Solicitação #{req.id.slice(0, 8)}
-                                                    </span>
-                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                        Pedido #{req.order_number_snapshot || req.orders?.order_number || "-"}
-                                                    </span>
-                                                </div>
-                                                <Badge variant={req.status === "approved" || req.status === "completed" ? "green" : req.status === "rejected" ? "red" : "orange"}>
-                                                    {req.status || "Pendente"}
-                                                </Badge>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs text-brand-inactive-text">
-                                                <span className="truncate">{req.customer_name_snapshot || req.customers?.name || "Cliente"}</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm shrink-0">
-                                                    {formatCurrency(Number(req.refund_amount || 0))}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-[11px] text-brand-inactive-text pt-1">
-                                                <span>{formatDate(req.created_at)}</span>
-                                                <Badge variant="blue" className="text-[10px] py-0 px-1.5">
-                                                    {req.request_type === "exchange" ? "Troca" : "Devolução"}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    ))}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                        <AnimatePresence mode="wait">
+                            {isLoading && requests.length === 0 ? (
+                                <div className="h-[400px] flex items-center justify-center">
+                                    <ThreeDotsLoader />
                                 </div>
-
-                                {/* Desktop View: Table */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                            ) : paginatedReturns.length === 0 ? (
+                                <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc={hasActiveFilters
+                                            ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            : "https://img.dudit.com.br/static/mascots/Devolucoes.png"}
+                                        imageAlt="Sem devoluções"
+                                        title={hasActiveFilters ? "Nenhuma solicitação encontrada" : "Nenhuma solicitação cadastrada"}
+                                        subtitle={hasActiveFilters ? "Ajuste a busca para encontrar o que procura." : "Nenhuma solicitação de troca ou devolução nesta categoria."}
+                                        itemButton={hasActiveFilters ? {
+                                            text: "Limpar filtros",
+                                            action: handleClearFilters,
+                                            variant: "outline",
+                                        } : undefined}
+                                    />
+                                </FadeIn>
+                            ) : effectiveViewMode === "grid" ? (
+                                <FadeIn key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                    {paginatedReturns.map((item) => (
+                                        <ReturnGridCard
+                                            key={item.id}
+                                            returnRequest={item}
+                                            onDetails={() => openEntity("view", item.id)}
+                                            onEdit={() => openEntity("edit", item.id)}
+                                            canManage
+                                            canEditLocked
+                                        />
+                                    ))}
+                                </FadeIn>
+                            ) : (
+                                <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
                                     <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                             <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
-                                                    <th
-                                                        onClick={() => handleSort("id")}
-                                                        className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Código {sortConfig?.key === "id" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("order_number")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Pedido {sortConfig?.key === "order_number" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
-                                                        Loja
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("customer")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        Cliente {sortConfig?.key === "customer" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("date")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        Data {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("refund_type")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        Resolução {sortConfig?.key === "refund_type" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("status")}
-                                                        className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                    </th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
-                                                        Total
-                                                    </th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
-                                                        Origem
-                                                    </th>
-                                                    <th className="py-3 px-2 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
-                                                        Ações
-                                                    </th>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    {COLUMNS.map((col, idx) => {
+                                                        const sortable = col.id !== "actions"
+                                                        const sorted = sortConfig?.key === col.id
+                                                        return (
+                                                            <th
+                                                                key={col.id}
+                                                                style={{ width: col.width }}
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg pl-4" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg pr-4" : ""} ${sortable ? "cursor-pointer group" : ""}`}
+                                                                onClick={() => {
+                                                                    if (!sortable) return
+                                                                    setSortConfig((prev) => ({
+                                                                        key: col.id as SortKey,
+                                                                        direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <span>{col.label}</span>
+                                                                {sorted ? null : null}
+                                                            </th>
+                                                        )
+                                                    })}
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {paginatedItems.map((req) => (
+                                                {paginatedReturns.map((item) => (
                                                     <ReturnListRow
-                                                        key={req.id}
-                                                        request={req}
-                                                        isPending={isPending}
-                                                        onDetail={() => openEntity("view", req.id)}
+                                                        key={item.id}
+                                                        returnRequest={item}
+                                                        columns={COLUMNS}
+                                                        onDetails={(r) => openEntity("view", r.id)}
+                                                        onEdit={(r) => openEntity("edit", r.id)}
+                                                        canManage
+                                                        canEditLocked
                                                     />
                                                 ))}
                                             </tbody>
                                         </table>
                                     </div>
-                                </div>
+                                </FadeIn>
+                            )}
+                        </AnimatePresence>
 
-                                {/* Pagination */}
-                                {totalPages > 1 && (
-                                    <div className="pt-4">
-                                        <Pagination
-                                            currentPage={page}
-                                            totalPages={totalPages}
-                                            onPageChange={setPage}
-                                        />
-                                    </div>
-                                )}
-                            </FadeIn>
+                        {filteredReturns.length > 0 && (
+                            <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
                         )}
-                    </AnimatePresence>
+                    </div>
                 </div>
-            </div>
+            </FadeIn>
 
-            {/* Filter Drawer / Sheet */}
             <FilterSheet
                 isOpen={isFilterSheetOpen}
                 onClose={() => setIsFilterSheetOpen(false)}
@@ -447,6 +400,6 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
                     setIsFilterSheetOpen(false)
                 }}
             />
-        </FadeIn>
+        </>
     )
 }

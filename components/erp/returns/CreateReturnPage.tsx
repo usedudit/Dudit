@@ -71,6 +71,13 @@ const mapPaymentMethodToPt = (method: string): string => {
     return method;
 }
 
+type ReturnAdminActionContext = {
+    reason?: string | null
+    riskScore?: number | null
+    notifySeller?: boolean
+    changedFields?: string[]
+}
+
 interface CreateReturnPageProps {
     partnerId: string
     mode: "create" | "edit" | "view"
@@ -78,6 +85,14 @@ interface CreateReturnPageProps {
     onBack: () => void
     onSave: (data: Partial<ReturnRequest> & Record<string, any>) => void
     isSaving: boolean
+    /** Painel admin: destrava edição de devoluções já finalizadas. */
+    adminContext?: boolean
+    /** Abas extras no topo do form (ex.: Comprador e Loja). */
+    extraTabs?: { value: string; label: string; content: React.ReactNode }[]
+    /** Modal de ação administrativa antes de salvar (motivo/risk/notificação). */
+    adminActionGate?: (
+        changedFields: string[],
+    ) => Promise<{ cancelled?: boolean; ctx?: ReturnAdminActionContext }>
 }
 
 interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition"> {
@@ -153,6 +168,9 @@ export default function CreateReturnPage({
     onBack,
     onSave,
     isSaving,
+    adminContext = false,
+    extraTabs,
+    adminActionGate,
 }: CreateReturnPageProps) {
     const [activeTab, setActiveTab] = useState("general")
     const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -236,8 +254,9 @@ export default function CreateReturnPage({
     const [isRetryingRefund, setIsRetryingRefund] = useState(false)
 
     const isViewOnly = useMemo(() => {
+        if (adminContext) return false
         return mode === "view" || !!(returnRequest && ["APPROVED", "REJECTED", "RESOLVED", "EXPIRED"].includes(returnRequest.status))
-    }, [mode, returnRequest])
+    }, [mode, returnRequest, adminContext])
 
     const isMarketplaceRequest = useMemo(() => {
         return !!(returnRequest?.source === "marketplace")
@@ -373,7 +392,7 @@ export default function CreateReturnPage({
     useEffect(() => {
         if ((mode === "edit" || mode === "view") && returnRequest?.id) {
             setHistoryLoading(true)
-            getReturnRequestDetailsAction(partnerId, returnRequest.id)
+            getReturnRequestDetailsAction(partnerId, returnRequest.id, { adminBypass: adminContext })
                 .then((res: any) => {
                     if (res.success && res.data) {
                         setRawReturnRequestData(res.data)
@@ -391,7 +410,7 @@ export default function CreateReturnPage({
                 .catch(console.error)
                 .finally(() => setHistoryLoading(false))
         }
-    }, [mode, returnRequest?.id, partnerId])
+    }, [mode, returnRequest?.id, partnerId, adminContext])
 
     // Load existing return data for edit/view modes
     useEffect(() => {
@@ -665,7 +684,7 @@ export default function CreateReturnPage({
             const res = await retryMercadoPagoRefundAction(partnerId, failedOrPendingRefund.id, returnRequest.id)
             if (res.success) {
                 notifySuccess("Reembolso via Mercado Pago processado com sucesso!")
-                getReturnRequestDetailsAction(partnerId, returnRequest.id).then((detailRes: any) => {
+                getReturnRequestDetailsAction(partnerId, returnRequest.id, { adminBypass: adminContext }).then((detailRes: any) => {
                     if (detailRes.success && detailRes.data) {
                         setRawReturnRequestData(detailRes.data)
                         if (detailRes.data.returnEvents) {
@@ -877,16 +896,70 @@ export default function CreateReturnPage({
         setReplacementItems(prev => prev.filter((_, itemIndex) => itemIndex !== index))
     }, [])
 
-    const completeSave = useCallback((returnToInventoryItems: { id: string; quantity: number }[] | null) => {
+    const computeChangedFields = useCallback((data: Partial<ReturnRequest> & Record<string, any>) => {
+        if (!returnRequest) return []
+        const fields: string[] = []
+
+        if (data.status && data.status !== returnRequest.status) fields.push("status")
+
+        const originalResolution = returnRequest.approvedResolution || returnRequest.desiredResolution || "refund"
+        if (data.resolutionType && data.resolutionType !== originalResolution) fields.push("resolução")
+        if (Number(data.refundValue || 0) !== Number(returnRequest.refundValue || 0)) fields.push("valor do reembolso")
+        if (Number(data.storeCreditValue || 0) !== Number(returnRequest.storeCreditValue || 0)) fields.push("vale-compra")
+        if ((data.observations || "") !== (returnRequest.sellerNotes || "")) fields.push("observações")
+        if (data.refundPaymentMethod && data.refundPaymentMethod !== (returnRequest.refundPaymentMethod || "")) {
+            fields.push("método de reembolso")
+        }
+
+        const originalItems = returnRequest.items || []
+        const nextItems = data.items || []
+        if (nextItems.length !== originalItems.length) {
+            fields.push("itens")
+        } else {
+            const itemsChanged = nextItems.some((item: any) => {
+                const original = originalItems.find((i: any) => i.id === item.id)
+                if (!original) return true
+                return (
+                    Number(item.quantity) !== Number(original.quantity) ||
+                    item.reason !== original.reason ||
+                    item.condition !== original.condition
+                )
+            })
+            if (itemsChanged) fields.push("itens")
+        }
+
+        const originalEvidence = returnRequest.evidenceImages || []
+        const nextEvidence = data.evidenceImages || []
+        if (nextEvidence.length !== originalEvidence.length) fields.push("evidências")
+
+        return fields
+    }, [returnRequest])
+
+    /**
+     * Em modo admin, abre o modal "Salvar alterações" (motivo/risk/notificação)
+     * antes de persistir e envia o contexto para o server action.
+     */
+    const saveWithAdminGate = useCallback(async (data: Partial<ReturnRequest> & Record<string, any>) => {
+        if (!adminContext || !adminActionGate) {
+            onSave(data)
+            return
+        }
+        const changedFields = computeChangedFields(data)
+        const gate = await adminActionGate(changedFields)
+        if (gate?.cancelled) return
+        onSave({ ...data, adminActionCtx: gate?.ctx ?? null })
+    }, [adminContext, adminActionGate, computeChangedFields, onSave])
+
+    const completeSave = useCallback(async (returnToInventoryItems: { id: string; quantity: number }[] | null) => {
         if (!pendingSaveData) return
-        onSave({
+        await saveWithAdminGate({
             ...pendingSaveData,
             returnToInventory: returnToInventoryItems !== null && returnToInventoryItems.length > 0,
             returnToInventoryItems,
         })
         setPendingSaveData(null)
         setIsInventoryRestoreModalOpen(false)
-    }, [onSave, pendingSaveData])
+    }, [pendingSaveData, saveWithAdminGate])
 
     const handleSelectCustomer = useCallback((customer: any) => {
         setSelectedOrder((prev: any) => {
@@ -920,7 +993,7 @@ export default function CreateReturnPage({
         })
     }, [])
 
-    const handleConfirmMpWarning = useCallback(() => {
+    const handleConfirmMpWarning = useCallback(async () => {
         setIsMpWarningModalOpen(false)
         if (!pendingSaveData) return
 
@@ -936,9 +1009,9 @@ export default function CreateReturnPage({
             return
         }
 
-        onSave({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
+        await saveWithAdminGate({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [pendingSaveData, onSave, checkedItems, resolutionType, returnRequest])
+    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest])
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
@@ -1078,7 +1151,7 @@ export default function CreateReturnPage({
                 return
             }
 
-            onSave({ ...payload, returnToInventory: false, returnToInventoryItems: null })
+            await saveWithAdminGate({ ...payload, returnToInventory: false, returnToInventoryItems: null })
         } catch (err) {
             console.error("Error saving return request:", err)
         } finally {
@@ -1162,6 +1235,9 @@ export default function CreateReturnPage({
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                        {extraTabs?.map((tab) => (
+                                            <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+                                        ))}
                                         <TabsTrigger value="evidence">Evidências</TabsTrigger>
                                         <TabsTrigger value="observations">Observações</TabsTrigger>
                                         {mode !== "create" && (
@@ -1838,7 +1914,18 @@ export default function CreateReturnPage({
                                                                 disabled={isViewOnly}
                                                                 value={returnStatus}
                                                                 setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
-                                                                options={[
+                                                                options={adminContext ? [
+                                                                    { value: "PENDING_REVIEW", label: "Pendente" },
+                                                                    { value: "UNDER_ANALYSIS", label: "Em análise" },
+                                                                    { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
+                                                                    { value: "WAITING_ITEM_RETURN", label: "Aguardando devolução do item" },
+                                                                    { value: "APPROVED", label: "Aprovada" },
+                                                                    { value: "PROCESSING", label: "Em processamento" },
+                                                                    { value: "RESOLVED", label: "Concluída" },
+                                                                    { value: "REJECTED", label: "Recusada" },
+                                                                    { value: "EXPIRED", label: "Expirada" },
+                                                                    { value: "ESCALATED", label: "Escalada para moderação" },
+                                                                ] : [
                                                                     { value: "PENDING_REVIEW", label: "Pendente" },
                                                                     { value: "UNDER_ANALYSIS", label: "Em análise" },
                                                                     { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
@@ -1849,7 +1936,7 @@ export default function CreateReturnPage({
 
                                                             <FormDropdown
                                                                 label="Tipo de resolução"
-                                                                disabled={isViewOnly || isMarketplaceRequest}
+                                                                disabled={isViewOnly || (isMarketplaceRequest && !adminContext)}
                                                                 value={resolutionType}
                                                                 setValue={(val) => setResolutionType(val as any)}
                                                                 options={[
@@ -2272,6 +2359,12 @@ export default function CreateReturnPage({
                                         </FadeIn>
                                     </TabsContent>
 
+                                    {extraTabs?.map((tab) => (
+                                        <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                                            {tab.content}
+                                        </TabsContent>
+                                    ))}
+
                                     <TabsContent value="evidence" className="mt-0">
                                         <FadeIn key="evidence" className="space-y-6">
                                             <FormSection title="Evidências de Retorno">
@@ -2280,7 +2373,7 @@ export default function CreateReturnPage({
                                                     onImageUpload={handleImageUpload}
                                                     onRemoveImage={handleRemoveImage}
                                                     onSetPrimaryImage={handleSetPrimaryImage}
-                                                    isEditing={!isViewOnly && !isMarketplaceRequest}
+                                                    isEditing={!isViewOnly && (!isMarketplaceRequest || adminContext)}
                                                     uploadingImages={uploadingImages}
                                                     isSaving={isSaving || isUploading}
                                                 />
@@ -2325,7 +2418,7 @@ export default function CreateReturnPage({
 
                                     {mode !== "create" && (
                                         <TabsContent value="history" className="mt-0">
-                                            <ReturnHistoryTab events={returnEvents} loading={historyLoading} />
+                                            <ReturnHistoryTab events={returnEvents} loading={historyLoading} showAdminActor={adminContext} />
                                         </TabsContent>
                                     )}
                                 </div>

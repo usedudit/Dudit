@@ -3,8 +3,6 @@
 @theme {
   --font-sans: var(--font-sans), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-barcode: var(--font-barcode), 'Libre Barcode 128 Text', monospace;
-
-
 }
 
 @layer utilities {
@@ -86,7 +84,7 @@
   --brand-gray: #F9FAFB;
   --brand-slate: #f3f5f9;
   --brand-border: #ebebeb;
-  --brand-green: #059669;
+  --brand-green: #79c325;
   --brand-green-light: #f3f9f6;
   --brand-green-secondary: #e5fad9;
   --brand-red: #f04438;
@@ -687,7 +685,7 @@ tbody tr {
  * conjunto. Paginas que precisam ocupar 100% da viewport (PDV, agenda) sao
  * acao de fora usando a classe `erp-fill-viewport`.
  */
-.erp-content-flow > *:not(.erp-fill-viewport) {
+.erp-content-flow>*:not(.erp-fill-viewport) {
   height: auto;
   flex-shrink: 0;
 }
@@ -704,7 +702,7 @@ tbody tr {
  * para a largura do container, e `min-width: 0` impede que o conteudo
  * interno volte a empurrar a largura.
  */
-.erp-entity-region > * {
+.erp-entity-region>* {
   flex: 1 1 0%;
   min-height: 0;
   min-width: 0;

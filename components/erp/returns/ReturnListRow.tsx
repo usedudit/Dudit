@@ -16,6 +16,8 @@ interface ReturnListRowProps {
   onPrint?: (returnRequest: ReturnRequest) => void
   onDelete?: (returnRequest: ReturnRequest) => void
   canManage: boolean
+  /** Permite editar mesmo em status finalizados (painel admin). */
+  canEditLocked?: boolean
   selected?: boolean
   onSelect?: () => void
 }
@@ -74,7 +76,7 @@ export function getRefundTypeLabel(refundType: ReturnRequest["refundType"]) {
   }
 }
 
-const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onPrint, onDelete, canManage, selected, onSelect }: ReturnListRowProps) => {
+const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, onPrint, onDelete, canManage, canEditLocked, selected, onSelect }: ReturnListRowProps) => {
   const statusMeta = getReturnStatusMeta(returnRequest.status)
 
   const renderCell = (id: string) => {
@@ -106,6 +108,12 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
             {returnRequest.orderNumber}
           </span>
         )
+      case "store":
+        return (
+          <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+            {returnRequest.storeName || "—"}
+          </span>
+        )
       case "customer":
         return (
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
@@ -135,7 +143,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown
               onPrint={() => onPrint?.(returnRequest)}
-              onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? () => onEdit?.(returnRequest) : undefined}
+              onEdit={canManage && (canEditLocked || !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status)) ? () => onEdit?.(returnRequest) : undefined}
             />
           </div>
         )

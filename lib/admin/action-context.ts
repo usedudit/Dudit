@@ -29,7 +29,7 @@ type ApplyAdminActionContextParams = {
     partnerId?: string | null
     /** Loja do item. Se null, usa a loja sede do parceiro; sem loja, o parceiro. */
     storeId?: string | null
-    targetType: "product" | "service" | "recurring_plan" | "order"
+    targetType: "product" | "service" | "recurring_plan" | "order" | "return_request"
     targetId: string
     /** Título da notificação enviada ao vendedor. */
     actionTitle: string
@@ -106,28 +106,9 @@ export async function applyAdminActionContext(p: ApplyAdminActionContextParams):
                     },
                 })
             } else if (p.partnerId) {
-                const { data: partnerRow } = await admin
-                    .from("partners")
-                    .select("id, risk_score")
-                    .eq("id", p.partnerId)
-                    .maybeSingle()
-                const previous = partnerRow?.risk_score ?? 0
-                const { error } = await admin.from("partners").update({ risk_score: riskScore }).eq("id", p.partnerId)
-                if (error) throw error
-                await adminAuditLog({
-                    adminUserId: p.adminUserId,
-                    actionType: AdminActionType.MODERATION_RISK_SCORE,
-                    targetType: "partner",
-                    targetId: p.partnerId,
-                    metadata: {
-                        scope: "partner",
-                        riskTargetType: p.targetType,
-                        riskTargetId: p.targetId,
-                        previousValue: previous,
-                        newValue: riskScore,
-                        reason: reason || null,
-                    },
-                })
+                // Risk score é armazenado por loja (stores.risk_score).
+                // Sem loja vinculada não há onde persistir o valor.
+                console.warn("[ADMIN_ACTION] risk score skipped: partner has no store", { partnerId: p.partnerId })
             }
 
             // Notificação de risk score entra na mensagem combinada abaixo

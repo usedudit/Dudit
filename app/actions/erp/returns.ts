@@ -36,6 +36,10 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
 import { sendRefundProcessed, sendHighValueRefund, sendSlaExpired, sendRefundRequested, sendExchangeCreated } from "@/lib/services/discord-general-webhook.service"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
+import { adminAuditLog } from "@/lib/admin/audit"
+import { AdminActionType } from "@/lib/admin/types"
+import { applyAdminActionContext, type AdminActionContext } from "@/lib/admin/action-context"
 
 // ─── Segurança: Constantes de Reembolso ────────────────────────────────────
 
@@ -457,10 +461,18 @@ export async function getReturnRequestsPageAction(
     }
 }
 
-export async function getReturnRequestDetailsAction(partnerId: string, requestId: string) {
+export async function getReturnRequestDetailsAction(
+    partnerId: string,
+    requestId: string,
+    opts?: { adminBypass?: boolean },
+) {
     try {
-        const access = await requirePermission(partnerId, "orders", "view")
-        assertPermission(access, "orders.list")
+        if (opts?.adminBypass) {
+            await requireAdminScope("moderation")
+        } else {
+            const access = await requirePermission(partnerId, "orders", "view")
+            assertPermission(access, "orders.list")
+        }
         const supabase = createAdminClient()
         const { data, error } = await supabase
             .from("return_requests")
@@ -480,7 +492,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
         if (error) throw error
 
         const requestStoreId = data.store_id || (data as any).orders?.store_id
-        if (requestStoreId) {
+        if (!opts?.adminBypass && requestStoreId) {
             await requireStorePermission(requestStoreId, partnerId, "orders", "view")
         }
 
@@ -553,6 +565,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
             metadata: e.metadata || e.new_values || {},
             event_type: e.action_type || e.action || "updated",
+            source: e.source || null,
             created_at: e.created_at,
         }))
 
@@ -1132,16 +1145,32 @@ async function maybeRefundMercadoPago(params: {
     }
 }
 
-export async function processReturnRequestAction(input: unknown) {
+export async function processReturnRequestAction(
+    input: unknown,
+    opts?: { adminBypass?: boolean; actionCtx?: AdminActionContext | null },
+) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     try {
         const user = await requireUser()
         const data = processReturnSchema.parse(input)
-        await requireMinimumPlan(data.partnerId, "crescer")
+        const adminBypass = Boolean(opts?.adminBypass)
+        let adminActorId: string | null = null
+        let adminActorEmail: string | null = null
+
+        if (adminBypass) {
+            const admin = await requireAdminScope("moderation")
+            adminActorId = admin.userId
+            adminActorEmail = admin.email || null
+        } else {
+            await requireMinimumPlan(data.partnerId, "crescer")
+        }
+
         if (data.nextStatus && !RETURN_STATUS_SET.has(data.nextStatus)) throw new Error("Status invalido")
 
-        const access = await requirePermission(data.partnerId, "orders", "edit")
-        assertPermission(access, "orders.can_refund")
+        if (!adminBypass) {
+            const access = await requirePermission(data.partnerId, "orders", "edit")
+            assertPermission(access, "orders.can_refund")
+        }
         const supabase = createAdminClient()
 
         const { data: request, error: requestError } = await supabase
@@ -1157,10 +1186,10 @@ export async function processReturnRequestAction(input: unknown) {
             .single()
 
         if (requestError || !request) throw new Error("Solicitação nao encontrada")
-        if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitação bloqueada")
+        if (!adminBypass && ["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitação bloqueada")
 
         const requestStoreId = request.store_id || (request as any).orders?.store_id
-        if (requestStoreId) {
+        if (!adminBypass && requestStoreId) {
             await requireStorePermission(requestStoreId, data.partnerId, "orders", "can_refund")
         }
 
@@ -1561,6 +1590,82 @@ export async function processReturnRequestAction(input: unknown) {
                 shortfallAmount: toNumber(result?.exchange_shortfall_amount),
                 surplusAmount: toNumber(result?.exchange_surplus_amount),
             }).catch(err => console.warn("[EXCHANGE] Discord webhook failed (non-blocking):", err))
+        }
+
+        // ─── Admin edit: registra na timeline da devolução + auditoria ────────
+        if (adminBypass && adminActorId) {
+            const actionCtx = opts?.actionCtx || null
+            const changedFields = actionCtx?.changedFields || []
+            const effectiveStoreId = request.store_id || (request as any).orders?.store_id || null
+            const changeLines: string[] = []
+
+            if (data.nextStatus && data.nextStatus !== request.status) {
+                changeLines.push(`Equipe Dudit alterou o status de ${request.status} para ${data.nextStatus}.`)
+            }
+            if (changedFields.length > 0) {
+                changeLines.push(`Equipe Dudit atualizou: ${changedFields.join(", ")}.`)
+            }
+            if (actionCtx?.reason?.trim()) {
+                changeLines.push(actionCtx.reason.trim())
+            }
+            if (changeLines.length === 0) {
+                changeLines.push("Equipe Dudit atualizou a solicitação.")
+            }
+
+            try {
+                await logAuditEvent({
+                    partnerId: request.partner_id,
+                    actorUserId: adminActorId,
+                    actorName: "Equipe Dudit",
+                    entityType: "return_request",
+                    entityId: data.requestId,
+                    actionType: "updated",
+                    changeLines,
+                    metadata: {
+                        dudit_action: true,
+                        admin_actor_name: adminActorEmail || adminActorId,
+                        admin_actor_id: adminActorId,
+                        from_status: request.status,
+                        to_status: data.nextStatus || request.status,
+                        changed_fields: changedFields,
+                        reason: actionCtx?.reason?.trim() || null,
+                        ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
+                    },
+                    source: "manual",
+                    storeId: effectiveStoreId,
+                })
+
+                await adminAuditLog({
+                    adminUserId: adminActorId,
+                    actionType: AdminActionType.RETURN_UPDATE,
+                    targetType: "return_request",
+                    targetId: data.requestId,
+                    metadata: {
+                        partnerId: request.partner_id,
+                        storeId: effectiveStoreId,
+                        returnId: data.requestId,
+                        fromStatus: request.status,
+                        toStatus: data.nextStatus || request.status,
+                        fields: changedFields,
+                        reason: actionCtx?.reason?.trim() || null,
+                    },
+                })
+
+                await applyAdminActionContext({
+                    adminUserId: adminActorId,
+                    partnerId: request.partner_id,
+                    storeId: effectiveStoreId,
+                    targetType: "return_request",
+                    targetId: data.requestId,
+                    actionTitle: "Solicitação de devolução atualizada pela Dudit",
+                    entityLabel: "devolução",
+                    entityName: `DVL-${data.requestId.slice(0, 6).toUpperCase()}`,
+                    sellerUrl: `/erp/devolucoes?view=${data.requestId}`,
+                    ctx: actionCtx,
+                })
+            } catch (auditErr) {
+                console.error("[processReturnRequest] admin audit failed:", auditErr)
+            }
         }
 
         return successResponse(result)

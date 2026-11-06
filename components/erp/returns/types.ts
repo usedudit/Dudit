@@ -45,6 +45,8 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
     unit_price: number
   }> | null
   exchangeBalanceResolution?: "store_credit" | "refund" | null
+  /** Nome da loja/vendedor (usado apenas no painel admin). */
+  storeName?: string | null
 }
 
 export interface ReturnEvent {
@@ -58,4 +60,5 @@ export interface ReturnEvent {
   created_at: string
   metadata?: Record<string, any>
   event_type?: string
+  source?: string | null
 }
