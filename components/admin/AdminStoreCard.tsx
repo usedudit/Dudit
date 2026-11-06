@@ -22,6 +22,7 @@ interface AdminStoreCardProps {
 
 export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }: AdminStoreCardProps) {
     const storeId = store.id || fallbackStoreId
+    const partner = store.partners || {}
 
     return (
         <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
@@ -61,6 +62,12 @@ export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }:
                     <div className="flex justify-between">
                         <span className="text-brand-inactive-text">CNPJ</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">{store.cnpj}</span>
+                    </div>
+                )}
+                {partner.name && (
+                    <div className="flex justify-between">
+                        <span className="text-brand-inactive-text">Vendedor / Parceiro</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{partner.trade_name || partner.name}</span>
                     </div>
                 )}
                 {storeId && (

@@ -23,9 +23,9 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
     const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
     const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
 
-    // Seller/Partner name from the joined data
+    // Seller/Partner name from the joined data (via stores.partners)
     const store = order.stores || {}
-    const partner = order.partners || {}
+    const partner = store.partners || {}
     const sellerName = partner.trade_name || partner.name || store.name || "—"
 
     return (

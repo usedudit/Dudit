@@ -24,8 +24,7 @@ import {
     Zap,
     Link2,
 } from 'lucide-react';
-import { GridLines, SectionHeader, Navbar, Footer, CTA, FaqSection } from '@/components/InstitucionalShared';
-import { INSTITUTIONAL_FAQ } from '@/lib/constants/institutional-faq';
+import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
 
 const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
@@ -39,10 +38,10 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         transition={{ duration: 0.6 }}
                     >
                         <h1 className="text-5xl font-bold text-brand-dark mb-6">
-                            Venda no balcão, na sua cidade ou para <span className="text-brand-green">todo o Brasil.</span>
+                            O que você precisa hoje pode estar na <span className="text-brand-green">Dudit.</span>
                         </h1>
                         <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
-                            Sistema completo de gestão comercial e vendas com 0% de comissão. Frente de caixa (PDV), catálogo online, entregas locais e frete nacional via transportadoras e Correios.
+                            Descubra produtos, serviços e negócios perto de você. Compre, anuncie ou agende de um jeito simples.
                         </p>
                         <div className="flex flex-wrap gap-4">
                             <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
@@ -71,8 +70,8 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                         <ShoppingBag className="w-4 h-4 text-blue-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Descubra e Compre</div>
-                                        <div className="text-xs text-brand-inactive-text">Produtos perto de você ou com envio nacional</div>
+                                        <div className="text-sm font-bold text-brand-dark">Descubra</div>
+                                        <div className="text-xs text-brand-inactive-text">Produtos, serviços e negócios perto de você</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
@@ -80,8 +79,8 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                         <Store className="w-4 h-4 text-green-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Venda com 0% de Taxa</div>
-                                        <div className="text-xs text-brand-inactive-text">No balcão físico, online ou para todo o país</div>
+                                        <div className="text-sm font-bold text-brand-dark">Anuncie</div>
+                                        <div className="text-xs text-brand-inactive-text">Seja descoberto por mais pessoas</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
@@ -89,8 +88,8 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                                         <CheckCircle2 className="w-4 h-4 text-purple-600" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold text-brand-dark">Organize sua Gestão</div>
-                                        <div className="text-xs text-brand-inactive-text">PDV, estoque com variações, OS e agenda</div>
+                                        <div className="text-sm font-bold text-brand-dark">Organize</div>
+                                        <div className="text-xs text-brand-inactive-text">Gestão simples para o seu dia a dia</div>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
@@ -137,19 +136,19 @@ const BentoFeaturesComoAjuda = () => {
         {
             title: "Precisa de alguma coisa?",
             subtitle: "PARA QUEM PROCURA",
-            description: "Encontrar lojas, produtos na sua cidade ou lojas que despacham para todo o Brasil.",
+            description: "Encontrar lojas, produtos, serviços e oportunidades perto de você.",
             type: "buy"
         },
         {
             title: "Tem algo para vender?",
             subtitle: "DESAPEGOS E PRODUTOS",
-            description: "Anuncie produtos com opção de retirada local ou envio para todo o território nacional.",
+            description: "Anuncie produtos, serviços ou qualquer coisa de forma simples.",
             type: "sell"
         },
         {
             title: "Tem um negócio?",
-            subtitle: "PARA COMERCIANTES E EMPRESAS",
-            description: "PDV para balcão, vitrine digital com 0% de taxa e frete nacional por transportadoras e Correios.",
+            subtitle: "PARA EMPREENDEDORES",
+            description: "Mostre o que você vende e facilite para clientes encontrarem você.",
             type: "store"
         },
         {
@@ -226,7 +225,7 @@ const BentoFeaturesComoAjuda = () => {
                                             dudit.com.br/sualoja
                                         </div>
                                         <div className="bg-brand-green/10 text-brand-green text-[9px] font-bold py-1 rounded text-center">
-                                            Vendas locais e para todo o Brasil
+                                            Aberta para clientes locais
                                         </div>
                                     </div>
                                 )}
@@ -324,23 +323,23 @@ const ParaQuemVende = () => {
     const items = [
         {
             num: "01",
-            title: "Vendas locais e para todo o Brasil",
-            desc: "Chegue até clientes da sua cidade com motoboy/retirada e despache encomendas para qualquer estado do Brasil com cálculo de frete automático por transportadoras e Correios.",
+            title: "Mais uma vitrine",
+            desc: "Chegue até mais pessoas da sua cidade. Sua loja aparece para quem está procurando exatamente o que você vende.",
         },
         {
             num: "02",
-            title: "Contato direto e catálogo online",
-            desc: "Clientes compram no balcão (PDV), chamam no WhatsApp ou fecham o pedido direto no seu catálogo online.",
+            title: "Contato direto",
+            desc: "Clientes chamam no WhatsApp ou compram direto na sua vitrine. Sem intermediários, sem complicação.",
         },
         {
             num: "03",
-            title: "0% de comissão por venda",
-            desc: "100% do lucro da venda fica com você. Não cobramos porcentagem sobre seus pedidos ou orçamentos.",
+            title: "Sem comissão",
+            desc: "100% do lucro da venda fica com você. A Dudit cobra apenas uma taxa fixa mensal, sem surpresas.",
         },
         {
             num: "04",
-            title: "Link na bio e PDV de balcão",
-            desc: "Compartilhe seu link profissional nas redes sociais e utilize a frente de caixa rápida para vendas presenciais no balcão.",
+            title: "Link na bio",
+            desc: "Tenha um catálogo limpo e profissional para compartilhar nas suas redes sociais. Seu link único para usar no Instagram.",
         },
     ];
 
@@ -462,7 +461,7 @@ const GlobalScale = () => {
                             <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
                             <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />O lucro é 100% seu.</h2>
                             <p className="text-brand-inactive-text text-lg mb-12 max-w-md leading-relaxed">
-                                A Dudit viabiliza vendas no balcão, entregas locais e envios para todo o Brasil com 0% de comissão. Sem taxas escondidas e sem porcentagem sobre suas vendas.
+                                A Dudit é mais uma vitrine para o seu negócio ser encontrado. Sem taxas escondidas e sem porcentagem sobre as suas vendas.
                             </p>
 
                             <div className="flex gap-12 pt-8">
@@ -571,11 +570,6 @@ export default function HomePage() {
                 <ParaQuemCompra />
                 <ParaQuemVende />
                 <GlobalScale />
-                <FaqSection
-                    title="Dúvidas Frequentes sobre a Dudit"
-                    description="Tire suas dúvidas sobre alcance local e nacional, taxas, entrega e ferramentas de gestão da Dudit."
-                    items={INSTITUTIONAL_FAQ}
-                />
                 <CTA onNavigate={onNavigate} />
             </main>
             <Footer onNavigate={onNavigate} />

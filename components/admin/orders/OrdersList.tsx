@@ -195,7 +195,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                 const num = String(order.order_number || order.id || "").toLowerCase()
                 const cust = String(order.customer_name || "").toLowerCase()
                 const st = String(order.stores?.name || "").toLowerCase()
-                const seller = String(order.partners?.trade_name || order.partners?.name || "").toLowerCase()
+                const seller = String(order.stores?.partners?.trade_name || order.stores?.partners?.name || "").toLowerCase()
                 const itemNames = (order.order_items || []).map((i: any) => String(i.product_name || "").toLowerCase()).join(" ")
                 if (!num.includes(term) && !cust.includes(term) && !st.includes(term) && !seller.includes(term) && !itemNames.includes(term)) {
                     return false
@@ -259,8 +259,8 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         bVal = (b.stores?.name || "").toLowerCase()
                         break
                     case "seller":
-                        aVal = (a.partners?.trade_name || a.partners?.name || "").toLowerCase()
-                        bVal = (b.partners?.trade_name || b.partners?.name || "").toLowerCase()
+                        aVal = (a.stores?.partners?.trade_name || a.stores?.partners?.name || "").toLowerCase()
+                        bVal = (b.stores?.partners?.trade_name || b.stores?.partners?.name || "").toLowerCase()
                         break
                     case "date":
                         aVal = new Date(a.created_at).getTime()
@@ -313,7 +313,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
         const returns = Array.isArray(order.return_requests) ? order.return_requests : []
         const store = order.stores || {}
-        const partner = order.partners || {}
+        const partner = store.partners || {}
         const sellerName = partner.trade_name || partner.name || store.name || "—"
         const isSelected = selectedOrders.has(order.id)
 
@@ -547,7 +547,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         const paymentMeta = getPaymentStatusMeta(order.situation)
                                         const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
                                         const store = order.stores || {}
-                                        const partner = order.partners || {}
+                                        const partner = store.partners || {}
                                         const sellerName = partner.trade_name || partner.name || store.name || "—"
                                         return (
                                             <div

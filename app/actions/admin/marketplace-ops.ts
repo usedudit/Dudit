@@ -82,8 +82,7 @@ export async function getAdminMarketplaceOrders(
             amount_paid,
             order_source,
             created_at,
-            stores!left(id, name, logo_url, phone, partner_id),
-            partners!left(id, name, trade_name),
+            stores!left(id, name, logo_url, phone, partner_id, partners!left(id, name, trade_name)),
             order_items(id, product_name, quantity),
             return_requests!order_id(id, status)
         `)
@@ -156,7 +155,7 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         .from("orders")
         .select(`
             *,
-            stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id),
+            stores!left(id, name, person_type, logo_url, banner_url, phone, description, risk_score, partner_id, partners!left(id, name, trade_name)),
             order_items(*, products(id, name, sku, images, unit, price), product_variants(id, variant_name, sku), services(id, name, images, price)),
             return_requests!order_id(
                 id, request_type, status, resolution_type, refund_amount, store_credit_amount, source, created_at,
