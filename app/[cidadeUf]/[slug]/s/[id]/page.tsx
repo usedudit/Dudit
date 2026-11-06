@@ -182,6 +182,7 @@ export default async function ServiceDetailsPage({
                 appointmentsOpen={capabilities?.appointmentsOpen ?? false}
                 checkoutOpen={capabilities?.checkoutOpen ?? false}
                 whatsappPhone={capabilities?.whatsappPhone ?? null}
+                orderFlow={capabilities?.baseOrderFlow ?? "dudit"}
             />
 
             <MarketplaceFooter />

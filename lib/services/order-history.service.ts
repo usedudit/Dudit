@@ -28,27 +28,38 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
   const supabase = getAdminClient()
   const cappedLimit = Math.min(Math.max(1, limit), MAX_MERGED_ENTRIES)
 
-  const { data: timelineResult, error: timelineError } = await supabase
-    .from("audit_logs")
-    .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
-    .eq("partner_id", partnerId)
-    .eq("entity_type", "order")
-    .eq("entity_id", orderId)
-    .order("created_at", { ascending: false })
-    .limit(cappedLimit)
+  // Busca a timeline e as devoluções do pedido em paralelo: são independentes
+  // e antes eram dois roundtrips sequenciais na abertura da aba Histórico.
+  const [timelineRes, returnRequestsRes] = await Promise.all([
+    supabase
+      .from("audit_logs")
+      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
+      .eq("partner_id", partnerId)
+      .eq("entity_type", "order")
+      .eq("entity_id", orderId)
+      .order("created_at", { ascending: false })
+      .limit(cappedLimit),
+    supabase
+      .from("return_requests")
+      .select("id, seller_notes")
+      .eq("partner_id", partnerId)
+      .eq("order_id", orderId)
+      .is("deleted_at", null),
+  ])
 
-  if (timelineError) {
-    console.error("[orders_history] timeline fetch error:", timelineError)
+  const timelineResult = timelineRes.data
+  if (timelineRes.error) {
+    console.error("[orders_history] timeline fetch error:", timelineRes.error)
   }
 
-  const { data: returnRequestIds } = await supabase
-    .from("return_requests")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("order_id", orderId)
-    .is("deleted_at", null)
+  const returnRequests = returnRequestsRes.data || []
+  // A presença de observações do lojista é usada para complementar as linhas
+  // de devolução, sem precisar de outra consulta.
+  const hasSellerNotes = returnRequests.some(
+    (rr: any) => rr.seller_notes && String(rr.seller_notes).trim().length > 0,
+  )
 
-  const returnRequestIdsList = (returnRequestIds || []).map((rr: any) => rr.id)
+  const returnRequestIdsList = returnRequests.map((rr: any) => rr.id)
   let returnTimelineResult: any[] = []
   if (returnRequestIdsList.length > 0) {
     const { data: rtData, error: rtError } = await supabase
@@ -119,19 +130,6 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
         ]),
       )
     }
-  }
-
-  // Fetch return requests seller notes to detect if seller notes exist for this order
-  let hasSellerNotes = false
-  try {
-    const { data: returnRequests } = await supabase
-      .from("return_requests")
-      .select("seller_notes")
-      .eq("order_id", orderId)
-      .is("deleted_at", null)
-    hasSellerNotes = (returnRequests || []).some((rr: any) => rr.seller_notes && rr.seller_notes.trim().length > 0)
-  } catch (err) {
-    console.error("[orders_history] return requests notes fetch error:", err)
   }
 
   return merged.map((entry) => {

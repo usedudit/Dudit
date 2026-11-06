@@ -3,6 +3,9 @@ import {
   findSuperFreteIntegration as getSuperFreteIntegration,
   buildSuperFreteClient as createClientFromIntegration,
 } from "@/lib/services/shipping/superfrete-integration"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import { revalidateOrderHistory } from "@/lib/utils/revalidation"
+import { getCarrierStatusLabel } from "@/lib/orders/carrier-status"
 
 export type CarrierLabelCancelResult =
   | { success: true; cancelled: true }
@@ -20,10 +23,13 @@ export async function cancelCarrierLabelForOrder(params: {
   labelId: string
   reason: string
   currentStatus?: string | null
+  /** Usuário que solicitou o cancelamento (para o histórico do pedido). */
+  actorUserId?: string | null
   /** Limite por chamada à SuperFrete. Usado pelo cron para caber no orçamento. */
   timeoutMs?: number
 }): Promise<CarrierLabelCancelResult> {
   const { partnerId, orderId, labelId, reason } = params
+  const cleanReason = String(reason || "").trim()
   if (!labelId) {
     return { success: false, cancelled: false, error: "Etiqueta não encontrada." }
   }
@@ -49,17 +55,35 @@ export async function cancelCarrierLabelForOrder(params: {
   }
 
   try {
-    await client.cancelOrder(labelId, reason, params.timeoutMs)
+    await client.cancelOrder(labelId, cleanReason, params.timeoutMs)
   } catch (err: any) {
     const message = err?.message || "Erro ao cancelar etiqueta."
     return { success: false, cancelled: false, error: message }
   }
 
+  const cancelledAt = new Date().toISOString()
+  const { data: shipmentRow } = await supabase
+    .from("order_shipments")
+    .select("id, status, payload")
+    .eq("partner_id", partnerId)
+    .eq("order_id", orderId)
+    .eq("external_label_id", labelId)
+    .maybeSingle()
+
+  const previousStatus = shipmentRow?.status || status || null
+  const previousPayload = (shipmentRow?.payload as Record<string, unknown> | null) || {}
+
   const { error: updateError } = await supabase
     .from("order_shipments")
     .update({
       status: "cancelled",
-      cancelled_at: new Date().toISOString(),
+      cancelled_at: cancelledAt,
+      payload: {
+        ...previousPayload,
+        cancel_reason: cleanReason || null,
+        cancelled_at: cancelledAt,
+        cancelled_by: params.actorUserId || null,
+      },
     })
     .eq("partner_id", partnerId)
     .eq("order_id", orderId)
@@ -68,6 +92,37 @@ export async function cancelCarrierLabelForOrder(params: {
   if (updateError) {
     return { success: false, cancelled: false, error: updateError.message }
   }
+
+  // Registra o cancelamento (e o motivo) no histórico do pedido. Sem isso a
+  // timeline só mostrava mudanças de status cruas, em inglês, e o motivo
+  // informado pelo lojista era perdido.
+  const reasonLine = cleanReason
+    ? `cancelou a etiqueta de frete. Motivo: ${cleanReason}`
+    : "cancelou a etiqueta de frete."
+  const statusLine =
+    previousStatus && previousStatus !== "cancelled"
+      ? `status do envio: ${getCarrierStatusLabel(previousStatus)} -> Cancelado.`
+      : null
+
+  await Promise.all([
+    logAuditEvent({
+      partnerId,
+      actorUserId: params.actorUserId || null,
+      entityType: "order",
+      entityId: orderId,
+      actionType: "shipping_label_cancelled",
+      changeLines: statusLine ? [reasonLine, statusLine] : [reasonLine],
+      metadata: {
+        shipment_id: shipmentRow?.id || null,
+        label_id: labelId,
+        reason: cleanReason || null,
+        from_status: previousStatus,
+        to_status: "cancelled",
+      },
+      source: "user",
+    }),
+    revalidateOrderHistory(orderId),
+  ])
 
   return { success: true, cancelled: true }
 }

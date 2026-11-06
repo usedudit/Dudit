@@ -5047,6 +5047,46 @@ export async function updateERPOrderAction(
 
   if (adminBypass && adminActorId) {
     const actionCtx = opts?.actionCtx || null;
+    const effectiveStoreId = (currentOrder as any).store_id || data.storeId || null;
+    const adminActorEmail = (await import("@/lib/supabase/admin").then(m => m.getAdminClient().auth.admin.getUserById(adminActorId)).then(r => r.data?.user?.email)).catch(() => null);
+    const changeLinesForAudit: string[] = [];
+
+    if (changeLines.length > 0) {
+      changeLinesForAudit.push(...changeLines.map((line: string) => `Equipe Dudit alterou: ${line}.`));
+    }
+    if (actionCtx?.reason?.trim()) {
+      changeLinesForAudit.push(actionCtx.reason.trim());
+    }
+    if (changeLinesForAudit.length === 0) {
+      changeLinesForAudit.push("Equipe Dudit atualizou o pedido.");
+    }
+
+    try {
+      await logAuditEvent({
+        partnerId: data.partnerId,
+        actorUserId: adminActorId,
+        actorName: "Equipe Dudit",
+        entityType: "order",
+        entityId: orderId,
+        actionType: "updated",
+        changeLines: changeLinesForAudit,
+        metadata: {
+          dudit_action: true,
+          admin_actor_name: adminActorEmail || adminActorId,
+          admin_actor_id: adminActorId,
+          from_status: currentOrder.situation,
+          to_status: currentOrder.situation, // status might change within changeLines
+          changed_fields: actionCtx?.changedFields || [],
+          reason: actionCtx?.reason?.trim() || null,
+          ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
+        },
+        source: "manual",
+        storeId: effectiveStoreId,
+      });
+    } catch (e) {
+      console.error("[ADMIN_ORDER] timeline audit log failed:", e);
+    }
+
     try {
       await adminAuditLog({
         adminUserId: adminActorId,
@@ -5062,12 +5102,12 @@ export async function updateERPOrderAction(
         },
       });
     } catch (e) {
-      console.error("[ADMIN_ORDER] audit log failed:", e);
+      console.error("[ADMIN_ORDER] admin audit log failed:", e);
     }
     await applyAdminActionContext({
       adminUserId: adminActorId,
       partnerId: data.partnerId,
-      storeId: (currentOrder as any).store_id || data.storeId || null,
+      storeId: effectiveStoreId,
       targetType: "order",
       targetId: orderId,
       actionTitle: `Pedido #${currentOrder.order_number || orderId} alterado pela administração`,
@@ -5586,6 +5626,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             labelId: String(carrierShipment.external_label_id),
             reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
             currentStatus: carrierShipment.status,
+            actorUserId: user.id,
           });
           if (result.success) {
             labelCancelled = true;

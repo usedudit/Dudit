@@ -29,6 +29,7 @@ import {
     SidebarCard,
     FormTextarea,
 } from "@/components/reusable"
+import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
@@ -732,26 +733,44 @@ export function AdminOrderDetailView({
                                                             />
                                                         )
                                                     }
-                                                    return (
-                                                        <div className="space-y-4">
-                                                            <div className="flex items-start gap-3 border-l-2 border-brand-green pl-4 py-1">
-                                                                <div className="flex-1">
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Criado</p>
-                                                                    <p className="text-xs text-brand-inactive-text">{formatDateTime(order.created_at)}</p>
-                                                                </div>
-                                                            </div>
 
-                                                            {events.map((ev: any) => (
-                                                                <div key={ev.id} className="flex items-start gap-3 border-l-2 border-brand-border dark:border-dark-border pl-4 py-1">
-                                                                    <div className="flex-1">
-                                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                            {ev.action_type || "Ação Administrativa"}
-                                                                        </p>
-                                                                        <p className="text-xs text-brand-inactive-text">{formatDateTime(ev.created_at)}</p>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                    // Map events to HistoryEntry format for HistoryTimeline
+                                                    const historyEntries: HistoryEntry[] = [
+                                                        {
+                                                            id: `created-${order.id}`,
+                                                            actor_name: "Sistema",
+                                                            change_lines: ["Pedido criado"],
+                                                            created_at: order.created_at,
+                                                            entry_type: "order_created",
+                                                            highlight: false,
+                                                        },
+                                                        ...events.map((ev: any) => {
+                                                            const isDuditAction = ev.metadata?.dudit_action === true || ev.source_table === "audit_logs"
+                                                            const actorName = isDuditAction
+                                                                ? (ev.metadata?.admin_actor_name || ev.admin_name || "Equipe Dudit")
+                                                                : (ev.admin_name || ev.actor_name || "Administrador")
+
+                                                            return {
+                                                                id: ev.id,
+                                                                actor_name: actorName,
+                                                                change_lines: Array.isArray(ev.change_lines)
+                                                                    ? ev.change_lines
+                                                                    : (ev.metadata?.reason
+                                                                            ? [ev.metadata.reason]
+                                                                            : [ev.action_type || "Ação Administrativa"]),
+                                                                created_at: ev.created_at,
+                                                                entry_type: ev.action_type || "updated",
+                                                                highlight: isDuditAction,
+                                                            }
+                                                        }),
+                                                    ]
+
+                                                    return (
+                                                        <HistoryTimeline
+                                                            entries={historyEntries}
+                                                            title="Histórico do Pedido"
+                                                            emptyMessage="Este pedido ainda não possui eventos de auditoria."
+                                                        />
                                                     )
                                                 })()}
                                             </FormSection>

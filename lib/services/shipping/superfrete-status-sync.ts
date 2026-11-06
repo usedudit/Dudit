@@ -1,6 +1,7 @@
-import { revalidateOrders } from "@/lib/utils/revalidation"
+import { revalidateOrders, revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import {
+  SUPERFRETE_LABEL_STATUS,
   SUPERFRETE_LABEL_STATUS_TO_DELIVERY_STATUS,
   SUPERFRETE_WEBHOOK_STATUS_TO_SHIPMENT_STATUS,
 } from "@/lib/services/shipping/superfrete"
@@ -238,6 +239,12 @@ export async function applySuperFreteShipmentStatus(params: {
     source === "webhook" || statusChanged || trackingChanged || orderChanged || returnChanged
 
   if (shouldLog) {
+    // A timeline do pedido é lida em português: nunca gravar o status cru da
+    // SuperFrete ("released", "posted" etc.) na linha do histórico.
+    const rawStatusLabel = shipmentStatus || rawStatus
+    const statusLabel =
+      SUPERFRETE_LABEL_STATUS[rawStatusLabel] || rawStatusLabel || "atualizado"
+
     await logAuditEvent({
       partnerId: shipment.partner_id,
       actorUserId: null,
@@ -246,13 +253,14 @@ export async function applySuperFreteShipmentStatus(params: {
       actionType: "shipping_status_updated",
       changeLines: [
         shipment.kind === "return"
-          ? `Status da etiqueta de devolução atualizado para: ${shipmentStatus || rawStatus}`
-          : `Status de frete atualizado para: ${shipmentStatus || rawStatus}`,
+          ? `Status da etiqueta de devolução atualizado para "${statusLabel}".`
+          : `Status de frete atualizado para "${statusLabel}".`,
       ],
       source,
       metadata: {
         shipment_id: shipment.id,
         shipment_status: shipmentStatus || rawStatus,
+        shipment_status_label: statusLabel,
         shipment_kind: shipment.kind,
         delivery_status: deliveryStatus,
         tracking_number: data.tracking,
@@ -260,6 +268,7 @@ export async function applySuperFreteShipmentStatus(params: {
         origin: source === "system" ? "reconcile" : "webhook",
       },
     })
+    await revalidateOrderHistory(shipment.order_id)
   }
 
   // Só invalida cache quando algo realmente mudou (evita churn no cron).

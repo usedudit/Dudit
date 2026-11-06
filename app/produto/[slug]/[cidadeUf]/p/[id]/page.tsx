@@ -201,6 +201,7 @@ export default async function ProductDetailsPage({
         checkoutOpen={capabilities ? capabilities.checkoutOpen : true}
         ordersLimitReached={capabilities?.ordersLimitReached ?? false}
         whatsappPhone={capabilities?.whatsappPhone ?? null}
+        orderFlow={capabilities?.baseOrderFlow ?? "dudit"}
       />
 
       <MarketplaceFooter />

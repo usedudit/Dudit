@@ -140,6 +140,7 @@ export default async function PlanDetailsPage({
                 userProfile={userProfile}
                 cartCount={cartCount}
                 sponsoredAd={detailAd}
+                orderFlow={plan.orderFlow}
             />
 
             <MarketplaceFooter />

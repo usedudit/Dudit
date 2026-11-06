@@ -1432,6 +1432,7 @@ export async function processReturnRequestAction(
                             labelId: String(shipment.external_label_id),
                             reason: "Cancelamento aprovado pelo lojista",
                             currentStatus: shipment.status,
+                            actorUserId: user.id,
                         })
                     }
                 } catch (labelErr) {

@@ -297,20 +297,47 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
         }
     }
 
-    // Get audit timeline events for this order
-    const { data: auditEvents } = await admin
+    // Get admin audit timeline events (from admin_audit_logs)
+    const { data: adminAuditEvents } = await admin
         .from("admin_audit_logs")
         .select("*")
         .eq("target_id", orderId)
         .order("created_at", { ascending: false })
         .limit(20)
 
+    // Get regular audit events (from audit_logs) for Dudit team actions with green highlight
+    const { data: regularAuditEvents } = await admin
+        .from("audit_logs")
+        .select("*")
+        .eq("entity_type", "order")
+        .eq("entity_id", orderId)
+        .order("created_at", { ascending: true })
+        .limit(50)
+
+    // Merge and normalize events
+    const mergedEvents = [
+        ...(regularAuditEvents || []).map((e: any) => ({
+            ...e,
+            source_table: "audit_logs",
+            action_type: e.action_type || e.action || "updated",
+            created_at: e.created_at,
+            admin_name: e.metadata?.admin_actor_name || e.actor_name,
+        })),
+        ...(adminAuditEvents || []).map((e: any) => ({
+            ...e,
+            source_table: "admin_audit_logs",
+            action_type: e.action_type,
+            created_at: e.created_at,
+            admin_name: e.admin_name || e.metadata?.admin_name,
+        })),
+    ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
     return {
         ...order,
         buyer_profile: buyerProfile,
         delivery_driver: deliveryDriver,
         delivery_assignments: deliveryAssignments,
-        audit_events: auditEvents || [],
+        audit_events: mergedEvents,
     }
 }
 

@@ -2061,16 +2061,16 @@ export function CheckoutPageClient() {
                 + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0)
             return [
                 { label: "Subtotal", value: formatCurrency(checkoutChargeTotal - checkoutDeliveryFee) },
-                Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
+                Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01
                     ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
                     : null,
-                customerInterest > 0
+                customerInterest >= 0.01
                     ? { label: "Juros", value: `+ ${formatCurrency(customerInterest)}` }
                     : null,
-                isCustomerFeeBearer && Number(paymentPreview.feeAmount || 0) > 0
+                isCustomerFeeBearer && Number(paymentPreview.feeAmount || 0) >= 0.01
                     ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
                     : null,
-                isCustomerFeeBearer && Number(paymentPreview.fixedFeeAmount || 0) > 0
+                isCustomerFeeBearer && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01
                     ? { label: "Custo do método", value: `+ ${formatCurrency(paymentPreview.fixedFeeAmount)}` }
                     : null,
                 { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
@@ -2441,7 +2441,7 @@ export function CheckoutPageClient() {
                         <Spinner size={16} />
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-green">
                         <span className="flex items-center gap-2">
                             <span>Desconto do meio de pagamento</span>
@@ -2450,7 +2450,7 @@ export function CheckoutPageClient() {
                         <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && (paymentPreview.feeBearer !== "merchant" || (paymentPreview.installmentFeeBearer || "merchant") !== "merchant") && Number(paymentPreview.interestAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Juros</span>
@@ -2459,13 +2459,22 @@ export function CheckoutPageClient() {
                         <span>+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Taxas</span>
                             {paymentMethodPreviewBadge}
                         </span>
                         <span>+{formatCurrency(paymentPreview.feeAmount)}</span>
+                    </div>
+                )}
+                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
+                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                        <span className="flex items-center gap-2">
+                            <span>Custos do método</span>
+                            {paymentMethodPreviewBadge}
+                        </span>
+                        <span>+{formatCurrency(paymentPreview.fixedFeeAmount)}</span>
                     </div>
                 )}
                 {appliedStoreCredit > 0 && (
@@ -3579,6 +3588,11 @@ export function CheckoutPageClient() {
                                         onOpenModal: () => setShowAddressModal(true),
                                         onOpenForm: () => setShowAddressForm(true),
                                     }}
+                                    ownDeliveryFee={deliveryFee}
+                                    ownDeliveryDistanceKm={deliveryDistanceKm}
+                                    ownDeliveryBreakdown={deliveryBreakdown}
+                                    ownDeliveryQuoteLoading={deliveryQuoteLoading}
+                                    ownDeliveryError={displayDeliveryError}
                                 />
                             )}
 
@@ -4029,6 +4043,7 @@ export function CheckoutPageClient() {
                                             requirements={requirements}
                                             deliveryType={formData.deliveryType}
                                             onDeliveryTypeChange={handleDeliveryTypeChange}
+                                            partnerId={partnerId}
                                             deliveryPlanEnabled={deliveryPlanEnabled}
                                             deliveryEnabled={deliveryEnabled}
                                             pickupEnabled={pickupEnabled}
@@ -4044,6 +4059,10 @@ export function CheckoutPageClient() {
                                             schedulingLines={schedulingLines}
                                             lines={checkoutContext?.lines || []}
                                             onFulfillmentModesSave={handleBulkFulfillmentModesSave}
+                                            deliveryAddress={formData.deliveryAddress || ""}
+                                            destinationCoords={selectedAddress?.latitude && selectedAddress?.longitude
+                                                ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                                                : undefined}
                                             addressProps={{
                                                 loadingAddresses,
                                                 userAddresses,
@@ -4051,6 +4070,11 @@ export function CheckoutPageClient() {
                                                 onOpenModal: () => setShowAddressModal(true),
                                                 onOpenForm: () => setShowAddressForm(true),
                                             }}
+                                            ownDeliveryFee={deliveryFee}
+                                            ownDeliveryDistanceKm={deliveryDistanceKm}
+                                            ownDeliveryBreakdown={deliveryBreakdown}
+                                            ownDeliveryQuoteLoading={deliveryQuoteLoading}
+                                            ownDeliveryError={displayDeliveryError}
                                         />
 
                                     </>
@@ -4478,25 +4502,25 @@ export function CheckoutPageClient() {
                                                 }
                                             </span>
                                         </div>
-                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between text-brand-green font-semibold">
                                                 <span>Desconto do pagamento</span>
                                                 <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && (paymentPreview.feeBearer !== "merchant" || (paymentPreview.installmentFeeBearer || "merchant") !== "merchant") && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && checkoutPricingSnapshot.paymentMethodInterest >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Juros</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Taxas</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) >= 0.01 && (
                                             <div className="flex justify-between">
                                                 <span>Custos do método</span>
                                                 <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.fixedFeeAmount)}</span>
@@ -5115,7 +5139,7 @@ export function CheckoutPageClient() {
 
                                 <TabsContent value="traditional" className="pt-2">
                                     <div className="space-y-3">
-                                        {storefrontMethods.map((m) => {
+                                        {visibleStorefrontMethods.map((m) => {
                                             const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                                 m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                     m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :

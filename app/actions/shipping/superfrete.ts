@@ -11,7 +11,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
-import { revalidateOrders, revalidateTransactions, safeRevalidateTag } from "@/lib/utils/revalidation"
+import { revalidateOrders, revalidateTransactions, revalidateOrderHistory, safeRevalidateTag } from "@/lib/utils/revalidation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { logAudit } from "@/lib/observability/audit-log"
 import { resolveOrderBuyerFiscal } from "@/lib/orders/buyer-fiscal"
@@ -1064,6 +1064,7 @@ export async function cancelSuperFreteLabelAction(payload: {
     orderId: payload.orderId,
     labelId: payload.labelId,
     reason: payload.reason,
+    actorUserId: user.id,
   })
 
   if (!result.success) {
@@ -1837,6 +1838,41 @@ export async function createOrderShippingLabelAction(payload: {
       })
     }
 
+    // Histórico do pedido: registra a geração da etiqueta em português, com
+    // serviço, valor e rastreio. Antes a geração não aparecia na timeline.
+    const serviceName =
+      SERVICE_LABELS[serviceId] ||
+      SERVICE_LABELS[requestedService] ||
+      (order as any)?.delivery_breakdown?.serviceName ||
+      "Transportadora"
+    const priceLine =
+      labelPrice != null && labelPrice > 0
+        ? ` no valor de R$ ${labelPrice.toFixed(2).replace(".", ",")}`
+        : ""
+    const trackingLine = label.tracking ? ` - rastreio ${label.tracking}` : ""
+
+    await logAuditEvent({
+      partnerId: ctx.partnerId,
+      actorUserId: user.id,
+      entityType: "order",
+      entityId: order.id,
+      actionType: "shipping_label_created",
+      changeLines: [
+        `gerou a etiqueta de frete (${serviceName})${priceLine}${trackingLine}.`,
+      ],
+      metadata: {
+        label_id: label.id,
+        service_id: serviceId,
+        service_name: serviceName,
+        price: labelPrice,
+        checkout_price: checkoutPrice > 0 ? checkoutPrice : null,
+        price_mismatch: priceMismatch,
+        tracking_number: label.tracking || null,
+      },
+      source: "user",
+    })
+    await revalidateOrderHistory(order.id)
+
     revalidateOrders(ctx.partnerId)
 
     return {
@@ -1981,6 +2017,7 @@ export async function updateOrderCarrierStatusAction(payload: {
       source: "user",
       metadata: { from_status: shipment?.status ?? null, to_status: nextStatus, shipment_id: shipment?.id ?? null, manual: true },
     })
+    await revalidateOrderHistory(order.id)
 
     // Avisa o cliente quando a encomenda é postada/entregue.
     if (
@@ -2637,6 +2674,35 @@ export async function createReturnShippingLabelAction(payload: {
         .update({ return_freight_payer: freightPayer, updated_at: new Date().toISOString() })
         .eq("id", returnRequest.id),
     ])
+
+    // Histórico do pedido: registra a etiqueta de devolução gerada.
+    const returnServiceName =
+      SERVICE_LABELS[labelServiceId] || SERVICE_LABELS[serviceId] || "Transportadora"
+    const returnPrice =
+      typeof label.price === "number" && label.price > 0
+        ? ` no valor de R$ ${label.price.toFixed(2).replace(".", ",")}`
+        : ""
+    const returnTracking = label.tracking ? ` - rastreio ${label.tracking}` : ""
+
+    await logAuditEvent({
+      partnerId: ctx.partnerId,
+      actorUserId: user.id,
+      entityType: "return_request",
+      entityId: returnRequest.id,
+      actionType: "return_shipping_label_created",
+      changeLines: [
+        `gerou a etiqueta de devolução (${returnServiceName})${returnPrice}${returnTracking}.`,
+      ],
+      metadata: {
+        order_id: returnRequest.order_id,
+        label_id: label.id,
+        service_id: labelServiceId,
+        price: typeof label.price === "number" ? label.price : null,
+        freight_payer: freightPayer,
+      },
+      source: "user",
+    })
+    await revalidateOrderHistory(returnRequest.order_id)
 
     // One-click: paga a etiqueta logo em seguida (igual ao fluxo de ida).
     let paid = false

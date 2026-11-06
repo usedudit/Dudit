@@ -16,10 +16,11 @@ import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } 
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
 import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
+import { AdminOrderDetailView } from "./AdminOrderDetailView"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 
-type SortKey = "order_number" | "customer" | "store" | "seller" | "date" | "total" | "status"
+type SortKey = "order_number" | "customer" | "channel" | "date" | "total" | "status" | "seller"
 type SortDirection = "asc" | "desc"
 
 interface OrdersListProps {
@@ -37,7 +38,6 @@ const INITIAL_FILTERS: OrderFilterState = {
     datePeriod: { ...EMPTY_DATE_PERIOD },
 }
 
-const STATUS_FILTER_OPTIONS = ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise", "Parcialmente Pago", "Entregue"]
 const DELIVERY_STATUS_FILTER_OPTIONS = [
     { value: "not_sent", label: "Não enviado" },
     { value: "preparing", label: "Em preparação" },
@@ -130,6 +130,18 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             }
         })
     }, [])
+
+    // Table columns matching ERP + seller column
+    const ADMIN_COLUMNS = useMemo(() => [
+        { id: "order_number", label: "Pedido", align: "left" as const, width: "200px", sortable: true },
+        { id: "customer", label: "Cliente", align: "left" as const, width: "250px", sortable: true },
+        { id: "channel", label: "Origem", align: "left" as const, width: "150px", sortable: false },
+        { id: "date", label: "Data", align: "left" as const, width: "150px", sortable: true },
+        { id: "total", label: "Total", align: "left" as const, width: "150px", sortable: true },
+        { id: "status", label: "Pagamento", align: "left" as const, width: "150px", sortable: true },
+        { id: "seller", label: "Vendedor", align: "left" as const, width: "180px", sortable: true },
+        { id: "actions", label: "Ações", align: "center" as const, width: "80px", sortable: false },
+    ], [])
 
     // Filter Config for FilterSheet - matching ERP
     const filterSections: FilterSectionConfig[] = useMemo(() => [
@@ -254,9 +266,9 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         aVal = (a.customer_name || "").toLowerCase()
                         bVal = (b.customer_name || "").toLowerCase()
                         break
-                    case "store":
-                        aVal = (a.stores?.name || "").toLowerCase()
-                        bVal = (b.stores?.name || "").toLowerCase()
+                    case "channel":
+                        aVal = (a.order_source || "").toLowerCase()
+                        bVal = (b.order_source || "").toLowerCase()
                         break
                     case "seller":
                         aVal = (a.stores?.partners?.trade_name || a.stores?.partners?.name || "").toLowerCase()
@@ -299,6 +311,16 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     // If viewing detail of a specific order via URL (?view=id)
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
         return (
+            <AdminOrderDetailView
+                orderId={entityState.entityId}
+                onBack={closeEntity}
+            />
+        )
+    }
+
+    // If editing - use admin edit form
+    if (entityState.isOpen && entityState.action === "edit" && entityState.entityId) {
+        return (
             <AdminOrderDetailClientWrapper
                 orderId={entityState.entityId}
                 onBack={closeEntity}
@@ -306,16 +328,16 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         )
     }
 
-    // Grid card component (inline, matching ERP OrderGridCard)
+    // Grid card component (matching ERP OrderGridCard exactly, plus seller column)
     const renderGridCard = (order: any) => {
         const paymentMeta = getPaymentStatusMeta(order.situation)
         const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
-        const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
         const returns = Array.isArray(order.return_requests) ? order.return_requests : []
         const store = order.stores || {}
         const partner = store.partners || {}
         const sellerName = partner.trade_name || partner.name || store.name || "—"
         const isSelected = selectedOrders.has(order.id)
+        const orderSource = order.order_source || "Manual"
 
         return (
             <div
@@ -348,7 +370,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} className="whitespace-nowrap" />
                                     )}
                                     {!order.hasOnlyServices && order.situation !== "cancelled" && (
-                                        <Badge variant="blue" icon={
+                                        <Badge variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "yellow" : "gray"} icon={
                                             order.delivery_type === "pickup"
                                                 ? <StoreIcon />
                                                 : <TruckIcon />
@@ -420,14 +442,13 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         </div>
                     </div>
 
-                    {/* Row 2: Loja & Vendedor & Actions */}
+                    {/* Row 2: Canal (Origem) & Vendedor & Actions - matching ERP + seller column */}
                     <div className="flex justify-between items-end gap-2">
                         <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Loja</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Origem</span>
                             <div className="flex items-center gap-1.5">
-                                <StoreIcon size={12} className="shrink-0" />
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
-                                    {store.name || "—"}
+                                    {orderSource}
                                 </span>
                             </div>
                         </div>
@@ -545,10 +566,10 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
                                     {paginatedItems.map((order) => {
                                         const paymentMeta = getPaymentStatusMeta(order.situation)
-                                        const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
                                         const store = order.stores || {}
                                         const partner = store.partners || {}
                                         const sellerName = partner.trade_name || partner.name || store.name || "—"
+                                        const orderSource = order.order_source || "Manual"
                                         return (
                                             <div
                                                 key={order.id}
@@ -571,8 +592,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
 
                                                 <div className="flex items-center justify-between text-xs text-brand-inactive-text">
                                                     <div className="flex items-center gap-1.5 min-w-0">
-                                                        <StoreIcon size={12} className="shrink-0" />
-                                                        <span className="truncate">{store.name || "-"}</span>
+                                                        <span className="truncate">{orderSource}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 min-w-0 ml-2">
                                                         <UserIcon size={12} className="shrink-0" />
@@ -605,45 +625,21 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                                 onChange={toggleSelectAll}
                                                             />
                                                         </th>
-                                                        <th
-                                                            onClick={() => handleSort("order_number")}
-                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Pedido {sortConfig?.key === "order_number" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("customer")}
-                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Cliente {sortConfig?.key === "customer" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("store")}
-                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Loja {sortConfig?.key === "store" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("seller")}
-                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Vendedor {sortConfig?.key === "seller" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th
-                                                            onClick={() => handleSort("status")}
-                                                            className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Pagamento {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th className="py-3 px-2 w-36 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Entrega</th>
-                                                        <th
-                                                            onClick={() => handleSort("total")}
-                                                            className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            Total {sortConfig?.key === "total" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
-                                                        </th>
-                                                        <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Itens</th>
-                                                        <th className="py-3 px-2 w-28 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Trocas</th>
+                                                        {ADMIN_COLUMNS.map((col) => (
+                                                            <th
+                                                                key={col.id}
+                                                                onClick={col.sortable ? () => handleSort(col.id as SortKey) : undefined}
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight ${col.sortable ? "cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors" : ""} ${col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left"} ${col.id === "actions" ? "pr-6 rounded-r-lg" : ""}`}
+                                                                style={{ width: col.width }}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-1">
+                                                                    <span>{col.label}</span>
+                                                                    {col.sortable && sortConfig?.key === col.id && (
+                                                                        <span>{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+                                                                    )}
+                                                                </div>
+                                                            </th>
+                                                        ))}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -651,8 +647,12 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                         <OrderListRow
                                                             key={order.id}
                                                             order={order}
+                                                            columns={ADMIN_COLUMNS}
                                                             isPending={isPending}
                                                             onDetail={() => openEntity("view", order.id)}
+                                                            selected={selectedOrders.has(order.id)}
+                                                            onSelect={toggleSelectOrder}
+                                                            showCheckbox
                                                         />
                                                     ))}
                                                 </tbody>

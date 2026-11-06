@@ -480,6 +480,15 @@ const KNOWN_STATUS_LABELS: Record<string, string> = {
   completed: "Concluído",
   shipped: "Enviado",
   delivered: "Entregue",
+  // Shipping labels (SuperFrete / order_shipments.status)
+  released: "Aguardando postagem",
+  posted: "Postado",
+  in_transit: "Em trânsito",
+  cancelled: "Cancelado",
+  canceled: "Cancelado",
+  failed: "Falhou",
+  not_sent: "Não enviado",
+  preparing: "Em preparação",
 }
 
 /**
@@ -503,13 +512,16 @@ export function humanizeTimelineChangeLine(line: string): string {
     return `Status alterado de "${oldLabel}" para "${newLabel}"`
   }
 
-  // Pattern: Status alterado para [status]
-  const statusToRegex = /status\s+alterado\s+para:?\s*["']?([a-zA-Z0-9_-]+)["']?/i
-  const matchTo = line.match(statusToRegex)
-  if (matchTo) {
-    const rawNew = matchTo[1]?.toLowerCase()
-    const newLabel = KNOWN_STATUS_LABELS[rawNew] || rawNew
-    return `Status alterado para "${newLabel}"`
+  // Pattern: Status de frete atualizado para "released"
+  // (linhas antigas de etiqueta SuperFrete gravadas em inglês)
+  const statusUpdatedRegex = /status(?:\s+(?:de\s+frete|da\s+etiqueta(?:\s+de\s+[a-zçãõáéíóú]+)?))?\s+(?:alterado|atualizado)\s+para:?\s*["']?([a-zA-Z0-9_-]+)["']?/i
+  const matchUpdated = line.match(statusUpdatedRegex)
+  if (matchUpdated) {
+    const rawNew = matchUpdated[1]?.toLowerCase()
+    // Só reescreve quando o token é um status conhecido (linhas antigas em
+    // inglês). Linhas já traduzidas em português passam intactas.
+    const newLabel = KNOWN_STATUS_LABELS[rawNew]
+    if (newLabel) return `Status alterado para "${newLabel}"`
   }
 
   return line

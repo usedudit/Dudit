@@ -8,9 +8,10 @@ import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
 import { BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
-import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger } from "@/components/reusable";
+import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger, Input, DefaultModal } from "@/components/reusable";
+import { RadioButton } from "@/components/reusable/RadioButton";
 import Pagination from "@/components/reusable/Pagination";
-import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon, TruckIcon, MoneyIcon } from '@/lib/icons';
+import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon, TruckIcon, MoneyIcon, SearchIcon, FilterIcon, ChevronDownIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
@@ -20,6 +21,35 @@ import { canonicalDeliveryStatus } from "@/lib/orders/status";
 import { pushUrl, replaceUrl } from "@/lib/navigation/history";
 
 const ORDERS_PER_PAGE = 10
+
+type OrderSortType = "recentes" | "antigos" | "maior_valor" | "menor_valor"
+type OrderTypeFilter = "todos" | "produtos" | "servicos" | "assinaturas"
+
+const ORDER_SORT_OPTIONS: { value: OrderSortType; label: string }[] = [
+    { value: "recentes", label: "Mais recentes" },
+    { value: "antigos", label: "Mais antigos" },
+    { value: "maior_valor", label: "Maior valor" },
+    { value: "menor_valor", label: "Menor valor" },
+]
+
+const ORDER_TYPE_OPTIONS: { value: OrderTypeFilter; label: string }[] = [
+    { value: "todos", label: "Todos os itens" },
+    { value: "produtos", label: "Produtos" },
+    { value: "servicos", label: "Serviços" },
+    { value: "assinaturas", label: "Assinaturas" },
+]
+
+const matchesOrderType = (order: any, type: OrderTypeFilter) => {
+    if (type === "todos") return true
+    const items = Array.isArray(order?.order_items) ? order.order_items : []
+    return items.some((item: any) => {
+        const isService = !!item.service_id || item.line_type === "service_booking"
+        const isSubscription = !!item.recurring_plan_id || item.line_type === "subscription"
+        if (type === "servicos") return isService
+        if (type === "assinaturas") return isSubscription
+        return !isService && !isSubscription
+    })
+}
 
 const getStatusConfig = (status: string) => {
     switch (status) {
@@ -133,6 +163,12 @@ export function MyOrdersListClient({
     const initialStatusTab = (initialTab && ["todos", "pending", "preparing", "sent", "delivered", "cancelled"].includes(initialTab)) ? initialTab : "todos";
     const [activeTab, setActiveTab] = useState<string>(initialStatusTab);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchInput, setSearchInput] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState<OrderSortType>("recentes");
+    const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>("todos");
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const reviewedItemsSet = useMemo(() => {
         return new Set((reviewedItemsArray || []).map(r => `${r.order_id}:${r.product_id || r.service_id}`));
@@ -242,6 +278,30 @@ export function MyOrdersListClient({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // Debounced search
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchInput(value);
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = setTimeout(() => {
+            setSearchQuery(value);
+            setCurrentPage(1);
+        }, 300);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        };
+    }, []);
+
+    const activeFiltersCount = (sortBy !== "recentes" ? 1 : 0) + (typeFilter !== "todos" ? 1 : 0);
+
+    const clearFilters = () => {
+        setSortBy("recentes");
+        setTypeFilter("todos");
+        setCurrentPage(1);
+    };
+
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     // Calculate tab counts
@@ -271,27 +331,68 @@ export function MyOrdersListClient({
     // Filter orders
     const filteredOrders = useMemo(() => {
         if (!orders) return [];
-        return orders.filter((order: any) => {
-            if (activeTab === "todos") return true;
-            if (activeTab === "pending") {
-                return order.situation === "pending" || order.situation === "payment_failed";
+        const normalizedQuery = searchQuery.trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+
+        const result = orders.filter((order: any) => {
+            if (activeTab !== "todos") {
+                if (activeTab === "pending") {
+                    if (!(order.situation === "pending" || order.situation === "payment_failed")) return false;
+                } else if (activeTab === "preparing") {
+                    const deliveryStatus = canonicalDeliveryStatus(order.delivery_status);
+                    if (!(order.situation === "paid" && (deliveryStatus === "not_sent" || deliveryStatus === "preparing"))) return false;
+                } else if (activeTab === "sent") {
+                    if (!(order.situation === "paid" && order.delivery_status === "sent")) return false;
+                } else if (activeTab === "delivered") {
+                    if (!(order.situation === "paid" && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available"))) return false;
+                } else if (activeTab === "cancelled") {
+                    if (!["cancelled", "refunded", "charged_back", "returned"].includes(order.situation)) return false;
+                }
             }
-            if (activeTab === "preparing") {
-                const deliveryStatus = canonicalDeliveryStatus(order.delivery_status);
-                return order.situation === "paid" && (deliveryStatus === "not_sent" || deliveryStatus === "preparing");
+
+            if (!matchesOrderType(order, typeFilter)) return false;
+
+            if (normalizedQuery) {
+                const storeObj = Array.isArray(order.stores) ? order.stores[0] : order.stores;
+                const itemNames = (order.order_items || [])
+                    .map((item: any) => item.products?.name || item.services?.name || item.recurring_plans?.name || item.product_name || "")
+                    .join(" ");
+                const haystack = [
+                    order.order_number,
+                    order.id,
+                    storeObj?.name,
+                    order.partners?.name,
+                    itemNames,
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                if (!haystack.includes(normalizedQuery)) return false;
             }
-            if (activeTab === "sent") {
-                return order.situation === "paid" && order.delivery_status === "sent";
-            }
-            if (activeTab === "delivered") {
-                return order.situation === "paid" && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available");
-            }
-            if (activeTab === "cancelled") {
-                return ["cancelled", "refunded", "charged_back", "returned"].includes(order.situation);
-            }
-            return false;
+
+            return true;
         });
-    }, [orders, activeTab]);
+
+        result.sort((a: any, b: any) => {
+            switch (sortBy) {
+                case "antigos":
+                    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                case "maior_valor":
+                    return Number(b.total_amount || 0) - Number(a.total_amount || 0);
+                case "menor_valor":
+                    return Number(a.total_amount || 0) - Number(b.total_amount || 0);
+                case "recentes":
+                default:
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+        });
+
+        return result;
+    }, [orders, activeTab, typeFilter, searchQuery, sortBy]);
 
     // Client-side pagination
     const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
@@ -302,6 +403,7 @@ export function MyOrdersListClient({
 
     const isDetails = !!(activeOrderId && activeOrder);
     const headerTitle = isDetails ? "Detalhes do pedido" : "Meus pedidos";
+    const hasSearchOrFilter = Boolean(searchQuery.trim()) || typeFilter !== "todos";
 
     return (
         <>
@@ -354,6 +456,34 @@ export function MyOrdersListClient({
                                     </TabsList>
                                 </Tabs>
                             </div>
+
+                            {/* Search & Filters Bar */}
+                            {orders && orders.length > 0 && (
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="relative flex-1 max-w-md">
+                                        <Input
+                                            label=""
+                                            name="orderSearchQuery"
+                                            placeholder="Buscar nos pedidos..."
+                                            value={searchInput}
+                                            onChange={(e) => handleSearchChange(e.target.value)}
+                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />}
+                                            className="mb-0"
+                                            variant="full-rounded"
+                                        />
+                                    </div>
+
+                                    <Button
+                                        onClick={() => setIsFiltersOpen(true)}
+                                        variant="outline"
+                                        className="flex items-center gap-2 w-fit"
+                                        leftIcon={<FilterIcon size={16} />}
+                                        rightIcon={<ChevronDownIcon size={14} />}
+                                    >
+                                        Filtros{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
+                                    </Button>
+                                </div>
+                            )}
 
                             <div className="flex-1">
                                 {paginatedOrders && paginatedOrders.length > 0 ? (
@@ -627,7 +757,11 @@ export function MyOrdersListClient({
                                                 imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                                 imageAlt="Nenhum pedido nesta categoria"
                                                 title="Nenhum pedido encontrado"
-                                                subtitle="Você não tem nenhum pedido com esse status no momento."
+                                                subtitle={
+                                                    hasSearchOrFilter
+                                                        ? "Nenhum pedido corresponde à busca ou aos filtros selecionados."
+                                                        : "Você não tem nenhum pedido com esse status no momento."
+                                                }
                                             />
                                         ) : (
                                             <IconPlaceholder
@@ -657,6 +791,62 @@ export function MyOrdersListClient({
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Filters Modal */}
+            <DefaultModal
+                isOpen={isFiltersOpen}
+                onClose={() => setIsFiltersOpen(false)}
+                title="Filtros"
+                maxWidth="md"
+            >
+                <div className="flex flex-col gap-1 py-2 px-4 max-h-[70vh] overflow-y-auto">
+                    <span className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body mt-2">
+                        Ordenar por
+                    </span>
+                    {ORDER_SORT_OPTIONS.map((opt) => (
+                        <RadioButton
+                            key={opt.value}
+                            name="order_sort_option"
+                            value={opt.value}
+                            checked={sortBy === opt.value}
+                            onChange={() => {
+                                setSortBy(opt.value);
+                                setCurrentPage(1);
+                            }}
+                            label={opt.label}
+                        />
+                    ))}
+
+                    <div className="h-px bg-brand-border dark:bg-dark-border my-2" />
+
+                    <span className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body mt-2">
+                        Tipo de item
+                    </span>
+                    {ORDER_TYPE_OPTIONS.map((opt) => (
+                        <RadioButton
+                            key={opt.value}
+                            name="order_type_option"
+                            value={opt.value}
+                            checked={typeFilter === opt.value}
+                            onChange={() => {
+                                setTypeFilter(opt.value);
+                                setCurrentPage(1);
+                            }}
+                            label={opt.label}
+                        />
+                    ))}
+
+                    {activeFiltersCount > 0 && (
+                        <Button
+                            onClick={clearFilters}
+                            variant="outline"
+                            className="w-full mt-4"
+                        >
+                            Limpar filtros
+                        </Button>
+                    )}
+                </div>
+            </DefaultModal>
         </>
     );
 }

@@ -2202,6 +2202,35 @@ export default function CreateOrder({
                                                 const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}`;
                                                 const hasCoupon = Number(effectiveCouponDiscountAmount || 0) > 0;
 
+                                                // Helpers for correct effective amount
+                                                const getLegEffectiveAmount = (entry: any): number => {
+                                                  const effective = Number(entry?.effectiveAmount ?? 0);
+                                                  if (effective > 0.009) return effective;
+                                                  const amount = Number(entry?.amount ?? 0);
+                                                  const received = Number(entry?.amountReceived ?? 0);
+                                                  const hasPricingAdjustment =
+                                                    Number(entry?.interestAmount || 0) > 0.009 ||
+                                                    Number(entry?.feeAmount || 0) > 0.009 ||
+                                                    Number(entry?.fixedFeeAmount || 0) > 0.009 ||
+                                                    Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
+                                                    String(entry?.adjustmentType || "none").toLowerCase() !== "none";
+                                                  if (
+                                                    !hasPricingAdjustment &&
+                                                    received > 0.009 &&
+                                                    received < amount - 0.009
+                                                  ) {
+                                                    return received;
+                                                  }
+                                                  return amount > 0.009 ? amount : received;
+                                                };
+
+                                                const isCashLeg = (entry: any): boolean => {
+                                                  const method = String(entry?.method || "")
+                                                    .toLowerCase()
+                                                    .trim();
+                                                  return method === "cash" || method.includes("dinheiro");
+                                                };
+
                                                 return isPaidOrder ? (
                                                     <div className="space-y-3">
                                                         <div className="flex justify-between items-start text-[14px] gap-4">
@@ -2214,20 +2243,56 @@ export default function CreateOrder({
                                                         {(() => {
                                                             const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009);
                                                             if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(originalPaidAmount || 0) > 0.009 && remainingAmount > 0.009)) return null;
+
+                                                            // Build payment lines grouped by method
+                                                            type PaymentValueLine = { label: string; amount: number; baseAmount: number; installmentNumber: number };
+                                                            const grouped = new Map<string, PaymentValueLine>();
+                                                            for (const entry of paidBreakdown) {
+                                                              const method = String(entry?.method || "").trim();
+                                                              const methodLabel = method
+                                                                ? formatPaymentMethodLabel(method, null)
+                                                                : "Método não informado";
+                                                              const label = methodLabel;
+                                                              const amount = getLegEffectiveAmount(entry);
+                                                              const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
+                                                              const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
+                                                              const key = `${label.toLowerCase()}::${installmentNumber}`;
+                                                              const existing = grouped.get(key);
+                                                              if (existing) {
+                                                                existing.amount += amount;
+                                                                existing.baseAmount += baseAmount;
+                                                              } else {
+                                                                grouped.set(key, { label, amount, baseAmount, installmentNumber });
+                                                              }
+                                                            }
+                                                            const paymentValueLines = Array.from(grouped.values());
+
                                                             return (
                                                                 <div className="flex justify-between items-start text-[14px] gap-4">
                                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
                                                                     <div className="flex flex-col gap-1 text-right">
-                                                                        {paidBreakdown.map((entry: any, index: number) => {
-                                                                            const received = Number(entry.amountReceived ?? entry.amount ?? 0);
-                                                                            const baseAmount = Number(entry.amount || 0);
-                                                                            const displayAmount = received > 0.009 ? received : baseAmount;
+                                                                        {paymentValueLines.map((line, index: number) => {
+                                                                            const hasInstallments = line.installmentNumber > 1;
+                                                                            const showBase =
+                                                                                !hasInstallments &&
+                                                                                line.baseAmount > 0.009 &&
+                                                                                line.amount > 0.009 &&
+                                                                                line.baseAmount - line.amount > 0.009;
                                                                             return (
-                                                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                                    {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
-                                                                                    {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
-                                                                                        ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
-                                                                                        : null}
+                                                                                <span key={`${line.label}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                                    {line.label}: {formatCurrency(line.amount)}
+                                                                                    {hasInstallments ? (
+                                                                                        <span className="text-brand-muted font-normal">
+                                                                                            {" "}
+                                                                                            ({line.installmentNumber}x de{" "}
+                                                                                            {formatCurrency(line.amount / line.installmentNumber)})
+                                                                                        </span>
+                                                                                    ) : showBase ? (
+                                                                                        <span className="text-brand-muted font-normal">
+                                                                                            {" "}
+                                                                                            (de {formatCurrency(line.baseAmount)})
+                                                                                        </span>
+                                                                                    ) : null}
                                                                                 </span>
                                                                             );
                                                                         })}

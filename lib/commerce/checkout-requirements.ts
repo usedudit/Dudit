@@ -110,8 +110,13 @@ export function aggregateCheckoutRequirements(
     hasProductOrSubscriptionLines && commonProductFulfillmentModes.length === 0
 
   const showRecurringDisclosure = lines.some((l) => l.lineKind === "subscription")
+  // Dinheiro / pagamento na entrega ou retirada: só faz sentido para
+  // carrinhos apenas de produtos. O modo de fulfillment (entrega, retirada ou
+  // envio) não deve restringir o dinheiro - retirada de produtos também pode
+  // ser paga em espécie, e o checkout já aplica a política de pagamento da
+  // retirada separadamente.
   const allowPayOnDelivery =
-    hasProductLines && !hasServiceLines && !hasSubscriptionLines && showLocalDeliveryOption
+    hasProductLines && !hasServiceLines && !hasSubscriptionLines
   const hasIncompatiblePaymentRestrictions = false
 
   return {

@@ -100,7 +100,11 @@ export async function getDeliveryDriverAdminAction(driverId: string) {
     admin.from("delivery_driver_partners").select("id, partner_id, is_active, created_at").eq("driver_id", safeDriverId).order("created_at", { ascending: false }),
   ])
 
-  const partnerIds = Array.from(new Set((links || []).map((row: any) => String(row.partner_id)).filter(Boolean)))
+  // Collect partner_ids from BOTH driver links AND assignments
+  // This ensures we get store names for deliveries to stores the driver isn't explicitly linked to
+  const partnerIdsFromLinks = (links || []).map((row: any) => String(row.partner_id)).filter(Boolean)
+  const partnerIdsFromAssignments = (assignments || []).map((row: any) => String(row.partner_id)).filter(Boolean)
+  const partnerIds = Array.from(new Set([...partnerIdsFromLinks, ...partnerIdsFromAssignments]))
   const { data: stores } = partnerIds.length
     ? await admin.from("stores").select("partner_id, name").in("partner_id", partnerIds).order("is_headquarters", { ascending: false })
     : { data: [] as any[] }

@@ -530,6 +530,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       images: planImages,
       saleViaDudit: !saleBlock,
       saleBlock,
+      orderFlow: capabilities.baseOrderFlow,
       whatsappPhone: capabilities.whatsappPhone,
     }
   } catch (e: unknown) {

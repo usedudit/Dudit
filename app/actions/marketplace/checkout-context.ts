@@ -160,34 +160,27 @@ export async function getMarketplaceCheckoutContextAction(input: {
     getPartnerDeliveryConfigAction(resolved.partnerId, targetStoreId),
     cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
     (async () => {
-      if (targetStoreId) {
-        const { data: storeMethods } = await admin
-          .from("payment_methods")
-          .select(
-            "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type, store_id"
-          )
-          .eq("partner_id", resolved.partnerId)
-          .eq("store_id", targetStoreId)
-          .eq("is_active", true)
-          .order("is_default", { ascending: false })
-          .order("priority", { ascending: false })
-          .order("discount_percent", { ascending: false })
-
-        if (storeMethods && storeMethods.length > 0) {
-          return { data: storeMethods }
-        }
-      }
-
-      return admin
+      // Inclui os métodos do parceiro (store_id nulo) junto com os da loja,
+      // igual ao que o ERP lista e ao getStorefrontPaymentMethodsAction. Antes,
+      // quando a loja tinha qualquer método próprio, os métodos do parceiro
+      // (inclusive o "Dinheiro" padrão) eram descartados e não apareciam no
+      // pagamento na entrega.
+      let query = admin
         .from("payment_methods")
         .select(
-          "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, store_id"
+          "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand, pix_key, pix_key_type, store_id"
         )
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
         .order("is_default", { ascending: false })
         .order("priority", { ascending: false })
         .order("discount_percent", { ascending: false })
+
+      if (targetStoreId) {
+        query = query.or(`store_id.is.null,store_id.eq.${targetStoreId}`)
+      }
+
+      return query
     })(),
     admin
       .from("addresses")

@@ -36,6 +36,8 @@ interface PlanDetailsPageClientProps {
     cartCount?: number
     hideHeaderAndFooter?: boolean
     sponsoredAd?: SponsoredAd | null
+    /** Fluxo configurado pelo vendedor (whatsapp ou dudit). */
+    orderFlow?: "whatsapp" | "dudit"
 }
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
@@ -53,6 +55,7 @@ export function PlanDetailsPageClient({
     cartCount,
     hideHeaderAndFooter = false,
     sponsoredAd = null,
+    orderFlow = "dudit",
 }: PlanDetailsPageClientProps) {
     const router = useRouter()
     const { user, supabase } = useSupabase()
@@ -510,6 +513,10 @@ export function PlanDetailsPageClient({
         return Number(partner.rating) > 0 ? Number(partner.rating).toFixed(1) : "-";
     }, [partner.rating])
 
+    // No fluxo via WhatsApp, vendas e avaliação da Dudit não representam a
+    // operação da loja. Nesse caso o card mostra apenas a data de cadastro.
+    const isWhatsappFlow = orderFlow === "whatsapp"
+
     const BuyPanel = (
         <div className="bg-white dark:bg-dark-surface relative">
             <div className="flex items-center gap-2 mb-4">
@@ -829,43 +836,54 @@ export function PlanDetailsPageClient({
                             </Link>
 
                             <div className="px-4 pb-4">
-                                {/* Reputation & Levels Bar */}
-                                <div className="my-6 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-base leading-none">{reputationLevel.badge}</span>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
+                                {isWhatsappFlow ? (
+                                    <div className="mt-2 pt-4 border-t border-brand-border text-center select-none">
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
+                                            <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
                                         </div>
                                     </div>
+                                ) : (
+                                    <>
+                                        {/* Reputation & Levels Bar */}
+                                        <div className="my-6 flex flex-col gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base leading-none">{reputationLevel.badge}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selo Dudit: {reputationLevel.name}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Nível do vendedor baseado em reputação e vendas</span>
+                                                </div>
+                                            </div>
 
-                                    {/* Horizontal segment bars */}
-                                    <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
-                                        {[1, 2, 3, 4, 5].map((lvl) => (
-                                            <div
-                                                key={lvl}
-                                                className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"
-                                                    }`}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
+                                            {/* Horizontal segment bars */}
+                                            <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
+                                                {[1, 2, 3, 4, 5].map((lvl) => (
+                                                    <div
+                                                        key={lvl}
+                                                        className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200 dark:bg-dark-border"
+                                                            }`}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
 
-                                {/* 3 columns metrics */}
-                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
-                                    </div>
-                                    <div className="flex flex-col items-center border-x border-brand-border">
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
-                                        <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
-                                    </div>
-                                </div>
+                                        {/* 3 columns metrics */}
+                                        <div className="grid grid-cols-3 gap-2 pt-4 border-t border-brand-border text-center select-none">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
+                                                <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Avaliação</span>
+                                            </div>
+                                            <div className="flex flex-col items-center border-x border-brand-border">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.vendas_totais || 0}</span>
+                                                <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Vendas</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formattedJoinedDate}</span>
+                                                <span className="text-[10px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">Cadastro</span>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     );

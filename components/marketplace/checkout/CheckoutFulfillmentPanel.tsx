@@ -3,9 +3,10 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton, ListItem, DefaultModal, Spinner } from "@/components/reusable"
-import { MapPinIcon, ServiceIcon } from "@/lib/icons"
+import { MapPinIcon, ServiceIcon, TruckIcon } from "@/lib/icons"
 import { formatCurrency, formatDeliveryDaysRange } from "@/lib/utils"
 import { getCarrierBrandIcon } from "@/lib/utils/carrier-brand"
+import { estimateAverageDeliveryTime } from "@/lib/services/location.service"
 import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
@@ -105,6 +106,12 @@ export type CheckoutFulfillmentPanelProps = {
   deliveryAddress?: string
   /** Coordenadas do endereço selecionado (evita geocodificar de novo). */
   destinationCoords?: { lat: number; lng: number } | null
+  /** Entrega própria (frete do vendedor) */
+  ownDeliveryFee?: number
+  ownDeliveryDistanceKm?: number | null
+  ownDeliveryBreakdown?: Record<string, any> | null
+  ownDeliveryQuoteLoading?: boolean
+  ownDeliveryError?: string | null
 }
 
 export function CheckoutFulfillmentPanel({
@@ -131,6 +138,11 @@ export function CheckoutFulfillmentPanel({
   partnerId = "",
   deliveryAddress = "",
   destinationCoords = null,
+  ownDeliveryFee = 0,
+  ownDeliveryDistanceKm = null,
+  ownDeliveryBreakdown = null,
+  ownDeliveryQuoteLoading = false,
+  ownDeliveryError = null,
 }: CheckoutFulfillmentPanelProps) {
   const isPickup = deliveryType === "pickup"
   const canShowLocalDelivery =
@@ -420,6 +432,56 @@ export function CheckoutFulfillmentPanel({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Entrega própria (frete do vendedor) */}
+          {!isPickup && canShowLocalDelivery && (
+            <div className="space-y-4 mt-4">
+              <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                Entrega pelo vendedor
+              </p>
+              {ownDeliveryQuoteLoading && (
+                <div className="flex items-center gap-2 text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">
+                  <Spinner size={16} />
+                  <span>Calculando entrega...</span>
+                </div>
+              )}
+              {!ownDeliveryQuoteLoading && (
+                <ListItem
+                  icon={<TruckIcon className="w-6 h-6 text-brand-green" />}
+                  title="Entrega própria"
+                  description={
+                    ownDeliveryDistanceKm != null && ownDeliveryDistanceKm > 0
+                      ? estimateAverageDeliveryTime(ownDeliveryDistanceKm) || "Tempo estimado indisponível"
+                      : ownDeliveryBreakdown?.isEstimate
+                        ? "Tempo estimado indisponível"
+                        : "Tempo estimado indisponível"
+                  }
+                  className="px-4 py-3"
+                  right={
+                    <div className="flex items-center gap-3 shrink-0">
+                      {deliveryFree || (ownDeliveryBreakdown?.deliveryPayer === "seller") || (ownDeliveryFee === 0 && ownDeliveryBreakdown?.isFreeByThreshold) ? (
+                        <span className="flex items-center gap-1.5 justify-end">
+                          {ownDeliveryBreakdown?.originalFee != null && Number(ownDeliveryBreakdown.originalFee) > 0 && (
+                            <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">
+                              {formatCurrency(Number(ownDeliveryBreakdown.originalFee))} |
+                            </span>
+                          )}
+                          <span className="text-sm font-bold text-brand-green">Grátis</span>
+                        </span>
+                      ) : (
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                          {formatCurrency(ownDeliveryFee)}
+                        </span>
+                      )}
+                    </div>
+                  }
+                />
+              )}
+              {ownDeliveryError && !ownDeliveryQuoteLoading && (
+                <p className="text-xs text-brand-red">{ownDeliveryError}</p>
+              )}
+            </div>
+          )}
 
           {!isPickup && canShowShipping && (carrierQuoteLoading || carrierOptions.length > 0 || Boolean(carrierError)) && (
             <div className="space-y-4">

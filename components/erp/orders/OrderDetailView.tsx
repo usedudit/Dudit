@@ -695,6 +695,40 @@ export default function OrderDetailView({
           },
         ]
         : [];
+
+  // `amountReceived` stores the pre-adjustment base for split payments while
+  // `amount`/`effectiveAmount` stores what was actually charged. The details
+  // view used to treat `amountReceived` as the charged value, so a card with
+  // installment fees/discounts showed an inverted "(de ...)" value and the
+  // inflated base leaked into the change calculation ("Troco").
+  const getLegEffectiveAmount = (entry: any): number => {
+    const effective = Number(entry?.effectiveAmount ?? 0);
+    if (effective > 0.009) return effective;
+    const amount = Number(entry?.amount ?? 0);
+    const received = Number(entry?.amountReceived ?? 0);
+    const hasPricingAdjustment =
+      Number(entry?.interestAmount || 0) > 0.009 ||
+      Number(entry?.feeAmount || 0) > 0.009 ||
+      Number(entry?.fixedFeeAmount || 0) > 0.009 ||
+      Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
+      String(entry?.adjustmentType || "none").toLowerCase() !== "none";
+    // Legacy partial legs store only the amount actually received.
+    if (
+      !hasPricingAdjustment &&
+      received > 0.009 &&
+      received < amount - 0.009
+    ) {
+      return received;
+    }
+    return amount > 0.009 ? amount : received;
+  };
+  const isCashLeg = (entry: any): boolean => {
+    const method = String(entry?.method || "")
+      .toLowerCase()
+      .trim();
+    return method === "cash" || method.includes("dinheiro");
+  };
+
   const itemCount = Number(order.order_items?.length || 0);
   const sortedOrderItems = [...(order.order_items || [])].sort(
     (a: any, b: any) => {
@@ -812,8 +846,21 @@ export default function OrderDetailView({
       couponDiscountAmount +
       paymentMethodDiscountAmount -
       effectivePaymentMethodExtraAmount;
-  const totalReceived = paymentBreakdown.reduce(
-    (sum: number, e: any) => sum + Number(e?.amountReceived || 0),
+  const getLegSettledAmount = (entry: any): number => {
+    const payWith = Number(entry?.payWithAmount ?? 0);
+    if (isCashLeg(entry) && (entry?.wantsChange || payWith > 0.009)) {
+      const cashReceived =
+        payWith > 0.009 ? payWith : Number(entry?.amountReceived ?? 0);
+      if (cashReceived > 0.009) return cashReceived;
+    }
+    return getLegEffectiveAmount(entry);
+  };
+  const settledPaymentLegs = paymentBreakdown.filter(
+    (entry: any) =>
+      Number(entry?.amountReceived ?? entry?.amount ?? 0) > 0.009,
+  );
+  const totalReceived = settledPaymentLegs.reduce(
+    (sum: number, e: any) => sum + getLegSettledAmount(e),
     0,
   );
   const changeAmount =
@@ -1137,7 +1184,12 @@ export default function OrderDetailView({
     (entry: any) => !isSinalPaymentLeg(entry, depositSummary),
   );
 
-  type PaymentValueLine = { label: string; amount: number; baseAmount: number };
+  type PaymentValueLine = {
+    label: string;
+    amount: number;
+    baseAmount: number;
+    installmentNumber: number;
+  };
   const buildPaymentValueLines = (
     legs: any[],
     prefix = "",
@@ -1157,19 +1209,25 @@ export default function OrderDetailView({
           ? `${methodLabel} (Mercado Pago)`
           : methodLabel;
       const label = `${prefix}${methodWithProvider}`;
-      const received = Number(entry.amountReceived ?? entry.amount ?? 0);
-      const baseAmount = Number(entry.amount || 0);
-      const displayAmount = received > 0.009 ? received : baseAmount;
-      const key = label.toLowerCase();
+      const amount = getLegEffectiveAmount(entry);
+      const baseAmount = isCashLeg(entry)
+        ? amount
+        : Number(entry?.amountReceived ?? entry?.amount ?? 0);
+      const installmentNumber = Math.max(
+        1,
+        Number(entry?.installmentNumber || 1),
+      );
+      const key = `${label.toLowerCase()}::${installmentNumber}`;
       const existing = grouped.get(key);
       if (existing) {
-        existing.amount += displayAmount;
+        existing.amount += amount;
         existing.baseAmount += baseAmount;
       } else {
         grouped.set(key, {
           label,
-          amount: displayAmount,
+          amount,
           baseAmount,
+          installmentNumber,
         });
       }
     }
@@ -1346,22 +1404,36 @@ export default function OrderDetailView({
           label="Valores por meio"
           value={
             <div className="flex flex-col gap-1">
-              {paymentValueLines.map((line, index) => (
-                <span
-                  key={`${line.label}-${index}`}
-                  className="text-brand-dark dark:text-dark-heading font-bold text-sm"
-                >
-                  {line.label}: {formatCurrency(line.amount)}
-                  {line.baseAmount > 0.009 &&
-                    line.amount > 0.009 &&
-                    Math.abs(line.baseAmount - line.amount) > 0.009 ? (
-                    <span className="text-brand-muted font-normal">
-                      {" "}
-                      (de {formatCurrency(line.baseAmount)})
-                    </span>
-                  ) : null}
-                </span>
-              ))}
+              {paymentValueLines.map((line, index) => {
+                const hasInstallments = line.installmentNumber > 1;
+                const showBase =
+                  !hasInstallments &&
+                  line.baseAmount > 0.009 &&
+                  line.amount > 0.009 &&
+                  line.baseAmount - line.amount > 0.009;
+                return (
+                  <span
+                    key={`${line.label}-${index}`}
+                    className="text-brand-dark dark:text-dark-heading font-bold text-sm"
+                  >
+                    {line.label}: {formatCurrency(line.amount)}
+                    {hasInstallments ? (
+                      <span className="text-brand-muted font-normal">
+                        {" "}
+                        ({line.installmentNumber}x de{" "}
+                        {formatCurrency(
+                          line.amount / line.installmentNumber,
+                        )})
+                      </span>
+                    ) : showBase ? (
+                      <span className="text-brand-muted font-normal">
+                        {" "}
+                        (de {formatCurrency(line.baseAmount)})
+                      </span>
+                    ) : null}
+                  </span>
+                );
+              })}
             </div>
           }
         />
