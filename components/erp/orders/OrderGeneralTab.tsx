@@ -131,7 +131,7 @@ interface OrderGeneralTabProps {
     isPaidOrder?: boolean
     originalPaymentMethod?: string
     originalPaymentProvider?: string
-    originalPaymentBreakdown?: Array<{ method: string; amount: number }>
+    originalPaymentBreakdown?: Array<{ method: string; amount: number; amountReceived?: number; installmentNumber?: number; effectiveAmount?: number }>
     originalPaidAmount?: number
     paymentMethodDiscountAmount?: number
     paymentMethodExtraAmount?: number

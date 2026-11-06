@@ -2,7 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Checkbox, PaymentMethodIndicator } from "@/components/reusable"
+import { Badge, Checkbox } from "@/components/reusable"
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { ReturnIcon, TruckIcon, StoreIcon, MoneyIcon, UserIcon } from "@/lib/icons"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
@@ -165,7 +166,7 @@ const OrderListRow = React.memo((
         >
             {showCheckbox && (
                 <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox checked={selected} onChange={() => onSelect?.(order.id)} />
+                    <Checkbox checked={selected ?? false} onChange={() => onSelect?.(order.id)} />
                 </td>
             )}
             {columns.map((col) => (

@@ -47,6 +47,8 @@ const DELIVERY_STATUS_FILTER_OPTIONS = [
     { value: "delivery_failed", label: "Falha na entrega" },
 ]
 
+const STATUS_FILTER_OPTIONS = ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise", "Parcialmente Pago", "Entregue"]
+
 export default function OrdersList({ initialData, initialStats }: OrdersListProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1023px)")
@@ -132,15 +134,23 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     }, [])
 
     // Table columns matching ERP + seller column
-    const ADMIN_COLUMNS = useMemo(() => [
-        { id: "order_number", label: "Pedido", align: "left" as const, width: "200px", sortable: true },
-        { id: "customer", label: "Cliente", align: "left" as const, width: "250px", sortable: true },
-        { id: "channel", label: "Origem", align: "left" as const, width: "150px", sortable: false },
-        { id: "date", label: "Data", align: "left" as const, width: "150px", sortable: true },
-        { id: "total", label: "Total", align: "left" as const, width: "150px", sortable: true },
-        { id: "status", label: "Pagamento", align: "left" as const, width: "150px", sortable: true },
-        { id: "seller", label: "Vendedor", align: "left" as const, width: "180px", sortable: true },
-        { id: "actions", label: "Ações", align: "center" as const, width: "80px", sortable: false },
+    interface AdminColumn {
+        id: string
+        label: string
+        align: "left" | "center" | "right"
+        width: string
+        sortable: boolean
+    }
+
+    const ADMIN_COLUMNS = useMemo<AdminColumn[]>(() => [
+        { id: "order_number", label: "Pedido", align: "left", width: "200px", sortable: true },
+        { id: "customer", label: "Cliente", align: "left", width: "250px", sortable: true },
+        { id: "channel", label: "Origem", align: "left", width: "150px", sortable: false },
+        { id: "date", label: "Data", align: "left", width: "150px", sortable: true },
+        { id: "total", label: "Total", align: "left", width: "150px", sortable: true },
+        { id: "status", label: "Pagamento", align: "left", width: "150px", sortable: true },
+        { id: "seller", label: "Vendedor", align: "left", width: "180px", sortable: true },
+        { id: "actions", label: "Ações", align: "center", width: "80px", sortable: false },
     ], [])
 
     // Filter Config for FilterSheet - matching ERP
@@ -370,7 +380,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                         <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} className="whitespace-nowrap" />
                                     )}
                                     {!order.hasOnlyServices && order.situation !== "cancelled" && (
-                                        <Badge variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "yellow" : "gray"} icon={
+                                        <Badge variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "orange" : "gray"} icon={
                                             order.delivery_type === "pickup"
                                                 ? <StoreIcon />
                                                 : <TruckIcon />
