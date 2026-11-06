@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition, useMemo, useCallback, useEffect } from "react"
-import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination, Checkbox } from "@/components/reusable"
+import { Button, Badge, IconPlaceholder, ThreeDotsLoader, Pagination, Checkbox, ActionsDropdown } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import OrderListRow from "./OrderListRow"
 import OrdersPageControls, { type OrderFilterState } from "./OrdersPageControls"
@@ -16,7 +16,6 @@ import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds } 
 import { toast } from "@/hooks/use-notification"
 import { useEntityState } from "@/hooks/use-entity-state"
 import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
-import { ActionsDropdown } from "@/components/reusable/ActionsDropdown"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 
@@ -510,11 +509,11 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                     onViewModeChange={setViewMode}
                     hasActiveFilters={hasActiveFilters}
                     tabCounts={{
-                        total: stats?.total,
-                        pending: stats?.pending,
-                        paid: stats?.paid,
-                        shipped: stats?.shipped,
-                        cancelled: stats?.cancelled,
+                        total: stats?.total ?? 0,
+                        pending: stats?.pending ?? 0,
+                        paid: stats?.paid ?? 0,
+                        shipped: stats?.shipped ?? 0,
+                        cancelled: stats?.cancelled ?? 0,
                     }}
                 />
 
@@ -603,7 +602,6 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                                         <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
                                                             <Checkbox
                                                                 checked={selectedOrders.size === paginatedItems.length && paginatedItems.length > 0}
-                                                                indeterminate={selectedOrders.size > 0 && selectedOrders.size < paginatedItems.length}
                                                                 onChange={toggleSelectAll}
                                                             />
                                                         </th>
