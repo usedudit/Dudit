@@ -60,58 +60,62 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent, showAdminActor = false
         changeLines.push(event.notes)
     }
 
-    if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
-        changeLines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`)
-        if (metadata.refund_status) {
-            changeLines.push(`Status do reembolso: ${metadata.refund_status}`)
+    // Para ações da Equipe Dudit, NÃO mostrar metadados técnicos (reembolso, troca, etc.)
+    // Mostrar apenas a mensagem/razão que o admin digitou no modal
+    if (!isDuditAction) {
+        if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
+            changeLines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`)
+            if (metadata.refund_status) {
+                changeLines.push(`Status do reembolso: ${metadata.refund_status}`)
+            }
+            if (metadata.refund_payment_method) {
+                changeLines.push(`Método de reembolso: ${metadata.refund_payment_method}`)
+            }
         }
-        if (metadata.refund_payment_method) {
-            changeLines.push(`Método de reembolso: ${metadata.refund_payment_method}`)
+
+        if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
+            changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
         }
-    }
 
-    if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
-        changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
-    }
+        if (metadata.exchange_order_id) {
+            changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
+        }
+        if (Number(metadata.exchange_shortfall_amount || 0) > 0) {
+            changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)
+        }
+        if (Number(metadata.exchange_surplus_amount || 0) > 0) {
+            changeLines.push(`Crédito excedente gerado: ${formatCurrency(Number(metadata.exchange_surplus_amount))}`)
+        }
+        if (metadata.exchange_balance_resolution) {
+            const dest = metadata.exchange_balance_resolution === "store_credit" ? "vale-compra" : "reembolso"
+            changeLines.push(`Saldo da troca enviado para: ${dest}`)
+        }
 
-    if (metadata.exchange_order_id) {
-        changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
-    }
-    if (Number(metadata.exchange_shortfall_amount || 0) > 0) {
-        changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)
-    }
-    if (Number(metadata.exchange_surplus_amount || 0) > 0) {
-        changeLines.push(`Crédito excedente gerado: ${formatCurrency(Number(metadata.exchange_surplus_amount))}`)
-    }
-    if (metadata.exchange_balance_resolution) {
-        const dest = metadata.exchange_balance_resolution === "store_credit" ? "vale-compra" : "reembolso"
-        changeLines.push(`Saldo da troca enviado para: ${dest}`)
-    }
+        if (metadata.stock_movement_id) {
+            changeLines.push("Itens restaurados ao estoque físico")
+        }
 
-    if (metadata.stock_movement_id) {
-        changeLines.push("Itens restaurados ao estoque físico")
-    }
+        if (metadata.resolution) {
+            const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
+                metadata.resolution === "exchange" ? "Troca" :
+                    metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution
+            changeLines.push(`Resolução desejada: ${resolLabel}`)
+        }
 
-    if (metadata.resolution) {
-        const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
-            metadata.resolution === "exchange" ? "Troca" :
-                metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution
-        changeLines.push(`Resolução desejada: ${resolLabel}`)
-    }
+        if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
+            changeLines.push("Itens na solicitação:")
+            metadata.items.forEach((item: any) => {
+                const name = item.productName || item.product_name || `Item ${String(item.order_item_id || "").slice(0, 6)}`
+                const qty = item.quantity || 1
+                const conditionRaw = String(item.condition || "").toLowerCase()
+                const cond = conditionRaw === "sealed" || conditionRaw === "lacrado" ? "Lacrado" : conditionRaw === "damaged" || conditionRaw === "danificado" ? "Danificado" : "Aberto"
+                changeLines.push(`  ${name} (${qty}x) - Condição: ${cond}`)
+            })
+        }
 
-    if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
-        changeLines.push("Itens na solicitação:")
-        metadata.items.forEach((item: any) => {
-            const name = item.productName || item.product_name || `Item ${String(item.order_item_id || "").slice(0, 6)}`
-            const qty = item.quantity || 1
-            const conditionRaw = String(item.condition || "").toLowerCase()
-            const cond = conditionRaw === "sealed" || conditionRaw === "lacrado" ? "Lacrado" : conditionRaw === "damaged" || conditionRaw === "danificado" ? "Danificado" : "Aberto"
-            changeLines.push(`  ${name} (${qty}x) - Condição: ${cond}`)
-        })
-    }
-
-    if (metadata.mpRefundId) {
-        changeLines.push(`Refund ID do Mercado Pago: ${metadata.mpRefundId}`)
+        if (metadata.mpRefundId) {
+            changeLines.push(`Refund ID do Mercado Pago: ${metadata.mpRefundId}`)
+        }
     }
 
     if (changeLines.length === 0) {

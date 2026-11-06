@@ -88,5 +88,18 @@ describe("Auth Security Rules", () => {
       expect(getSafeRedirectPath("/erp/pedidos?status=open&page=2#top")).toBe("/erp/pedidos?status=open&page=2#top")
     })
   })
+
+  describe("Password Verification Helper (CWE-250 & Captcha Bypass on Server)", () => {
+    it("rejects empty email or password gracefully", async () => {
+      const { verifyUserPassword } = await import("@/lib/auth/verify-password")
+      const res1 = await verifyUserPassword("", "anyPassword")
+      expect(res1.success).toBe(false)
+      expect(res1.error).toContain("Credenciais incompletas")
+
+      const res2 = await verifyUserPassword("user@example.com", "")
+      expect(res2.success).toBe(false)
+      expect(res2.error).toContain("Credenciais incompletas")
+    })
+  })
 })
 

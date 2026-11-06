@@ -2,8 +2,11 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { createClient } from "@/lib/supabase/server"
-import { BillingPage } from "@/components/billing/BillingPage"
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { adminListBillingSubscriptionsAction } from "@/app/actions/billing/admin-subscriptions"
+import { AdminHeader } from "@/components/admin/admin-header"
+import SubscriptionsList from "@/components/admin/billing/SubscriptionsList"
+
+export const dynamic = "force-dynamic"
 
 export default async function AdminBillingSubscriptionsPage() {
     await requireAdmin("moderator")
@@ -22,13 +25,21 @@ export default async function AdminBillingSubscriptionsPage() {
         avatarColor: "bg-brand-green"
     } : undefined
 
+    const result = await adminListBillingSubscriptionsAction({ status: "all", limit: 100 })
+
+    const initialData = result.success ? (result.data || []) : []
+    const initialStats = result.stats || { total: 0, active: 0, past_due: 0, cancelled: 0, trial: 0 }
+    const initialTotalCount = result.totalCount || 0
+
     return (
         <>
-            <AdminPageHeader pageTitle="Assinaturas" userProfile={userProfile} />
-            <FadeIn className="p-4">
-                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                    <BillingPage showTitle={false} />
-                </div>
+            <AdminHeader pageTitle="Assinaturas" userProfile={userProfile} />
+            <FadeIn className="flex-1">
+                <SubscriptionsList
+                    initialData={initialData}
+                    initialStats={initialStats}
+                    initialTotalCount={initialTotalCount}
+                />
             </FadeIn>
         </>
     )

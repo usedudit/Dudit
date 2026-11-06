@@ -31,6 +31,7 @@ import {
     Input,
     ActionsDropdown,
     DropdownItem,
+    FormTextarea,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -621,10 +622,8 @@ export function AdminUserDetailView({
             >
                 <div className="space-y-4 pt-2">
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Pontuação de Risco (0 - 100)
-                        </label>
                         <Input
+                            label="Pontuação de Risco (0 - 100)"
                             type="number"
                             min={0}
                             max={100}
@@ -638,10 +637,8 @@ export function AdminUserDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Título da Notificação (Opcional)
-                        </label>
                         <Input
+                            label="Título da Notificação (Opcional)"
                             type="text"
                             value={riskTitle}
                             onChange={(e) => setRiskTitle(e.target.value)}
@@ -653,15 +650,12 @@ export function AdminUserDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Motivo / Mensagem da Notificação (Enviado para o Cliente)
-                        </label>
-                        <textarea
+                        <FormTextarea
+                            label="Motivo / Mensagem da Notificação (Opcional)"
                             value={riskReason}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRiskReason(e.target.value)}
                             placeholder="Descreva o motivo do ajuste que será enviado para o cliente..."
-                            rows={3}
-                            className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                            rows={2}
                         />
                     </div>
 

@@ -16,6 +16,7 @@ import "server-only"
 import { createHash, randomBytes } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { ForbiddenError } from "@/lib/auth/authorization"
+import { verifyUserPassword } from "@/lib/auth/verify-password"
 
 const STEP_UP_TTL_MINUTES = 5
 
@@ -23,7 +24,7 @@ const STEP_UP_TTL_MINUTES = 5
  * Create a step-up authentication token after validating the admin's password.
  *
  * SECURITY:
- * - Password is validated server-side via Supabase Auth signInWithPassword
+ * - Password is validated server-side via isolated Supabase Auth signInWithPassword (bypasses CAPTCHA)
  * - Token is a random 32-byte hex string
  * - Only the SHA-256 hash is stored in the database
  * - Token expires in 5 minutes
@@ -36,29 +37,29 @@ export async function createStepUpToken(
     email: string,
     password: string
 ): Promise<string> {
-    // 1. Validate password via Supabase Auth
-    const { createClient } = await import("@supabase/supabase-js")
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // 1. Resolve and validate admin email
+    let adminEmail = email?.trim().toLowerCase()
+    if (!adminEmail) {
+        const admin = getAdminClient()
+        const { data: userData } = await admin.auth.admin.getUserById(userId)
+        adminEmail = userData?.user?.email?.trim().toLowerCase() || ""
+    }
 
-    const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
+    if (!adminEmail) {
+        throw new ForbiddenError("Email de administrador não identificado.")
+    }
 
-    const { error: authError } = await tempClient.auth.signInWithPassword({
-        email,
-        password,
-    })
-
-    if (authError) {
+    // 2. Validate password via isolated Supabase Auth client (bypasses CAPTCHA)
+    const verifyResult = await verifyUserPassword(adminEmail, password)
+    if (!verifyResult.success) {
         throw new ForbiddenError("Senha inválida. Autenticação adicional falhou.")
     }
 
-    // 2. Generate token
+    // 3. Generate token
     const rawToken = randomBytes(32).toString("hex")
     const tokenHash = createHash("sha256").update(rawToken).digest("hex")
 
-    // 3. Store hash in DB
+    // 4. Store hash in DB
     const admin = getAdminClient()
     const expiresAt = new Date(Date.now() + STEP_UP_TTL_MINUTES * 60 * 1000).toISOString()
 
@@ -68,7 +69,7 @@ export async function createStepUpToken(
         expires_at: expiresAt,
     })
 
-    // 4. Cleanup old expired tokens (fire & forget)
+    // 5. Cleanup old expired tokens (fire & forget)
     admin
         .from("admin_step_up_tokens")
         .delete()

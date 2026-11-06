@@ -2,7 +2,7 @@
 
 import React from "react"
 import { StoreIcon } from "@/lib/icons"
-import { IconPlaceholder } from "@/components/reusable"
+import { IconPlaceholder, SidebarCard } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 
@@ -25,12 +25,9 @@ export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }:
     const partner = store.partners || {}
 
     return (
-        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                Dados do Vendedor / Loja
-            </h3>
+        <SidebarCard hasTopStrip hasSeparator title="Dados do Vendedor / Loja">
             <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
                     {store.logo_url ? (
                         <img src={getR2ImageUrl(store.logo_url)} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -87,6 +84,6 @@ export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }:
                     </div>
                 )}
             </div>
-        </div>
+        </SidebarCard>
     )
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox, FormSection, ListItem, RadioButton, InfoCard, FloatingActionBar, AlertModal } from "@/components/reusable"
-import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon, TrashIcon, XIcon } from "@/lib/icons"
+import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon, TrashIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -857,18 +857,18 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                             </Button>
                                         </FloatingActionBar>
 
-                                            <AlertModal
-                                                isOpen={isRemoveModalOpen}
-                                                onClose={() => setIsRemoveModalOpen(false)}
-                                                onConfirm={() => {
-                                                    removeSelectedItems()
-                                                    setIsRemoveModalOpen(false)
-                                                }}
-                                                title="Remover itens selecionados?"
-                                                message={`${selection.size} cliente(s) serão removidos da lista de importação.`}
-                                                variant="danger"
-                                                confirmText="Remover"
-                                            />
+                                        <AlertModal
+                                            isOpen={isRemoveModalOpen}
+                                            onClose={() => setIsRemoveModalOpen(false)}
+                                            onConfirm={() => {
+                                                removeSelectedItems()
+                                                setIsRemoveModalOpen(false)
+                                            }}
+                                            title="Remover itens selecionados?"
+                                            message={`${selection.size} cliente(s) serão removidos da lista de importação.`}
+                                            variant="danger"
+                                            confirmText="Remover"
+                                        />
 
                                         {viewMode === "grid" ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">

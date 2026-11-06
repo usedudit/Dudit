@@ -8,10 +8,12 @@ import {
     IconPlaceholder,
     AlertModal,
     DefaultModal,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { toast } from "@/hooks/use-notification"
-import { PlusIcon, TruckIcon, MailIcon } from "@/lib/icons"
+import { PlusIcon, TruckIcon, MailIcon, ThreeDotsIcon } from "@/lib/icons"
 import {
     listDeliveryDriversAdminAction,
     updateDeliveryDriverAdminAction,
@@ -728,17 +730,15 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                                     <Badge variant={driver.availability_status === "available" ? "green" : "gray"}>
                                                         {driver.availability_status === "available" ? "Disponível" : "Offline"}
                                                     </Badge>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="text-xs h-8 px-2.5"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setToggleTarget(driver)
-                                                        }}
-                                                    >
-                                                        {driver.is_active ? "Desativar" : "Ativar"}
-                                                    </Button>
+                                                    <ActionsDropdown>
+                                                        <DropdownItem
+                                                            onClick={() => setToggleTarget(driver)}
+                                                            className={driver.is_active ? "text-brand-red" : "text-brand-green"}
+                                                        >
+                                                            <ThreeDotsIcon size={16} className="mr-1" />
+                                                            {driver.is_active ? "Desativar" : "Ativar"}
+                                                        </DropdownItem>
+                                                    </ActionsDropdown>
                                                 </div>
                                             </div>
                                         ))}
@@ -839,23 +839,16 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                                                 </div>
                                                             </td>
                                                             <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                                                                <div className="flex items-center justify-center gap-2 action-btn" onClick={(e) => e.stopPropagation()}>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="text-xs h-8 px-2.5"
-                                                                        onClick={() => openEntity("view", driver.user_id)}
-                                                                    >
-                                                                        Detalhes
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant={driver.is_active ? "outlinered" : "outline"}
-                                                                        className="text-xs h-8 px-2.5"
-                                                                        onClick={() => setToggleTarget(driver)}
-                                                                    >
-                                                                        {driver.is_active ? "Desativar" : "Ativar"}
-                                                                    </Button>
+                                                                <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                                                                    <ActionsDropdown>
+                                                                        <DropdownItem
+                                                                            onClick={() => setToggleTarget(driver)}
+                                                                            className={driver.is_active ? "text-brand-red" : "text-brand-green"}
+                                                                        >
+                                                                            <ThreeDotsIcon size={16} className="mr-1" />
+                                                                            {driver.is_active ? "Desativar" : "Ativar"}
+                                                                        </DropdownItem>
+                                                                    </ActionsDropdown>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -894,6 +887,18 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                     setIsFilterSheetOpen(false)
                 }}
             />
+
+            {/* Mobile Floating Action Button - Novo Entregador */}
+            <div className="md:hidden fixed bottom-6 right-6 z-40">
+                <Button
+                    onClick={() => openEntity("create")}
+                    className="w-14 h-14 rounded-full shadow-lg shadow-brand-green/30"
+                    aria-label="Novo Entregador"
+                    leftIcon={<PlusIcon size={20} />}
+                >
+                    <span className="sr-only">Novo Entregador</span>
+                </Button>
+            </div>
 
             {/* Toggle Status Modal */}
             <AlertModal

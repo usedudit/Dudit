@@ -736,7 +736,7 @@ export function ExplorarPageClient({
 
     const normalizedInitialResults = useMemo(() => {
         const userId = userProfile?.userId || null
-        
+
         const normalizeItemType = (item: any) => {
             const rawType = String(item?.itemType || "").toLowerCase()
             if (rawType === "loja" || rawType === "vitrine" || rawType === "vitrines" || rawType === "partner" || rawType === "parceiro") {
@@ -1718,10 +1718,16 @@ export function ExplorarPageClient({
 
     const showExploreSections = pageMode === "sections" && !selectedSection
 
-    // Check if we're in a completely empty state (no results at all)
-    const isCompletelyEmpty = useMemo(() => {
-        return rawItems.length === 0 && !isCategoryMode && moreDistantItems.length === 0 && moreDistantSellers.length === 0
-    }, [rawItems.length, isCategoryMode, moreDistantItems.length, moreDistantSellers.length])
+    // Estado "sem nenhum resultado" da listagem local.
+    // NÃO usar `moreDistantItems`/`moreDistantSellers` aqui: o servidor busca esses
+    // itens numa query "distante" separada sempre que há busca por cidade, então eles
+    // existem mesmo com 0 resultados locais e fariam a condição nunca ser verdadeira
+    // (mantendo título, contador, filtros e badge de localidade na tela).
+    const isEmptyListing = useMemo(() => {
+        if (isContentLoading) return false
+        if (isCategoryMode) return false
+        return rawItems.length === 0 && filteredResults.length === 0
+    }, [isContentLoading, isCategoryMode, rawItems.length, filteredResults.length])
 
     // ─── Themed rotating sections ───────────────────────────────────────
     const CATEGORY_THEMES = [
@@ -1828,7 +1834,7 @@ export function ExplorarPageClient({
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-28 lg:pb-12 mt-4 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) - Hide when completely empty */}
-                    {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isCompletelyEmpty && (
+                    {!query && categoryCircles.length > 0 && !isLandingPage && !isCategoryMode && !isEmptyListing && (
                         <div className="mb-6 lg:mb-8">
                             <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -1853,7 +1859,7 @@ export function ExplorarPageClient({
                     )}
 
                     {/* ─── SECTIONS MODE: Discover sections on top ─── */}
-                    {showExploreSections && !isCompletelyEmpty && (
+                    {showExploreSections && !isEmptyListing && (
                         <div className="mb-6 lg:mb-8 space-y-6 lg:space-y-10">
                             {/* 3. VÍDEOS DA COMUNIDADE */}
                             {showCommunityVideos && (
@@ -1898,11 +1904,11 @@ export function ExplorarPageClient({
                     )}
 
                     {/* ─── CATEGORY DISCOVERY SECTIONS ─── */}
-                    {!isCompletelyEmpty && renderCategoryDiscoverSections()}
+                    {!isEmptyListing && renderCategoryDiscoverSections()}
 
                     <div className="min-w-0 flex-1">
                         {/* Title Section - ABOVE BANNER - Hide when completely empty */}
-                        {!isLandingPage && !isCompletelyEmpty && (
+                        {!isLandingPage && !isEmptyListing && (
                             <ExplorarHeaderSection
                                 title={pageTitle}
                                 resultsCount={filteredResults.length}
@@ -1925,7 +1931,7 @@ export function ExplorarPageClient({
                         )}
 
                         {/* Filtros / Ordenar - fixos logo abaixo do título - Hide when completely empty */}
-                        {!isLandingPage && !isCompletelyEmpty && (
+                        {!isLandingPage && !isEmptyListing && (
                             <ExplorarViewControls
                                 onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
                                 onOpenSort={() => setIsSortBottomSheetOpen(true)}
@@ -1994,7 +2000,7 @@ export function ExplorarPageClient({
                                 <>
                                     {/* Empty state with action buttons when no local results found in city/radius */}
                                     {rawItems.length === 0 && !isCategoryMode && (
-                                        <div className="py-12 flex flex-col items-center">
+                                        <div className="flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
                                                 imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"

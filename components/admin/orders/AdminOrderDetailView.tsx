@@ -27,6 +27,7 @@ import {
     ActionsDropdown,
     DropdownItem,
     SidebarCard,
+    FormTextarea,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
@@ -809,10 +810,8 @@ export function AdminOrderDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Título da Notificação (Opcional)
-                        </label>
                         <Input
+                            label="Título da Notificação (Opcional)"
                             type="text"
                             value={riskTitle}
                             onChange={(e) => setRiskTitle(e.target.value)}
@@ -824,15 +823,12 @@ export function AdminOrderDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Motivo / Mensagem da Notificação (Enviado para o Cliente)
-                        </label>
-                        <textarea
+                        <FormTextarea
+                            label="Motivo / Mensagem da Notificação (Opcional)"
                             value={riskReason}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRiskReason(e.target.value)}
                             placeholder="Descreva o motivo do ajuste que será enviado para o cliente..."
-                            rows={3}
-                            className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                            rows={2}
                         />
                     </div>
 

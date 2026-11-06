@@ -200,7 +200,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     customerId: data.customerId || null,
                     resolution: mapLegacyResolution(data.resolutionType || data.desiredResolution || data.refundType),
                     reason: mapLegacyReason(selectedItems[0]?.reason || data.reason),
-                    message: data.observations || "",
+                    message: "",
                     items: selectedItems.map((item: any) => ({
                         order_item_id: item.orderItemId || item.id,
                         quantity: Number(item.quantity || 1),
@@ -218,12 +218,12 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 })
                 if (!response.success) throw new Error(response.error)
                 const requestId = response.data?.id
-                if (data.status && data.status !== "PENDING_REVIEW" && requestId) {
+                if (requestId) {
                     const processRes = await processReturnRequestAction({
                         partnerId,
                         requestId,
                         action: "updated",
-                        nextStatus: data.status,
+                        nextStatus: data.status || "PENDING_REVIEW",
                         refundAmount: Number(data.refundValue || 0),
                         refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
                         refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
@@ -243,7 +243,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                             partnerId,
                             requestId,
                             action: "updated",
-                            nextStatus: data.status,
+                            nextStatus: data.status || "PENDING_REVIEW",
                             refundAmount: Number(data.refundValue || 0),
                             refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
                             refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,

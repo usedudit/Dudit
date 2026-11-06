@@ -23,6 +23,7 @@ import {
     ActionsDropdown,
     DropdownItem,
     ListItem,
+    SidebarCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
@@ -291,11 +292,7 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                                     {/* Status & Valores */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Status & Valores
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Status & Valores">
                                                         <div className="space-y-3 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Status</span>
@@ -330,13 +327,10 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                 )}
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Compra Vinculada */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                            Compra Vinculada
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Compra Vinculada">
                                                         <div className="space-y-2 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Plano</span>
@@ -366,16 +360,13 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                            Protocolo
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Protocolo">
                                                         <p className="text-xs text-brand-inactive-text">
                                                             {refund.id?.slice(0, 8)?.toUpperCase() || "—"}
                                                         </p>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -491,10 +482,7 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                 </div>
 
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                            Resumo dos Anexos
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Resumo dos Anexos">
                                                         <div className="space-y-2 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Imagens</span>
@@ -505,7 +493,7 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">{parsedDocs.length}</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>

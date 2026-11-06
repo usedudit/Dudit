@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { headers } from "next/headers"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
+import { verifyUserPassword } from "@/lib/auth/verify-password"
 import { requireUser, requireMinimumPlan, requireOrderAccess, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { can } from "@/lib/permissions/can"
@@ -1733,11 +1734,8 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
             const userEmail = userData?.user?.email
             if (!userEmail) throw new Error("Não foi possível obter email do usuário")
 
-            const { error: signInErr } = await supabase.auth.signInWithPassword({
-                email: userEmail,
-                password: data.refundPassword,
-            })
-            if (signInErr) throw new Error("Senha incorreta")
+            const verifyResult = await verifyUserPassword(userEmail, data.refundPassword)
+            if (!verifyResult.success) throw new Error("Senha incorreta")
         }
 
         // 6. Cooldown para valores muito altos

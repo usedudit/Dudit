@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
+import { motion } from "framer-motion"
 import {
     ChevronLeftIcon,
     TruckIcon,
     StoreIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -20,6 +22,8 @@ import {
     AlertModal,
     ListItem,
     SidebarCard,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -356,10 +360,7 @@ export function AdminDeliveryDriverDetailView({
                                                     </SidebarCard>
 
                                                     {/* Card de Lojas Vinculadas */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Lojas Vinculadas ({partners.length})
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title={`Lojas Vinculadas (${partners.length})`}>
                                                         {partners.length === 0 ? (
                                                             <p className="text-xs text-brand-inactive-text">
                                                                 Entregador autônomo da plataforma (atende a todas as lojas da região sem vínculos exclusivos).
@@ -381,20 +382,17 @@ export function AdminDeliveryDriverDetailView({
                                                                 ))}
                                                             </div>
                                                         )}
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Card de Identificadores */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Identificadores
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Identificadores">
                                                         <div className="space-y-2 text-xs">
                                                             <div>
                                                                 <span className="text-brand-inactive-text block">UUID do Entregador</span>
                                                                 <span className="font-mono text-brand-dark dark:text-dark-heading select-all break-all">{driver.user_id}</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -471,12 +469,15 @@ export function AdminDeliveryDriverDetailView({
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                                                                                    <Link
-                                                                                        href={`/ddt-admin/orders?view=${a.order_id}`}
-                                                                                        className="text-xs font-bold text-brand-green hover:underline"
-                                                                                    >
-                                                                                        Ver Pedido →
-                                                                                    </Link>
+                                                                                    <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                                                                                        <ActionsDropdown>
+                                                                                            <DropdownItem
+                                                                                                onClick={() => window.open(`/ddt-admin/orders?view=${a.order_id}`, "_blank")}
+                                                                                            >
+                                                                                                <StoreIcon size={16} className="mr-1" /> Ver Pedido
+                                                                                            </DropdownItem>
+                                                                                        </ActionsDropdown>
+                                                                                    </div>
                                                                                 </td>
                                                                             </tr>
                                                                         ))}
@@ -485,31 +486,87 @@ export function AdminDeliveryDriverDetailView({
                                                             </div>
                                                         </div>
 
-                                                        {/* Mobile Cards */}
+                                                        {/* Mobile Cards - GridCard Pattern */}
                                                         <div className="md:hidden space-y-3">
-                                                            {paginatedAssignments.map((a: any) => (
-                                                                <div key={a.id} className="p-4 rounded-xl border border-brand-border dark:border-dark-border space-y-2">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <div className="flex flex-col">
-                                                                            <span className="font-mono font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                Pedido #{String(a.order_id).slice(0, 8)}
-                                                                            </span>
-                                                                            <span className="text-xs text-brand-inactive-text">
-                                                                                {a.partner_name}
-                                                                            </span>
+                                                            {paginatedAssignments.map((a: any) => {
+                                                                const statusMeta = a.status === "delivered" ? { label: "Entregue", variant: "green" as const } :
+                                                                    a.status === "failed" ? { label: "Falhou", variant: "red" as const } :
+                                                                    a.status === "out_for_delivery" ? { label: "Em rota", variant: "blue" as const } :
+                                                                    { label: a.status, variant: "gray" as const };
+
+                                                                const orderNumberDisplay = `#${String(a.order_id).slice(0, 8)}`;
+
+                                                                return (
+                                                                    <motion.div
+                                                                        key={a.id}
+                                                                        initial={{ opacity: 0 }}
+                                                                        animate={{ opacity: 1 }}
+                                                                        exit={{ opacity: 0 }}
+                                                                        transition={{ duration: 0.2 }}
+                                                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 group flex flex-col"
+                                                                    >
+                                                                        <div className="flex gap-3 mb-2">
+                                                                            {/* Avatar */}
+                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                <TruckIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                                            </div>
+
+                                                                            <div className="flex-1 min-w-0">
+                                                                                {/* Row 1: Pedido + Badge */}
+                                                                                <div className="flex justify-between items-start gap-1">
+                                                                                    <div className="flex items-center gap-2 min-w-0 pr-1 flex-nowrap">
+                                                                                        <h3
+                                                                                            className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0 font-mono"
+                                                                                            title={orderNumberDisplay}
+                                                                                        >
+                                                                                            {orderNumberDisplay}
+                                                                                        </h3>
+                                                                                        <div className="flex items-center shrink-0">
+                                                                                            <Badge variant={statusMeta.variant} className="whitespace-nowrap scale-90 shrink-0">
+                                                                                                {statusMeta.label}
+                                                                                            </Badge>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* Ações */}
+                                                                                    <div className="shrink-0 -mt-0.5 -mr-1">
+                                                                                        <ActionsDropdown>
+                                                                                            <DropdownItem
+                                                                                                onClick={() => window.open(`/ddt-admin/orders?view=${a.order_id}`, "_blank")}
+                                                                                            >
+                                                                                                <StoreIcon size={16} /> Ver Pedido
+                                                                                            </DropdownItem>
+                                                                                        </ActionsDropdown>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Row 2: Loja */}
+                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                    {a.partner_name || "Loja Parceira"}
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
-                                                                        <Badge variant={a.status === "delivered" ? "green" : a.status === "failed" ? "red" : "blue"}>
-                                                                            {a.status === "delivered" ? "Entregue" : a.status === "failed" ? "Falhou" : a.status}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between text-xs pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(a.delivery_fee || 0))}</span>
-                                                                        <Link href={`/ddt-admin/orders?view=${a.order_id}`} className="font-bold text-brand-green">
-                                                                            Ver Pedido →
-                                                                        </Link>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
+
+                                                                        {/* Info Rows */}
+                                                                        <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                                                                            <div className="flex justify-between items-start gap-2">
+                                                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Taxa de Entrega</span>
+                                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                        {formatCurrency(Number(a.delivery_fee || 0))}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex flex-col gap-0.5 items-end shrink-0">
+                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
+                                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                        {a.assigned_at ? formatDateTime(a.assigned_at) : "-"}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </motion.div>
+                                                                );
+                                                            })}
                                                         </div>
 
                                                         {/* Pagination */}

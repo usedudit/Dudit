@@ -44,6 +44,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params }: Props) {
     const { cidadeUf } = await params
 
+    // Evitar que rotas institucionais e de ajuda sejam capturadas pela rota dinâmica de cidade
+    if (cidadeUf === "ajuda" || cidadeUf === "institucional") {
+        redirect(`/${cidadeUf}`)
+    }
+
     if (!isValidCitySlug(cidadeUf)) {
         if (cidadeUf.includes(".") || cidadeUf.length < 3) {
             notFound()

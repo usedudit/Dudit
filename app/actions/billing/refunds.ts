@@ -12,6 +12,7 @@ import { notifyPartnerTeam } from "@/lib/billing/notifications"
 import { createRefundPublicToken, hashRefundPublicToken, isRefundPublicTokenFormat } from "@/lib/security/refund-public-token"
 import { decryptCpfIfEncrypted } from "@/lib/crypto"
 import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
+import { verifyUserPassword } from "@/lib/auth/verify-password"
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 
@@ -560,18 +561,8 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
             return { error: "Email do administrador não identificado." }
         }
 
-        const { createClient } = await import("@supabase/supabase-js")
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        const authVerifyClient = createClient(supabaseUrl, supabaseAnonKey, {
-            auth: { autoRefreshToken: false, persistSession: false },
-        })
-        const { error: signInErr } = await authVerifyClient.auth.signInWithPassword({
-            email: adminEmail,
-            password: data.refundPassword,
-        })
-
-        if (signInErr) {
+        const verifyResult = await verifyUserPassword(adminEmail, data.refundPassword)
+        if (!verifyResult.success) {
             return { error: "Senha de administrador incorreta. Ação não autorizada." }
         }
 

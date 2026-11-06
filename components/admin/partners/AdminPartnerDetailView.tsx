@@ -31,6 +31,7 @@ import {
     ActionsDropdown,
     DropdownItem,
     SidebarCard,
+    FormTextarea,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -897,14 +898,14 @@ export function AdminPartnerDetailView({
                                                     <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
                                                         {paginatedServices.map((s: any) => (
                                                             <div key={s.id} className="py-3 flex items-center justify-between gap-3">
-                                                                    <div className="min-w-0 flex flex-col">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(s.price || 0))}</span>
-                                                                        <Link href={`/ddt-admin/catalog/services/${s.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
-                                                                    </div>
+                                                                <div className="min-w-0 flex flex-col">
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
+                                                                    <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                    <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(s.price || 0))}</span>
+                                                                    <Link href={`/ddt-admin/catalog/services/${s.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1205,10 +1206,8 @@ export function AdminPartnerDetailView({
             >
                 <div className="space-y-4 pt-2">
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Pontuação de Risco (0 - 100)
-                        </label>
                         <Input
+                            label="Pontuação de Risco (0 - 100)"
                             type="number"
                             min={0}
                             max={100}
@@ -1222,10 +1221,8 @@ export function AdminPartnerDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Título da Notificação (Opcional)
-                        </label>
                         <Input
+                            label="Título da Notificação (Opcional)"
                             type="text"
                             value={riskTitle}
                             onChange={(e) => setRiskTitle(e.target.value)}
@@ -1237,15 +1234,12 @@ export function AdminPartnerDetailView({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                            Motivo / Mensagem da Notificação (Enviado para a Loja)
-                        </label>
-                        <textarea
+                        <FormTextarea
+                            label="Motivo / Mensagem da Notificação (Opcional)"
                             value={riskReason}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRiskReason(e.target.value)}
-                            placeholder="Descreva o motivo da alteração de risco que será enviado para a loja..."
-                            rows={3}
-                            className="w-full px-3 py-2 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                            placeholder="Descreva o motivo do ajuste que será enviado para o cliente..."
+                            rows={2}
                         />
                     </div>
 

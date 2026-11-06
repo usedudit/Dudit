@@ -197,7 +197,7 @@ export function FavoritesPageClient({
                 <div className="hidden lg:block items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text dark:text-dark-body font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}
+                            Favoritos
                         </h1>
                         <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Seus produtos e serviços salvos em um só lugar</p>
                     </div>

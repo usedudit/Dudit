@@ -84,6 +84,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityTermPage({ params }: Props) {
   const { cidadeUf, slug } = await params
 
+  // Evitar que rotas institucionais e de ajuda sejam capturadas pela rota dinâmica de cidade/termo
+  if (cidadeUf === "ajuda" || cidadeUf === "institucional") {
+    redirect(`/${cidadeUf}${slug ? `/${slug}` : ""}`)
+  }
+
   if (cidadeUf.length === 2) {
     permanentRedirect(`/${slug}-${cidadeUf}`)
   }

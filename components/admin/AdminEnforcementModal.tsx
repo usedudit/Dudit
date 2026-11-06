@@ -416,17 +416,36 @@ export function AdminEnforcementModal({
                         </FormSection>
 
                         {/* Risk Score Setting */}
-                        <FormSection title={`Score de Risco (${riskScore} pts):`} hasSeparator>
+                        <FormSection title="Score de Risco (0 - 100)" hasSeparator>
                             <div className="flex items-center justify-between">
                                 <Badge
                                     variant={riskScore >= 80 ? "red" : riskScore >= 50 ? "orange" : riskScore >= 25 ? "orange" : "green"}
                                 >
                                     {riskScore >= 80 ? "Crítico" : riskScore >= 50 ? "Alto" : riskScore >= 25 ? "Médio" : "Baixo / Seguro"}
                                 </Badge>
+                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">{riskScore} pts</span>
                             </div>
 
+                            {/* Manual Input */}
+                            <Input
+                                label="Digite o Score de Risco"
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={riskScore}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10)
+                                    if (!isNaN(val) && val >= 0 && val <= 100) setRiskScore(val)
+                                }}
+                                placeholder="Ex: 50"
+                                className="w-32 mt-2"
+                            />
+                            <span className="text-[11px] text-brand-inactive-text mt-1 block">
+                                0 a 24: Baixo risco • 25 a 49: Médio risco • 50+: Alto risco (alerta vermelho)
+                            </span>
+
                             {/* Quick Risk Score Chips */}
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 mt-2">
                                 {(isSuspend
                                     ? [
                                         { label: `Manter Atual (${currentRiskScore})`, val: currentRiskScore },
@@ -508,18 +527,11 @@ export function AdminEnforcementModal({
                             </div>
                         </FormSection>
 
-                        {/* Consequences Box */}
-                        <div className="space-y-1.5">
-                            <h4 className="font-bold text-xs uppercase tracking-wider text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                <AlertTriangleIcon size={14} className={isSuspend ? "text-brand-red" : "text-brand-green"} />
-                                Impacto Operacional:
-                            </h4>
-                            <ul className="space-y-1 text-xs text-brand-inactive-text dark:text-dark-body list-disc pl-5">
-                                {(isSuspend ? config.suspendImpacts : config.unsuspendImpacts).map((impact, idx) => (
-                                    <li key={idx}>{impact}</li>
-                                ))}
-                            </ul>
-                        </div>
+                        <InfoCard title="Impacto Operacional" message={<ul className="space-y-1 list-disc pl-5">
+                            {(isSuspend ? config.suspendImpacts : config.unsuspendImpacts).map((impact, idx) => (
+                                <li key={idx}>{impact}</li>
+                            ))}
+                        </ul>} color="red" />
 
                         <Separator />
 
@@ -527,7 +539,7 @@ export function AdminEnforcementModal({
                         <div className="space-y-2">
                             <div className="relative">
                                 <PasswordInput
-                                    title="Confirme sua senha"
+                                    label="Confirme sua senha"
                                     value={adminPassword}
                                     onChange={(e) => setAdminPassword(e.target.value)}
                                     className="w-full"

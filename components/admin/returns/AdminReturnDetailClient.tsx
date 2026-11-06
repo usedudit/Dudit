@@ -81,13 +81,21 @@ export default function AdminReturnDetailClient({ detail, onBack, mode = "edit" 
         if (!request?.id || !partnerId) return
         setIsSaving(true)
         try {
+            const statusChanged = data.status && data.status !== request.status
+            const nextStatus = statusChanged ? data.status : undefined
+            
+            // Only auto-approve refund if status is being changed to an approved/resolved state
+            const shouldApproveRefund = nextStatus && 
+                ["APPROVED", "PROCESSING", "RESOLVED"].includes(nextStatus) && 
+                Number(data.refundValue || 0) > 0
+
             const response = await processReturnRequestAction({
                 partnerId,
                 requestId: request.id,
                 action: "updated",
-                nextStatus: data.status,
+                nextStatus,
                 refundAmount: Number(data.refundValue || 0),
-                refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
+                refundStatus: shouldApproveRefund ? "APPROVED" : "PENDING",
                 refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund"))
                     ? data.refundPaymentMethod || null
                     : null,
@@ -119,7 +127,7 @@ export default function AdminReturnDetailClient({ detail, onBack, mode = "edit" 
         } finally {
             setIsSaving(false)
         }
-    }, [partnerId, request?.id, handleBack, router, toast])
+    }, [partnerId, request?.id, request?.status, handleBack, router, toast])
 
     const extraTabs = [
         {

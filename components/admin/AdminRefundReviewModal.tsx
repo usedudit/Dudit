@@ -12,6 +12,7 @@ import {
     TabsTrigger,
     TabsContent,
     FormSection,
+    InfoCard,
 } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FileIcon } from "@/lib/icons"
@@ -232,13 +233,11 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
 
                     <div>
                         {refund.is_within_7_days ? (
-                            <Badge variant="green" className="flex items-center gap-1">
-                                <ShieldCheck size={12} />
+                            <Badge variant="green">
                                 <span>Dentro dos 7 dias (CDC Art. 49)</span>
                             </Badge>
                         ) : (
-                            <Badge variant="orange" className="flex items-center gap-1">
-                                <AlertTriangle size={12} />
+                            <Badge variant="orange">
                                 <span>Fora dos 7 dias legais</span>
                             </Badge>
                         )}
@@ -299,15 +298,11 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                         {/* Formulário de Aprovação com Step-Up Security */}
                         {actionType === "approve" ? (
                             <form onSubmit={handleApprove} className="space-y-4">
-                                <div className="p-3.5 bg-brand-green/10 border border-brand-green/20 rounded-xl text-xs text-gray-700 dark:text-dark-body space-y-1">
-                                    <p className="font-bold text-brand-green flex items-center gap-1.5">
-                                        <Lock size={14} />
-                                        <span>Ação Financeira Irreversível com Step-Up Auth</span>
-                                    </p>
-                                    <p>
-                                        Ao confirmar, o Mercado Pago efetuará a devolução imediata do dinheiro, a assinatura será cancelada e o cliente terá <strong>24h de carência</strong> para salvar seus dados antes de ser rebaixado para o Plano Gratuito.
-                                    </p>
-                                </div>
+                                <InfoCard
+                                    title="Ação Financeira Irreversível com Step-Up Auth"
+                                    color="green"
+                                    message="Ao confirmar, o Mercado Pago efetuará a devolução imediata do dinheiro, a assinatura será cancelada e o cliente terá 24h de carência para salvar seus dados antes de ser rebaixado para o Plano Gratuito."
+                                />
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -337,11 +332,8 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                        <KeyRound size={14} className="text-brand-orange" />
-                                        <span>Sua Senha de Administrador <span className="text-brand-red">*</span></span>
-                                    </label>
                                     <Input
+                                        label="Sua Senha de Administrador"
                                         type="password"
                                         value={refundPassword}
                                         onChange={(e) => setRefundPassword(e.target.value)}
@@ -351,10 +343,8 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                        Mensagem de Parecer para o Lojista (Opcional)
-                                    </label>
                                     <FormTextarea
+                                        label="Mensagem de Parecer para o Lojista (Opcional)"
                                         value={adminResponse}
                                         onChange={(e) => setAdminResponse(e.target.value)}
                                         placeholder="Ex: Reembolso aprovado conforme garantia legal. Carência de 24h ativada..."
@@ -390,15 +380,11 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                             </form>
                         ) : (
                             <form onSubmit={handleReject} className="space-y-4">
-                                <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl text-xs text-red-800 dark:text-red-300">
-                                    Ao recusar, o lojista será notificado e o plano continuará ativo normalmente até o fim do período.
-                                </div>
+                                <InfoCard title="Recusar Solicitação" color="red" message="Ao recusar, o lojista será notificado e o plano continuará ativo normalmente até o fim do período." />
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                        Motivo da Recusa (Obrigatório) <span className="text-brand-red">*</span>
-                                    </label>
                                     <FormTextarea
+                                        label="Motivo da Recusa (Obrigatório)"
                                         value={adminResponse}
                                         onChange={(e) => setAdminResponse(e.target.value)}
                                         placeholder="Explique o motivo pelo qual o reembolso não pôde ser concedido..."
@@ -440,9 +426,9 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                             <FormSection title={`Imagens de Evidência (${imageUrls.length})`}>
                                 <ProductImagesSection
                                     images={imageUrls}
-                                    onImageUpload={() => {}}
-                                    onRemoveImage={() => {}}
-                                    onSetPrimaryImage={() => {}}
+                                    onImageUpload={() => { }}
+                                    onRemoveImage={() => { }}
+                                    onSetPrimaryImage={() => { }}
                                     isEditing={false}
                                 />
                             </FormSection>

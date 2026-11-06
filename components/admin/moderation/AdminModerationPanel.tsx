@@ -2,8 +2,9 @@
 
 import React, { useState, useTransition, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon, PackageIcon, BriefcaseIcon, StoreIcon } from "@/lib/icons"
-import { Button, Input, Badge, FormDropdown, AlertModal, FormSection, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, IconPlaceholder, SidebarCard } from "@/components/reusable"
+import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon, PackageIcon, BriefcaseIcon, StoreIcon, ThreeDotsIcon, FilterIcon } from "@/lib/icons"
+import { Button, Input, Badge, FormDropdown, AlertModal, FormSection, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, IconPlaceholder, SidebarCard, ActionsDropdown, DropdownItem } from "@/components/reusable"
+import Dropdown from "@/components/reusable/Dropdown"
 import { FormTextarea } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -240,99 +241,163 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
         <FadeIn>
             <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
-                    {/* Page Header */}
-                    <div className="px-4 md:px-8 pt-6 pb-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                    Moderação
-                                </h1>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium max-w-2xl">
-                                    {mode === "automatic"
-                                        ? "Revise produtos, serviços e perfis pendentes de aprovação no marketplace"
-                                        : "Busque por ID específico para revisar, editar ou remover conteúdo manualmente"}
-                                </p>
-                            </div>
-
-                            {/* Mode Toggle */}
-                            <div className="flex items-center gap-3">
-                                <div className="inline-flex items-center gap-1.5 bg-brand-gray dark:bg-dark-border rounded-lg p-1">
-                                    <button
-                                        onClick={() => handleModeChange("automatic")}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === "automatic"
-                                                ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
-                                                : "text-brand-inactive-text hover:text-brand-dark"
-                                            }`}
+                    {/* Desktop Controls Bar - Mode Dropdown + Actions */}
+                    <div className="hidden md:flex items-center justify-between px-8 py-4 gap-4 border-b border-brand-border dark:border-dark-border">
+                        <div className="flex items-center gap-3">
+                            {/* Mode Selector Dropdown */}
+                            <Dropdown
+                                trigger={
+                                    <Button
+                                        variant={mode === "automatic" ? "filled" : "outline"}
+                                        className="h-[42px] px-4 gap-2"
+                                        leftIcon={
+                                            mode === "automatic" ? (
+                                                <PackageIcon size={16} />
+                                            ) : mode === "manual" ? (
+                                                <SearchIcon size={16} />
+                                            ) : (
+                                                <PlayIcon size={16} />
+                                            )
+                                        }
                                     >
-                                        Automática
-                                    </button>
-                                    <button
-                                        onClick={() => handleModeChange("manual")}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${mode === "manual"
-                                                ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
-                                                : "text-brand-inactive-text hover:text-brand-dark"
-                                            }`}
-                                    >
-                                        Manual
-                                    </button>
-                                </div>
-                                {mode === "automatic" && (
-                                    <button
-                                        onClick={() => {
-                                            startTransition(async () => {
-                                                try {
-                                                    const result = await getModerationQueue(null, 50, "pending_moderation")
-                                                    if (window.location.pathname === "/ddt-admin/moderation") {
-                                                        const event = new Event("moderation-refresh")
-                                                        window.dispatchEvent(event)
-                                                    }
-                                                } catch (err) {
-                                                    console.error("Refresh failed:", err)
-                                                }
-                                            })
-                                        }}
-                                        disabled={isPending}
-                                        className="px-3 py-1.5 text-sm font-medium text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border rounded-lg hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors disabled:opacity-50"
-                                    >
-                                        {isPending ? "Atualizando..." : "Atualizar"}
-                                    </button>
-                                )}
-                            </div>
+                                        {mode === "automatic" ? "Fila de Moderação" : mode === "manual" ? "Busca por ID" : "Vídeos da Comunidade"}
+                                    </Button>
+                                }
+                                align="left"
+                                showChevron={false}
+                                width="w-56"
+                            >
+                                <DropdownItem onClick={() => handleModeChange("automatic")} className={mode === "automatic" ? "font-medium text-brand-green" : ""}>
+                                    <PackageIcon size={16} className="mr-2" /> Fila de Moderação
+                                </DropdownItem>
+                                <DropdownItem onClick={() => handleModeChange("manual")} className={mode === "manual" ? "font-medium text-brand-green" : ""}>
+                                    <SearchIcon size={16} className="mr-2" /> Busca por ID
+                                </DropdownItem>
+                                <DropdownItem onClick={() => handleModeChange("videos")} className={mode === "videos" ? "font-medium text-brand-green" : ""}>
+                                    <PlayIcon size={16} className="mr-2" /> Vídeos da Comunidade
+                                </DropdownItem>
+                            </Dropdown>
                         </div>
+                        
+                        {/* Desktop Actions - only for manual mode */}
+                        {mode === "manual" && (
+                            <div className="flex items-center gap-2">
+                                <div className="w-72">
+                                    <Input
+                                        name="search-id"
+                                        placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
+                                        value={searchId}
+                                        onChange={(e) => setSearchId(e.target.value)}
+                                        onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
+                                        className="h-[42px]"
+                                        variant="full-rounded"
+                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                    />
+                                </div>
+                                <div className="w-40">
+                                    <FormDropdown
+                                        options={SEARCH_TYPES}
+                                        value={searchType}
+                                        setValue={(v) => { setSearchType(v as SearchType); setResult(null); setError("") }}
+                                    />
+                                </div>
+                                <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending} className="h-[42px]">
+                                    <SearchIcon size={18} /> Buscar
+                                </Button>
+                            </div>
+                        )}
+                        
+                        {/* Desktop Actions - only for videos mode */}
+                        {mode === "videos" && (
+                            <div className="flex items-center gap-2">
+                                <div className="w-80">
+                                    <Input
+                                        name="search-videos"
+                                        placeholder="Buscar por título ou loja..."
+                                        value={videoSearch}
+                                        onChange={(e) => setVideoSearch(e.target.value)}
+                                        className="h-[42px]"
+                                        variant="full-rounded"
+                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Mode Toggle Bar */}
-                    <div className="px-4 md:px-8 mb-4">
-                        <div className="inline-flex items-center gap-1.5 bg-brand-gray dark:bg-dark-border rounded-lg p-1">
-                            <button
-                                onClick={() => handleModeChange("automatic")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "automatic"
-                                        ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                    }`}
+                    {/* Mobile/Tablet Controls Bar */}
+                    <div className="md:hidden flex flex-col gap-3 px-4 py-3 border-b border-brand-border dark:border-dark-border">
+                        {/* Search Input */}
+                        <div className="w-full">
+                            <Input
+                                name="mobile-search"
+                                placeholder={mode === "automatic" ? "Buscar na fila..." : mode === "manual" ? `ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...` : "Buscar por título ou loja..."}
+                                value={mode === "manual" ? searchId : mode === "videos" ? videoSearch : ""}
+                                onChange={(e) => {
+                                    if (mode === "manual") setSearchId(e.target.value);
+                                    else if (mode === "videos") setVideoSearch(e.target.value);
+                                }}
+                                onKeyDown={(e: React.KeyboardEvent) => {
+                                    if (e.key === "Enter") {
+                                        if (mode === "manual") handleSearch();
+                                    }
+                                }}
+                                className="h-[44px]"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            />
+                        </div>
+                        
+                        {/* Actions Dropdown Button */}
+                        <div className="flex items-center justify-end">
+                            <Dropdown
+                                trigger={
+                                    <Button variant="outline" className="w-[44px] h-[44px] p-0 rounded-full">
+                                        <ThreeDotsIcon className="w-5 h-5 text-brand-inactive-text" />
+                                    </Button>
+                                }
+                                align="right"
+                                showChevron={false}
+                                width="w-56"
                             >
-                                Fila de Moderação
-                            </button>
-                            <button
-                                onClick={() => handleModeChange("manual")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "manual"
-                                        ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                    }`}
-                            >
-                                <SearchIcon size={16} className="inline mr-1" />
-                                Busca por ID
-                            </button>
-                            <button
-                                onClick={() => handleModeChange("videos")}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${mode === "videos"
-                                        ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow"
-                                        : "text-brand-inactive-text hover:text-brand-dark"
-                                    }`}
-                            >
-                                <PlayIcon size={16} className="inline mr-1" />
-                                Vídeos da Comunidade
-                            </button>
+                                <DropdownItem onClick={() => handleModeChange("automatic")} className={mode === "automatic" ? "font-medium text-brand-green" : ""}>
+                                    <PackageIcon size={16} className="mr-2" /> Fila de Moderação
+                                </DropdownItem>
+                                <DropdownItem onClick={() => handleModeChange("manual")} className={mode === "manual" ? "font-medium text-brand-green" : ""}>
+                                    <SearchIcon size={16} className="mr-2" /> Busca por ID
+                                </DropdownItem>
+                                <DropdownItem onClick={() => handleModeChange("videos")} className={mode === "videos" ? "font-medium text-brand-green" : ""}>
+                                    <PlayIcon size={16} className="mr-2" /> Vídeos da Comunidade
+                                </DropdownItem>
+                                {mode === "manual" && (
+                                    <>
+                                        <div className="border-t border-brand-border dark:border-dark-border my-1" />
+                                        <div className="w-full">
+                                            <div className="px-3 py-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                Tipo de busca
+                                            </div>
+                                            {SEARCH_TYPES.map((t) => (
+                                                <DropdownItem
+                                                    key={t.value}
+                                                    onClick={() => { setSearchType(t.value); setResult(null); setError("") }}
+                                                    className={searchType === t.value ? "font-medium text-brand-green" : ""}
+                                                >
+                                                    {searchType === t.value && <CheckCircleIcon size={14} className="mr-2 text-brand-green" />}
+                                                    {t.label}
+                                                </DropdownItem>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                {mode === "videos" && (
+                                    <>
+                                        <div className="border-t border-brand-border dark:border-dark-border my-1" />
+                                        <DropdownItem onClick={() => loadVideos(1)}>
+                                            <FilterIcon size={16} className="mr-2" /> Atualizar lista
+                                        </DropdownItem>
+                                    </>
+                                )}
+                            </Dropdown>
                         </div>
                     </div>
 
@@ -343,33 +408,6 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                         </div>
                     ) : mode === "manual" ? (
                         <div className="px-4 md:px-8 pb-8">
-                            {/* Manual Search Controls */}
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                    <div className="flex gap-2 items-center flex-wrap flex-1">
-                                        <Input
-                                            name="search-id"
-                                            placeholder={`ID do ${SEARCH_TYPES.find(t => t.value === searchType)?.label.toLowerCase()}...`}
-                                            value={searchId}
-                                            onChange={(e) => setSearchId(e.target.value)}
-                                            onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleSearch()}
-                                            className="h-[42px] w-64"
-                                            variant="full-rounded"
-                                        />
-                                        <div className="w-40">
-                                            <FormDropdown
-                                                options={SEARCH_TYPES}
-                                                value={searchType}
-                                                setValue={(v) => { setSearchType(v as SearchType); setResult(null); setError("") }}
-                                            />
-                                        </div>
-                                        <Button variant="default" onClick={handleSearch} disabled={isPending} isLoading={isPending} className="h-[42px]">
-                                            <SearchIcon size={18} /> Buscar
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Error State */}
                             {error && (
                                 <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-center mb-6">
@@ -489,21 +527,6 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                                 </div>
                             ) : (
                                 <>
-                                    {/* Video Search */}
-                                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-                                        <div className="w-full md:w-80">
-                                            <Input
-                                                name="search-videos"
-                                                placeholder="Buscar por título ou loja..."
-                                                value={videoSearch}
-                                                onChange={(e) => setVideoSearch(e.target.value)}
-                                                className="h-[42px]"
-                                                variant="full-rounded"
-                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                            />
-                                        </div>
-                                    </div>
-
                                     {/* Video List */}
                                     {filteredVideos.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center p-12 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text min-h-[300px]">
@@ -598,15 +621,6 @@ export function AdminModerationPanel({ initialData }: AdminModerationPanelProps)
                     )}
                 </div>
             </div>
-
-            {/* Mobile Bottom Action Bar */}
-            {result && mode === "manual" && !isCatalogResult && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                    <Button variant="outline" onClick={handleRefresh} disabled={isPending} className="flex-1 h-12">
-                        Atualizar
-                    </Button>
-                </div>
-            )}
 
             {/* Reject Video Modal */}
             {videoToReject && (

@@ -2,8 +2,11 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { createClient } from "@/lib/supabase/server"
-import { BillingPage } from "@/components/billing/BillingPage"
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { adminListPurchasesAction } from "@/app/actions/billing/admin-purchases"
+import { AdminHeader } from "@/components/admin/admin-header"
+import PurchasesList from "@/components/admin/billing/PurchasesList"
+
+export const dynamic = "force-dynamic"
 
 export default async function AdminBillingPage() {
     await requireAdmin("moderator")
@@ -22,13 +25,21 @@ export default async function AdminBillingPage() {
         avatarColor: "bg-brand-green"
     } : undefined
 
+    const result = await adminListPurchasesAction({ status: "all", limit: 100 })
+
+    const initialData = result.success ? (result.data || []) : []
+    const initialStats = result.stats || { total: 0, completed: 0, pending: 0, failed: 0, refunded: 0, cancelled: 0 }
+    const initialTotalCount = result.totalCount || 0
+
     return (
         <>
-            <AdminPageHeader pageTitle="Faturamento" userProfile={userProfile} />
-            <FadeIn className="p-4">
-                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                    <BillingPage showTitle={false} />
-                </div>
+            <AdminHeader pageTitle="Faturamento" userProfile={userProfile} />
+            <FadeIn className="flex-1">
+                <PurchasesList
+                    initialData={initialData}
+                    initialStats={initialStats}
+                    initialTotalCount={initialTotalCount}
+                />
             </FadeIn>
         </>
     )

@@ -998,6 +998,7 @@ export default function CreateReturnPage({
         if (!pendingSaveData) return
 
         const shouldAskInventoryRestore =
+            !adminContext &&
             checkedItems.length > 0 &&
             resolutionType !== "rejected"
 
@@ -1011,7 +1012,7 @@ export default function CreateReturnPage({
 
         await saveWithAdminGate({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest])
+    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest, adminContext])
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
@@ -1139,6 +1140,7 @@ export default function CreateReturnPage({
             }
 
             const shouldAskInventoryRestore =
+                !adminContext &&
                 checkedItems.length > 0 &&
                 resolutionType !== "rejected"
 
@@ -2379,15 +2381,21 @@ export default function CreateReturnPage({
                                                 />
                                             </FormSection>
 
-                                            {returnRequest?.id && (
-                                                <GenericAttachmentsTab
-                                                    entityId={returnRequest.id}
-                                                    partnerId={partnerId}
-                                                    entityType="return"
-                                                    title="Documentos de Evidência"
-                                                    subtitle="Gerencie documentos adicionais anexados como evidência desta devolução."
-                                                />
-                                            )}
+                                            <GenericAttachmentsTab
+                                                entityId={returnRequest?.id}
+                                                partnerId={partnerId}
+                                                entityType="return"
+                                                title="Documentos de Evidência"
+                                                subtitle="Gerencie documentos adicionais anexados como evidência desta devolução."
+                                                isNew={mode === "create"}
+                                                stagedFiles={evidenceUploads.filter(u => u.file instanceof File).map(u => u.file as File)}
+                                                onStagedFilesChange={(files) => {
+                                                    const newUploads = files.map(f => ({ file: f, file_url: "", file_name: f.name, file_type: f.type, file_size: f.size }))
+                                                    setEvidenceUploads(prev => [...prev.filter(u => !(u.file instanceof File)), ...newUploads])
+                                                }}
+                                                stagedImages={evidenceImages}
+                                                onStagedImagesChange={setEvidenceImages}
+                                            />
                                         </FadeIn>
                                     </TabsContent>
 

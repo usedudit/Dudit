@@ -8,6 +8,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { verifyUserPassword } from "@/lib/auth/verify-password"
 import type { User } from "@supabase/supabase-js"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -44,26 +45,39 @@ function getDisplayProvider(user: User): string {
 
 /**
  * Check if the user's session was created recently (within SESSION_FRESHNESS_SECONDS).
- * Uses the JWT `iat` (issued at) claim from the session.
+ * Uses the JWT `iat` (issued at) claim from the session, with fallback to user.last_sign_in_at.
  */
-async function isSessionFresh(): Promise<boolean> {
+async function isSessionFresh(user?: User): Promise<boolean> {
     const supabase = await getSupabaseServerClient()
     const { data: { session } } = await supabase.auth.getSession()
 
-    if (!session) return false
-
-    // Decode the access token to get `iat`
-    try {
-        const payload = JSON.parse(
-            Buffer.from(session.access_token.split(".")[1], "base64url").toString()
-        )
-        const iat = payload.iat as number | undefined
-        if (!iat) return false
-        const now = Math.floor(Date.now() / 1000)
-        return (now - iat) < SESSION_FRESHNESS_SECONDS
-    } catch {
-        return false
+    if (session?.access_token) {
+        // Decode the access token to get `iat`
+        try {
+            const payload = JSON.parse(
+                Buffer.from(session.access_token.split(".")[1], "base64url").toString()
+            )
+            const iat = payload.iat as number | undefined
+            if (iat) {
+                const now = Math.floor(Date.now() / 1000)
+                if ((now - iat) < SESSION_FRESHNESS_SECONDS) {
+                    return true
+                }
+            }
+        } catch {
+            // fallback below
+        }
     }
+
+    if (user?.last_sign_in_at) {
+        const lastSignIn = new Date(user.last_sign_in_at).getTime()
+        const now = Date.now()
+        if (!isNaN(lastSignIn) && (now - lastSignIn) < SESSION_FRESHNESS_SECONDS * 1000) {
+            return true
+        }
+    }
+
+    return false
 }
 
 // ─── Server Actions ─────────────────────────────────────────────────────────
@@ -84,7 +98,7 @@ export async function getPasswordSecurityInfo(): Promise<{
     return {
         hasPassword: userHasPassword(user),
         provider: getDisplayProvider(user),
-        isSessionFresh: await isSessionFresh(),
+        isSessionFresh: await isSessionFresh(user),
     }
 }
 
@@ -94,10 +108,10 @@ export async function getPasswordSecurityInfo(): Promise<{
  * SECURITY:
  * - userId is ALWAYS from requireUser(), NEVER from client input
  * - hasPassword is computed server-side, NEVER trusted from client
- * - Session freshness enforced server-side
+ * - Session freshness enforced for initial password definition (OAuth accounts without password)
  * - Rate limited (5 req / 15 min per user+IP)
  * - CSRF validated
- * - Current password verified server-side via signInWithPassword when applicable
+ * - Current password verified server-side via isolated verifyUserPassword (bypasses CAPTCHA)
  * - Password set via admin API (service role) to prevent client bypass
  */
 export async function changePasswordAction(data: {
@@ -122,16 +136,23 @@ export async function changePasswordAction(data: {
     // 3. Authentication - userId comes ONLY from server session
     const user = await requireUser()
 
-    // 4. Session freshness check
-    const sessionFresh = await isSessionFresh()
-    if (!sessionFresh) {
-        return {
-            error:
-                "Sua sessão expirou. Por segurança, faça login novamente antes de alterar a senha.",
+    // 4. Compute hasPassword server-side (NEVER trust client)
+    const hasPassword = userHasPassword(user)
+
+    // 5. Session freshness check
+    // If user does NOT have an existing password (OAuth account setting password for the first time),
+    // require recent login. If user HAS a password, verifying current password below provides real-time proof.
+    if (!hasPassword) {
+        const sessionFresh = await isSessionFresh(user)
+        if (!sessionFresh) {
+            return {
+                error:
+                    "Sua sessão expirou. Por segurança, faça login novamente antes de definir uma senha.",
+            }
         }
     }
 
-    // 5. Input validation (never HTML-strip passwords to prevent CWE-20 mangling)
+    // 6. Input validation (never HTML-strip passwords to prevent CWE-20 mangling)
     if (typeof data.newPassword !== "string" || typeof data.confirmPassword !== "string") {
         return { error: "Dados inválidos" }
     }
@@ -155,9 +176,6 @@ export async function changePasswordAction(data: {
         return { error: "As senhas não coincidem" }
     }
 
-    // 6. Compute hasPassword server-side (NEVER trust client)
-    const hasPassword = userHasPassword(user)
-
     // 7. If user has password, verify current password server-side
     if (hasPassword) {
         const currentPassword = data.currentPassword
@@ -165,14 +183,20 @@ export async function changePasswordAction(data: {
             return { error: "Digite sua senha atual" }
         }
 
-        // Verify current password via signInWithPassword
-        const supabase = await getSupabaseServerClient()
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: user.email!,
-            password: currentPassword,
-        })
+        let userEmail = user.email?.trim().toLowerCase()
+        if (!userEmail) {
+            const admin = getAdminClient()
+            const { data: userData } = await admin.auth.admin.getUserById(user.id)
+            userEmail = userData?.user?.email?.trim().toLowerCase() || ""
+        }
 
-        if (signInError) {
+        if (!userEmail) {
+            return { error: "Não foi possível identificar o email associado à conta." }
+        }
+
+        // Verify current password via isolated service role client (bypasses CAPTCHA)
+        const verifyResult = await verifyUserPassword(userEmail, currentPassword)
+        if (!verifyResult.success) {
             return { error: "Senha atual incorreta" }
         }
     }

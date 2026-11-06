@@ -429,12 +429,9 @@ export function UserProfilePage({
             }
             else {
                 notifySuccess("Sucesso", "Senha alterada com sucesso!")
-                // Automatically restore session using the new password, then refresh UI
+                // Sign out all OTHER devices/sessions
                 const { supabaseBrowser: supabase } = await import("@/lib/supabase/browser-client")
-                await supabase.auth.signInWithPassword({
-                    email: email,
-                    password: passwordData.newPassword
-                })
+                // Password updated via server action
 
                 // Sign out all OTHER devices/sessions (keeps current session active)
                 await supabase.auth.signOut({ scope: 'others' })

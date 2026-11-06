@@ -20,6 +20,7 @@ const DOCUMENT_LABELS: Record<string, string> = {
 /**
  * Banner modal bloqueante de re-consentimento dos documentos legais.
  * Aparece quando existe uma versão em vigor que o usuário ainda não aceitou.
+ * Não aparece em páginas institucionais (/institucional/*) e central de ajuda (/ajuda/*).
  */
 export function LegalConsentBanner() {
   const pathname = usePathname()
@@ -28,8 +29,15 @@ export function LegalConsentBanner() {
   const [accepting, setAccepting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Não mostrar banner em páginas institucionais e central de ajuda
+  const isExcludedPath = pathname?.startsWith("/institucional/") || pathname?.startsWith("/ajuda/")
+
   useEffect(() => {
     if (pathname?.startsWith("/print")) return
+    if (isExcludedPath) {
+      setPending(null)
+      return
+    }
     if (!user) {
       setPending(null)
       return
@@ -47,9 +55,9 @@ export function LegalConsentBanner() {
     return () => {
       cancelled = true
     }
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, isExcludedPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isOpen = Boolean(!isAuthLoading && user && pending && pending.length > 0)
+  const isOpen = Boolean(!isAuthLoading && user && pending && pending.length > 0 && !isExcludedPath)
 
   // Bloqueia o scroll enquanto o modal está aberto
   useEffect(() => {
