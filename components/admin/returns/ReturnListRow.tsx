@@ -70,7 +70,7 @@ const ReturnListRow = React.memo(({ request, isPending, onDetail }: ReturnListRo
     const creditAmount = Number(request.store_credit_amount || 0)
     const totalDisplay = refundAmount > 0 ? refundAmount : creditAmount
 
-    const storeName = request.stores?.name || request.partners?.stores?.[0]?.name || request.partners?.store_name || "Loja"
+    const storeName = request.stores?.name || request.partners?.stores?.[0]?.name || "Loja"
     const storeId = request.store_id || request.orders?.store_id || request.partner_id
 
     const resolution = request.resolution_type || request.approved_resolution || request.desired_resolution || request.request_type

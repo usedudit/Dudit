@@ -32,6 +32,7 @@ import {
     FormTextarea,
     ThreeDotsLoader,
     IconPlaceholder,
+    DefaultModal,
 } from "@/components/reusable"
 import {
     createERPDeliveryAction,
@@ -1046,7 +1047,7 @@ export default function CreateDeliveryPage({
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     {formatCurrency(activeOrder.totalAmount || 0)}
                                                 </span>
                                             </div>
@@ -1226,12 +1227,14 @@ export default function CreateDeliveryPage({
                 isDestructive
             />
 
-            <DuditDriverDetailsModal
+            <DefaultModal
                 isOpen={isDuditDriverDetailsOpen}
                 onClose={() => setIsDuditDriverDetailsOpen(false)}
-                driver={platformDriver}
-                deliveryNumber={deliveryNumber}
-            />
+                title="Detalhes do Entregador"
+                maxWidth="md"
+            >
+                <DuditDriverDetailsModal isOpen={isDuditDriverDetailsOpen} onClose={() => setIsDuditDriverDetailsOpen(false)} driver={platformDriver} deliveryNumber={deliveryNumber} />
+            </DefaultModal>
 
             <AlertModal
                 isOpen={unassignModal.isOpen}

@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
-import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { TruckIcon } from "@/lib/icons"
 
 interface DeliveryListItemProps {
@@ -50,7 +50,7 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
       case "delivery_fee":
         return <span className="text-[13px] font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</span>
       case "status":
-        return <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
+        return <Badge variant={statusMeta.variant} icon={<TruckIcon />}>{statusMeta.label}</Badge>
       case "delivery_person": {
         const isPlatform = Boolean(delivery.is_platform_driver || delivery.isPlatformDriver || delivery.platform_driver || delivery.delivery_person_id?.startsWith?.("platform:"))
         return (

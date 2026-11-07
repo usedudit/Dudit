@@ -416,3 +416,13 @@ export async function ensureMarketplaceCustomer({
 
   return customerId
 }
+
+export {
+  syncUserDefaultAddressToErpCustomers,
+  syncDeliveryDriverAddress,
+  syncUserDefaultAddressEverywhere,
+  type SyncUserAddressToErpOptions,
+  type SyncUserAddressToErpResult,
+  type UserAddressData,
+} from "./customer-address-sync"
+

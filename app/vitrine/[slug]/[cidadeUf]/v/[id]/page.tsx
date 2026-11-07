@@ -11,12 +11,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return { title: "Loja não encontrada" }
   }
 
-  const sname = store.name || store.partners?.store_name || "Loja Parceira"
-  const sdesc = store.description || store.partners?.store_description || `Conheça a loja ${sname} na Dudit, sua conexão direta e sem taxas.`
+  const sname = store.name || "Loja Parceira"
+  const sdesc = store.description || `Conheça a loja ${sname} na Dudit, sua conexão direta e sem taxas.`
   const addr = store.addresses
   const city = addr?.city || store.city || "Brasil"
   const state = addr?.state || store.state || "BR"
-  const logo = store.logo_url || store.partners?.store_image_url || "https://img.dudit.com.br/static/Logo.png"
+  const logo = store.logo_url || "https://img.dudit.com.br/static/Logo.png"
   const url = `https://dudit.com.br${getStoreUrl(store)}`
 
   return {

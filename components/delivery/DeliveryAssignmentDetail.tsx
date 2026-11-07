@@ -1098,7 +1098,7 @@ export default function DeliveryAssignmentDetail({
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(order.total_amount || 0)}
                                                     </span>
                                                 </div>

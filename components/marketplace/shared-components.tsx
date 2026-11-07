@@ -78,31 +78,28 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
-    const storeName = partner.name || partner.store_name || vitrine.name || "Vendedor"
-    const rawStoreAvatar =
-        partner.store_avatar ||
-        partner.store_image_url ||
-        null
+    const storeName = vitrine.name || "Vendedor"
+    const rawStoreAvatar = vitrine.logo_url || null
     const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar, "thumb") : null
     const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
 
     // Resolve banner logic strictly using banner_url (never logo_url)
-    const rawBanner = vitrine.banner_url || partner.banner_url || null
+    const rawBanner = vitrine.banner_url || null
     const bannerUrl = rawBanner && !rawBanner.includes("Placeholder.png") ? rawBanner : null
     const fallbackBanner = hasPartnerLogo
-        ? getDefaultBannerSeeded(partner.id || storeName)
+        ? getDefaultBannerSeeded(vitrine.id || storeName)
         : getBannerUrlByColor(getAvatarColor(storeName))
     const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "large") : fallbackBanner
-    const city = partner.city || vitrine.city || ""
-    const state = partner.state || vitrine.state || ""
-    const category = vitrine.category || partner.category || (typeof partner.category === "string" ? partner.category : null)
-    const reviewsCount = partner.reviewsCount ?? vitrine.reviewsCount ?? 0
-    const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0
-    const locationLabel = getLocationLabel(partner, locationContext, { full: preferCityLabel })
+    const city = vitrine.city || ""
+    const state = vitrine.state || ""
+    const category = vitrine.category || null
+    const reviewsCount = vitrine.reviewsCount ?? 0
+    const showRating = (vitrine.rating ?? 0) > 0
+    const locationLabel = getLocationLabel(vitrine, locationContext, { full: preferCityLabel })
 
     // Resolve distance (O(1) in-memory calculation)
-    const storeLat = partner.latitude ?? vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
-    const storeLng = partner.longitude ?? vitrine.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
+    const storeLat = vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
+    const storeLng = vitrine.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
 
     let distanceKm: number | null = null
     if (partner.distance_km != null && typeof partner.distance_km === "number") {
@@ -115,12 +112,12 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
 
     const distanceLabel = preferCityLabel && locationLabel
         ? null
-        : (distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null))
+        : (distanceKm != null ? formatDistanceLabel(distanceKm) : (vitrine.distance_km_formatted || null))
 
-    const rawDeliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
+    const rawDeliverySettings = vitrine.delivery_settings || null
     const deliverySettings = Array.isArray(rawDeliverySettings) ? rawDeliverySettings[0] : rawDeliverySettings
     const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
-    const hasProducts = vitrine.has_products !== false && partner.has_products !== false && vitrine.type !== "services_only" && partner.business_type !== "services"
+    const hasProducts = vitrine.has_products !== false && vitrine.type !== "services_only"
 
     // Only show delivery time if the store has products and delivery is enabled (not pickup only, not services only)
     const showDeliveryTime = isDeliveryEnabled && hasProducts
@@ -136,7 +133,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         && distanceKm > maxDeliveryKm
 
     const deliveryTime = (showDeliveryTime && !outOfRadius && !locationOnly)
-        ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted || vitrine.delivery_time_formatted) : null))
+        ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : (vitrine.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(vitrine.delivery_time_formatted) : null))
         : null
 
     const deliveryFeeLabel = (outOfRadius || locationOnly) ? null : (estimateDeliveryFeeLabel({
@@ -147,13 +144,13 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
         maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
         isDeliveryEnabled,
         deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
+    }) || vitrine.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null))
 
     const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
 
     return (
         <IntentPrefetchLink
-            href={getStoreUrl({ ...partner, ...vitrine })}
+            href={getStoreUrl({ ...vitrine })}
             className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
         >
             <div className="relative w-full aspect-[1400/300] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 dark:bg-dark-border/50">

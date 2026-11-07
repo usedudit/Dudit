@@ -4,7 +4,8 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { TruckIcon } from "@/lib/icons"
 
 interface DeliveryGridCardProps {
   delivery: any
@@ -30,7 +31,7 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
           <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{delivery.customerName}</p>
         </div>
         <Tooltip text={statusMeta.label}>
-          <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} />
+          <Badge variant={statusMeta.variant} icon={<TruckIcon />} />
         </Tooltip>
       </div>
 

@@ -746,7 +746,7 @@ export function ExplorarPageClient({
             if (rawType === "servico" || rawType === "serviço" || rawType === "service") return "servico"
             if (rawType === "plano" || rawType === "plan" || rawType === "recorrente" || rawType === "recurring") return "plano"
 
-            if (item?.store_name || item?.name || item?.partners?.store_name) return "loja"
+            if (item?.store_name || item?.name) return "loja"
             return rawType
         }
 

@@ -874,7 +874,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         : "https://img.dudit.com.br/static/Placeholder.png";
 
     const isDelivery = order.delivery_type === "delivery";
-    const sellerName = store?.name || order.partners?.name || order.partners?.store_name || "Loja Parceira";
+    const sellerName = store?.name || "Loja Parceira";
     const totalAmount = Number(order.total_amount);
 
     const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
@@ -2232,7 +2232,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                             </div>
                                         ) : (
-                                            <Link href={getStoreUrl({ ...(store || order.partners), id: store?.store_id || store?.id || order.store_id || order.partner_id, short_id: store?.short_id || order.partners?.short_id, name: store?.name || order.partners?.store_name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.store_id || order.partner_id, short_id: store?.short_id, name: store?.name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
 
                                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />

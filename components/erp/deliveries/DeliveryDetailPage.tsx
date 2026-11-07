@@ -8,13 +8,13 @@ import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon, TruckIcon, StoreIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getPaymentStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import Portal from "@/components/Portal"
@@ -353,7 +353,6 @@ export default function DeliveryDetailPage({
         )
     }
 
-    const statusMeta = getDeliveryStatusMeta(delivery.status)
     const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
     const links = (delivery.delivery_orders || []).filter((l: any) => l?.orders && l.orders.situation !== "cancelled")
 
@@ -408,22 +407,22 @@ export default function DeliveryDetailPage({
                                     <Tooltip text={paymentMeta.label}>
                                         <span className="contents">
                                             <span className="hidden lg:inline-flex">
-                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>{paymentMeta.label}</Badge>
                                             </span>
                                             <span className="lg:hidden">
-                                                <Badge variant={paymentMeta.variant} />
+                                                <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} />
                                             </span>
                                         </span>
                                     </Tooltip>
                                     <Tooltip text={deliveryMeta.label}>
                                         <span className="contents">
                                             <span className="hidden lg:inline-flex">
-                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
+                                                <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                                     {deliveryMeta.label}
                                                 </Badge>
                                             </span>
                                             <span className="lg:hidden">
-                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)} />
+                                                <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} />
                                             </span>
                                         </span>
                                     </Tooltip>
@@ -839,7 +838,7 @@ export default function DeliveryDetailPage({
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     {formatCurrency(order.total_amount || order.totalAmount || 0)}
                                                 </span>
                                             </div>
@@ -881,12 +880,12 @@ export default function DeliveryDetailPage({
                                                 <Tooltip text={deliveryMeta.label}>
                                                     <span className="contents">
                                                         <span className="hidden lg:inline-flex">
-                                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
+                                                            <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />}>
                                                                 {deliveryMeta.label}
                                                             </Badge>
                                                         </span>
                                                         <span className="lg:hidden">
-                                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)} />
+                                                            <Badge variant={deliveryMeta.variant} icon={order.delivery_type === "pickup" ? <StoreIcon /> : <TruckIcon />} />
                                                         </span>
                                                     </span>
                                                 </Tooltip>

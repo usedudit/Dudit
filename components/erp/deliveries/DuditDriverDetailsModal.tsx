@@ -1,6 +1,6 @@
 "use client"
 
-import { ListItem } from "@/components/reusable"
+import { Button, ListItem } from "@/components/reusable"
 import {
     PhoneIcon,
     WhatsappIcon,
@@ -56,45 +56,48 @@ export default function DuditDriverDetailsModal({
                         Contato Direto com o Entregador:
                     </span>
                     <div className="grid grid-cols-2 gap-3">
-                        <a
-                            href={`tel:${driver.phone}`}
-                            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-brand-gray dark:hover:bg-dark-border/40 font-bold text-xs text-brand-dark dark:text-dark-heading transition-colors"
-                        >
-                            <PhoneIcon size={14} className="text-brand-green" />
-                            Ligar ({driver.phone})
-                        </a>
-
-                        {whatsappUrl && (
-                            <a
-                                href={whatsappUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors"
+                        <a href={`tel:${driver.phone}`}>
+                            <Button
+                                variant="outline"
+                                leftIcon={<PhoneIcon size={14} className="text-brand-green" />}
                             >
-                                <WhatsappIcon size={14} />
-                                Abrir WhatsApp
-                            </a>
+                                Ligar ({driver.phone})
+                            </Button>
+                        </a>
+                    </div>
+
+                    {whatsappUrl && (
+                        <a href={whatsappUrl}>
+                            <Button
+                                variant="outline"
+                                leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
+                            >
+                                Abrir WhatsApp ({driver.phone})
+                            </Button>
+                        </a>
+                    )}
+                </div >
+            )
+            }
+
+            {
+                (driver.acceptedAt || driver.pickedUpAt) && (
+                    <div className="p-3.5 rounded-xl bg-brand-gray/40 dark:bg-dark-border/10 border border-brand-border dark:border-dark-border space-y-1.5 text-xs text-brand-dark dark:text-dark-heading">
+                        {driver.acceptedAt && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Oferta aceita em:</span>
+                                <span className="font-semibold">{formatDateTime(driver.acceptedAt)}</span>
+                            </div>
+                        )}
+                        {driver.pickedUpAt && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-brand-inactive-text dark:text-dark-body">Retirado na loja em:</span>
+                                <span className="font-semibold">{formatDateTime(driver.pickedUpAt)}</span>
+                            </div>
                         )}
                     </div>
-                </div>
-            )}
-
-            {(driver.acceptedAt || driver.pickedUpAt) && (
-                <div className="p-3.5 rounded-xl bg-brand-gray/40 dark:bg-dark-border/10 border border-brand-border dark:border-dark-border space-y-1.5 text-xs text-brand-dark dark:text-dark-heading">
-                    {driver.acceptedAt && (
-                        <div className="flex items-center justify-between">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Oferta aceita em:</span>
-                            <span className="font-semibold">{formatDateTime(driver.acceptedAt)}</span>
-                        </div>
-                    )}
-                    {driver.pickedUpAt && (
-                        <div className="flex items-center justify-between">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Retirado na loja em:</span>
-                            <span className="font-semibold">{formatDateTime(driver.pickedUpAt)}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     )
 }

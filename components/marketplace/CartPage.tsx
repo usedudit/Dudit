@@ -21,7 +21,7 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
-import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { quoteDeliveryFeeAction, checkServiceAttendanceAction } from "@/app/actions/shared/delivery"
 import { quoteCarrierFreightAction } from "@/app/actions/marketplace/carrier-shipping"
 import type { CarrierFreightOption } from "@/lib/services/shipping/carrier-checkout"
@@ -108,6 +108,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         city: "",
         state: "",
         noNumber: false,
+        isDefault: false,
         latitude: null as number | null,
         longitude: null as number | null,
     })
@@ -149,6 +150,21 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         const addr = userAddresses.find(a => a.id === id)
         notifyAddressUpdated(id, addr)
         setShowAddressModal(false)
+    }
+
+    const handleSetDefaultInCart = async (e: React.MouseEvent, addrId: string) => {
+        e.stopPropagation()
+        try {
+            const csrfToken = await fetchCSRFTokenSingleton() || ""
+            const result = await setDefaultAddressAction(addrId, "user", userId, csrfToken)
+            if (!result.error) {
+                setUserAddresses(prev => prev.map(a => ({ ...a, is_default: a.id === addrId })))
+                const target = userAddresses.find(a => a.id === addrId)
+                notifyAddressUpdated(addrId, target, (result as any)?.citySlug)
+            }
+        } catch (err) {
+            console.error("Erro ao definir endereço padrão no carrinho:", err)
+        }
     }
 
     const handleCepBlurInCart = async () => {
@@ -194,7 +210,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 entityId: userId, entityType: "user",
                 street, number: finalNumber, complement: newAddressData.complement,
                 neighborhood, city, state, zipCode,
-                isDefault: userAddresses.length === 0,
+                isDefault: newAddressData.isDefault || userAddresses.length === 0,
                 latitude: newAddressData.latitude ?? null,
                 longitude: newAddressData.longitude ?? null,
                 csrf_token: csrfToken,
@@ -202,12 +218,17 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             if (result.error) {
                 setAddressFormError(result.error)
             } else if (result.address) {
-                setUserAddresses(prev => [...prev, result.address])
+                setUserAddresses(prev => {
+                    if (result.address.is_default) {
+                        return [...prev.map(a => ({ ...a, is_default: false })), result.address]
+                    }
+                    return [...prev, result.address]
+                })
                 setSelectedAddressId(result.address.id)
                 notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
                 setShowNewAddressForm(false)
                 setShowAddressModal(false)
-                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, isDefault: false, latitude: null, longitude: null })
             }
         } catch {
             setAddressFormError("Erro ao salvar endereço.")
@@ -2032,10 +2053,19 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                         <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                                                             {addr.street}, {addr.number}
                                                         </span>
-                                                        {addr.is_default && (
-                                                            <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
+                                                        {addr.is_default ? (
+                                                            <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded shrink-0">
                                                                 Padrão
                                                             </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                title="Definir como endereço padrão (reflete no ERP de todas as lojas)"
+                                                                onClick={(e) => handleSetDefaultInCart(e, addr.id)}
+                                                                className="text-[11px] font-medium text-brand-green hover:underline ml-auto shrink-0"
+                                                            >
+                                                                Tornar padrão
+                                                            </button>
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
@@ -2147,6 +2177,16 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                     />
                                 </div>
                             </div>
+                            <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
+                                <input
+                                    type="checkbox"
+                                    checked={newAddressData.isDefault || userAddresses.length === 0}
+                                    disabled={userAddresses.length === 0}
+                                    onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
+                                    className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+                                />
+                                <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
+                            </label>
                             <div className="flex gap-2 pt-2">
                                 <Button
                                     type="button"

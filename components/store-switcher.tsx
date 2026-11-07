@@ -184,7 +184,7 @@ export function StoreSwitcher({
                                     {selectedStore.name}
                                 </span>
                                 {selectedStore.user_role && (
-                                    <span className="text-xs text-green-600 dark:text-green-400">
+                                    <span className="text-xs text-brand-green">
                                         {formatUserRole(selectedStore.user_role)}
                                     </span>
                                 )}
@@ -217,7 +217,7 @@ export function StoreSwitcher({
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{store.name}</p>
                                     {store.user_role && (
-                                        <p className="text-xs text-green-600 dark:text-green-400 truncate">
+                                        <p className="text-xs text-brand-green truncate">
                                             {formatUserRole(store.user_role)}
                                         </p>
                                     )}

@@ -41,14 +41,14 @@ export function PartnerBottomSheet({ partner, onClose }: PartnerCardProps) {
           <div className="w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 border border-brand-border bg-gray-50 flex items-center justify-center">
             <img
               src={imageUrl}
-              alt={partner.name || partner.store_name || "Loja"}
+              alt={partner.store_name || "Loja"}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           </div>
 
           <div className="flex flex-col flex-1 pb-1">
             <div className="flex justify-between items-start mb-1">
-              <h3 className="font-semibold text-[16px] text-brand-dark leading-tight line-clamp-2 pr-4">{partner.name || partner.store_name || "Loja"}</h3>
+              <h3 className="font-semibold text-[16px] text-brand-dark leading-tight line-clamp-2 pr-4">{partner.store_name || "Loja"}</h3>
             </div>
 
             {partner.rating > 0 && (

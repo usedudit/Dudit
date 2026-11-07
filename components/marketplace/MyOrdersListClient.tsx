@@ -363,7 +363,6 @@ export function MyOrdersListClient({
                     order.order_number,
                     order.id,
                     storeObj?.name,
-                    order.partners?.name,
                     itemNames,
                 ]
                     .filter(Boolean)
@@ -499,7 +498,7 @@ export function MyOrdersListClient({
                                             const statusConfig = shipmentBadge ? { ...baseStatusConfig, ...shipmentBadge } : baseStatusConfig;
                                             const StatusIcon = statusConfig.icon;
                                             const storeObj = Array.isArray(order.stores) ? order.stores[0] : order.stores;
-                                            const sellerName = storeObj?.name || order.partners?.name || "Loja Parceira";
+                                            const sellerName = storeObj?.name || "Loja Parceira";
                                             const storeImage = storeObj?.logo_url
                                                 ? getR2ImageUrl(storeObj.logo_url)
                                                 : "https://img.dudit.com.br/static/Placeholder.png";

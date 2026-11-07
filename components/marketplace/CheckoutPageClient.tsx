@@ -7,7 +7,7 @@ import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
-import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
@@ -526,6 +526,7 @@ export function CheckoutPageClient() {
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false,
+        isDefault: false,
         latitude: null as number | null, longitude: null as number | null
     })
 
@@ -1188,7 +1189,7 @@ export function CheckoutPageClient() {
                 city,
                 state,
                 zipCode,
-                isDefault: userAddresses.length === 0,
+                isDefault: newAddressData.isDefault || userAddresses.length === 0,
                 latitude: newAddressData.latitude ?? null,
                 longitude: newAddressData.longitude ?? null,
                 csrf_token: token,
@@ -1212,7 +1213,7 @@ export function CheckoutPageClient() {
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
 
                 setShowAddressForm(false)
-                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, isDefault: false, latitude: null, longitude: null })
                 setDeliveryError(null)
                 setAddressFormError(null)
 
@@ -1224,6 +1225,20 @@ export function CheckoutPageClient() {
             setAddressFormError("Erro ao salvar endereço. Tente novamente.")
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handleSetDefaultAddress = async (addrId: string) => {
+        try {
+            const token = csrfToken || await fetchCSRFTokenSingleton() || ""
+            const result = await setDefaultAddressAction(addrId, "user", userId, token)
+            if (!result.error) {
+                setUserAddresses(prev => prev.map(a => ({ ...a, is_default: a.id === addrId })))
+                const target = userAddresses.find(a => a.id === addrId)
+                notifyAddressUpdated(addrId, target, (result as any)?.citySlug)
+            }
+        } catch (err) {
+            console.error("Erro ao definir endereço padrão no checkout:", err)
         }
     }
 
@@ -4875,6 +4890,17 @@ export function CheckoutPageClient() {
                         </div>
                     </div>
 
+                    <label className="flex items-center gap-2 text-xs text-brand-dark dark:text-dark-heading cursor-pointer pt-1">
+                        <input
+                            type="checkbox"
+                            checked={newAddressData.isDefault || userAddresses.length === 0}
+                            disabled={userAddresses.length === 0}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, isDefault: e.target.checked }))}
+                            className="rounded text-brand-green focus:ring-brand-green h-4 w-4"
+                        />
+                        <span>Definir como endereço padrão (reflete no ERP de todas as lojas)</span>
+                    </label>
+
                     <Button
                         onClick={handleSaveNewAddress}
                         disabled={isLoading || loadingCep}
@@ -5004,7 +5030,26 @@ export function CheckoutPageClient() {
                                 }`}
                         >
                             <div className="flex-1 pr-4">
-                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                    {address.is_default ? (
+                                        <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded shrink-0">
+                                            Padrão
+                                        </span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            title="Definir como endereço padrão (reflete no ERP de todas as lojas)"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleSetDefaultAddress(address.id)
+                                            }}
+                                            className="text-[11px] font-medium text-brand-green hover:underline ml-auto shrink-0"
+                                        >
+                                            Tornar padrão
+                                        </button>
+                                    )}
+                                </div>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">CEP: {address.zip_code}</p>
                             </div>

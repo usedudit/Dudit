@@ -217,8 +217,8 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                 const num = String(order.order_number || order.id || "").toLowerCase()
                 const cust = String(order.customer_name || "").toLowerCase()
                 const st = String(order.stores?.name || "").toLowerCase()
-                const seller = String(order.stores?.partners?.trade_name || order.stores?.partners?.name || "").toLowerCase()
                 const itemNames = (order.order_items || []).map((i: any) => String(i.product_name || "").toLowerCase()).join(" ")
+                const seller = String(order.stores?.name || "").toLowerCase()
                 if (!num.includes(term) && !cust.includes(term) && !st.includes(term) && !seller.includes(term) && !itemNames.includes(term)) {
                     return false
                 }
@@ -281,8 +281,8 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                         bVal = (b.order_source || "").toLowerCase()
                         break
                     case "seller":
-                        aVal = (a.stores?.partners?.trade_name || a.stores?.partners?.name || "").toLowerCase()
-                        bVal = (b.stores?.partners?.trade_name || b.stores?.partners?.name || "").toLowerCase()
+                        aVal = (a.stores?.name || "").toLowerCase()
+                        bVal = (b.stores?.name || "").toLowerCase()
                         break
                     case "date":
                         aVal = new Date(a.created_at).getTime()
@@ -355,8 +355,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             )
         )
         const store = order.stores || {}
-        const partner = store.partners || {}
-        const sellerName = partner.trade_name || partner.name || store.name || "—"
+        const sellerName = store.name || "—"
         const isSelected = selectedOrders.has(order.id)
         const orderSource = order.order_source || "Manual"
 
@@ -591,8 +590,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                     {paginatedItems.map((order) => {
                                         const paymentMeta = getPaymentStatusMeta(order.situation)
                                         const store = order.stores || {}
-                                        const partner = store.partners || {}
-                                        const sellerName = partner.trade_name || partner.name || store.name || "—"
+                                        const sellerName = store.name || "—"
                                         const orderSource = order.order_source || "Manual"
                                         return (
                                             <div

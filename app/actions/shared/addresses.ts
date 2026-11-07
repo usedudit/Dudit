@@ -257,24 +257,14 @@ export async function createAddressAction(data: {
   if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
     citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
     try {
-      const { getAdminClient } = await import("@/lib/supabase/admin")
-      await getAdminClient()
-        .from("delivery_drivers")
-        .update({
-          city: address.city,
-          neighborhood: address.neighborhood,
-          street: address.street,
-          number: address.number,
-          complement: address.complement,
-          state: address.state,
-          zip_code: address.zip_code,
-          latitude: address.latitude,
-          longitude: address.longitude,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", data.entityId)
-    } catch (driverSyncErr) {
-      console.warn("[addresses] Failed to sync driver location:", driverSyncErr)
+      const { syncUserDefaultAddressEverywhere } = await import("@/lib/services/customer-address-sync")
+      await syncUserDefaultAddressEverywhere({
+        userId: data.entityId,
+        address,
+        userEmail: user.email,
+      })
+    } catch (syncErr) {
+      console.warn("[addresses] Failed to sync address to ERP / driver:", syncErr)
     }
   }
 
@@ -386,24 +376,14 @@ export async function updateAddressAction(data: {
   if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
     citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
     try {
-      const { getAdminClient } = await import("@/lib/supabase/admin")
-      await getAdminClient()
-        .from("delivery_drivers")
-        .update({
-          city: address.city,
-          neighborhood: address.neighborhood,
-          street: address.street,
-          number: address.number,
-          complement: address.complement,
-          state: address.state,
-          zip_code: address.zip_code,
-          latitude: address.latitude,
-          longitude: address.longitude,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", data.entityId)
-    } catch (driverSyncErr) {
-      console.warn("[addresses] Failed to sync driver location:", driverSyncErr)
+      const { syncUserDefaultAddressEverywhere } = await import("@/lib/services/customer-address-sync")
+      await syncUserDefaultAddressEverywhere({
+        userId: data.entityId,
+        address,
+        userEmail: user.email,
+      })
+    } catch (syncErr) {
+      console.warn("[addresses] Failed to sync address to ERP / driver:", syncErr)
     }
   }
 
@@ -465,6 +445,16 @@ export async function deleteAddressAction(
       if (remaining && remaining.length > 0) {
         await supabase.from("addresses").update({ is_default: true }).eq("id", remaining[0].id)
         await syncUserAddressCookiesAndRevalidate(remaining[0], remaining[0].id)
+        try {
+          const { syncUserDefaultAddressEverywhere } = await import("@/lib/services/customer-address-sync")
+          await syncUserDefaultAddressEverywhere({
+            userId: entityId,
+            address: remaining[0],
+            userEmail: user.email,
+          })
+        } catch (syncErr) {
+          console.warn("[addresses] Failed to sync fallback default address to ERP / driver:", syncErr)
+        }
       } else {
         try {
           const cookieStore = await cookies()
@@ -524,6 +514,16 @@ export async function setDefaultAddressAction(
   let citySlug: string | null = null
   if (entityType === "user" && updatedAddress) {
     citySlug = await syncUserAddressCookiesAndRevalidate(updatedAddress, addressId)
+    try {
+      const { syncUserDefaultAddressEverywhere } = await import("@/lib/services/customer-address-sync")
+      await syncUserDefaultAddressEverywhere({
+        userId: entityId,
+        address: updatedAddress,
+        userEmail: user.email,
+      })
+    } catch (syncErr) {
+      console.warn("[addresses] Failed to sync default address to ERP / driver:", syncErr)
+    }
   }
 
   return { success: true, address: updatedAddress, citySlug }

@@ -84,7 +84,7 @@ export async function getAdminMarketplaceOrders(
             amount_paid,
             order_source,
             created_at,
-            stores!left(id, name, logo_url, phone, partner_id, partners!left(id, name, trade_name)),
+            stores!left(id, name, logo_url, phone, partner_id, partners!left(id)),
             order_items(id, product_name, quantity),
             return_requests!order_id(id, status, desired_resolution, approved_resolution, refund_amount)
         `)

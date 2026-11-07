@@ -22,10 +22,9 @@ interface AdminStoreCardProps {
 
 export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }: AdminStoreCardProps) {
     const storeId = store.id || fallbackStoreId
-    const partner = store.partners || {}
 
     return (
-        <SidebarCard hasTopStrip hasSeparator title="Dados do Vendedor / Loja">
+        <SidebarCard hasTopStrip hasSeparator title="Dados da Loja">
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
                     {store.logo_url ? (
@@ -61,12 +60,6 @@ export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }:
                         <span className="font-bold text-brand-dark dark:text-dark-heading">{store.cnpj}</span>
                     </div>
                 )}
-                {partner.name && (
-                    <div className="flex justify-between">
-                        <span className="text-brand-inactive-text">Vendedor / Parceiro</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">{partner.trade_name || partner.name}</span>
-                    </div>
-                )}
                 {storeId && (
                     <div className="flex justify-between text-xs">
                         <span className="text-brand-inactive-text">ID da Loja</span>
@@ -76,7 +69,7 @@ export function AdminStoreCard({ store, fallbackStoreId, linkToPartner = true }:
                 {storeId && linkToPartner && (
                     <div className="pt-2">
                         <Link
-                            href={`/ddt-admin/partners?view=${storeId}`}
+                            href={`/ddt-admin/stores?view=${storeId}`}
                             className="text-xs font-bold text-brand-green hover:underline"
                         >
                             Ver ficha completa da loja →

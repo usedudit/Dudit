@@ -47,10 +47,9 @@ const OrderListRow = React.memo((
     const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
     const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
 
-    // Seller/Partner name from the joined data (via stores.partners)
+    // Seller/Partner name from the joined data (via stores)
     const store = order.stores || {}
-    const partner = store.partners || {}
-    const sellerName = partner.trade_name || partner.name || store.name || "—"
+    const sellerName = store.name || "—"
     const orderSource = order.order_source || "Manual"
 
     const renderCellContent = (colId: string) => {
@@ -171,9 +170,9 @@ const OrderListRow = React.memo((
                         <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading truncate">
                             {sellerName}
                         </span>
-                        {partner.id && (
+                        {store.id && (
                             <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                                Vendedor ID: {partner.id.slice(0, 8)}...
+                                Loja ID: {store.id.slice(0, 8)}...
                             </span>
                         )}
                     </div>

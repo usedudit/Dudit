@@ -5,7 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable";
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import { FadeIn } from "@/components/animations/FadeIn";
-import { ExportFileIcon } from "@/lib/icons";
+import { ExportFileIcon, ReloadIcon, RotateIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon } from "@/lib/icons";
 import type { CursorPaginatedResult } from "@/lib/admin/types";
 import { getAdminReturnRequests, getAdminReturnRequestsStats, type AdminReturnStats } from "@/app/actions/admin/marketplace-ops";
 import { useMediaQuery } from "@/components/erp/hooks";
@@ -21,6 +21,12 @@ import AdminReturnDetailClientWrapper from "./AdminReturnDetailClientWrapper";
 import { PermissionProvider } from "@/lib/permission-context";
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
 import { StoreProvider } from "@/lib/store-context";
+import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard";
+import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard";
+import { FormSection } from "@/components/reusable/FormSection";
+import { Dropdown, DropdownItem } from "@/components/reusable/Dropdown";
+import { ThreeDotsIcon, ChevronDownIcon } from "@/lib/icons";
+import { cn } from "@/lib/utils";
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados";
 type SortKey = "id" | "order_number" | "store" | "customer" | "date" | "refund_type" | "status";
@@ -64,7 +70,7 @@ const INITIAL_FILTERS: FilterState = {
   hasEvidence: false,
 };
 
-export default function ReturnsList({ initialData }: ReturnsListProps) {
+export default function ReturnsList({ initialData, initialStats }: ReturnsListProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
   const { state: entityState, open: openEntity, close: closeEntity } = useEntityState();
@@ -86,14 +92,18 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
+  // Stats state
+  const [stats, setStats] = useState<AdminReturnStats | null>(initialStats || null);
+
   const refreshRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [res] = await Promise.all([
+      const [res, statsRes] = await Promise.all([
         getAdminReturnRequests(null, 100),
         getAdminReturnRequestsStats().catch(() => null),
       ]);
       setRequests((res.data || []) as ReturnRequest[]);
+      if (statsRes) setStats(statsRes);
     } catch (err) {
       console.error("Failed to refresh admin returns:", err);
     } finally {
@@ -302,33 +312,90 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
     );
   }
 
+  // KPI Items for HorizontalKPICard
+  const kpiItems = useMemo(() => {
+    if (!stats) return [];
+    return [
+      {
+        title: "Total",
+        value: stats.total.toLocaleString("pt-BR"),
+        trend: "Todas as solicitações",
+        subtext: "Cadastradas no sistema",
+        icon: RotateIcon,
+        iconBg: "bg-brand-green-light dark:bg-dark-border/40",
+        iconColor: "text-brand-dark dark:text-dark-heading",
+      },
+      {
+        title: "Pendentes",
+        value: stats.pending.toLocaleString("pt-BR"),
+        trend: "Aguardando análise",
+        subtext: "Precisam de ação",
+        icon: AlertCircleIcon,
+        iconBg: "bg-yellow-100 dark:bg-yellow-900/30",
+        iconColor: "text-yellow-600 dark:text-yellow-400",
+      },
+      {
+        title: "Em Análise / Aprovados",
+        value: stats.approved.toLocaleString("pt-BR"),
+        trend: "Processando",
+        subtext: "Aprovados ou aguardando item",
+        icon: ClockIcon,
+        iconBg: "bg-blue-100 dark:bg-blue-900/30",
+        iconColor: "text-blue-600 dark:text-blue-400",
+      },
+      {
+        title: "Finalizados",
+        value: stats.completed.toLocaleString("pt-BR"),
+        trend: stats.rejected > 0 ? `${stats.rejected} rejeitados` : "Concluídos",
+        subtext: "Resolvidos ou expirados",
+        icon: CheckCircleIcon,
+        iconBg: "bg-green-100 dark:bg-green-900/30",
+        iconColor: "text-green-600 dark:text-green-400",
+      },
+    ];
+  }, [stats]);
+
   return (
     <>
       <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
         <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-          <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-            <div className="flex flex-col gap-2 pt-1">
-              <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                Trocas e devoluções
-              </h1>
-              <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                Gerencie trocas, devoluções, créditos e reembolsos de todas as lojas.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => toast.success("Exportação iniciada em segundo plano")}
-                leftIcon={<ExportFileIcon size={18} />}
-              >
-                Exportar
-              </Button>
-            </div>
-          </div>
 
-          <div className="mb-6 px-4 md:px-8">
+          {/* Header Section - DashboardSectionCard + HorizontalKPICard */}
+          <DashboardSectionCard
+            title="Trocas e devoluções"
+            action={
+              <Dropdown
+                trigger={
+                  <Button variant="outline" size="icon" className="h-[42px] w-[42px] rounded-[12px] shrink-0" leftIcon={<ThreeDotsIcon size={20} />}>
+                  </Button>
+                }
+                align="right"
+                width="w-48"
+                showChevron={false}
+              >
+                <DropdownItem onClick={refreshRequests} disabled={isLoading}>
+                  <ReloadIcon size={16} /> Atualizar
+                </DropdownItem>
+                <DropdownItem onClick={() => toast.success("Exportação iniciada em segundo plano")}>
+                  <ExportFileIcon size={16} /> Exportar
+                </DropdownItem>
+              </Dropdown>
+            }
+            className="mb-0"
+          >
+            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+              Gerencie trocas, devoluções, créditos e reembolsos de todas as lojas.
+            </p>
+            {kpiItems.length > 0 && <HorizontalKPICard items={kpiItems} />}
+          </DashboardSectionCard>
+
+          {/* Tabs Section - DashboardSectionCard */}
+          <DashboardSectionCard
+            title="Filtros por Status"
+            className="mb-0"
+          >
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ActiveTab)}>
-              <TabsList className="px-0">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="Todos">Todos</TabsTrigger>
                 <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
                 <TabsTrigger value="Analise">Análise</TabsTrigger>
@@ -337,17 +404,22 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
                 <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
+          </DashboardSectionCard>
 
-          <ReturnPageControls
-            search={search}
-            onSearchChange={setSearch}
-            onOpenFilter={() => setIsFilterSheetOpen(true)}
-            viewMode={effectiveViewMode}
-            onViewModeChange={setViewModeState}
-          />
+          {/* Controls Section - FormSection */}
+          <FormSection hasSeparator>
+            <ReturnPageControls
+              search={search}
+              onSearchChange={setSearch}
+              onOpenFilter={() => setIsFilterSheetOpen(true)}
+              viewMode={effectiveViewMode}
+              onViewModeChange={setViewModeState}
+              onExport={() => toast.success("Exportação iniciada em segundo plano")}
+            />
+          </FormSection>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+          {/* List/Grid Content */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2">
             <AnimatePresence mode="wait">
               {isLoading && requests.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">
@@ -396,7 +468,12 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
                               <th
                                 key={col.id}
                                 style={{ width: col.width }}
-                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg pl-4" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg pr-4" : ""} ${sortable ? "cursor-pointer group" : ""}`}
+                                className={cn(
+                                  "py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50",
+                                  idx === 0 ? "rounded-l-lg pl-4" : "",
+                                  idx === COLUMNS.length - 1 ? "rounded-r-lg pr-4" : "",
+                                  sortable ? "cursor-pointer group" : ""
+                                )}
                                 onClick={() => {
                                   if (!sortable) return;
                                   setSortConfig((prev) => ({
@@ -432,7 +509,9 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
             </AnimatePresence>
 
             {filteredReturns.length > 0 && (
-              <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
+              <div className="flex justify-center mt-4 pt-4 border-t border-brand-border/60 dark:border-dark-border/60">
+                <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} inline />
+              </div>
             )}
           </div>
         </div>
