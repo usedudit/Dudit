@@ -78,14 +78,15 @@ export async function getAdminMarketplaceOrders(
             delivery_type,
             payment_method,
             payment_provider,
+            payment_breakdown,
             total_amount,
             paid_amount,
             amount_paid,
             order_source,
             created_at,
-            stores!left(id, name, logo_url, phone, partner_id, partners!left(id)),
+            stores!left(id, name, logo_url, phone, partner_id, partners!left(id, name, trade_name)),
             order_items(id, product_name, quantity),
-            return_requests!order_id(id, status)
+            return_requests!order_id(id, status, desired_resolution, approved_resolution, refund_amount)
         `)
 
     if (filters?.search && filters.search.trim().length > 0) {

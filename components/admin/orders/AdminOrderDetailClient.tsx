@@ -56,6 +56,7 @@ export default function AdminOrderDetailClient({ detail, onBack }: AdminOrderDet
                 changedFields,
                 force: true,
                 confirmLabel: "Salvar",
+                notifyLabel: "Enviar notificação pelo Dudit",
                 runner: async (payload: AdminActionPayload) => {
                     capturedCtx = {
                         reason: payload.reason || null,

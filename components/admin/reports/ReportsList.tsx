@@ -10,6 +10,7 @@ import {
     IconPlaceholder,
     DefaultModal,
     Badge,
+    FormTextarea,
 } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -341,11 +342,11 @@ export default function ReportsList({
                                     subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhuma denúncia nesta categoria no momento."}
                                     itemButton={hasActiveFilters ? {
                                         text: "Limpar Filtros",
-                                    action: () => {
-                                        setSearch("")
-                                        setFilters(INITIAL_REPORT_FILTERS)
-                                        setStatusTab("all")
-                                    },
+                                        action: () => {
+                                            setSearch("")
+                                            setFilters(INITIAL_REPORT_FILTERS)
+                                            setStatusTab("all")
+                                        },
                                         variant: "outline",
                                     } : undefined}
                                 />
@@ -570,14 +571,15 @@ export default function ReportsList({
                 }
             >
                 <div className="space-y-4 py-2">
-                    <p className="text-xs text-brand-inactive-text">
+                    <p className="text-sm text-brand-inactive-text">
                         Descartar denúncias improcedentes encerra o ticket sem penalizar o alvo denunciado.
                     </p>
-                    <textarea
+                    <FormTextarea
+                        label="Motivo do descarte (opcional)..."
                         value={actionReason}
                         onChange={(e) => setActionReason(e.target.value)}
-                        placeholder="Motivo do descarte (opcional)..."
-                        className="w-full min-h-[90px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
+                        placeholder="Descreva o motivo do ajuste que será enviado para o cliente..."
+                        rows={2}
                     />
                 </div>
             </DefaultModal>

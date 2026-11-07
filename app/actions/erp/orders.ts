@@ -3191,7 +3191,15 @@ export async function getOrderDetailsAction(
   if (opts?.adminBypass) {
     await requireAdminScope("moderation");
   } else {
-    await requirePermission(partnerId, "orders", "view");
+    try {
+      await requirePermission(partnerId, "orders", "view");
+    } catch (permErr) {
+      try {
+        await requireAdminScope("moderation");
+      } catch {
+        throw permErr;
+      }
+    }
   }
   const supabase = createAdminClient();
   const isUuid =
@@ -3796,7 +3804,13 @@ export async function getOrderHistoryAction(
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
-  await requirePermission(partnerId, "orders", "view");
+  let isAdmin = false;
+  try {
+    await requireAdminScope("moderation");
+    isAdmin = true;
+  } catch {
+    await requirePermission(partnerId, "orders", "view");
+  }
 
   const supabase = createAdminClient();
   const { data: saleRow } = await supabase
@@ -3806,14 +3820,44 @@ export async function getOrderHistoryAction(
     .eq("partner_id", partnerId)
     .maybeSingle();
   if (saleRow?.id) {
-    if (saleRow.store_id) await requireStorePermission(saleRow.store_id, partnerId, "orders", "view");
+    if (!isAdmin && saleRow.store_id) await requireStorePermission(saleRow.store_id, partnerId, "orders", "view");
     return { success: true, data: [] as any[] };
   }
 
   const { data: order } = await supabase.from("orders").select("store_id").eq("id", orderId).eq("partner_id", partnerId).maybeSingle();
-  if (order?.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view");
+  if (!isAdmin && order?.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view");
 
-  const entries = await getOrderHistoryEntries(orderId, partnerId);
+  const rawEntries = await getOrderHistoryEntries(orderId, partnerId);
+  const entries = rawEntries.map((e) => {
+    const isDuditAction = Boolean(
+      e.metadata?.dudit_action ||
+      (e.metadata as any)?.is_admin_action ||
+      e.actor_name === "Equipe Dudit"
+    );
+
+    if (isDuditAction) {
+      if (isAdmin) {
+        const adminName = e.metadata?.admin_actor_name || "Admin";
+        return {
+          ...e,
+          actor_name: `Equipe Dudit (${adminName})`,
+          highlight: true,
+        };
+      } else {
+        const sanitizedMetadata = { ...e.metadata };
+        delete sanitizedMetadata.admin_actor_name;
+        delete sanitizedMetadata.admin_actor_id;
+        return {
+          ...e,
+          actor_name: "Equipe Dudit",
+          highlight: true,
+          metadata: sanitizedMetadata,
+        };
+      }
+    }
+    return e;
+  });
+
   return { success: true, data: entries };
 }
 
@@ -5055,7 +5099,7 @@ export async function updateERPOrderAction(
       changeLinesForAudit.push(...changeLines.map((line: string) => `Equipe Dudit alterou: ${line}.`));
     }
     if (actionCtx?.reason?.trim()) {
-      changeLinesForAudit.push(actionCtx.reason.trim());
+      changeLinesForAudit.push(`Motivo: "${actionCtx.reason.trim()}"`);
     }
     if (changeLinesForAudit.length === 0) {
       changeLinesForAudit.push("Equipe Dudit atualizou o pedido.");
@@ -5116,6 +5160,29 @@ export async function updateERPOrderAction(
       sellerUrl: `/erp/pedidos?view=${orderId}`,
       ctx: actionCtx,
     });
+
+    if (actionCtx?.notifySeller && actionCtx?.reason?.trim() && currentOrder.buyer_id) {
+      try {
+        const { createNotification } = await import("@/lib/services/notification.service");
+        await createNotification({
+          userId: currentOrder.buyer_id,
+          type: "admin_announcement",
+          title: `Pedido #${currentOrder.order_number || orderId} atualizado`,
+          message: actionCtx.reason.trim(),
+          entityType: "order",
+          entityId: orderId,
+          data: {
+            order_id: orderId,
+            audience: "buyer",
+            url: `/pedidos`,
+          },
+          idempotencyKey: `admin_action:order_buyer:${orderId}:${Date.now()}`,
+          origin: "system",
+        });
+      } catch (err) {
+        console.error("[ADMIN_ORDER] buyer notification failed:", err);
+      }
+    }
   }
 
   return { success: true, orderNumber: currentOrder.order_number };

@@ -2,10 +2,10 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Checkbox } from "@/components/reusable"
+import { Badge, Checkbox, Tooltip } from "@/components/reusable"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
-import { ReturnIcon, TruckIcon, StoreIcon, MoneyIcon, UserIcon } from "@/lib/icons"
+import { ReturnIcon, TruckIcon, StoreIcon, MoneyIcon, UserIcon, ShoppingCartIcon } from "@/lib/icons"
 import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
 
 interface ColumnDef {
@@ -31,6 +31,17 @@ const OrderListRow = React.memo((
     const returns = Array.isArray(order.return_requests) ? order.return_requests : []
     const exchangeOrder = order.exchange_parent_order_id || order.exchange_return_request_id
 
+    const hasRefund = Boolean(
+        order.is_refunded ||
+        Number(order.refunded_amount || 0) > 0 ||
+        order.situation === "refunded" ||
+        order.situation === "chargeback" ||
+        returns.some((req: any) =>
+            ["APPROVED", "RESOLVED"].includes(req.status) &&
+            (req.approved_resolution === "refund" || req.desired_resolution === "refund" || Number(req.refund_amount || 0) > 0)
+        )
+    )
+
     // Use shared payment status meta (same as ERP)
     const paymentMeta = getPaymentStatusMeta(order.situation)
     const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
@@ -44,17 +55,55 @@ const OrderListRow = React.memo((
 
     const renderCellContent = (colId: string) => {
         switch (colId) {
-            case "order_number":
+            case "order_number": {
+                const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+                const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing)
+                const paidMethodEntries = methodEntries.filter((b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009)
+                const paidLabels = Array.from(new Set(paidMethodEntries.map((b: any) => String(b?.method || "").toLowerCase().trim()).filter(Boolean)))
+                let pmLabel: string | null = null
+
+                if (paidLabels.length > 1) {
+                    pmLabel = "Múltiplos meios"
+                } else if (paidMethodEntries.length === 1) {
+                    pmLabel = paidMethodEntries[0]?.method || order.payment_method || null
+                } else if (methodEntries.length === 1) {
+                    pmLabel = methodEntries[0]?.method || order.payment_method || null
+                } else {
+                    pmLabel = order.payment_method || null
+                }
+
+                if (pmLabel && methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
+                    pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`
+                }
+
                 return (
-                    <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                            #{order.order_number || order.id.slice(0, 8)}
-                        </span>
-                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
-                            {formatDate(order.created_at)} - {formatTime(order.created_at)}
-                        </span>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                            <ShoppingCartIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                        </div>
+                        <div className="flex flex-col text-left min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
+                                    #{order.order_number || order.id.slice(0, 8)}
+                                </span>
+                                {returns.length > 0 && (
+                                    <Tooltip text="Possui histórico de trocas/devoluções">
+                                        <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
+                                    </Tooltip>
+                                )}
+                                {hasRefund && (
+                                    <Tooltip text="Possui histórico de reembolso">
+                                        <Badge variant="red" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap" />
+                                    </Tooltip>
+                                )}
+                            </div>
+                            <div className="mt-1 flex items-center">
+                                <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify compact />
+                            </div>
+                        </div>
                     </div>
                 )
+            }
 
             case "customer":
                 return (
@@ -91,27 +140,28 @@ const OrderListRow = React.memo((
 
             case "status":
                 return (
-                    <div className="flex flex-col items-center gap-1">
-                        <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>
-                            {paymentMeta.label}
-                        </Badge>
-                        {(() => {
-                            const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
-                            const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing)
-                            const paidMethodEntries = methodEntries.filter((b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009)
-                            const paidLabels = Array.from(new Set(paidMethodEntries.map((b: any) => String(b?.method || "").toLowerCase().trim()).filter(Boolean)))
-                            let pmLabel: string | null = null
-                            if (paidLabels.length > 1) {
-                                pmLabel = "Múltiplos meios"
-                            } else if (paidMethodEntries.length === 1) {
-                                pmLabel = paidMethodEntries[0]?.method || order.payment_method || null
-                            } else if (methodEntries.length === 1) {
-                                pmLabel = methodEntries[0]?.method || order.payment_method || null
-                            } else {
-                                pmLabel = order.payment_method || null
-                            }
-                            return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify compact />
-                        })()}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {order.situation === "cancelled" ? (
+                            <Badge variant="red">
+                                Cancelado
+                            </Badge>
+                        ) : (
+                            <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>
+                                {paymentMeta.label}
+                            </Badge>
+                        )}
+                        {order.delivery_status && order.situation !== "cancelled" && (
+                            <Badge
+                                variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "orange" : "gray"}
+                                icon={
+                                    order.delivery_type === "pickup"
+                                        ? <StoreIcon />
+                                        : <TruckIcon />
+                                }
+                            >
+                                {deliveryMeta}
+                            </Badge>
+                        )}
                     </div>
                 )
 

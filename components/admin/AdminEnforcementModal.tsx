@@ -290,6 +290,9 @@ export function AdminEnforcementModal({
 
             onClose()
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             console.error("[ADMIN_ENFORCEMENT_MODAL] Error:", err)
             setErrorMessage(err?.message || "Ocorreu um erro ao processar a ação.")
         } finally {

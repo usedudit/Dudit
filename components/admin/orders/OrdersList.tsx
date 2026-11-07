@@ -143,12 +143,12 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     }
 
     const ADMIN_COLUMNS = useMemo<AdminColumn[]>(() => [
-        { id: "order_number", label: "Pedido", align: "left", width: "200px", sortable: true },
-        { id: "customer", label: "Cliente", align: "left", width: "250px", sortable: true },
-        { id: "channel", label: "Origem", align: "left", width: "150px", sortable: false },
-        { id: "date", label: "Data", align: "left", width: "150px", sortable: true },
-        { id: "total", label: "Total", align: "left", width: "150px", sortable: true },
-        { id: "status", label: "Pagamento", align: "left", width: "150px", sortable: true },
+        { id: "order_number", label: "Pedido", align: "left", width: "230px", sortable: true },
+        { id: "customer", label: "Cliente", align: "left", width: "220px", sortable: true },
+        { id: "channel", label: "Origem", align: "left", width: "130px", sortable: false },
+        { id: "date", label: "Data", align: "left", width: "140px", sortable: true },
+        { id: "total", label: "Total", align: "left", width: "140px", sortable: true },
+        { id: "status", label: "Status", align: "left", width: "240px", sortable: true },
         { id: "seller", label: "Vendedor", align: "left", width: "180px", sortable: true },
         { id: "actions", label: "Ações", align: "center", width: "80px", sortable: false },
     ], [])
@@ -324,6 +324,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
             <AdminOrderDetailView
                 orderId={entityState.entityId}
                 onBack={closeEntity}
+                onEdit={(id) => openEntity("edit", id)}
             />
         )
     }
@@ -343,6 +344,16 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
         const paymentMeta = getPaymentStatusMeta(order.situation)
         const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
         const returns = Array.isArray(order.return_requests) ? order.return_requests : []
+        const hasRefund = Boolean(
+            order.is_refunded ||
+            Number(order.refunded_amount || 0) > 0 ||
+            order.situation === "refunded" ||
+            order.situation === "chargeback" ||
+            returns.some((req: any) =>
+                ["APPROVED", "RESOLVED"].includes(req.status) &&
+                (req.approved_resolution === "refund" || req.desired_resolution === "refund" || Number(req.refund_amount || 0) > 0)
+            )
+        )
         const store = order.stores || {}
         const partner = store.partners || {}
         const sellerName = partner.trade_name || partner.name || store.name || "—"
@@ -372,6 +383,9 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                 </h3>
                                 {returns.length > 0 && (
                                     <Badge variant="purple" icon={<ReturnIcon />} className="whitespace-nowrap" />
+                                )}
+                                {hasRefund && (
+                                    <Badge variant="red" icon={<ReturnIcon />} className="whitespace-nowrap" />
                                 )}
                                 <div className="flex items-center gap-1 shrink-0">
                                     {order.situation === "cancelled" ? (

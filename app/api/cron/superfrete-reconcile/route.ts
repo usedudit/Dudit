@@ -34,6 +34,44 @@ interface ShipmentRow {
   tracking_url: string | null
   payload: Record<string, unknown> | null
   external_label_id: string
+  created_at?: string
+}
+
+/**
+ * Detecta se o erro indica que o pedido/etiqueta não existe na SuperFrete
+ * (ex.: HTTP 404, HTTP 400 com "Pedido não encontrado" ou validação orders.0).
+ */
+function isNotFoundError(err: any): boolean {
+  if (err?.status === 404) return true
+  const msg = String(err?.message || "").toLowerCase()
+  const detailStr = typeof err?.detail === "object" ? JSON.stringify(err.detail).toLowerCase() : ""
+  return (
+    msg.includes("pedido não encontrado") ||
+    msg.includes("não encontrado") ||
+    msg.includes("not found") ||
+    detailStr.includes("pedido não encontrado") ||
+    detailStr.includes("não encontrado") ||
+    detailStr.includes("not found") ||
+    detailStr.includes("orders.0")
+  )
+}
+
+/**
+ * Detecta erro de autenticação (token expirado ou revogado no parceiro).
+ */
+function isAuthError(err: any): boolean {
+  if (err?.status === 401 || err?.status === 403) return true
+  const msg = String(err?.message || "").toLowerCase()
+  return msg.includes("unauthorized") || msg.includes("não autorizado")
+}
+
+/**
+ * Detecta se a SuperFrete respondeu Rate Limit (HTTP 429).
+ */
+function isRateLimitError(err: any): boolean {
+  if (err?.status === 429) return true
+  const msg = String(err?.message || "").toLowerCase()
+  return msg.includes("too many requests") || msg.includes("rate limit")
 }
 
 export async function GET(req: Request) {
@@ -70,7 +108,7 @@ export async function GET(req: Request) {
     const { data: shipments, error: shipmentsError } = await supabase
       .from("order_shipments")
       .select(
-        "id, order_id, partner_id, kind, return_request_id, status, tracking_number, tracking_url, payload, external_label_id",
+        "id, order_id, partner_id, kind, return_request_id, status, tracking_number, tracking_url, payload, external_label_id, created_at",
       )
       .eq("provider_slug", SUPERFRETE_PROVIDER)
       .not("external_label_id", "is", null)
@@ -96,9 +134,82 @@ export async function GET(req: Request) {
     let checked = 0
     let processed = 0
     let failed = 0
+    const authFailedPartners = new Set<string>()
+    let hitRateLimit = false
 
     const reconcile = async (shipment: ShipmentRow) => {
+      if (hitRateLimit) return
+      if (authFailedPartners.has(shipment.partner_id)) return
+
       checked++
+      const cleanLabelId = String(shipment.external_label_id || "").trim()
+
+      // 1. Validação básica do ID da etiqueta externa
+      if (!cleanLabelId || cleanLabelId === "undefined" || cleanLabelId === "null") {
+        await supabase
+          .from("order_shipments")
+          .update({
+            status: "failed",
+            payload: {
+              ...(shipment.payload || {}),
+              last_event: "invalid_label_id",
+              last_event_at: new Date().toISOString(),
+              last_reconcile_error: "ID de etiqueta externo ausente ou inválido.",
+            },
+          })
+          .eq("id", shipment.id)
+          .eq("partner_id", shipment.partner_id)
+        processed++
+        return
+      }
+
+      // 2. Etiqueta gerada com checkout simulado (sandbox / fallback de saldo)
+      // Não existe pedido real na SuperFrete a reconciliar via API.
+      if (shipment.payload?.payment_simulated) {
+        await supabase
+          .from("order_shipments")
+          .update({
+            status: "failed",
+            payload: {
+              ...(shipment.payload || {}),
+              last_event: "skipped_simulated",
+              last_event_at: new Date().toISOString(),
+              last_reconcile_error:
+                "Etiqueta gerada em modo simulado (não existe na SuperFrete). Reconciliação encerrada.",
+            },
+          })
+          .eq("id", shipment.id)
+          .eq("partner_id", shipment.partner_id)
+        processed++
+        return
+      }
+
+      // 3. Etiqueta no carrinho ('pending') expirada
+      // Na SuperFrete, se uma etiqueta ficou 'pending' (não paga) por mais de 14 dias,
+      // o carrinho expirou/foi limpo. Não adianta consultar a cada 5 min.
+      const PENDING_MAX_AGE_DAYS = 14
+      const createdAtMs = shipment.created_at ? new Date(shipment.created_at).getTime() : 0
+      if (
+        shipment.status === "pending" &&
+        createdAtMs > 0 &&
+        Date.now() - createdAtMs > PENDING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
+      ) {
+        await supabase
+          .from("order_shipments")
+          .update({
+            status: "failed",
+            payload: {
+              ...(shipment.payload || {}),
+              last_event: "cart_expired",
+              last_event_at: new Date().toISOString(),
+              last_reconcile_error: "Etiqueta não paga no carrinho expirou após 14 dias.",
+            },
+          })
+          .eq("id", shipment.id)
+          .eq("partner_id", shipment.partner_id)
+        processed++
+        return
+      }
 
       try {
         const client = await getClient(shipment.partner_id)
@@ -109,7 +220,7 @@ export async function GET(req: Request) {
         // Recalcula o fôlego restante aqui: a busca da integração acima também
         // consome tempo, e o corte precisa acontecer antes do cron-job.org.
         const timeoutMs = Math.min(MAX_REQUEST_MS, Math.max(1_000, deadline - Date.now()))
-        const info = await client.getOrderInfo(shipment.external_label_id, timeoutMs)
+        const info = await client.getOrderInfo(cleanLabelId, timeoutMs)
         const status = typeof info?.status === "string" ? info.status : null
         if (!status) {
           throw new Error("SuperFrete não retornou status da etiqueta")
@@ -137,9 +248,65 @@ export async function GET(req: Request) {
         })
         processed++
       } catch (err: any) {
+        // Pedido não encontrado na SuperFrete (404 ou 400 'orders.0: Pedido não encontrado'):
+        // A etiqueta não existe (expirou, foi apagada ou criada em outro ambiente/sandbox).
+        // Marca como 'failed' para sair definitivamente da fila e não gera alerta no Sentry.
+        if (isNotFoundError(err)) {
+          console.info(
+            `[SuperFrete Reconcile] Etiqueta ${cleanLabelId} não encontrada na SuperFrete. Encerrando reconciliação (status='failed').`,
+          )
+          await supabase
+            .from("order_shipments")
+            .update({
+              status: "failed",
+              payload: {
+                ...(shipment.payload || {}),
+                last_event: "not_found",
+                last_event_at: new Date().toISOString(),
+                last_reconcile_error:
+                  "Pedido não encontrado na SuperFrete. Etiqueta encerrada.",
+              },
+            })
+            .eq("id", shipment.id)
+            .eq("partner_id", shipment.partner_id)
+          processed++
+          return
+        }
+
+        // Erro de autenticação do parceiro (token inválido/expirado):
+        if (isAuthError(err)) {
+          authFailedPartners.add(shipment.partner_id)
+          failed++
+          console.warn(
+            `[SuperFrete Reconcile] Parceiro ${shipment.partner_id} não autorizado na SuperFrete (token expirado ou inválido).`,
+          )
+          await supabase
+            .from("order_shipments")
+            .update({
+              payload: {
+                ...(shipment.payload || {}),
+                last_event: "reconcile_auth_error",
+                last_event_at: new Date().toISOString(),
+                last_reconcile_error: "Token SuperFrete não autorizado ou expirado.",
+              },
+            })
+            .eq("id", shipment.id)
+            .eq("partner_id", shipment.partner_id)
+          return
+        }
+
+        // Rate Limit da SuperFrete (HTTP 429):
+        if (isRateLimitError(err)) {
+          hitRateLimit = true
+          console.warn(
+            "[SuperFrete Reconcile] Rate limit atingido na SuperFrete. Interrompendo lote atual.",
+          )
+          return
+        }
+
         failed++
         console.warn(
-          `[SuperFrete Reconcile] Falha ao sincronizar etiqueta ${shipment.external_label_id}:`,
+          `[SuperFrete Reconcile] Falha ao sincronizar etiqueta ${cleanLabelId}:`,
           err?.message || err,
         )
         captureError(err, {
@@ -169,6 +336,11 @@ export async function GET(req: Request) {
     let deferred = 0
 
     for (let i = 0; i < rows.length; i += CONCURRENCY) {
+      if (hitRateLimit) {
+        deferred = rows.length - i
+        break
+      }
+
       const remaining = deadline - Date.now()
       if (remaining < MIN_BATCH_WINDOW_MS) {
         deferred = rows.length - i

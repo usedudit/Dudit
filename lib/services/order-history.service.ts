@@ -136,6 +136,16 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     let actorName = entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema"
     let changeLines = [...entry.change_lines]
 
+    const isDuditAction = Boolean(
+      entry.metadata?.dudit_action ||
+      (entry.metadata as any)?.is_admin_action ||
+      (entry as any).actor_name === "Equipe Dudit"
+    )
+
+    if (isDuditAction) {
+      actorName = "Equipe Dudit"
+    }
+
     // Rewrite return created events for ERP view
     if (entry.entry_type === "return_created") {
       actorName = "Solicitação de devolução"

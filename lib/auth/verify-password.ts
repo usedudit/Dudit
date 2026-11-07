@@ -49,7 +49,7 @@ export async function verifyUserPassword(
 
         return { success: true }
     } finally {
-        verifyClient.auth.signOut().catch(() => { })
+        verifyClient.auth.signOut({ scope: "local" }).catch(() => { })
     }
 }
 

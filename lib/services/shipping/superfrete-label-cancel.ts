@@ -57,8 +57,18 @@ export async function cancelCarrierLabelForOrder(params: {
   try {
     await client.cancelOrder(labelId, cleanReason, params.timeoutMs)
   } catch (err: any) {
-    const message = err?.message || "Erro ao cancelar etiqueta."
-    return { success: false, cancelled: false, error: message }
+    const msg = String(err?.message || "").toLowerCase()
+    const isNotFound =
+      err?.status === 404 ||
+      msg.includes("pedido não encontrado") ||
+      msg.includes("não encontrado") ||
+      msg.includes("orders.0")
+    if (!isNotFound) {
+      const message = err?.message || "Erro ao cancelar etiqueta."
+      return { success: false, cancelled: false, error: message }
+    }
+    // Se a etiqueta já não existia na SuperFrete (expirada, apagada ou sandbox),
+    // prossegue para marcar como cancelada localmente sem travar o pedido.
   }
 
   const cancelledAt = new Date().toISOString()

@@ -211,20 +211,19 @@ export function ReturnDetailView({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-brand-border dark:border-dark-border px-4 md:px-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* Tabs & Content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
+        <div className="border-b border-brand-border dark:border-dark-border px-4 md:px-8">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">Dados Gerais</TabsTrigger>
             <TabsTrigger value="evidence">Evidências</TabsTrigger>
             <TabsTrigger value="observations">Observações</TabsTrigger>
             <TabsTrigger value="history">Histórico</TabsTrigger>
           </TabsList>
-        </Tabs>
-      </div>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
         <div
           ref={scrollRef}
           className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8"
@@ -530,6 +529,7 @@ export function ReturnDetailView({
           </div>
         </div>
       </div>
+    </Tabs>
 
       {/* Print Modal */}
       <ReturnPrintModal

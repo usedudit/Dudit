@@ -9,6 +9,7 @@ import {
   ClockIcon,
   ReturnIcon,
   CalendarIcon,
+  EditIcon,
 } from "@/lib/icons";
 import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet";
 import {
@@ -226,15 +227,17 @@ interface OrderDetailViewProps {
   orderId: string;
   partnerId: string;
   onBack: () => void;
-  onEditOrder: (order: any, reason?: string) => void;
-  onUpdateDeliveryStatus: (order: any) => void;
-  onUpdatePaymentStatus: (order: any) => void;
-  onCancelOrder: (order: any) => void;
-  onOpenNotes: (order: any) => void;
+  onEditOrder?: (order: any, reason?: string) => void;
+  onUpdateDeliveryStatus?: (order: any) => void;
+  onUpdatePaymentStatus?: (order: any) => void;
+  onCancelOrder?: (order: any) => void;
+  onOpenNotes?: (order: any) => void;
   initialOrder?: any;
   /** True while the parent entity cache is fetching the full order. */
   detailLoading?: boolean;
   initialTab?: string;
+  adminContext?: boolean;
+  extraTabs?: { value: string; label: string; content: React.ReactNode }[];
 }
 
 export default function OrderDetailView({
@@ -249,6 +252,8 @@ export default function OrderDetailView({
   initialOrder,
   detailLoading = false,
   initialTab,
+  adminContext = false,
+  extraTabs,
 }: OrderDetailViewProps) {
   const { role, canRbac, planSlug } = usePermissions();
   const { selectedStore } = useStore();
@@ -901,7 +906,7 @@ export default function OrderDetailView({
   const cancelNote = (
     String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || ""
   ).trim();
-  const canEdit = order.situation !== "cancelled";
+  const canEdit = adminContext ? true : order.situation !== "cancelled";
   const isPickupOrder = order.delivery_type === "pickup";
   const isPaidOrder = ["paid", "partially_paid"].includes(order.situation);
 
@@ -1703,27 +1708,39 @@ export default function OrderDetailView({
 
                     {/* Desktop action buttons */}
                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                      {onEditOrder && (adminContext || (canEdit && canRbac("orders.edit"))) && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          leftIcon={<EditIcon size={16} />}
+                          onClick={() => onEditOrder(order)}
+                        >
+                          Editar Pedido
+                        </Button>
+                      )}
                       <ActionsDropdown
                         onPrint={() =>
                           setPrintModalOrderId(order.id || order.order_number)
                         }
                         onEdit={
-                          canEdit && canRbac("orders.edit")
+                          onEditOrder && (adminContext || (canEdit && canRbac("orders.edit")))
                             ? () => onEditOrder(order)
                             : undefined
                         }
                         onCancel={
-                          order.situation === "cancelled"
-                            ? () => onOpenNotes(order)
-                            : () => onCancelOrder(order)
+                          onCancelOrder
+                            ? order.situation === "cancelled"
+                              ? () => onOpenNotes?.(order)
+                              : () => onCancelOrder(order)
+                            : undefined
                         }
                         onPaymentStatus={
-                          order.situation !== "cancelled"
+                          onUpdatePaymentStatus && order.situation !== "cancelled"
                             ? () => onUpdatePaymentStatus(order)
                             : undefined
                         }
                         onDeliveryStatus={
-                          order.situation !== "cancelled" && !hasOnlyServices
+                          onUpdateDeliveryStatus && order.situation !== "cancelled" && !hasOnlyServices
                             ? () => onUpdateDeliveryStatus(order)
                             : undefined
                         }
@@ -1747,6 +1764,11 @@ export default function OrderDetailView({
                       )}
                       <TabsTrigger value="attachments">Anexos</TabsTrigger>
                       <TabsTrigger value="history">Histórico</TabsTrigger>
+                      {extraTabs?.map((tab) => (
+                        <TabsTrigger key={tab.value} value={tab.value}>
+                          {tab.label}
+                        </TabsTrigger>
+                      ))}
                     </TabsList>
                   </div>
                 </div>
@@ -2869,6 +2891,13 @@ export default function OrderDetailView({
                       })()}
                     </FadeIn>
                   </TabsContent>
+                  {extraTabs?.map((tab) => (
+                    <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                      <FadeIn key={tab.value}>
+                        {tab.content}
+                      </FadeIn>
+                    </TabsContent>
+                  ))}
                 </Tabs>
               </div>
             </div>
@@ -2881,22 +2910,24 @@ export default function OrderDetailView({
           fullWidth
           onPrint={() => setPrintModalOrderId(order.id || order.order_number)}
           onEdit={
-            canEdit && canRbac("orders.edit")
+            onEditOrder && (adminContext || (canEdit && canRbac("orders.edit")))
               ? () => onEditOrder(order)
               : undefined
           }
           onCancel={
-            order.situation === "cancelled"
-              ? () => onOpenNotes(order)
-              : () => onCancelOrder(order)
+            onCancelOrder
+              ? order.situation === "cancelled"
+                ? () => onOpenNotes?.(order)
+                : () => onCancelOrder(order)
+              : undefined
           }
           onPaymentStatus={
-            order.situation !== "cancelled"
+            onUpdatePaymentStatus && order.situation !== "cancelled"
               ? () => onUpdatePaymentStatus(order)
               : undefined
           }
           onDeliveryStatus={
-            order.situation !== "cancelled" && !hasOnlyServices
+            onUpdateDeliveryStatus && order.situation !== "cancelled" && !hasOnlyServices
               ? () => onUpdateDeliveryStatus(order)
               : undefined
           }

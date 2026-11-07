@@ -302,8 +302,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
 
                             {/* Content */}
                             <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                                    <TabsContent value="general" className="mt-0">
+                                <TabsContent value="general" className="mt-0">
                                         <FadeIn key="general">
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
@@ -560,7 +559,6 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                             </FormSection>
                                         </FadeIn>
                                     </TabsContent>
-                                </Tabs>
                             </div>
                         </div>
                     </Tabs>

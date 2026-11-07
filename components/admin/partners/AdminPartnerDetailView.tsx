@@ -277,6 +277,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }
@@ -296,6 +299,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }
@@ -317,6 +323,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }
@@ -337,6 +346,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }
@@ -358,6 +370,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }
@@ -378,6 +393,9 @@ export function AdminPartnerDetailView({
             }
             return res
         } catch (err: any) {
+            if (err?.message === "NEXT_REDIRECT" || err?.digest?.includes?.("NEXT_REDIRECT")) {
+                throw err
+            }
             toast.error(err.message || "Erro inesperado")
             throw err
         }

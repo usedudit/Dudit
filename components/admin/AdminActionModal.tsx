@@ -21,6 +21,7 @@ interface AdminActionModalProps {
     /** Exige motivo com mínimo de 5 caracteres (ações destrutivas). */
     requireReason?: boolean
     confirmLabel: string
+    notifyLabel?: string
     /** Executa a ação. O modal fica com spinner até a promise resolver. */
     onConfirm: (payload: AdminActionPayload) => Promise<void>
 }
@@ -39,6 +40,7 @@ export default function AdminActionModal({
     changedFields,
     requireReason = false,
     confirmLabel,
+    notifyLabel,
     onConfirm,
 }: AdminActionModalProps) {
     const [reason, setReason] = useState("")
@@ -165,7 +167,7 @@ export default function AdminActionModal({
                         disabled={!reason.trim()}
                         className="w-4 h-4 rounded border-brand-border accent-brand-green"
                     />
-                    Enviar notificação ao vendedor pelo Dudit
+                    {notifyLabel || "Enviar notificação ao vendedor pelo Dudit"}
                 </label>
             </div>
         </DefaultModal>
@@ -188,6 +190,7 @@ export interface AdminActionRequest {
     /** Força abertura do modal mesmo sem changedFields/requireReason (ex.: save admin de pedido). */
     force?: boolean
     confirmLabel: string
+    notifyLabel?: string
     runner: (payload: AdminActionPayload) => Promise<AdminActionResult>
 }
 
@@ -238,6 +241,7 @@ export function useAdminActionModal() {
             changedFields={request.changedFields}
             requireReason={request.requireReason}
             confirmLabel={request.confirmLabel}
+            notifyLabel={request.notifyLabel}
             onConfirm={async (payload) => {
                 const result = await request.runner(payload).catch((e) => ({
                     success: false,

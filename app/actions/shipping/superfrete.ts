@@ -1039,11 +1039,19 @@ export async function getSuperFreteLabelInfoAction(payload: {
 
     return { success: true, order }
   } catch (err: any) {
-    captureError(err, {
-      module: "shipping",
-      action: "get_label_info_superfrete",
-      partnerId: payload.partnerId,
-    })
+    const msg = String(err?.message || "").toLowerCase()
+    const isNotFound =
+      err?.status === 404 ||
+      msg.includes("pedido não encontrado") ||
+      msg.includes("não encontrado") ||
+      msg.includes("orders.0")
+    if (!isNotFound) {
+      captureError(err, {
+        module: "shipping",
+        action: "get_label_info_superfrete",
+        partnerId: payload.partnerId,
+      })
+    }
     return { success: false, error: err?.message || "Erro ao buscar informações da etiqueta." }
   }
 }
