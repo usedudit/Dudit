@@ -41,6 +41,8 @@ import {
     XIcon,
     EyeIcon,
     BoxIcon,
+    MoneyIcon,
+    StoreIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -1041,20 +1043,25 @@ export default function DeliveryAssignmentDetail({
                         if (!selectedOrderForDetail) return null
                         const order = selectedOrderForDetail
                         const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
-                        const isOrderDelivered = orderDeliveredMap[order.order_id] || false
+                        const isOrderDelivered = Boolean(orderDeliveredMap[order.order_id] || order.delivery_status === "delivered" || order.status === "delivered" || assignment.status === "delivered")
                         const canMarkDelivered = assignment.status === "out_for_delivery" && !isOrderDelivered
-                        const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
-                        const deliveryMeta = getDeliveryStatusMeta(isOrderDelivered ? "delivered" : (assignment.status === "out_for_delivery" ? "sent" : assignment.status))
+                        const paymentMeta = getPaymentStatusMeta(order.situation || order.payment_status || assignment.situation || assignment.payment_status || "pending")
+                        const resolvedDeliveryStatus = isOrderDelivered
+                            ? "delivered"
+                            : (assignment.status === "out_for_delivery"
+                                ? "sent"
+                                : (order.delivery_status || (assignment.status === "accepted" ? "accepted" : "preparing")))
+                        const deliveryMeta = getDeliveryStatusMeta(resolvedDeliveryStatus)
                         const ordItems = order.items || []
                         const orderDate = order.created_at || order.order_date || order.order_created_at || assignment.assigned_at
-                        const orderIsPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((order.payment_status || order.situation || "").toLowerCase())
+                        const orderIsPaid = ["paid", "pago", "approved", "aprovado", "concluido", "concluído"].includes(String(order.situation || order.payment_status || "").toLowerCase())
                         const orderNeedsPayment = !orderIsPaid
 
                         const orderHistoryEntries: HistoryEntry[] = []
                         if (order.created_at || order.order_date) {
                             orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
                         }
-                        if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                        if (orderIsPaid) {
                             orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
                         }
                         if (isOrderDelivered) {
@@ -1109,11 +1116,16 @@ export default function DeliveryAssignmentDetail({
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                    <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>
+                                                        {paymentMeta.label}
+                                                    </Badge>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
-                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
+                                                    <Badge
+                                                        variant={deliveryMeta.variant}
+                                                        icon={order.delivery_type === "pickup" ? <StoreIcon /> : getDeliveryStatusIcon(resolvedDeliveryStatus)}
+                                                    >
                                                         {deliveryMeta.label}
                                                     </Badge>
                                                 </div>

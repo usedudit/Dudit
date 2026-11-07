@@ -31,6 +31,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
 import ReturnPrintModal from "@/components/erp/returns/ReturnPrintModal"
+import { ReturnHistoryTab } from "@/components/erp/returns/ReturnHistoryTab"
 
 const formatReturnReasonLabel = (rawReason?: string | null): string => {
     if (!rawReason) return "Não informado"
@@ -508,30 +509,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
 
                                     <TabsContent value="timeline" className="mt-0">
                                         <FadeIn key="timeline">
-                                            <FormSection title="Histórico de Eventos" hasSeparator>
-                                                {events.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={ClockIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhum evento registrado"
-                                                        subtitle="Esta solicitação ainda não possui eventos no histórico."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        {events.map((ev: any) => (
-                                                            <div key={ev.id} className="flex items-start gap-3 border-l-2 border-brand-border dark:border-dark-border pl-4 py-1">
-                                                                <div className="flex-1">
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {ev.message || ev.event_type}
-                                                                    </p>
-                                                                    <p className="text-xs text-brand-inactive-text">{formatDateTime(ev.created_at)}</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </FormSection>
+                                            <ReturnHistoryTab events={events} showAdminActor={true} viewer="admin" />
                                         </FadeIn>
                                     </TabsContent>
 

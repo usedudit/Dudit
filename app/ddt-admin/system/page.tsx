@@ -22,7 +22,7 @@ export default async function AdminSystemPage() {
   return (
     <>
       <AdminHeader pageTitle="Sistema & Manutenção" />
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-6 md:p-8 max-w-[1700px] mx-auto">
         <SystemMaintenancePage
           initialState={{
             maintenance,

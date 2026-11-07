@@ -57,6 +57,7 @@ interface ReturnDetailViewProps {
   onEdit?: (orderId: string) => void;
   onPrint?: () => void;
   initialRequest?: any;
+  adminContext?: boolean;
 }
 
 export function ReturnDetailView({
@@ -65,6 +66,7 @@ export function ReturnDetailView({
   onEdit,
   onPrint,
   initialRequest,
+  adminContext,
 }: ReturnDetailViewProps) {
   const { toast } = useToast();
   const { state: entityState, open: openEntity, close: closeEntity } = useEntityState();
@@ -105,7 +107,9 @@ export function ReturnDetailView({
       // getReturnRequestDetailsAction needs partnerId - we'll get it from the request or context
       // For now, we'll use the initialRequest if available
       if (initialRequest?.partnerId) {
-        const res = await getReturnRequestDetailsAction(initialRequest.partnerId, orderId);
+        const res = await getReturnRequestDetailsAction(initialRequest.partnerId, orderId, {
+          adminBypass: Boolean(adminContext),
+        });
         if (res.success && res.data) {
           setRequest(res.data);
           setEvidenceImages(res.data.evidenceImages || []);
@@ -116,7 +120,7 @@ export function ReturnDetailView({
     } finally {
       setLoading(false);
     }
-  }, [orderId, initialRequest?.partnerId]);
+  }, [orderId, initialRequest?.partnerId, adminContext]);
 
   useEffect(() => {
     if (!initialRequest) {
@@ -440,7 +444,11 @@ export function ReturnDetailView({
 
               <TabsContent value="history" className="mt-6">
                 <FadeIn key="history">
-                  <ReturnHistoryTab events={returnEvents} loading={historyLoading} />
+                  <ReturnHistoryTab
+                    events={returnEvents}
+                    loading={historyLoading}
+                    showAdminActor={adminContext}
+                  />
                 </FadeIn>
               </TabsContent>
             </div>

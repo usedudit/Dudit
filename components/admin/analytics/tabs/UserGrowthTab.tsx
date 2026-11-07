@@ -13,8 +13,9 @@ import {
 } from "@/lib/icons"
 import { Badge } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
+import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
 import type { UserAnalyticsData } from "@/app/actions/admin/analytics"
-import { DashboardLineChart, DashboardBarChart } from "@/components/erp/dashboard/charts/DashboardCharts"
+import { DashboardLineChart } from "@/components/erp/dashboard/charts/DashboardCharts"
 
 interface UserGrowthTabProps {
     data: UserAnalyticsData
@@ -82,17 +83,15 @@ export function UserGrowthTab({ data }: UserGrowthTabProps) {
             {/* Top Metric Cards - Using HorizontalKPICard from ERP */}
             <HorizontalKPICard items={kpiItems} />
 
-            {/* Timeline Chart */}
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border p-6">
-                <div className="mb-6">
-                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                        Evolução de Novos Cadastros e Usuários Ativos
-                    </h3>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                        Linha verde: Novos cadastros diários | Linha cinza: Usuários ativos diários
-                    </p>
-                </div>
-
+            {/* Timeline Chart - Using DashboardSectionCard */}
+            <DashboardSectionCard
+                title="Evolução de Novos Cadastros e Usuários Ativos"
+                icon={CalendarIcon}
+                className="mb-0"
+            >
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-6">
+                    Linha verde: Novos cadastros diários | Linha cinza: Usuários ativos diários
+                </p>
                 <div className="h-[300px] w-full">
                     <DashboardLineChart
                         data={chartPoints}
@@ -101,14 +100,15 @@ export function UserGrowthTab({ data }: UserGrowthTabProps) {
                         showLegend={true}
                     />
                 </div>
-            </div>
+            </DashboardSectionCard>
 
-            {/* Retention Insights Card */}
+            {/* Retention Insights Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border p-6">
-                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">
-                        Comportamento de Retenção & Fidelização
-                    </h4>
+                <DashboardSectionCard
+                    title="Comportamento de Retenção & Fidelização"
+                    icon={RepeatIcon}
+                    className="mb-0"
+                >
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
                         A taxa de retorno mede os clientes cadastrados que voltam à Dudit para pesquisar, contatar lojas, agendar ou comprar.
                     </p>
@@ -122,12 +122,13 @@ export function UserGrowthTab({ data }: UserGrowthTabProps) {
                             <span className="text-sm font-bold text-brand-green">~48%</span>
                         </div>
                     </div>
-                </div>
+                </DashboardSectionCard>
 
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border p-6">
-                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">
-                        Engajamento da Base
-                    </h4>
+                <DashboardSectionCard
+                    title="Engajamento da Base"
+                    icon={UserIcon}
+                    className="mb-0"
+                >
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
                         Distribuição dos usuários ativos por tipo de interação na plataforma:
                     </p>
@@ -141,7 +142,7 @@ export function UserGrowthTab({ data }: UserGrowthTabProps) {
                             <Badge variant="green">Alta Conversão (62%)</Badge>
                         </div>
                     </div>
-                </div>
+                </DashboardSectionCard>
             </div>
         </div>
     )

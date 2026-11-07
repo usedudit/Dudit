@@ -491,40 +491,231 @@ const KNOWN_STATUS_LABELS: Record<string, string> = {
   preparing: "Em preparação",
 }
 
+export type TimelineViewer = "customer" | "seller" | "admin"
+
+export interface ResolveTimelineActorParams {
+  entry: {
+    actor_user_id?: string | null
+    actor_name?: string | null
+    metadata?: Record<string, any> | null
+    source?: string | null
+    entry_type?: string | null
+  }
+  viewer: TimelineViewer
+  orderCustomerName?: string | null
+  storeName?: string | null
+  buyerId?: string | null
+}
+
 /**
- * Converte linhas de log técnicas em texto legível em português.
- * Trata padrões como:
- * - 'Status alterado: aguardando_aprovacao → concluida' -> 'Status alterado de "Aguardando Aprovação" para "Concluída"'
- * - 'Status: "aguardando_aprovacao" -> "concluida"' -> 'Status alterado de "Aguardando Aprovação" para "Concluída"'
+ * Resolve o nome de exibição do autor do evento para o histórico,
+ * padronizado por perspectiva de visualização (cliente, vendedor ou admin).
+ */
+export function resolveTimelineActorName({
+  entry,
+  viewer,
+  orderCustomerName,
+  storeName,
+  buyerId,
+}: ResolveTimelineActorParams): string {
+  const metadata = entry.metadata || {}
+  const isDuditAction = Boolean(
+    metadata.dudit_action ||
+    metadata.is_admin_action ||
+    metadata.admin_actor_name ||
+    entry.actor_name === "Equipe Dudit" ||
+    entry.actor_name === "Dudit" ||
+    entry.source === "admin"
+  )
+  const isSystem = Boolean(
+    (!entry.actor_user_id && !isDuditAction && !metadata.admin_actor_name) ||
+    entry.actor_name?.toLowerCase() === "sistema" ||
+    entry.source === "system" ||
+    entry.source === "webhook"
+  )
+  const isCustomer = Boolean(
+    !isDuditAction &&
+    !isSystem &&
+    ((buyerId && entry.actor_user_id === buyerId) ||
+      metadata.is_buyer === true ||
+      metadata.source === "marketplace" ||
+      entry.source === "marketplace" ||
+      entry.entry_type === "return_created" ||
+      (orderCustomerName && entry.actor_name === orderCustomerName))
+  )
+
+  // 1. Ação da Equipe Dudit (Admin)
+  if (isDuditAction) {
+    if (viewer === "admin") {
+      const adminName =
+        metadata.admin_actor_name ||
+        (entry.actor_name && entry.actor_name.includes("(") ? entry.actor_name.replace(/.*?\((.*?)\).*/, "$1") : null) ||
+        "Admin"
+      return `Equipe Dudit (${adminName})`
+    }
+    // Cliente e Vendedor só veem "Equipe Dudit"
+    return "Equipe Dudit"
+  }
+
+  // 2. Ação do Sistema Automático
+  if (isSystem) {
+    return "Sistema"
+  }
+
+  // 3. Ação do Cliente
+  if (isCustomer) {
+    if (viewer === "customer") {
+      return "Você"
+    }
+    const customerDisplayName = orderCustomerName || entry.actor_name || "Cliente"
+    return `${customerDisplayName} (Cliente)`
+  }
+
+  // 4. Ação do Vendedor / Lojista
+  if (viewer === "customer") {
+    // Cliente nunca vê nome pessoal do colaborador da loja; vê o nome da loja ou "Vendedor"
+    return storeName || "Vendedor"
+  }
+  if (viewer === "admin") {
+    const staffName = entry.actor_name || "Vendedor"
+    return `${staffName} (Vendedor)`
+  }
+  // Vendedor no ERP vê o nome do usuário que fez a ação
+  return entry.actor_name || "Vendedor"
+}
+
+/**
+ * Converte linhas de log técnicas em texto legível, neutro e padronizado em português,
+ * para ser exibido igualmente para clientes, lojistas e administradores.
  */
 export function humanizeTimelineChangeLine(line: string): string {
   if (!line || typeof line !== "string") return ""
+  const trimmed = line.trim()
+  if (!trimmed) return ""
+  const lower = trimmed.toLowerCase()
 
-  // Pattern: Status alterado: old -> new OR Status: old -> new OR status: "old" → "new"
-  const statusTransitionRegex = /(?:status(?:\s+alterado)?[:\s]+)(?:["']?([a-zA-Z0-9_-]+)["']?)\s*(?:→|->|para)\s*(?:["']?([a-zA-Z0-9_-]+)["']?)/i
-  const match = line.match(statusTransitionRegex)
+  // 1. Linhas de status de entrega
+  if (lower.includes("status de entrega") || lower.includes("status da entrega")) {
+    const target = (
+      trimmed.includes("->") || trimmed.includes("→")
+        ? trimmed.split(/->|→/).pop()!
+        : trimmed.replace(/^.*status\s+d[ea]\s+entrega:?\s*/i, "")
+    ).trim().toLowerCase()
 
-  if (match) {
-    const rawOld = match[1]?.toLowerCase()
-    const rawNew = match[2]?.toLowerCase()
-    const oldLabel = KNOWN_STATUS_LABELS[rawOld] || rawOld
-    const newLabel = KNOWN_STATUS_LABELS[rawNew] || rawNew
-    return `Status alterado de "${oldLabel}" para "${newLabel}"`
+    if (target.includes("entregue") || target === "delivered") return "Pedido entregue."
+    if (target.includes("saiu para entrega") || target.includes("em trânsito") || target.includes("em transito") || target === "in_transit") return "Pedido saiu para entrega."
+    if (target.includes("retirada") || target.includes("disponível") || target.includes("disponivel") || target === "ready_for_pickup") return "Pedido pronto para retirada."
+    if (target.includes("retirado") || target === "picked_up") return "Pedido retirado pelo cliente."
+    if (target.includes("falha") || target.includes("não entregue") || target.includes("nao entregue") || target === "failed") return "Tentativa de entrega não realizada."
+    if (target.includes("preparando") || target.includes("preparação") || target.includes("preparacao") || target.includes("separação") || target.includes("separacao") || target === "preparing") return "Pedido em separação."
+    if (target.includes("cancelado") || target === "cancelled" || target === "canceled") return "Entrega do pedido cancelada."
+    if (target.includes("não enviado") || target.includes("nao enviado") || target.includes("pendente") || target === "not_sent" || target === "pending") return "Pedido aguardando envio."
+    if (target.includes("enviado") || target === "shipped" || target === "sent") return "Pedido enviado para entrega."
+    return `Status de entrega: ${target}.`
   }
 
-  // Pattern: Status de frete atualizado para "released"
-  // (linhas antigas de etiqueta SuperFrete gravadas em inglês)
+  // 2. Linhas de status de pagamento
+  if (lower.includes("status de pagamento") || lower.includes("status do pagamento")) {
+    const target = (
+      trimmed.includes("->") || trimmed.includes("→")
+        ? trimmed.split(/->|→/).pop()!
+        : trimmed.replace(/^.*status\s+d[oe]\s+pagamento:?\s*/i, "")
+    ).trim().toLowerCase()
+
+    if (target.includes("pago") || target.includes("aprovado") || target.includes("concluído") || target.includes("concluido") || target === "paid" || target === "approved") return "Pagamento aprovado com sucesso."
+    if (target.includes("cancelado") || target.includes("recusado") || target === "cancelled" || target === "failed") return "Pagamento cancelado."
+    if (target.includes("reembolsado") || target.includes("estornado") || target === "refunded") return "Pagamento reembolsado."
+    if (target.includes("pendente") || target.includes("aguardando") || target === "pending") return "Aguardando confirmação de pagamento."
+    if (target.includes("análise") || target.includes("analise") || target.includes("processando") || target === "processing") return "Pagamento em análise."
+    return `Status de pagamento: ${target}.`
+  }
+
+  // 3. Linhas de status de devolução / troca
+  if (
+    lower.includes("alterou status") ||
+    lower.includes("status da solicitação") ||
+    lower.includes("status de devolução") ||
+    lower.includes("status de troca")
+  ) {
+    const target = (
+      trimmed.includes("->") || trimmed.includes("→")
+        ? trimmed.split(/->|→/).pop()!
+        : trimmed.replace(/^.*status[^:]*:?\s*/i, "")
+    ).trim().toLowerCase()
+
+    if (target.includes("aprovad")) return "Solicitação de troca/devolução aprovada."
+    if (target.includes("recusad") || target.includes("rejeitad")) return "Solicitação de troca/devolução recusada."
+    if (target.includes("resolvid") || target.includes("concluíd") || target.includes("concluid")) return "Solicitação de troca/devolução concluída."
+    if (target.includes("análise") || target.includes("analise")) return "Solicitação de troca/devolução em análise."
+    if (target.includes("aguardando devolução") || target.includes("aguardando devolucao") || target.includes("item_return")) return "Aguardando devolução dos itens."
+    if (target.includes("aguardando cliente") || target.includes("waiting_customer")) return "Solicitação aguardando retorno do cliente."
+    if (target.includes("escalada") || target.includes("moderação") || target.includes("moderacao") || target.includes("escalated")) return "Solicitação escalada para moderação da Dudit."
+    if (target.includes("expirad") || target.includes("expired")) return "Solicitação expirada."
+  }
+
+  // 4. Criação e atualização de devolução
+  if (
+    trimmed === "Solicitação criada" ||
+    trimmed === "Solicitação criada." ||
+    trimmed === "Solicitação de devolução criada" ||
+    trimmed === "Solicitação de devolução criada." ||
+    trimmed === "Solicitação de devolução criada pelo cliente" ||
+    trimmed === "Solicitação de devolução criada pelo cliente."
+  ) {
+    return "Solicitação de troca/devolução criada."
+  }
+
+  if (trimmed.startsWith("Solicitação atualizada:") || trimmed.startsWith("Solicitação de devolução atualizada:") || trimmed === "Status da solicitação atualizado.") {
+    return "Solicitação de troca/devolução atualizada."
+  }
+
+  // 5. Linhas de sinal (depósito) neutras para cliente, vendedor e admin
+  if (lower.includes("sinal") && (lower.includes("cancel") || lower.includes("cancelado"))) {
+    return "Cobrança de sinal cancelada."
+  }
+  if (lower.includes("sinal") && (lower.includes("gerad") || lower.includes("gerou"))) {
+    return "Cobrança de sinal gerada via Mercado Pago."
+  }
+  if (lower.includes("sinal") && (lower.includes("confirm") || lower.includes("pago") || lower.includes("recebimento"))) {
+    return "Pagamento do sinal confirmado com sucesso."
+  }
+  if (lower.includes("sinal") && (lower.includes("expir") || lower.includes("expirou"))) {
+    return "Prazo para pagamento do sinal expirado."
+  }
+
+  // 6. Ações comuns de log
+  if (lower.includes("alterou as observações do pedido")) {
+    return "Observações do pedido atualizadas."
+  }
+  if (lower === "reembolso via mercado pago executado" || lower === "reembolso via mercado pago executado.") {
+    return "Reembolso via Mercado Pago processado com sucesso."
+  }
+  if (trimmed === "criou registro.") return "Registro criado."
+  if (trimmed === "atualizou informações.") return "Informações atualizadas."
+  if (trimmed === "cancelou registro.") return "Registro cancelado."
+  if (trimmed === "marcou como pago.") return "Marcado como pago."
+  if (trimmed === "marcou como recebido.") return "Marcado como recebido."
+
+  // 7. Padrão geral de transição de status antigo
+  const statusTransitionRegex = /(?:status(?:\s+alterado)?[:\s]+)(?:["']?([a-zA-Z0-9_-]+)["']?)\s*(?:→|->|para)\s*(?:["']?([a-zA-Z0-9_-]+)["']?)/i
+  const matchTransition = trimmed.match(statusTransitionRegex)
+  if (matchTransition) {
+    const rawOld = matchTransition[1]?.toLowerCase()
+    const rawNew = matchTransition[2]?.toLowerCase()
+    const oldLabel = KNOWN_STATUS_LABELS[rawOld] || matchTransition[1]
+    const newLabel = KNOWN_STATUS_LABELS[rawNew] || matchTransition[2]
+    return `Status alterado de "${oldLabel}" para "${newLabel}".`
+  }
+
   const statusUpdatedRegex = /status(?:\s+(?:de\s+frete|da\s+etiqueta(?:\s+de\s+[a-zçãõáéíóú]+)?))?\s+(?:alterado|atualizado)\s+para:?\s*["']?([a-zA-Z0-9_-]+)["']?/i
-  const matchUpdated = line.match(statusUpdatedRegex)
+  const matchUpdated = trimmed.match(statusUpdatedRegex)
   if (matchUpdated) {
     const rawNew = matchUpdated[1]?.toLowerCase()
-    // Só reescreve quando o token é um status conhecido (linhas antigas em
-    // inglês). Linhas já traduzidas em português passam intactas.
-    const newLabel = KNOWN_STATUS_LABELS[rawNew]
-    if (newLabel) return `Status alterado para "${newLabel}"`
+    const newLabel = KNOWN_STATUS_LABELS[rawNew] || matchUpdated[1]
+    if (newLabel) return `Status alterado para "${newLabel}".`
   }
 
-  return line
+  return trimmed
 }
 
 

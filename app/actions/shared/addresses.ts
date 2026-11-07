@@ -256,6 +256,26 @@ export async function createAddressAction(data: {
   let citySlug: string | null = null
   if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
     citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      await getAdminClient()
+        .from("delivery_drivers")
+        .update({
+          city: address.city,
+          neighborhood: address.neighborhood,
+          street: address.street,
+          number: address.number,
+          complement: address.complement,
+          state: address.state,
+          zip_code: address.zip_code,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", data.entityId)
+    } catch (driverSyncErr) {
+      console.warn("[addresses] Failed to sync driver location:", driverSyncErr)
+    }
   }
 
   return { success: true, address, citySlug }
@@ -365,6 +385,26 @@ export async function updateAddressAction(data: {
   let citySlug: string | null = null
   if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
     citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      await getAdminClient()
+        .from("delivery_drivers")
+        .update({
+          city: address.city,
+          neighborhood: address.neighborhood,
+          street: address.street,
+          number: address.number,
+          complement: address.complement,
+          state: address.state,
+          zip_code: address.zip_code,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", data.entityId)
+    } catch (driverSyncErr) {
+      console.warn("[addresses] Failed to sync driver location:", driverSyncErr)
+    }
   }
 
   return { success: true, address, citySlug }

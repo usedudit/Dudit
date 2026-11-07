@@ -8,7 +8,7 @@ import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon, MoneyIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -868,10 +868,10 @@ export default function DeliveryDetailPage({
                                                 <Tooltip text={paymentMeta.label}>
                                                     <span className="contents">
                                                         <span className="hidden lg:inline-flex">
-                                                            <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                            <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>{paymentMeta.label}</Badge>
                                                         </span>
                                                         <span className="lg:hidden">
-                                                            <Badge variant={paymentMeta.variant} />
+                                                            <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} />
                                                         </span>
                                                     </span>
                                                 </Tooltip>

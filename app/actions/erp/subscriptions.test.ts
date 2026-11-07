@@ -32,6 +32,7 @@ vi.mock("@/lib/services/subscription.service", () => ({
   getPartnerPlan: vi.fn(),
   getPartnerSubscription: vi.fn(),
   getUsageCounters: vi.fn(),
+  PAST_DUE_GRACE_PERIOD_DAYS: 3,
 }))
 
 vi.mock("@/lib/billing/subscription-period", () => ({
@@ -218,7 +219,7 @@ describe("getSubscriptionStatusAction — pending plan change", () => {
           id: "sub-pending",
           plan_id: "plan-escalar",
           status: "pending",
-          created_at: "2026-10-31T12:00:00.000Z",
+          created_at: new Date().toISOString(),
           billing_email: "partner@example.com",
           mercado_pago_subscription_id: null,
           plan: { id: "plan-escalar", name: "Escalar", slug: "escalar", price: 49.9 },
@@ -270,6 +271,28 @@ describe("getSubscriptionStatusAction — pending plan change", () => {
 
     expect(res.success).toBe(true)
     expect(res.data.pending_change).toBeNull()
+  })
+
+  it("auto-cancels a pending upgrade attempt that has been abandoned for more than 3 days", async () => {
+    const staleDate = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "sub-stale-pending",
+        plan_id: "plan-escalar",
+        status: "pending",
+        created_at: staleDate,
+        billing_email: "partner@example.com",
+        plan: { id: "plan-escalar", name: "Escalar", slug: "escalar", price: 49.9 },
+      },
+      error: null,
+    })
+
+    const res: any = await getSubscriptionStatusAction()
+
+    expect(res.success).toBe(true)
+    expect(res.data.pending_change).toBeNull()
+    const { cancelPendingPlanChangeAttempts } = await import("@/lib/services/mercadopago/subscriptions")
+    expect(cancelPendingPlanChangeAttempts).toHaveBeenCalledWith("partner-1")
   })
 })
 

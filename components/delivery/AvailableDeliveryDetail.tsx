@@ -31,6 +31,8 @@ import {
     BoxIcon,
     XIcon,
     EyeIcon,
+    MoneyIcon,
+    StoreIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -52,6 +54,8 @@ export interface AvailableDeliveryDetailProps {
         store_phone?: string
         store_address?: string
         store_logo_url?: string
+        pickup_distance_km?: number | null
+        distance_km?: number | null
         order_count?: number
         orders?: Array<{
             order_id?: string
@@ -336,6 +340,11 @@ export default function AvailableDeliveryDetail({
                                                                     <span>{offer.store_address}</span>
                                                                 </p>
                                                             )}
+                                                            {offer.pickup_distance_km != null && (
+                                                                <p className="text-xs font-semibold text-brand-green flex items-center gap-1">
+                                                                    <span>📍 {offer.pickup_distance_km === 0 ? "No seu endereço de cadastro" : `Distância até a loja: ${offer.pickup_distance_km} km`}</span>
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <div className="shrink-0">
                                                             <ActionsDropdown
@@ -465,8 +474,8 @@ export default function AvailableDeliveryDetail({
                                                                 </div>
                                                                 <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento:</span>
-                                                                    <Badge variant={getPaymentStatusMeta(offer.payment_status).variant}>
-                                                                        {getPaymentStatusMeta(offer.payment_status).label}
+                                                                    <Badge variant={getPaymentStatusMeta(offer.payment_status || (offer as any).situation).variant} icon={<MoneyIcon />}>
+                                                                        {getPaymentStatusMeta(offer.payment_status || (offer as any).situation).label}
                                                                     </Badge>
                                                                 </div>
                                                             </>
@@ -655,8 +664,9 @@ export default function AvailableDeliveryDetail({
                     if (!selectedOrderForDetail) return null
                     const order = selectedOrderForDetail
                     const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
-                    const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
-                    const deliveryMeta = getDeliveryStatusMeta("available")
+                    const paymentMeta = getPaymentStatusMeta(order.situation || order.payment_status || offer.situation || offer.payment_status || "pending")
+                    const rawDeliveryStatus = order.delivery_status || order.deliveryStatus || (offer.status === "delivered" ? "delivered" : "preparing")
+                    const deliveryMeta = getDeliveryStatusMeta(rawDeliveryStatus)
                     const ordItems = order.items || []
                     const orderDate = order.created_at || order.order_date || order.order_created_at || offer.assigned_at
 
@@ -664,7 +674,7 @@ export default function AvailableDeliveryDetail({
                     if (order.created_at || order.order_date) {
                         orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
                     }
-                    if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                    if (["paid", "pago", "approved", "aprovado", "concluido", "concluído"].includes(String(order.situation || order.payment_status || "").toLowerCase())) {
                         orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
                     }
 
@@ -718,11 +728,16 @@ export default function AvailableDeliveryDetail({
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                <Badge variant={paymentMeta.variant} icon={<MoneyIcon />}>
+                                                    {paymentMeta.label}
+                                                </Badge>
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
-                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon("available")}>
+                                                <Badge
+                                                    variant={deliveryMeta.variant}
+                                                    icon={order.delivery_type === "pickup" ? <StoreIcon /> : getDeliveryStatusIcon(rawDeliveryStatus)}
+                                                >
                                                     {deliveryMeta.label}
                                                 </Badge>
                                             </div>

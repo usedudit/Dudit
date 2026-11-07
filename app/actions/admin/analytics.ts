@@ -422,7 +422,7 @@ export async function getPartnerAnalyticsAction(
             .lte("created_at", range.endIso)
             .order("created_at", { ascending: false })
             .limit(50),
-        admin.from("plans").select("id, name"),
+        admin.from("recurring_plans").select("id, name"),
     ])
 
     const totalPartners = totalPartnersRes.count || 0
@@ -437,7 +437,6 @@ export async function getPartnerAnalyticsAction(
     const partnerRetentionRate = totalPartners > 0 ? Number(((activePartners / totalPartners) * 100).toFixed(1)) : 0
     const businessesWithDemandRate = activePartners > 0 ? Number(((businessesWithDemand / activePartners) * 100).toFixed(1)) : 0
 
-    // Plans map
     const planNameMap = new Map<string, string>()
         ; (plansRes.data || []).forEach((p: any) => planNameMap.set(p.id, p.name))
 
@@ -478,8 +477,8 @@ export async function getPartnerAnalyticsAction(
             planCancellations++
         }
 
-        const prevPlan = meta.previous_plan_name || planNameMap.get(meta.previous_plan_id) || "Básico"
-        const newPlan = meta.new_plan_name || planNameMap.get(meta.new_plan_id) || (normalizedType === "cancellation" ? "Cancelado" : "Pro")
+        const prevPlan = meta.previous_plan_name || planNameMap.get(meta.previous_plan_id) || "Plano anterior"
+        const newPlan = meta.new_plan_name || planNameMap.get(meta.new_plan_id) || (normalizedType === "cancellation" ? "Cancelado" : "Plano atual")
         const reason = meta.reason || meta.cancel_reason || (normalizedType === "upgrade" ? "Expansão de limites e recursos" : normalizedType === "downgrade" ? "Ajuste de custos" : "Sem justificativa informada")
 
         recentPlanChanges.push({

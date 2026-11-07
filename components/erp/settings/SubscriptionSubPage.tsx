@@ -41,6 +41,7 @@ import {
     createSubscriptionAction,
     cancelSubscriptionAction,
     upgradeSubscriptionAction,
+    cancelPendingUpgradeAction,
 } from "@/app/actions/erp/subscriptions"
 import {
     getLatestPurchaseForSubscriptionAction,
@@ -831,6 +832,25 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         handleGeneratePendingManualPayment()
     }
 
+    const [cancellingPendingUpgrade, setCancellingPendingUpgrade] = useState(false)
+
+    const handleCancelPendingUpgrade = async () => {
+        try {
+            setCancellingPendingUpgrade(true)
+            const res = await cancelPendingUpgradeAction()
+            if (res.success) {
+                toast.success("Tentativa de upgrade cancelada com sucesso.")
+                await loadData()
+            } else {
+                toast.error(res.error || "Erro ao cancelar tentativa de upgrade.")
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Erro ao cancelar tentativa.")
+        } finally {
+            setCancellingPendingUpgrade(false)
+        }
+    }
+
     // ─── Render ────────────────────────────────────────────────────────────
 
     const currentPlanSlug = subData?.plan?.slug || "free"
@@ -863,6 +883,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const pendingChange = subData?.pending_change ?? null
     const pendingInvoice = pendingChange?.invoice ?? null
     const isPendingPayment = Boolean(pendingChange)
+    const isPastDue = subData?.subscription?.status === "past_due"
     const hasBillingInfo = hasActivePaidSub || isPendingPayment
     const nextInvoiceDate = (!isScheduledToCancel && !isPeriodExpired)
         ? (nextInvoice?.due_date
@@ -1117,16 +1138,32 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                 )}
                             </div>
 
-                            {/* Card 2: Próxima Fatura */}
+                            {/* Card 2: Cobrança / Renovação */}
                             <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
-                                            {isPendingPayment ? "Fatura pendente" : "Próxima fatura"}
+                                            {isPendingPayment
+                                                ? "Upgrade pendente"
+                                                : isPastDue
+                                                    ? "Renovação em atraso"
+                                                    : isScheduledToCancel
+                                                        ? "Status da assinatura"
+                                                        : hasActivePaidSub
+                                                            ? "Próxima renovação"
+                                                            : "Faturamento & Cobranças"}
                                         </span>
                                         {isScheduledToCancel ? (
                                             <Badge variant="gray">
-                                                Cancelada
+                                                Cancelamento agendado
+                                            </Badge>
+                                        ) : isPendingPayment ? (
+                                            <Badge variant="orange">
+                                                Aguardando pagamento
+                                            </Badge>
+                                        ) : isPastDue ? (
+                                            <Badge variant="red">
+                                                Tolerância ativa
                                             </Badge>
                                         ) : hasScheduledChange ? (
                                             <Badge variant="blue">
@@ -1134,13 +1171,13 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             </Badge>
                                         ) : !hasBillingInfo ? (
                                             <Badge variant="gray">
-                                                Sem cobranças
+                                                Sem mensalidade
                                             </Badge>
-                                        ) : nextInvoiceStatusLabel(shownInvoiceStatus) ? (
-                                            <Badge variant={nextInvoiceStatusVariant(shownInvoiceStatus)}>
-                                                {nextInvoiceStatusLabel(shownInvoiceStatus)}
+                                        ) : (
+                                            <Badge variant="green">
+                                                Renovação automática
                                             </Badge>
-                                        ) : null}
+                                        )}
                                     </div>
 
                                     <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
@@ -1150,80 +1187,175 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 : formatCurrency(shownAmount)
                                         ) : "..."}
                                     </h2>
+
+                                    <p className="text-xs md:text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                                        {isPendingPayment ? (
+                                            `Solicitação de upgrade para o Plano ${shownPlanName}. Expira em até 3 dias se não for confirmada.`
+                                        ) : isPastDue ? (
+                                            subData?.subscription?.grace_days_left != null ? (
+                                                `Tentativa de cobrança recusada. Você está no período de tolerância de 3 dias (restam ${subData.subscription.grace_days_left} dia(s) de acesso).`
+                                            ) : (
+                                                "Tentativa de cobrança recusada. Regularize o pagamento para manter os recursos liberados."
+                                            )
+                                        ) : isScheduledToCancel ? (
+                                            "Sua assinatura não será renovada ao final deste ciclo. Nenhuma nova cobrança será realizada."
+                                        ) : !hasBillingInfo ? (
+                                            "Seu plano atual é gratuito e vitalício. Você não possui mensalidades ou cobranças automáticas."
+                                        ) : (
+                                            "Seu plano renova automaticamente a cada mês no cartão cadastrado."
+                                        )}
+                                    </p>
                                 </div>
 
-                                <div className="space-y-3 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
+                                <div className="space-y-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     {isScheduledToCancel ? (
-                                        <>
+                                        <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {scheduledPlan ? "A gerar" : "Nenhuma fatura a gerar"}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Próximo plano</span>
-                                                <span className="font-bold text-amber-600 dark:text-amber-400">
-                                                    {scheduledPlan
-                                                        ? getHardcodedPlan(scheduledPlan.slug).name
-                                                        : "Cancelada"}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Acesso até</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Acesso liberado até</span>
                                                 <span className="font-bold text-amber-600 dark:text-amber-400">
                                                     {accessUntilDate ? formatDate(accessUntilDate) : "-"}
                                                 </span>
                                             </div>
-                                        </>
-                                    ) : !hasBillingInfo ? (
-                                        <>
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Próximo plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {scheduledPlan ? getHardcodedPlan(scheduledPlan.slug).name : "Começar (Gratuito)"}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Cobranças futuras</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Nenhuma
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : !hasBillingInfo ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Começar (Gratuito)
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Cobrança futura</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Nenhuma cobrança agendada
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Histórico</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     Sem faturas pendentes
                                                 </span>
                                             </div>
-
+                                        </div>
+                                    ) : isPendingPayment ? (
+                                        <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano solicitado</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Plano Começar (Gratuito)
+                                                    Plano {shownPlanName}
                                                 </span>
                                             </div>
-
                                             <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    Sem vencimento
-                                                </span>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Fatura</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {shownInvoiceNumber}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {subData ? `Plano ${shownPlanName}` : "-"}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center justify-between text-xs md:text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do pedido</span>
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                     {shownDueDate ? formatDate(shownDueDate) : "-"}
                                                 </span>
                                             </div>
-                                        </>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status</span>
+                                                <span className="font-bold text-brand-orange">
+                                                    Expira em 3 dias se não pago
+                                                </span>
+                                            </div>
+
+                                            <div className="pt-2 flex flex-col gap-2">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <Button
+                                                        className="w-full"
+                                                        onClick={handleGeneratePendingManualPayment}
+                                                        disabled={manualPaymentModal.loading}
+                                                        isLoading={manualPaymentModal.loading}
+                                                        leftIcon={<EnergyIcon size={16} />}
+                                                    >
+                                                        Pagar via PIX (QR Code)
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="w-full"
+                                                        onClick={handlePayPending}
+                                                    >
+                                                        Pagar com Cartão
+                                                    </Button>
+                                                </div>
+                                                <Button
+                                                    variant="outlinered"
+                                                    className="w-full"
+                                                    onClick={handleCancelPendingUpgrade}
+                                                    disabled={cancellingPendingUpgrade}
+                                                    isLoading={cancellingPendingUpgrade}
+                                                >
+                                                    Cancelar upgrade
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : isPastDue ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Plano {shownPlanName}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Vencimento</span>
+                                                <span className="font-bold text-brand-red">
+                                                    {shownDueDate ? formatDate(shownDueDate) : "-"}
+                                                </span>
+                                            </div>
+
+                                            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <Button
+                                                    className="w-full"
+                                                    onClick={handleGenerateManualPayment}
+                                                    disabled={manualPaymentModal.loading}
+                                                    isLoading={manualPaymentModal.loading}
+                                                    leftIcon={<EnergyIcon size={16} />}
+                                                >
+                                                    Pagar via PIX (QR Code)
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={handlePayPending}
+                                                >
+                                                    Pagar com Cartão
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Plano</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Plano {shownPlanName}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data da renovação</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {shownDueDate ? formatDate(shownDueDate) : "-"}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs md:text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de cobrança</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    Cartão de Crédito
+                                                </span>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>

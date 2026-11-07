@@ -263,7 +263,7 @@ export default function AvailableDeliveriesList() {
             if (debounceTimer) clearTimeout(debounceTimer)
             try {
                 supabaseClient.removeChannel(channel)
-            } catch {}
+            } catch { }
         }
     }, [supabaseClient, loadOffers])
 
@@ -416,27 +416,10 @@ export default function AvailableDeliveriesList() {
                             <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
                                 Entregas Disponíveis
                             </h1>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                {offers.length} {offers.length === 1 ? "oferta" : "ofertas"}
-                            </span>
                         </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                             Ofertas de entrega em tempo real aguardando aceite na sua região.
                         </p>
-                    </div>
-
-                    {/* TOP CONTROLS: REFRESH */}
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => loadOffers(true)}
-                            disabled={isRefreshing || isLoading || isCooldown}
-                            className="shrink-0"
-                        >
-                            <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
-                        </Button>
                     </div>
                 </div>
 
@@ -494,7 +477,6 @@ export default function AvailableDeliveriesList() {
                                     }}
                                     className="h-[42px]"
                                     variant="full-rounded"
-                                    label=""
                                 />
                                 {search && (
                                     <button
@@ -554,7 +536,7 @@ export default function AvailableDeliveriesList() {
                                     imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
                                     imageAlt="Nenhuma oferta disponível"
                                     title="Nenhuma entrega disponível no momento"
-                                    subtitle="Novas solicitações de entrega enviadas pelos lojistas parceiros aparecerão aqui automaticamente."
+                                    subtitle="Novas solicitações de entrega enviadas por lojas no seu raio de atendimento (até 20 km) aparecerão aqui em tempo real. Certifique-se de manter seu status 'Disponível' ativado no topo da página."
                                     itemButton={{
                                         text: "Verificar agora",
                                         action: () => loadOffers(true),

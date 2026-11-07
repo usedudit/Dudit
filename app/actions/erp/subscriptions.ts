@@ -188,66 +188,75 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       const pendingPrice = Number(pendingPlan?.price || 0)
 
       if (pendingSub && pendingPrice > 0 && pendingPlan?.slug !== "free") {
-        const loadPendingPurchase = () =>
-          admin
-            .from("billing_purchases")
-            .select("*, billing_invoices(*)")
-            .eq("subscription_id", pendingSub.id)
-            .in("status", ["pending", "failed"])
-            .order("billing_period_start", { ascending: false })
-            .limit(1)
-            .maybeSingle()
+        const createdAtMs = pendingSub.created_at ? new Date(pendingSub.created_at).getTime() : 0
+        const isStale = createdAtMs > 0 && (Date.now() - createdAtMs) > PAST_DUE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
 
-        let { data: pendingPurchase } = await loadPendingPurchase()
+        if (isStale) {
+          // Abandoned checkout attempt older than 3 days: auto-cancel lazily so user sees clean state
+          await cancelPendingPlanChangeAttempts(partner.id)
+          pendingChange = null
+        } else {
+          const loadPendingPurchase = () =>
+            admin
+              .from("billing_purchases")
+              .select("*, billing_invoices(*)")
+              .eq("subscription_id", pendingSub.id)
+              .in("status", ["pending", "failed"])
+              .order("billing_period_start", { ascending: false })
+              .limit(1)
+              .maybeSingle()
 
-        // Legacy attempts created before the invoice invariant may have no
-        // purchase. Materialize it lazily so the latest unfinished plan change
-        // is always visible and payable in the billing history.
-        if (!pendingPurchase) {
-          await ensurePendingInvoiceForCheckout(pendingSub.id, null)
-          const retry = await loadPendingPurchase()
-          pendingPurchase = retry.data
-        }
+          let { data: pendingPurchase } = await loadPendingPurchase()
 
-        const pendingInvoice = (pendingPurchase as any)?.billing_invoices?.[0] || null
-        const dueDate =
-          pendingPurchase?.billing_period_start || (pendingSub as any).created_at || null
-
-        let pendingPaymentUrl: string | null = null
-        if (pendingSub.mercado_pago_subscription_id) {
-          try {
-            const mpStatus = await getMpSubscriptionStatus(
-              pendingSub.mercado_pago_subscription_id,
-            )
-            if (typeof mpStatus?.init_point === "string") {
-              pendingPaymentUrl = mpStatus.init_point
-            }
-          } catch {
-            // Non-critical: the UI falls back to the manual PIX flow.
+          // Legacy attempts created before the invoice invariant may have no
+          // purchase. Materialize it lazily so the latest unfinished plan change
+          // is always visible and payable in the billing history.
+          if (!pendingPurchase) {
+            await ensurePendingInvoiceForCheckout(pendingSub.id, null)
+            const retry = await loadPendingPurchase()
+            pendingPurchase = retry.data
           }
-        }
 
-        pendingChange = {
-          subscription_id: pendingSub.id,
-          plan_id: pendingSub.plan_id,
-          plan_name: pendingPlan.name,
-          plan_slug: pendingPlan.slug,
-          amount: Number(pendingPurchase?.total_amount ?? pendingPrice),
-          status: pendingPurchase?.status ?? "pending",
-          payment_url: pendingPaymentUrl,
-          created_at: (pendingSub as any).created_at ?? null,
-          invoice: pendingPurchase
-            ? {
-                purchase_id: pendingPurchase.id,
-                invoice_id: pendingInvoice?.id || pendingPurchase.invoice_id || null,
-                invoice_number: pendingInvoice?.invoice_number || null,
-                due_date: dueDate,
-                period_start: pendingPurchase.billing_period_start || null,
-                period_end: pendingPurchase.billing_period_end || null,
-                amount: Number(pendingPurchase.total_amount || pendingPrice),
-                status: pendingPurchase.status,
+          const pendingInvoice = (pendingPurchase as any)?.billing_invoices?.[0] || null
+          const dueDate =
+            pendingPurchase?.billing_period_start || (pendingSub as any).created_at || null
+
+          let pendingPaymentUrl: string | null = null
+          if (pendingSub.mercado_pago_subscription_id) {
+            try {
+              const mpStatus = await getMpSubscriptionStatus(
+                pendingSub.mercado_pago_subscription_id,
+              )
+              if (typeof mpStatus?.init_point === "string") {
+                pendingPaymentUrl = mpStatus.init_point
               }
-            : null,
+            } catch {
+              // Non-critical: the UI falls back to the manual PIX flow.
+            }
+          }
+
+          pendingChange = {
+            subscription_id: pendingSub.id,
+            plan_id: pendingSub.plan_id,
+            plan_name: pendingPlan.name,
+            plan_slug: pendingPlan.slug,
+            amount: Number(pendingPurchase?.total_amount ?? pendingPrice),
+            status: pendingPurchase?.status ?? "pending",
+            payment_url: pendingPaymentUrl,
+            created_at: (pendingSub as any).created_at ?? null,
+            invoice: pendingPurchase
+              ? {
+                  purchase_id: pendingPurchase.id,
+                  invoice_id: pendingInvoice?.id || pendingPurchase.invoice_id || null,
+                  invoice_number: pendingInvoice?.invoice_number || null,
+                  due_date: dueDate,
+                  period_start: pendingPurchase.billing_period_start || null,
+                  period_end: pendingPurchase.billing_period_end || null,
+                  amount: Number(pendingPurchase.total_amount || pendingPrice),
+                  status: pendingPurchase.status,
+                }
+              : null,
+          }
         }
       }
     } catch (err: any) {
@@ -399,6 +408,24 @@ export async function cancelSubscriptionAction(input?: {
       message,
       cancelAtPeriodEnd: result.cancelAtPeriodEnd,
       currentPeriodEnd: result.currentPeriodEnd,
+    })
+  } catch (error: any) {
+    return errorResponse(error.message)
+  }
+}
+
+/**
+ * Cancel the current pending plan-change attempt (dismisses unfinished upgrade checkout).
+ */
+export async function cancelPendingUpgradeAction(): Promise<ActionResponse<any>> {
+  try {
+    const user = await requireUser()
+    const partner = await requirePartner()
+
+    await cancelPendingPlanChangeAttempts(partner.id)
+
+    return successResponse({
+      message: "Tentativa de upgrade cancelada com sucesso.",
     })
   } catch (error: any) {
     return errorResponse(error.message)

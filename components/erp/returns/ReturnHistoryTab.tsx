@@ -1,6 +1,6 @@
 "use client"
 
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, resolveTimelineActorName, humanizeTimelineChangeLine, type TimelineViewer } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ReturnEvent } from "./types"
@@ -11,6 +11,7 @@ interface ReturnHistoryTabProps {
     loading?: boolean
     /** Painel admin: revela qual membro da equipe Dudit executou a ação. */
     showAdminActor?: boolean
+    viewer?: TimelineViewer
 }
 
 function getReturnStatusLabel(status: string) {
@@ -41,81 +42,118 @@ function getStatusActionLabel(actionType: string) {
     }
 }
 
-function mapReturnEventToHistoryEntry(event: ReturnEvent, showAdminActor = false): HistoryEntry {
+function mapReturnEventToHistoryEntry(
+    event: ReturnEvent,
+    showAdminActor = false,
+    viewer: TimelineViewer = showAdminActor ? "admin" : "seller"
+): HistoryEntry {
     const changeLines: string[] = []
     const metadata = event.metadata || {}
     const actionType = event.event_type || "updated"
-    const isDuditAction = Boolean(metadata.dudit_action) || event.source === "admin"
-    const actorName = isDuditAction
-        ? (showAdminActor && metadata.admin_actor_name
-            ? String(metadata.admin_actor_name)
-            : "Equipe Dudit")
-        : (event.actor_name || "Sistema")
+    const isCustomerEvent = actionType === "created" || Boolean(metadata.is_buyer || event.source === "marketplace")
 
-    if (event.previous_status && event.new_status && event.previous_status !== event.new_status) {
-        changeLines.push(`alterou status: ${getReturnStatusLabel(event.previous_status)} → ${getReturnStatusLabel(event.new_status)}`)
+    const actorName = resolveTimelineActorName({
+        entry: {
+            actor_user_id: event.changed_by || null,
+            actor_name: event.actor_name || null,
+            metadata: {
+                ...metadata,
+                is_buyer: isCustomerEvent,
+                admin_actor_name: metadata.admin_actor_name,
+            },
+            source: event.source || null,
+            entry_type: actionType === "created" ? "return_created" : actionType,
+        },
+        viewer,
+        orderCustomerName: event.actor_name || null,
+    })
+
+    const isDuditAction = Boolean(
+        metadata.dudit_action ||
+        event.source === "admin" ||
+        (event.actor_name && event.actor_name.includes("Equipe Dudit"))
+    )
+
+    if (actionType === "created") {
+        changeLines.push("Solicitação de troca/devolução criada.")
+    } else if (event.previous_status && event.new_status && event.previous_status !== event.new_status) {
+        changeLines.push(humanizeTimelineChangeLine(`alterou status: ${getReturnStatusLabel(event.previous_status)} → ${getReturnStatusLabel(event.new_status)}`))
     }
 
-    if (event.notes) {
-        changeLines.push(event.notes)
+    if (Array.isArray(event.change_lines) && event.change_lines.length > 0) {
+        for (const rawLine of event.change_lines) {
+            const line = humanizeTimelineChangeLine(rawLine)
+            if (line && !changeLines.includes(line)) {
+                changeLines.push(line)
+            }
+        }
+    } else if (event.notes) {
+        const line = humanizeTimelineChangeLine(event.notes)
+        if (line && !changeLines.includes(line)) {
+            changeLines.push(line)
+        }
     }
 
-    // Para ações da Equipe Dudit, NÃO mostrar metadados técnicos (reembolso, troca, etc.)
-    // Mostrar apenas a mensagem/razão que o admin digitou no modal
-    if (!isDuditAction) {
-        if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
-            changeLines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`)
-            if (metadata.refund_status) {
-                changeLines.push(`Status do reembolso: ${metadata.refund_status}`)
-            }
-            if (metadata.refund_payment_method) {
-                changeLines.push(`Método de reembolso: ${metadata.refund_payment_method}`)
-            }
-        }
+    if (metadata.reason && !changeLines.some(l => l.includes(metadata.reason))) {
+        changeLines.push(`Motivo: "${metadata.reason}"`)
+    }
 
-        if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
-            changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
-        }
+    // Informações financeiras e detalhes adicionais (mostrados apenas quando aprovado/resolvido)
+    const isApprovedOrResolved = event.new_status === "APPROVED" || event.new_status === "RESOLVED" || event.new_status === "PROCESSING" || actionType === "approved" || actionType === "resolved"
+    const isRejectedEvent = event.new_status === "REJECTED" || actionType === "rejected" || metadata.to_status === "REJECTED"
 
-        if (metadata.exchange_order_id) {
-            changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
+    if (!isRejectedEvent && isApprovedOrResolved && metadata.refund_amount && Number(metadata.refund_amount) > 0) {
+        changeLines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`)
+        if (metadata.refund_status) {
+            changeLines.push(`Status do reembolso: ${metadata.refund_status}`)
         }
-        if (Number(metadata.exchange_shortfall_amount || 0) > 0) {
-            changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)
+        if (metadata.refund_payment_method) {
+            changeLines.push(`Método de reembolso: ${metadata.refund_payment_method}`)
         }
-        if (Number(metadata.exchange_surplus_amount || 0) > 0) {
-            changeLines.push(`Crédito excedente gerado: ${formatCurrency(Number(metadata.exchange_surplus_amount))}`)
-        }
-        if (metadata.exchange_balance_resolution) {
-            const dest = metadata.exchange_balance_resolution === "store_credit" ? "vale-compra" : "reembolso"
-            changeLines.push(`Saldo da troca enviado para: ${dest}`)
-        }
+    }
 
-        if (metadata.stock_movement_id) {
-            changeLines.push("Itens restaurados ao estoque físico")
-        }
+    if (!isRejectedEvent && isApprovedOrResolved && metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
+        changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
+    }
 
-        if (metadata.resolution) {
-            const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
-                metadata.resolution === "exchange" ? "Troca" :
-                    metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution
-            changeLines.push(`Resolução desejada: ${resolLabel}`)
-        }
+    if (!isRejectedEvent && isApprovedOrResolved && metadata.exchange_order_id) {
+        changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
+    }
+    if (!isRejectedEvent && isApprovedOrResolved && Number(metadata.exchange_shortfall_amount || 0) > 0) {
+        changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)
+    }
+    if (!isRejectedEvent && isApprovedOrResolved && Number(metadata.exchange_surplus_amount || 0) > 0) {
+        changeLines.push(`Crédito excedente gerado: ${formatCurrency(Number(metadata.exchange_surplus_amount))}`)
+    }
+    if (!isRejectedEvent && isApprovedOrResolved && metadata.exchange_balance_resolution) {
+        const dest = metadata.exchange_balance_resolution === "store_credit" ? "vale-compra" : "reembolso"
+        changeLines.push(`Saldo da troca enviado para: ${dest}`)
+    }
 
-        if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
-            changeLines.push("Itens na solicitação:")
-            metadata.items.forEach((item: any) => {
-                const name = item.productName || item.product_name || `Item ${String(item.order_item_id || "").slice(0, 6)}`
-                const qty = item.quantity || 1
-                const conditionRaw = String(item.condition || "").toLowerCase()
-                const cond = conditionRaw === "sealed" || conditionRaw === "lacrado" ? "Lacrado" : conditionRaw === "damaged" || conditionRaw === "danificado" ? "Danificado" : "Aberto"
-                changeLines.push(`  ${name} (${qty}x) - Condição: ${cond}`)
-            })
-        }
+    if (metadata.stock_movement_id) {
+        changeLines.push("Itens restaurados ao estoque físico")
+    }
 
-        if (metadata.mpRefundId) {
-            changeLines.push(`Refund ID do Mercado Pago: ${metadata.mpRefundId}`)
-        }
+    if (metadata.resolution) {
+        const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
+            metadata.resolution === "exchange" ? "Troca" :
+                metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution
+        changeLines.push(`Resolução desejada: ${resolLabel}`)
+    }
+
+    if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
+        changeLines.push("Itens na solicitação:")
+        metadata.items.forEach((item: any) => {
+            const name = item.productName || item.product_name || `Item ${String(item.order_item_id || "").slice(0, 6)}`
+            const qty = item.quantity || 1
+            const conditionRaw = String(item.condition || "").toLowerCase()
+            const cond = conditionRaw === "sealed" || conditionRaw === "lacrado" ? "Lacrado" : conditionRaw === "damaged" || conditionRaw === "danificado" ? "Danificado" : "Aberto"
+            changeLines.push(`  ${name} (${qty}x) - Condição: ${cond}`)
+        })
+    }
+
+    if (metadata.mpRefundId) {
+        changeLines.push(`Refund ID do Mercado Pago: ${metadata.mpRefundId}`)
     }
 
     if (changeLines.length === 0) {
@@ -132,7 +170,12 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent, showAdminActor = false
     }
 }
 
-export function ReturnHistoryTab({ events, loading = false, showAdminActor = false }: ReturnHistoryTabProps) {
+export function ReturnHistoryTab({
+    events,
+    loading = false,
+    showAdminActor = false,
+    viewer = showAdminActor ? "admin" : "seller",
+}: ReturnHistoryTabProps) {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full min-h-[200px] w-full">
@@ -141,7 +184,7 @@ export function ReturnHistoryTab({ events, loading = false, showAdminActor = fal
         )
     }
 
-    const entries = (events || []).map((event) => mapReturnEventToHistoryEntry(event, showAdminActor))
+    const entries = (events || []).map((event) => mapReturnEventToHistoryEntry(event, showAdminActor, viewer))
 
     return (
         <FadeIn>

@@ -102,8 +102,14 @@ export default function AvailableDeliveryGridCard({
                     </div>
 
                     {/* Row 2: Estabelecimento */}
-                    <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate mt-1">
-                        {offer.store_name || offer.partner_name || "Estabelecimento"}
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate mt-1">
+                        <span className="truncate">{offer.store_name || offer.partner_name || "Estabelecimento"}</span>
+                        {offer.pickup_distance_km != null && (
+                            <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-brand-green shrink-0">
+                                <MapPinIcon size={11} />
+                                {offer.pickup_distance_km === 0 ? "No seu local" : `${offer.pickup_distance_km} km`}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>

@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
-import { formatCurrency } from "@/lib/utils/formatters"
+import { formatCurrency, humanizeTimelineChangeLine } from "@/lib/utils/formatters"
 
 const MAX_MERGED_ENTRIES = 50
 
@@ -134,77 +134,65 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
 
   return merged.map((entry) => {
     let actorName = entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema"
-    let changeLines = [...entry.change_lines]
+    let changeLines = (entry.change_lines || []).map((line) => humanizeTimelineChangeLine(line))
 
     const isDuditAction = Boolean(
       entry.metadata?.dudit_action ||
       (entry.metadata as any)?.is_admin_action ||
-      (entry as any).actor_name === "Equipe Dudit"
+      (entry as any).actor_name === "Equipe Dudit" ||
+      (entry.metadata as any)?.admin_actor_name
     )
 
     if (isDuditAction) {
       actorName = "Equipe Dudit"
     }
 
-    // Rewrite return created events for ERP view
-    if (entry.entry_type === "return_created") {
-      actorName = "Solicitação de devolução"
-      changeLines = changeLines.map(line => 
-        line === "Solicitação criada" ? "Solicitação de devolução criada pelo cliente" : line
-      )
+    // Default line for return created if empty
+    if (entry.entry_type === "return_created" && changeLines.length === 0) {
+      changeLines.push("Solicitação de troca/devolução criada.")
     }
 
-    // Format deposit events for human readability in ERP & Marketplace
-    if (entry.entry_type === "deposit_cancelled") {
-      actorName = "Sinal cancelado"
-      changeLines = changeLines.map(line =>
-        line.startsWith("cancelou") ? "O sinal do pedido foi cancelado pelo vendedor." : line
-      )
-    } else if (entry.entry_type === "deposit_created") {
-      actorName = "Cobrança de sinal gerada"
-      changeLines = changeLines.map(line =>
-        line.startsWith("gerou") ? "Nova cobrança de sinal gerada via Mercado Pago." : line
-      )
-    } else if (entry.entry_type === "deposit_paid") {
-      actorName = "Sinal pago"
-      changeLines = changeLines.map(line =>
-        line.startsWith("confirmou") ? "Recebimento do sinal confirmado." : line
-      )
-    } else if (entry.entry_type === "deposit_expired") {
-      actorName = "Sinal expirado"
-      changeLines = changeLines.map(line =>
-        line.startsWith("expirou") ? "O prazo para pagamento do sinal expirou." : line
-      )
+    // Standardize deposit change lines if legacy raw text was saved
+    if (entry.entry_type === "deposit_cancelled" && changeLines.length === 0) {
+      changeLines.push("Cobrança de sinal cancelada.")
+    } else if (entry.entry_type === "deposit_created" && changeLines.length === 0) {
+      changeLines.push("Cobrança de sinal gerada via Mercado Pago.")
+    } else if (entry.entry_type === "deposit_paid" && changeLines.length === 0) {
+      changeLines.push("Pagamento do sinal confirmado com sucesso.")
+    } else if (entry.entry_type === "deposit_expired" && changeLines.length === 0) {
+      changeLines.push("Prazo para pagamento do sinal expirado.")
     }
 
-    // Rewrite return status changes for ERP view
-    if (entry.entry_type && entry.entry_type.startsWith("return_") && entry.entry_type !== "return_created") {
-      changeLines = changeLines.map(line => {
-        if (line.startsWith("Solicitação atualizada:")) {
-          let newLine = line.replace("Solicitação atualizada:", "Solicitação de devolução atualizada:")
-          if (hasSellerNotes) {
-            newLine = newLine.trim().replace(/\.$/, "") + ". Observações adicionadas."
-          }
-          return newLine
-        }
-        return line
-      })
+    // Append seller notes indicator if present and not already added
+    if (
+      entry.entry_type &&
+      entry.entry_type.startsWith("return_") &&
+      entry.entry_type !== "return_created" &&
+      hasSellerNotes &&
+      !changeLines.some((l) => l.toLowerCase().includes("observações adicionadas"))
+    ) {
+      changeLines.push("Observações adicionadas.")
     }
 
-    // Enrich return events with financial details from metadata
+    // Enrich return events with financial details from metadata (only when approved/resolved and NOT rejected)
     if (entry.entry_type && entry.entry_type.startsWith("return_") && entry.metadata) {
       const md = entry.metadata
-      if (Number(md.refund_amount || 0) > 0) {
-        changeLines.push(`Valor do reembolso: ${formatCurrency(Number(md.refund_amount))}`)
-      }
-      if (Number(md.store_credit_amount || 0) > 0) {
-        changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(md.store_credit_amount))}`)
-      }
-      if (md.refund_payment_method) {
-        changeLines.push(`Método de reembolso: ${md.refund_payment_method}`)
-      }
-      if (md.exchange_order_id) {
-        changeLines.push(`Pedido de troca criado: #${String(md.exchange_order_id).slice(0, 8).toUpperCase()}`)
+      const isRejected = md.to_status === "REJECTED" || entry.entry_type === "return_rejected"
+      const isApprovedOrResolved = md.to_status === "APPROVED" || md.to_status === "RESOLVED" || md.to_status === "PROCESSING" || entry.entry_type === "return_approved" || entry.entry_type === "return_resolved"
+
+      if (!isRejected && isApprovedOrResolved) {
+        if (Number(md.refund_amount || 0) > 0) {
+          changeLines.push(`Valor do reembolso: ${formatCurrency(Number(md.refund_amount))}`)
+        }
+        if (Number(md.store_credit_amount || 0) > 0) {
+          changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(md.store_credit_amount))}`)
+        }
+        if (md.refund_payment_method) {
+          changeLines.push(`Método de reembolso: ${md.refund_payment_method}`)
+        }
+        if (md.exchange_order_id) {
+          changeLines.push(`Pedido de troca criado: #${String(md.exchange_order_id).slice(0, 8).toUpperCase()}`)
+        }
       }
     }
 

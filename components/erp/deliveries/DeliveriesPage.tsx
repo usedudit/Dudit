@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { replaceUrl } from "@/lib/navigation/history"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -75,7 +74,6 @@ export default function DeliveriesPage({
     planSlug?: string
     carrierEnabled?: boolean
 }) {
-    const searchParams = useSearchParams()
     const router = useRouter()
     const { openPlanUpgrade } = usePlanUpgrade()
 
@@ -88,23 +86,8 @@ export default function DeliveriesPage({
 
     const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
 
-    const initialSearch = searchParams?.get("search") || ""
-    const [search, setSearchState] = useState(initialSearch)
-
-    const setSearch = useCallback((val: string) => {
-        setSearchState(val)
-        if (typeof window !== "undefined") {
-            const url = new URL(window.location.href)
-            if (val.trim()) {
-                url.searchParams.set("search", val.trim())
-            } else {
-                url.searchParams.delete("search")
-            }
-            replaceUrl(`${url.pathname}${url.search}${url.hash}`)
-        }
-    }, [])
-
-    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
+    const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [filters, setFilters] = useState<{ status: string[]; datePeriod: DatePeriodFilterValue }>({
         status: [],
         datePeriod: { ...EMPTY_DATE_PERIOD },
@@ -115,15 +98,6 @@ export default function DeliveriesPage({
     const [mode, setMode] = useState<"deliveries" | "carriers" | "failed">("deliveries")
     const carrierEnabled = initialCarrierEnabled
     const planSlug = initialPlanSlug || "free"
-
-    // Sync search with URL searchParams
-    useEffect(() => {
-        const currentSearchParam = searchParams?.get("search") || ""
-        if (currentSearchParam !== search) {
-            setSearchState(currentSearchParam)
-            setDebouncedSearch(currentSearchParam)
-        }
-    }, [searchParams])
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })

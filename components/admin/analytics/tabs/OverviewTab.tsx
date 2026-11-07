@@ -18,6 +18,7 @@ import {
 } from "@/lib/icons"
 import { Badge, Button } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
+import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
 import type { OverviewAnalyticsData } from "@/app/actions/admin/analytics"
 
 interface OverviewTabProps {
@@ -69,27 +70,21 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header Description */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/5 dark:to-transparent p-5 rounded-[24px] border border-emerald-500/20">
-                <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-full bg-brand-green/20 text-brand-green flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                        <TrendingUpIcon size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-base sm:text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Painel Executivo de Saúde da Dudit
-                        </h2>
-                        <p className="text-xs sm:text-sm text-brand-inactive-text dark:text-dark-body">
-                            Consolidado de crescimento de usuários, atividade de parceiros e inteligência de demanda do marketplace.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
+            {/* Header Description - Using DashboardSectionCard */}
+            <DashboardSectionCard
+                title="Painel Executivo de Saúde da Dudit"
+                icon={TrendingUpIcon}
+                action={
                     <Badge variant="green" className="py-1 px-3">
                         Período: {data.periodRange.label}
                     </Badge>
-                </div>
-            </div>
+                }
+                className="mb-0 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/5 dark:to-transparent border-emerald-500/20"
+            >
+                <p className="text-xs sm:text-sm text-brand-inactive-text dark:text-dark-body">
+                    Consolidado de crescimento de usuários, atividade de parceiros e inteligência de demanda do marketplace.
+                </p>
+            </DashboardSectionCard>
 
             {/* Top KPI Cards - Using HorizontalKPICard from ERP */}
             <HorizontalKPICard items={kpiItems} />
@@ -97,16 +92,10 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
             {/* Middle Section: Demand Funnel & Market Opportunities */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Funil de Demanda da Plataforma */}
-                <div className="lg:col-span-8 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border overflow-hidden">
-                    <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                        <div>
-                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">
-                                Funil de Demanda do Marketplace
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Da intenção de compra até a conversão em contato, agendamento ou pedido
-                            </p>
-                        </div>
+                <DashboardSectionCard
+                    title="Funil de Demanda do Marketplace"
+                    icon={SearchIcon}
+                    action={
                         <Button
                             variant="ghost"
                             className="text-xs text-brand-green font-semibold"
@@ -114,9 +103,14 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                         >
                             Ver Detalhes <ArrowRightIcon size={14} className="ml-1" />
                         </Button>
-                    </div>
+                    }
+                    className="lg:col-span-8"
+                >
+                    <div className="space-y-4">
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                            Da intenção de compra até a conversão em contato, agendamento ou pedido
+                        </p>
 
-                    <div className="p-6 flex flex-col gap-4">
                         {/* Step 1: Buscas */}
                         <div className="p-4 rounded-[24px] bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
@@ -194,78 +188,73 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </DashboardSectionCard>
 
                 {/* Top Demanda Reprimida ("O que a cidade quer?") */}
-                <div className="lg:col-span-4 bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border overflow-hidden flex flex-col justify-between">
+                <DashboardSectionCard
+                    title="O que a Cidade Quer"
+                    icon={TagIcon}
+                    action={
+                        <Badge variant="red">Demandas Registradas</Badge>
+                    }
+                    className="lg:col-span-4 flex flex-col justify-between"
+                >
                     <div>
-                        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                                <h3 className="font-bold text-brand-dark dark:text-dark-heading">
-                                    O que a Cidade Quer
-                                </h3>
-                            </div>
-                            <Badge variant="red">Demandas Registradas</Badge>
-                        </div>
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
+                            Demandas que os clientes cadastraram na Dudit procurando produtos, serviços ou lojas:
+                        </p>
 
-                        <div className="p-6">
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
-                                Demandas que os clientes cadastraram na Dudit procurando produtos, serviços ou lojas:
-                            </p>
-
-                            {topOpportunities.length > 0 ? (
-                                <div className="flex flex-col gap-3">
-                                    {topOpportunities.map((item, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="p-3 rounded-[24px] bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 flex items-center justify-between"
-                                        >
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
-                                                        {item.term}
-                                                    </div>
-                                                    {item.demandType && (
-                                                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                            item.demandType === 'contratar'
-                                                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
-                                                                : item.demandType === 'loja'
-                                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
-                                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
-                                                        }`}>
-                                                            {item.demandType === 'contratar' ? 'Contratar' : item.demandType === 'loja' ? 'Loja' : 'Comprar'}
-                                                        </span>
-                                                    )}
+                        {topOpportunities.length > 0 ? (
+                            <div className="flex flex-col gap-3">
+                                {topOpportunities.map((item, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="p-3 rounded-[24px] bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
+                                                    {item.term}
                                                 </div>
-                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    Categoria sugerida: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.suggestedCategory || "Geral"}</span>
-                                                </div>
+                                                {item.demandType && (
+                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                        item.demandType === 'contratar'
+                                                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
+                                                            : item.demandType === 'loja'
+                                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                                                    }`}>
+                                                        {item.demandType === 'contratar' ? 'Contratar' : item.demandType === 'loja' ? 'Loja' : 'Comprar'}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-right">
-                                                <Badge variant="red">{item.count} {item.count === 1 ? 'demanda' : 'demandas'}</Badge>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                Categoria sugerida: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.suggestedCategory || "Geral"}</span>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="py-8 text-center text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Nenhuma demanda registrada recentemente.
-                                </div>
-                            )}
-                        </div>
+                                        <div className="text-right">
+                                            <Badge variant="red">{item.count} {item.count === 1 ? 'demanda' : 'demandas'}</Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-8 text-center text-xs text-brand-inactive-text dark:text-dark-body">
+                                Nenhuma demanda registrada recentemente.
+                            </div>
+                        )}
                     </div>
 
-                    <div className="p-6 pt-0 border-t border-brand-border/40 dark:border-dark-border/40 mt-auto">
+                    <div className="pt-4 border-t border-brand-border/40 dark:border-dark-border/40 mt-auto">
                         <Button
                             variant="outline"
-                            className="w-full text-xs font-semibold mt-4"
+                            className="w-full text-xs font-semibold"
                             onClick={() => onNavigateTab("demanda")}
                         >
                             Ver Todas as Demandas da Cidade <ArrowRightIcon size={14} className="ml-1" />
                         </Button>
                     </div>
-                </div>
+                </DashboardSectionCard>
             </div>
         </div>
     )

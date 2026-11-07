@@ -11,7 +11,7 @@ import ProductImagesSection from '@/components/erp/product/ProductImagesSection'
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
-import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction, getReturnAuditLogsAction } from '@/app/actions/erp/returns';
+import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
 import { cancelBuyerOrderAction, confirmOrderFulfillmentAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
 import { getPartnerReturnPolicyPublicAction } from '@/app/actions/marketplace/store-policies';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
@@ -24,7 +24,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted, resolveTimelineActorName, humanizeTimelineChangeLine } from '@/lib/utils';
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
@@ -133,7 +133,7 @@ const getReturnRequestStatusConfig = (request: any): { title: string; descriptio
         case "APPROVED":
             return {
                 title: `${typeLabel} aprovada!`,
-                description: `O vendedor aceitou sua solicitação. Resolução: ${request.approved_resolution === "refund" ? "Reembolso" : request.approved_resolution === "store_credit" ? "Vale-compra" : "Troca"}.`,
+                description: `O vendedor aprovou sua solicitação.`,
                 color: "green",
             };
         case "REJECTED":
@@ -534,7 +534,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         phone: null,
         loaded: false,
     });
-    const [returnAuditLogs, setReturnAuditLogs] = useState<any[]>([]);
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
         allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -651,37 +650,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     }
 
-    const activeSteps = getClientTimelineSteps(order).filter(s => s.active);
-    const historyEntries = activeSteps.map((step, idx) => {
-        const dateToUse = step.iso || order.created_at;
-        let changeLines: string[] = [];
-        if (step.subLabel) {
-            changeLines = Array.isArray(step.subLabel) ? step.subLabel : [step.subLabel];
-        } else {
-            if (step.label === "Pedido Realizado") changeLines = ["Seu pedido foi registrado em nosso sistema."];
-            else if (step.label === "Aguardando pagamento") changeLines = ["Aguardando a confirmação do pagamento pelo intermediador."];
-            else if (step.label === "Pago") changeLines = ["Pagamento confirmado com sucesso."];
-            else if (step.label === "Em andamento" || step.label === "Em progresso") changeLines = ["O vendedor está processando seu pedido."];
-            else if (step.label === "Enviado") changeLines = ["Seu pedido saiu para entrega."];
-            else if (step.label === "Pronto para retirada") changeLines = ["Produtos do pedido estão prontos para serem retirados no local."];
-            else if (step.label === "Finalizado") changeLines = ["Seu pedido está em fase de conclusão."];
-            else if (step.label === "Pedido entregue") changeLines = ["O pedido foi entregue ao destinatário."];
-            else if (step.label === "Pedido retirado") changeLines = ["O pedido foi retirado na loja."];
-            else if (step.label === "Concluído") changeLines = ["O serviço foi concluído."];
-            else if (step.label === "Cancelado") changeLines = ["O pedido foi cancelado."];
-            else if (step.label === "Falha na entrega" || step.label === "Não entregue" || step.label === "Entrega não realizada" || step.label === "Retirada não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
-            else changeLines = ["Etapa concluída."];
-        }
-
-        return {
-            id: `step-${idx}-${step.label}`,
-            actor_name: step.label,
-            change_lines: changeLines,
-            created_at: dateToUse,
-            entry_type: step.label.toLowerCase()
-        };
-    });
-
     const remainingQuantities = useMemo(() => {
         const remaining: Record<string, number> = {}
         const orderItems = order?.order_items || []
@@ -691,7 +659,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         requests.forEach((rr: any) => {
             if (rr.deleted_at) return
             const status = String(rr.status || "").toUpperCase()
-            if (status === "REJECTED" || status === "EXPIRED" || status === "CANCELLED") return
+            if (status === "CANCELLED") return
             const riList = rr.return_items || []
             riList.forEach((ri: any) => {
                 if (ri.order_item_id) {
@@ -714,9 +682,24 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         return Object.values(remainingQuantities).some((qty: number) => qty > 0)
     }, [remainingQuantities])
 
-    const activeReturnRequest = order.return_requests?.find((r: any) => !r.deleted_at && ["PENDING_REVIEW", "UNDER_ANALYSIS", "APPROVED", "WAITING_CUSTOMER", "WAITING_ITEM_RETURN", "PROCESSING", "ESCALATED"].includes(r.status));
-    const hasActiveReturn = !!activeReturnRequest;
-    const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
+    const latestReturnRequest = useMemo(() => {
+        if (!order?.return_requests || !Array.isArray(order.return_requests) || order.return_requests.length === 0) {
+            return null;
+        }
+        const valid = order.return_requests.filter((r: any) => !r.deleted_at);
+        if (valid.length === 0) return null;
+        const inProgress = valid.find((r: any) =>
+            ["PENDING_REVIEW", "UNDER_ANALYSIS", "APPROVED", "WAITING_CUSTOMER", "WAITING_ITEM_RETURN", "PROCESSING", "ESCALATED"].includes(r.status)
+        );
+        if (inProgress) return inProgress;
+        return [...valid].sort((a: any, b: any) =>
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        )[0];
+    }, [order?.return_requests]);
+
+    const activeReturnRequest = latestReturnRequest;
+    const hasActiveReturn = Boolean(latestReturnRequest && ["PENDING_REVIEW", "UNDER_ANALYSIS", "APPROVED", "WAITING_CUSTOMER", "WAITING_ITEM_RETURN", "PROCESSING", "ESCALATED"].includes(latestReturnRequest.status));
+    const returnStatusCfg = latestReturnRequest ? getReturnRequestStatusConfig(latestReturnRequest) : null;
 
     // Latest outbound shipment with tracking (SuperFrete / carrier labels)
     const trackedShipment = (() => {
@@ -734,74 +717,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const carrierInfo = carrierDelivery
         ? { shipment: outboundShipment, breakdown: order.delivery_breakdown }
         : null
-
-    useEffect(() => {
-        if (!activeReturnRequest) {
-            setReturnAuditLogs([])
-            return
-        }
-        getReturnAuditLogsAction(activeReturnRequest.id).then((res: any) => {
-            if (res.success && res.data) {
-                setReturnAuditLogs(res.data)
-            } else {
-                setReturnAuditLogs([])
-            }
-        }).catch(() => setReturnAuditLogs([]))
-    }, [activeReturnRequest])
-
-    const returnEvents = returnAuditLogs.length > 0 ? returnAuditLogs : (activeReturnRequest?.auditLogs || []);
-    const mappedReturnHistoryEntries = returnEvents.map((evt: any) => {
-        let title = "Solicitação de devolução";
-        let lines: string[] = [];
-        const metadata = evt.metadata || {}
-
-        if (evt.event_type === "created" || evt.message === "Solicitação criada" || evt.message === "Solicitação de cancelamento criada") {
-            title = "Solicitação de devolução";
-            if (evt.message === "Solicitação de cancelamento criada") {
-                lines = ["Solicitação de cancelamento criada"];
-            } else if (metadata.resolution) {
-                const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
-                    metadata.resolution === "exchange" ? "Troca" :
-                        metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution;
-                lines = [`Solicitação de devolução/troca criada. Resolução desejada: ${resolLabel}`];
-            } else {
-                lines = ["Solicitação de devolução/troca criada pelo cliente"];
-            }
-        } else if (evt.event_type === "status_changed" || evt.event_type === "status_updated" || evt.event_type === "updated") {
-            const fromLabel = evt.previous_status ? getReturnStatusLabel(evt.previous_status) : "Pendente";
-            const toLabel = evt.new_status ? getReturnStatusLabel(evt.new_status) : "";
-            title = "Atualização da solicitação de devolução";
-            lines = [`Solicitação atualizada: ${fromLabel} → ${toLabel}`];
-            if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
-                lines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`);
-            }
-            if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
-                lines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`);
-            }
-            if (metadata.exchange_order_id) {
-                lines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`);
-            }
-        } else if (evt.event_type === "message_added") {
-            title = "Mensagem na Devolução";
-            lines = [evt.message];
-        } else if (evt.event_type === "mercadopago_refund_executed") {
-            title = "Reembolso via Mercado Pago executado";
-            lines = [`Reembolso de ${formatCurrency(Number(metadata.amount || 0))} executado com sucesso.`];
-            if (metadata.mpRefundId) {
-                lines.push(`Refund ID: ${metadata.mpRefundId}`);
-            }
-        } else {
-            lines = [evt.message || "Evento de devolução registrado."];
-        }
-
-        return {
-            id: `return-evt-${evt.id}`,
-            actor_name: title,
-            change_lines: lines,
-            created_at: evt.created_at || new Date().toISOString(),
-            entry_type: "devolução"
-        };
-    });
 
     // Map deposit history entries from order fulfillment if available (instant fallback)
     const depositHistoryEntries = useMemo(() => {
@@ -857,23 +772,61 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     }, [order?.checkout_fulfillment, order?.created_at]);
 
     const combinedHistoryEntries = useMemo(() => {
-        // If buyerAuditEntries has deposit entries, don't duplicate them from depositHistoryEntries
-        const hasAuditDeposit = buyerAuditEntries.some((e: any) =>
+        const rawEntries = (buyerAuditEntries || []);
+
+        const hasAuditDeposit = rawEntries.some((e: any) =>
             e.entry_type && String(e.entry_type).startsWith("deposit_")
         );
         const effectiveDepositEntries = hasAuditDeposit ? [] : depositHistoryEntries;
 
-        const all = [
-            ...historyEntries,
-            ...mappedReturnHistoryEntries,
-            ...buyerAuditEntries,
-            ...effectiveDepositEntries,
-        ];
+        const allRaw = [...rawEntries, ...effectiveDepositEntries];
+        if (allRaw.length === 0) return [];
 
-        return all.sort((a, b) => {
+        const sanitized = allRaw.map((entry: any) => {
+            const metadata = entry.metadata || {};
+            const actorName = resolveTimelineActorName({
+                entry,
+                viewer: "customer",
+                orderCustomerName: order?.customer_name,
+                storeName: order?.store?.name,
+                buyerId: order?.buyer_id,
+            });
+
+            let changeLines = (entry.change_lines || []).map((line: string) => humanizeTimelineChangeLine(line)).filter(Boolean);
+
+            // Filter out internal seller notes edits from customer view
+            changeLines = changeLines.filter(
+                (l: string) =>
+                    !l.toLowerCase().includes("observações do pedido atualizadas") &&
+                    !l.toLowerCase().includes("alterou as observações do pedido"),
+            );
+
+            // If event was a return rejection, filter out false refund/credit/exchange lines
+            const isRejectedReturn = entry.entry_type === "return_rejected" ||
+                metadata.to_status === "REJECTED" ||
+                (entry.entry_type?.startsWith("return_") && changeLines.some((l: string) => l.toLowerCase().includes("recusad") || l.toLowerCase().includes("rejeitad")));
+
+            if (isRejectedReturn) {
+                changeLines = changeLines.filter((l: string) =>
+                    !l.startsWith("Valor do reembolso:") &&
+                    !l.startsWith("Status do reembolso:") &&
+                    !l.startsWith("Saldo da troca enviado para:") &&
+                    !l.startsWith("Vale-compra gerado:") &&
+                    !l.startsWith("Pedido de troca criado:")
+                );
+            }
+
+            return {
+                ...entry,
+                actor_name: actorName,
+                change_lines: changeLines,
+            };
+        }).filter((e: any) => e.change_lines.length > 0);
+
+        return sanitized.sort((a: any, b: any) => {
             return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         });
-    }, [historyEntries, mappedReturnHistoryEntries, buyerAuditEntries, depositHistoryEntries]);
+    }, [buyerAuditEntries, depositHistoryEntries, order?.buyer_id, order?.customer_name, order?.store?.name]);
 
     const orderItems = order?.order_items || [];
     const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking");

@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   DeliveryPickupIcon,
   DeliveryFailedIcon,
+  TruckIcon,
 } from "@/lib/icons"
 
 export type PaymentStatusValue =
@@ -34,16 +35,29 @@ type BadgeVariant = "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "g
 const DELIVERY_STATUS_ICONS: Record<string, React.ElementType> = {
   pending: BlockedIcon,
   not_sent: BlockedIcon,
+  nao_enviado: BlockedIcon,
   preparing: ClockIcon,
+  em_preparacao: ClockIcon,
+  available: ClockIcon,
+  requested: ClockIcon,
+  assigned: ClockIcon,
+  accepted: DeliveryPickupIcon,
+  picked_up: DeliveryPickupIcon,
   sent: DeliverySentIcon,
+  in_transit: DeliverySentIcon,
+  out_for_delivery: DeliverySentIcon,
   delivered: CheckCircleIcon,
+  entregue: CheckCircleIcon,
   pickup_available: DeliveryPickupIcon,
   delivery_failed: DeliveryFailedIcon,
   cancelled: BlockedIcon,
+  cancelada: BlockedIcon,
+  cancelado: BlockedIcon,
 }
 
 export function getDeliveryStatusIcon(status?: string | null): React.ReactElement<{ className?: string }> {
-  const IconComp = (status && DELIVERY_STATUS_ICONS[status]) || BlockedIcon
+  const key = status ? String(status).toLowerCase().trim() : ""
+  const IconComp = (key && DELIVERY_STATUS_ICONS[key]) || TruckIcon
   return React.createElement(IconComp, { size: 12 })
 }
 
@@ -52,6 +66,8 @@ const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant
   pago: { label: "Pago", variant: "green" },
   approved: { label: "Aprovado", variant: "green" },
   aprovado: { label: "Aprovado", variant: "green" },
+  concluido: { label: "Pago", variant: "green" },
+  concluído: { label: "Pago", variant: "green" },
   partially_paid: { label: "Parcialmente Pago", variant: "orange" },
   parcialmente_pago: { label: "Parcialmente Pago", variant: "orange" },
   pending: { label: "Pendente", variant: "gray" },
@@ -72,17 +88,31 @@ const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant
 }
 
 const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
-  // Basic delivery (new canonical set)
+  // Basic delivery (canonical set)
   pending: { label: "Não enviado", variant: "gray" },
   preparing: { label: "Em preparação", variant: "orange" },
   sent: { label: "Enviado", variant: "blue" },
   delivered: { label: "Entregue", variant: "green" },
   cancelled: { label: "Cancelada", variant: "red" },
 
-  // Backward compatibility (older status values still exist in DB/UI)
+  // Backward compatibility / synonyms
   not_sent: { label: "Não enviado", variant: "gray" },
+  nao_enviado: { label: "Não enviado", variant: "gray" },
   pickup_available: { label: "Pronto para retirada", variant: "cyan" },
   delivery_failed: { label: "Falha na entrega", variant: "red" },
+  em_preparacao: { label: "Em preparação", variant: "orange" },
+  entregue: { label: "Entregue", variant: "green" },
+  cancelada: { label: "Cancelada", variant: "red" },
+  cancelado: { label: "Cancelada", variant: "red" },
+
+  // Dudit Delivery Driver / Logistics aliases (so they NEVER show raw English strings)
+  available: { label: "Em preparação", variant: "orange" },
+  requested: { label: "Em preparação", variant: "orange" },
+  assigned: { label: "Em preparação", variant: "orange" },
+  accepted: { label: "A caminho da retirada", variant: "blue" },
+  picked_up: { label: "Retirado na loja", variant: "blue" },
+  in_transit: { label: "Em trânsito", variant: "blue" },
+  out_for_delivery: { label: "Em rota de entrega", variant: "blue" },
 }
 
 export function getPaymentStatusMeta(status?: string | null) {
@@ -93,7 +123,8 @@ export function getPaymentStatusMeta(status?: string | null) {
 
 export function getDeliveryStatusMeta(status?: string | null) {
   if (!status) return { label: "Não informado", variant: "gray" as const }
-  return DELIVERY_STATUS_META[status] || { label: status, variant: "gray" as const }
+  const key = String(status).toLowerCase().trim()
+  return DELIVERY_STATUS_META[key] || { label: status, variant: "gray" as const }
 }
 
 export function getPaymentStatusLabel(status?: string | null) {

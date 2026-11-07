@@ -18,6 +18,9 @@ import type { ReturnRequest } from "@/components/erp/returns/types";
 import { getReturnResolutionLabel } from "@/lib/returns/types";
 import { ReturnDetailView } from "@/components/erp/returns/ReturnDetailView";
 import AdminReturnDetailClientWrapper from "./AdminReturnDetailClientWrapper";
+import { PermissionProvider } from "@/lib/permission-context";
+import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
+import { StoreProvider } from "@/lib/store-context";
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados";
 type SortKey = "id" | "order_number" | "store" | "customer" | "date" | "refund_type" | "status";
@@ -263,14 +266,29 @@ export default function ReturnsList({ initialData }: ReturnsListProps) {
   // If viewing detail (read-only)
   if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
     const currentReq = requests.find(r => r.id === entityState.entityId);
+    const partnerId = currentReq?.partnerId || "";
+
     return (
-      <ReturnDetailView
-        orderId={entityState.entityId}
-        onBack={closeEntity}
-        onEdit={handleEdit}
-        onPrint={handlePrint}
-        initialRequest={currentReq}
-      />
+      <PermissionProvider
+        role="OWNER"
+        routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+        partnerId={partnerId}
+        businessInfo={{}}
+        planSlug="escalar"
+      >
+        <StoreProvider
+          partnerId={partnerId}
+        >
+          <ReturnDetailView
+            orderId={entityState.entityId}
+            onBack={closeEntity}
+            onEdit={handleEdit}
+            onPrint={handlePrint}
+            initialRequest={currentReq}
+            adminContext={true}
+          />
+        </StoreProvider>
+      </PermissionProvider>
     );
   }
 

@@ -28,6 +28,8 @@ export interface AvailableDeliveryOffer {
     assigned_at?: string
     notes?: string
     items?: Array<{ name: string; quantity: number }>
+    pickup_distance_km?: number | null
+    distance_km?: number | null
 }
 
 interface AvailableDeliveryListRowProps {
@@ -114,9 +116,17 @@ export default function AvailableDeliveryListRow({
 
             {/* ESTABELECIMENTO */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border w-[220px]">
-                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[200px]">
-                    {offer.store_name || offer.partner_name || "Estabelecimento"}
-                </span>
+                <div className="flex flex-col min-w-0">
+                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[200px]">
+                        {offer.store_name || offer.partner_name || "Estabelecimento"}
+                    </span>
+                    {offer.pickup_distance_km != null && (
+                        <span className="text-[11px] font-medium text-brand-green flex items-center gap-1 mt-0.5">
+                            <MapPinIcon size={11} />
+                            {offer.pickup_distance_km === 0 ? "No mesmo local" : `A ${offer.pickup_distance_km} km de você`}
+                        </span>
+                    )}
+                </div>
             </td>
 
             {/* DESTINO DA ENTREGA */}

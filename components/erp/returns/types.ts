@@ -58,6 +58,7 @@ export interface ReturnEvent {
   actor_name?: string
   notes: string | null
   created_at: string
+  change_lines?: string[]
   metadata?: Record<string, any>
   event_type?: string
   source?: string | null

@@ -114,6 +114,18 @@ export async function reconcileSubscriptions(): Promise<ReconcileResult> {
     result.errors++
   }
 
+  // Expire abandoned pending checkout attempts older than 3 days
+  try {
+    const { expireStalePendingSubscriptions } = await import("@/lib/services/mercadopago/subscriptions")
+    const expiredPending = await expireStalePendingSubscriptions()
+    if (expiredPending.expiredCount > 0) {
+      result.updated += expiredPending.expiredCount
+    }
+  } catch (err: any) {
+    console.error("[ReconcileSubs] Stale pending checkouts cleanup failed:", err?.message)
+    result.errors++
+  }
+
   let accessToken: string
   try {
     accessToken = await getMpPlatformAccessToken()

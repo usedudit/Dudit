@@ -1000,7 +1000,7 @@ export default function CreateReturnPage({
         const shouldAskInventoryRestore =
             !adminContext &&
             checkedItems.length > 0 &&
-            resolutionType !== "rejected"
+            (returnStatus === "APPROVED" || returnStatus === "REJECTED")
 
         if (shouldAskInventoryRestore) {
             const initialQty: Record<string, number> = {}
@@ -1012,7 +1012,7 @@ export default function CreateReturnPage({
 
         await saveWithAdminGate({ ...pendingSaveData, returnToInventory: false, returnToInventoryItems: null })
         setPendingSaveData(null)
-    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest, adminContext])
+    }, [pendingSaveData, saveWithAdminGate, checkedItems, resolutionType, returnRequest, adminContext, returnStatus])
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
@@ -1107,7 +1107,7 @@ export default function CreateReturnPage({
                     product_name: item.product.name || "",
                     sku: item.product.sku || "",
                 })),
-                exchangeBalanceResolution: exchangeSurplus > 0 ? exchangeBalanceResolution : null,
+                exchangeBalanceResolution: (resolutionType === "exchange" && exchangeSurplus > 0) ? exchangeBalanceResolution : null,
                 returnDate: returnDate.toISOString(),
                 observations,
                 evidenceImages: cleanEvidenceImages,
@@ -1142,7 +1142,7 @@ export default function CreateReturnPage({
             const shouldAskInventoryRestore =
                 !adminContext &&
                 checkedItems.length > 0 &&
-                resolutionType !== "rejected"
+                (returnStatus === "APPROVED" || returnStatus === "REJECTED")
 
             if (shouldAskInventoryRestore) {
                 setPendingSaveData(payload)

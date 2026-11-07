@@ -88,26 +88,27 @@ export default function AdminReturnDetailClient({ detail, onBack, mode = "edit" 
             const shouldApproveRefund = nextStatus && 
                 ["APPROVED", "PROCESSING", "RESOLVED"].includes(nextStatus) && 
                 Number(data.refundValue || 0) > 0
+            const isRejected = nextStatus === "REJECTED"
 
             const response = await processReturnRequestAction({
                 partnerId,
                 requestId: request.id,
                 action: "updated",
                 nextStatus,
-                refundAmount: Number(data.refundValue || 0),
-                refundStatus: shouldApproveRefund ? "APPROVED" : "PENDING",
-                refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund"))
+                refundAmount: shouldApproveRefund ? Number(data.refundValue || 0) : 0,
+                refundStatus: shouldApproveRefund ? "APPROVED" : (isRejected ? "FAILED" : "PENDING"),
+                refundPaymentMethod: (shouldApproveRefund && (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")))
                     ? data.refundPaymentMethod || null
                     : null,
                 returnToInventory: Boolean(data.returnToInventory),
                 returnToInventoryItems: data.returnToInventoryItems || null,
                 customerId: data.customerId || null,
-                storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                storeCreditAmount: (shouldApproveRefund && data.resolutionType === "store_credit") ? Number(data.storeCreditValue || 0) : 0,
+                exchangeItems: (shouldApproveRefund && data.resolutionType === "exchange") ? data.exchangeItems || [] : [],
+                exchangeBalanceResolution: (shouldApproveRefund && data.resolutionType === "exchange") ? data.exchangeBalanceResolution || null : null,
                 notes: data.observations || "",
                 idempotencyKey: `admin-update:${request.id}:${Date.now()}`,
-                accountId: data.accountId || null,
+                accountId: shouldApproveRefund ? (data.accountId || null) : null,
             }, {
                 adminBypass: true,
                 actionCtx: data.adminActionCtx ?? null,

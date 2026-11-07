@@ -53,6 +53,7 @@ import {
     InfoIcon,
     XIcon,
     TruckIcon,
+    MoneyIcon,
     BoxIcon,
 } from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
@@ -359,10 +360,6 @@ export default function CreateDeliveryPage({
 
     const primaryOrder = selectedOrders[0] || null
 
-    const selectedStatusMeta = getDeliveryStatusMeta(status)
-    const paymentMeta = getPaymentStatusMeta(primaryOrder?.status)
-    const deliveryMeta = getDeliveryStatusMeta(primaryOrder?.deliveryStatus)
-
     const customerAddress = useMemo(
         () => buildCustomerAddress(primaryOrder?.address),
         [primaryOrder?.address]
@@ -598,10 +595,10 @@ export default function CreateDeliveryPage({
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="Pedidos" onClick={() => setStep(1)}>
-                                            1. Pedidos
+                                            Pedidos
                                         </TabsTrigger>
                                         <TabsTrigger value="Observacoes" onClick={() => setStep(2)}>
-                                            2. Observações
+                                            Observações
                                         </TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -703,10 +700,10 @@ export default function CreateDeliveryPage({
                                                                                             {formatCurrency(order.totalAmount || 0)}
                                                                                         </div>
                                                                                         <div className="flex items-center gap-1">
-                                                                                            <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                            <Badge variant={searchPaymentMeta.variant} icon={<MoneyIcon />} className="scale-90 whitespace-nowrap">
                                                                                                 {searchPaymentMeta.label}
                                                                                             </Badge>
-                                                                                            <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                            <Badge variant={searchDeliveryMeta.variant} icon={<TruckIcon />} className="scale-90 whitespace-nowrap">
                                                                                                 {searchDeliveryMeta.label}
                                                                                             </Badge>
                                                                                         </div>
@@ -752,42 +749,46 @@ export default function CreateDeliveryPage({
                                                             </div>
 
                                                             <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
-                                                                {selectedOrders.map((order) => (
-                                                                    <div key={order.id} className="p-4 flex items-center justify-between gap-4">
-                                                                        <div className="min-w-0">
-                                                                            <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                {order.displayId}
-                                                                            </p>
-                                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
-                                                                            </p>
+                                                                {selectedOrders.map((order) => {
+                                                                    const orderPaymentMeta = getPaymentStatusMeta(order.status)
+                                                                    const orderDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
+                                                                    return (
+                                                                        <div key={order.id} className="p-4 flex items-center justify-between gap-4">
+                                                                            <div className="min-w-0">
+                                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                    {order.displayId}
+                                                                                </p>
+                                                                                <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                    {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                                <Badge variant={orderPaymentMeta.variant} icon={<MoneyIcon />}>
+                                                                                    {orderPaymentMeta.label}
+                                                                                </Badge>
+                                                                                <Badge variant={orderDeliveryMeta.variant} icon={<TruckIcon />}>
+                                                                                    {orderDeliveryMeta.label}
+                                                                                </Badge>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    className="w-9 h-9"
+                                                                                    onClick={() => setInfoOrder(order)}
+                                                                                    title="Informações do pedido"
+                                                                                >
+                                                                                    <InfoIcon className="w-4 h-4" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghostred"
+                                                                                    className="w-9 h-9"
+                                                                                    onClick={() => setOrderToRemove(order.id)}
+                                                                                    title="Remover"
+                                                                                >
+                                                                                    <TrashIcon className="w-4 h-4" />
+                                                                                </Button>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="flex items-center gap-2 shrink-0">
-                                                                            <Badge variant={getPaymentStatusMeta(order.status).variant}>
-                                                                                {getPaymentStatusMeta(order.status).label}
-                                                                            </Badge>
-                                                                            <Badge variant={getDeliveryStatusMeta(order.deliveryStatus).variant}>
-                                                                                {getDeliveryStatusMeta(order.deliveryStatus).label}
-                                                                            </Badge>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                className="w-9 h-9"
-                                                                                onClick={() => setInfoOrder(order)}
-                                                                                title="Informações do pedido"
-                                                                            >
-                                                                                <InfoIcon className="w-4 h-4" />
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghostred"
-                                                                                className="w-9 h-9"
-                                                                                onClick={() => setOrderToRemove(order.id)}
-                                                                                title="Remover"
-                                                                            >
-                                                                                <TrashIcon className="w-4 h-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                                    )
+                                                                })}
                                                             </div>
                                                         </div>
                                                     ) : null}
@@ -820,7 +821,7 @@ export default function CreateDeliveryPage({
                                                                 {platformDriver && !platformDriver.isPendingAcceptance && (
                                                                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
                                                                         <div className="flex items-center gap-2 min-w-0">
-                                                                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                                                            <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
                                                                             <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">{platformDriver.fullName}</span>
                                                                         </div>
                                                                         <button
@@ -888,7 +889,7 @@ export default function CreateDeliveryPage({
                                                         {platformDriver && !platformDriver.isPendingAcceptance && (
                                                             <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
                                                                 <div className="flex items-center gap-2 min-w-0">
-                                                                    <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                                                    <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
                                                                     <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">{platformDriver.fullName}</span>
                                                                 </div>
                                                                 <button
@@ -906,10 +907,10 @@ export default function CreateDeliveryPage({
                                                             value={status}
                                                             setValue={setStatus}
                                                             options={[
-                                                                { value: "pending", label: "Pendente" },
+                                                                { value: "pending", label: "Não enviado" },
                                                                 { value: "preparing", label: "Em preparação" },
-                                                                { value: "sent", label: "Saiu para entrega" },
-                                                                { value: "delivered", label: "Concluída" },
+                                                                { value: "sent", label: "Enviado" },
+                                                                { value: "delivered", label: "Entregue" },
                                                                 { value: "cancelled", label: "Cancelada" },
                                                             ]}
                                                         />
@@ -1029,8 +1030,8 @@ export default function CreateDeliveryPage({
                             </Button>
                         </header>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                            <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
+                            <Tabs defaultValue="dados_gerais" className="w-full">
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
                                     <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
                                         Dados Gerais
@@ -1040,7 +1041,7 @@ export default function CreateDeliveryPage({
                                     </TabsTrigger>
                                 </TabsList>
 
-                                <div className="flex-1 overflow-y-auto space-y-6">
+                                <div className="space-y-6">
                                     <TabsContent value="dados_gerais" className="mt-0 space-y-6">
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center text-sm">

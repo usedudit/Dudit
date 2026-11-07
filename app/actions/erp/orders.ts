@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { revalidateOrders } from "@/lib/utils/revalidation";
-import { formatDateTime } from "@/lib/utils/formatters";
+import { formatDateTime, resolveTimelineActorName, humanizeTimelineChangeLine } from "@/lib/utils/formatters";
 import { formatCurrency } from "@/lib/utils";
 import { requireUser } from "@/lib/auth/authorization";
 import { requireStorePermission } from "@/lib/auth/authorization";
@@ -3824,39 +3824,69 @@ export async function getOrderHistoryAction(
     return { success: true, data: [] as any[] };
   }
 
-  const { data: order } = await supabase.from("orders").select("store_id").eq("id", orderId).eq("partner_id", partnerId).maybeSingle();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("store_id, buyer_id, customer_id, customer_name, stores(name)")
+    .eq("id", orderId)
+    .eq("partner_id", partnerId)
+    .maybeSingle();
   if (!isAdmin && order?.store_id) await requireStorePermission(order.store_id, partnerId, "orders", "view");
 
   const rawEntries = await getOrderHistoryEntries(orderId, partnerId);
-  const entries = rawEntries.map((e) => {
-    const isDuditAction = Boolean(
-      e.metadata?.dudit_action ||
-      (e.metadata as any)?.is_admin_action ||
-      e.actor_name === "Equipe Dudit"
-    );
+  const viewer = isAdmin ? "admin" : "seller";
+  const storeName = (order?.stores as any)?.name || null;
 
-    if (isDuditAction) {
-      if (isAdmin) {
-        const adminName = e.metadata?.admin_actor_name || "Admin";
-        return {
-          ...e,
-          actor_name: `Equipe Dudit (${adminName})`,
-          highlight: true,
-        };
-      } else {
-        const sanitizedMetadata = { ...e.metadata };
+  const entries = rawEntries
+    .map((e) => {
+      const isDuditAction = Boolean(
+        e.metadata?.dudit_action ||
+        (e.metadata as any)?.is_admin_action ||
+        e.actor_name === "Equipe Dudit" ||
+        (e.metadata as any)?.admin_actor_name
+      );
+
+      const actorName = resolveTimelineActorName({
+        entry: e,
+        viewer,
+        orderCustomerName: order?.customer_name,
+        storeName,
+        buyerId: order?.buyer_id,
+      });
+
+      const sanitizedMetadata = { ...e.metadata };
+      if (!isAdmin) {
         delete sanitizedMetadata.admin_actor_name;
         delete sanitizedMetadata.admin_actor_id;
-        return {
-          ...e,
-          actor_name: "Equipe Dudit",
-          highlight: true,
-          metadata: sanitizedMetadata,
-        };
       }
-    }
-    return e;
-  });
+
+      let changeLines = (e.change_lines || []).map((l) => humanizeTimelineChangeLine(l)).filter(Boolean);
+
+      // Filter false refund/credit lines on rejected returns
+      const isRejected =
+        e.metadata?.to_status === "REJECTED" ||
+        e.entry_type === "return_rejected" ||
+        changeLines.some((l) => l.toLowerCase().includes("recusad") || l.toLowerCase().includes("rejeitad"));
+
+      if (isRejected) {
+        changeLines = changeLines.filter(
+          (l) =>
+            !l.startsWith("Valor do reembolso:") &&
+            !l.startsWith("Status do reembolso:") &&
+            !l.startsWith("Saldo da troca enviado para:") &&
+            !l.startsWith("Vale-compra gerado:") &&
+            !l.startsWith("Pedido de troca criado:")
+        );
+      }
+
+      return {
+        ...e,
+        actor_name: actorName,
+        change_lines: changeLines,
+        highlight: isDuditAction,
+        metadata: sanitizedMetadata,
+      };
+    })
+    .filter((e) => e.change_lines.length > 0);
 
   return { success: true, data: entries };
 }
@@ -5246,7 +5276,15 @@ export async function updateOrderNotesAction(input: {
   const user = await requireUser();
   if (!user) return { success: false as const, error: "Não autenticado" };
 
-  await requirePermission(input.partnerId, "orders", "edit", user);
+  let isAdmin = false;
+  let adminEmail: string | null = null;
+  try {
+    const admin = await requireAdminScope("moderation");
+    isAdmin = true;
+    adminEmail = admin.email || admin.userId;
+  } catch {
+    await requirePermission(input.partnerId, "orders", "edit", user);
+  }
   const supabase = createAdminClient();
 
   const { data: currentOrder, error: currentOrderError } = await supabase
@@ -5259,10 +5297,10 @@ export async function updateOrderNotesAction(input: {
   if (currentOrderError || !currentOrder?.id) {
     return {
       success: false as const,
-      error: currentOrderError?.message || "Pedido nÃ£o encontrado.",
+      error: currentOrderError?.message || "Pedido não encontrado.",
     };
   }
-  if (currentOrder.store_id) {
+  if (!isAdmin && currentOrder.store_id) {
     await requireStorePermission(currentOrder.store_id, input.partnerId, "orders", "edit");
   }
 
@@ -5294,10 +5332,16 @@ export async function updateOrderNotesAction(input: {
     await logAuditEvent({
       partnerId: input.partnerId,
       actorUserId: user.id,
+      actorName: isAdmin ? "Equipe Dudit" : undefined,
       entityType: "order",
       entityId: input.orderId,
       actionType: "updated",
       changeLines: ["alterou as observações do pedido."],
+      metadata: isAdmin ? {
+        dudit_action: true,
+        admin_actor_name: adminEmail || user.id,
+        admin_actor_id: user.id,
+      } : undefined,
       source: "manual",
     });
   } catch (historyError) {
@@ -5446,17 +5490,26 @@ export async function updateOrdersStatusInBatchAction(payload: {
     return { error: "Detalhamento de pagamento inválido." };
   }
 
-  const access = await requirePermission(
-    payload.partnerId,
-    "orders",
-    payload.actionType === "cancel" ? "cancel" : "edit",
-    user,
-  );
-  if (payload.actionType === "payment_status") {
-    await requirePermission(payload.partnerId, "financial", "edit", user);
-  }
-  if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
-    await requirePermission(payload.partnerId, "orders", "can_refund", user);
+  let isAdmin = false;
+  let adminEmail: string | null = null;
+  let access: any = null;
+  try {
+    const admin = await requireAdminScope("moderation");
+    isAdmin = true;
+    adminEmail = admin.email || admin.userId;
+  } catch {
+    access = await requirePermission(
+      payload.partnerId,
+      "orders",
+      payload.actionType === "cancel" ? "cancel" : "edit",
+      user,
+    );
+    if (payload.actionType === "payment_status") {
+      await requirePermission(payload.partnerId, "financial", "edit", user);
+    }
+    if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
+      await requirePermission(payload.partnerId, "orders", "can_refund", user);
+    }
   }
   const supabase = createAdminClient();
   const capabilities = await getPartnerCapabilities(payload.partnerId);
@@ -5547,7 +5600,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
       Number(leg?.paymentMethodDiscountAmount || leg?.adjustmentAmount || 0) > 0.009
     );
     if (discountRequested) {
-      await requirePermission(payload.partnerId, "orders", "can_apply_discount", user);
+      if (!isAdmin) {
+        await requirePermission(payload.partnerId, "orders", "can_apply_discount", user);
+      }
       const totalDiscount = payload.paymentBreakdown.reduce((sum: number, leg: any) =>
         sum + Number(leg?.paymentMethodDiscountAmount || leg?.adjustmentAmount || 0), 0);
       if (totalDiscount > Number((currentOrders[0] as any).total_amount || 0) + 0.009) {
@@ -5556,15 +5611,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
     }
   }
 
-  const storeAction = payload.actionType === "cancel" ? "cancel" : "edit";
-  for (const order of currentOrders as any[]) {
-    if (order.store_id) {
-      await requireStorePermission(order.store_id, payload.partnerId, "orders", storeAction);
-      if (payload.actionType === "payment_status") {
-        await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
-      }
-      if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
-        await requireStorePermission(order.store_id, payload.partnerId, "orders", "can_refund");
+  if (!isAdmin) {
+    const storeAction = payload.actionType === "cancel" ? "cancel" : "edit";
+    for (const order of currentOrders as any[]) {
+      if (order.store_id) {
+        await requireStorePermission(order.store_id, payload.partnerId, "orders", storeAction);
+        if (payload.actionType === "payment_status") {
+          await requireStorePermission(order.store_id, payload.partnerId, "financial", "edit");
+        }
+        if (payload.actionType === "cancel" && payload.generateAutomaticRefund === true) {
+          await requireStorePermission(order.store_id, payload.partnerId, "orders", "can_refund");
+        }
       }
     }
   }
@@ -5964,18 +6021,26 @@ export async function updateOrdersStatusInBatchAction(payload: {
               lines.push("gerou reembolso automático no financeiro");
             }
 
+            const auditMetadata = {
+              oldStatus: getPaymentStatusLabel(order.situation),
+              newStatus: "Cancelado",
+              statusScope: "payment",
+              ...(isAdmin ? {
+                dudit_action: true,
+                admin_actor_name: adminEmail || user.id,
+                admin_actor_id: user.id,
+              } : {}),
+            };
+
             return logAuditEvent({
               partnerId: payload.partnerId,
               actorUserId: user.id,
+              actorName: isAdmin ? "Equipe Dudit" : undefined,
               entityType: "order",
               entityId: order.id,
               actionType: "cancelled",
               changeLines: lines,
-              metadata: {
-                oldStatus: getPaymentStatusLabel(order.situation),
-                newStatus: "Cancelado",
-                statusScope: "payment",
-              },
+              metadata: auditMetadata,
               source: "erp",
               storeId: order.store_id,
             });
@@ -6613,7 +6678,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 ...(overrideOrderIds.has(String(order.id))
                   ? {
                     manualBalanceOverride: true,
-                    overrideRole: access.roleId,
+                    overrideRole: access?.roleId || "admin",
                   }
                   : {}),
               };
@@ -6626,14 +6691,24 @@ export async function updateOrdersStatusInBatchAction(payload: {
               }
               : null;
 
+        const auditMetadata = {
+          ...metadata,
+          ...(isAdmin ? {
+            dudit_action: true,
+            admin_actor_name: adminEmail || user.id,
+            admin_actor_id: user.id,
+          } : {}),
+        };
+
         return logAuditEvent({
           partnerId: payload.partnerId,
           actorUserId: user.id,
+          actorName: isAdmin ? "Equipe Dudit" : undefined,
           entityType: "order",
           entityId: order.id,
           actionType: payload.actionType,
           changeLines: lines,
-          metadata,
+          metadata: auditMetadata,
           source: "manual",
         });
       }),

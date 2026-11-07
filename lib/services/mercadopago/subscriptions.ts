@@ -951,6 +951,57 @@ export async function cancelPendingPlanChangeAttempts(partnerId: string): Promis
   }
 }
 
+export const PENDING_CHECKOUT_EXPIRY_DAYS = 3
+
+/**
+ * Automatically expire any pending subscription checkouts that were abandoned
+ * and are older than 3 days.
+ */
+export async function expireStalePendingSubscriptions(): Promise<{ expiredCount: number }> {
+  const admin = getAdminClient()
+  const cutoff = new Date(Date.now() - PENDING_CHECKOUT_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: staleSubs, error } = await admin
+    .from("subscriptions")
+    .select("id, partner_id, mercado_pago_subscription_id, created_at")
+    .eq("status", "pending")
+    .lte("created_at", cutoff)
+
+  if (error || !staleSubs || staleSubs.length === 0) {
+    return { expiredCount: 0 }
+  }
+
+  let count = 0
+  const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+
+  for (const pending of staleSubs as any[]) {
+    if (await hasApprovedPaymentForSubscription(pending.id)) {
+      continue
+    }
+
+    if (pending.mercado_pago_subscription_id) {
+      try {
+        await cancelMpPreapproval(pending.mercado_pago_subscription_id)
+      } catch (err: any) {
+        SecureLogger.warn("Failed to cancel expired pending preapproval", {
+          subscriptionId: pending.id,
+          error: err?.message,
+        })
+      }
+    }
+
+    await syncSubscriptionToBilling(pending.id, "reconciliation", {
+      status: "cancelled",
+      previousStatus: "pending",
+      cancellationReason: "expired",
+      notify: false,
+    })
+    count++
+  }
+
+  return { expiredCount: count }
+}
+
 /**
  * Whether a subscription already has an approved payment on any of its cycles.
  * Used to avoid cancelling a checkout attempt that was paid a moment ago.

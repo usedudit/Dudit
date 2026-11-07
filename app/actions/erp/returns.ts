@@ -468,11 +468,17 @@ export async function getReturnRequestDetailsAction(
     opts?: { adminBypass?: boolean },
 ) {
     try {
-        if (opts?.adminBypass) {
+        let isAdmin = Boolean(opts?.adminBypass)
+        if (isAdmin) {
             await requireAdminScope("moderation")
         } else {
-            const access = await requirePermission(partnerId, "orders", "view")
-            assertPermission(access, "orders.list")
+            try {
+                await requireAdminScope("moderation")
+                isAdmin = true
+            } catch {
+                const access = await requirePermission(partnerId, "orders", "view")
+                assertPermission(access, "orders.list")
+            }
         }
         const supabase = createAdminClient()
         const { data, error } = await supabase
@@ -493,7 +499,7 @@ export async function getReturnRequestDetailsAction(
         if (error) throw error
 
         const requestStoreId = data.store_id || (data as any).orders?.store_id
-        if (!opts?.adminBypass && requestStoreId) {
+        if (!isAdmin && requestStoreId) {
             await requireStorePermission(requestStoreId, partnerId, "orders", "view")
         }
 
@@ -556,19 +562,38 @@ export async function getReturnRequestDetailsAction(
             .eq("entity_id", requestId)
             .order("created_at", { ascending: true })
 
-        const returnEvents = (auditLogsData || []).map((e: any) => ({
-            id: e.id,
-            return_request_id: e.entity_id,
-            previous_status: e.metadata?.from_status || e.old_values?.status || null,
-            new_status: e.metadata?.to_status || e.new_values?.status || null,
-            changed_by: e.actor_user_id || e.user_id || null,
-            actor_name: e.actor_name || "Sistema",
-            notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
-            metadata: e.metadata || e.new_values || {},
-            event_type: e.action_type || e.action || "updated",
-            source: e.source || null,
-            created_at: e.created_at,
-        }))
+        const returnEvents = (auditLogsData || []).map((e: any) => {
+            const meta = e.metadata || e.new_values || {}
+            const isDuditAction = Boolean(meta.dudit_action || (meta as any).is_admin_action || e.actor_name === "Equipe Dudit" || e.source === "admin")
+            let actorName = e.actor_name || "Sistema"
+            let sanitizedMeta = { ...meta }
+
+            if (isDuditAction) {
+                if (isAdmin) {
+                    const adminName = meta.admin_actor_name || "Admin"
+                    actorName = `Equipe Dudit (${adminName})`
+                } else {
+                    delete sanitizedMeta.admin_actor_name
+                    delete sanitizedMeta.admin_actor_id
+                    actorName = "Equipe Dudit"
+                }
+            }
+
+            return {
+                id: e.id,
+                return_request_id: e.entity_id,
+                previous_status: meta?.from_status || e.old_values?.status || null,
+                new_status: meta?.to_status || e.new_values?.status || null,
+                changed_by: isDuditAction && !isAdmin ? null : (e.actor_user_id || e.user_id || null),
+                actor_name: actorName,
+                notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (meta?.notes || meta?.message || null),
+                change_lines: Array.isArray(e.change_lines) ? e.change_lines : [],
+                metadata: sanitizedMeta,
+                event_type: e.action_type || e.action || "updated",
+                source: e.source || null,
+                created_at: e.created_at,
+            }
+        })
 
         const normalized = normalizeReturnRow({ ...data, auditLogs: returnEvents })
         const evidenceRows = (data.return_evidence || []) as any[]
@@ -619,11 +644,17 @@ export async function getReturnAuditLogsAction(requestId: string) {
             .maybeSingle()
         if (requestError) throw requestError
         if (!request) return { success: false as const, error: "Solicitação de devolução não encontrada." }
-        const access = await requirePermission(request.partner_id, "orders", "view", user)
-        assertPermission(access, "orders.list")
-        const requestStoreId = request.store_id || (request as any).orders?.store_id
-        if (requestStoreId) {
-            await requireStorePermission(requestStoreId, request.partner_id, "orders", "view")
+        let isAdmin = false
+        try {
+            await requireAdminScope("moderation")
+            isAdmin = true
+        } catch {
+            const access = await requirePermission(request.partner_id, "orders", "view", user)
+            assertPermission(access, "orders.list")
+            const requestStoreId = request.store_id || (request as any).orders?.store_id
+            if (requestStoreId) {
+                await requireStorePermission(requestStoreId, request.partner_id, "orders", "view")
+            }
         }
         const { data, error } = await supabase
             .from("audit_logs")
@@ -632,18 +663,38 @@ export async function getReturnAuditLogsAction(requestId: string) {
             .eq("entity_id", requestId)
             .order("created_at", { ascending: true })
         if (error) throw error
-        const events = (data || []).map((e: any) => ({
-            id: e.id,
-            return_request_id: e.entity_id,
-            previous_status: e.metadata?.from_status || e.old_values?.status || null,
-            new_status: e.metadata?.to_status || e.new_values?.status || null,
-            changed_by: e.actor_user_id || e.user_id || null,
-            actor_name: e.actor_name || "Sistema",
-            notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
-            metadata: e.metadata || e.new_values || {},
-            event_type: e.action_type || e.action || "updated",
-            created_at: e.created_at,
-        }))
+        const events = (data || []).map((e: any) => {
+            const meta = e.metadata || e.new_values || {}
+            const isDuditAction = Boolean(meta.dudit_action || (meta as any).is_admin_action || e.actor_name === "Equipe Dudit" || e.source === "admin")
+            let actorName = e.actor_name || "Sistema"
+            let sanitizedMeta = { ...meta }
+
+            if (isDuditAction) {
+                if (isAdmin) {
+                    const adminName = meta.admin_actor_name || "Admin"
+                    actorName = `Equipe Dudit (${adminName})`
+                } else {
+                    delete sanitizedMeta.admin_actor_name
+                    delete sanitizedMeta.admin_actor_id
+                    actorName = "Equipe Dudit"
+                }
+            }
+
+            return {
+                id: e.id,
+                return_request_id: e.entity_id,
+                previous_status: meta?.from_status || e.old_values?.status || null,
+                new_status: meta?.to_status || e.new_values?.status || null,
+                changed_by: isDuditAction && !isAdmin ? null : (e.actor_user_id || e.user_id || null),
+                actor_name: actorName,
+                notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (meta?.notes || meta?.message || null),
+                change_lines: Array.isArray(e.change_lines) ? e.change_lines : [],
+                metadata: sanitizedMeta,
+                event_type: e.action_type || e.action || "updated",
+                source: e.source || null,
+                created_at: e.created_at,
+            }
+        })
         return { success: true as const, data: events }
     } catch (e: any) {
         return { success: false as const, error: e?.message || "Erro ao carregar histórico da devolução" }
@@ -1289,14 +1340,35 @@ export async function processReturnRequestAction(
             }
         }
 
-        const refundStatus = data.refundStatus
+        const isApprovedStatus = ["APPROVED", "PROCESSING", "RESOLVED"].includes(data.nextStatus || "")
+        const isRejectedStatus = data.nextStatus === "REJECTED"
+
+        if (isRejectedStatus) {
+            data.refundAmount = 0
+            data.refundStatus = "FAILED"
+            data.storeCreditAmount = 0
+            data.exchangeItems = []
+            data.exchangeBalanceResolution = null
+            data.accountId = null
+        } else if (data.nextStatus && !isApprovedStatus) {
+            data.refundAmount = 0
+            data.refundStatus = "PENDING"
+            data.storeCreditAmount = 0
+            data.exchangeItems = []
+            data.exchangeBalanceResolution = null
+            data.accountId = null
+        }
+
+        const refundStatus = isRejectedStatus
+            ? "FAILED"
+            : (isApprovedStatus && data.refundAmount > 0 ? "APPROVED" : (data.refundStatus || "PENDING"))
 
         const useSelectiveReturn = data.returnToInventoryItems !== undefined && data.returnToInventoryItems !== null
         const pReturnToInventoryForRpc = useSelectiveReturn ? false : data.returnToInventory
 
         const approvedResolution = request.desired_resolution || request.approved_resolution
         const isExchange = approvedResolution === "exchange"
-        const pRefundAmountForRpc = isExchange ? 0 : data.refundAmount
+        const pRefundAmountForRpc = isRejectedStatus ? 0 : (isExchange ? 0 : data.refundAmount)
 
         const { data: processed, error } = await supabase.rpc("process_return_request", {
             p_request_id: data.requestId,
@@ -1305,14 +1377,14 @@ export async function processReturnRequestAction(
             p_next_status: data.nextStatus || null,
             p_refund_amount: pRefundAmountForRpc,
             p_refund_status: refundStatus,
-            p_refund_payment_method: data.refundPaymentMethod || null,
+            p_refund_payment_method: isRejectedStatus ? null : (data.refundPaymentMethod || null),
             p_return_to_inventory: pReturnToInventoryForRpc,
-            p_store_credit_amount: data.storeCreditAmount,
-            p_exchange_items: data.exchangeItems || [],
-            p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
+            p_store_credit_amount: isRejectedStatus ? 0 : data.storeCreditAmount,
+            p_exchange_items: isRejectedStatus ? [] : (data.exchangeItems || []),
+            p_exchange_balance_resolution: (isExchange && !isRejectedStatus) ? (data.exchangeBalanceResolution || null) : null,
             p_notes: sanitizeNotes(data.notes),
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
-            p_account_id: data.accountId || null,
+            p_account_id: isApprovedStatus ? (data.accountId || null) : null,
         })
 
         if (error) throw error
@@ -1516,9 +1588,34 @@ export async function processReturnRequestAction(
         // A execução real do reembolso MP ocorre em executeMercadoPagoRefundAction,
         // que possui todas as validações de segurança (confirmação, senha, cooldown, rate limit, etc.).
 
+        // Movimentação financeira ao aprovar reembolso manual: debita o valor da conta bancária selecionada
+        const effectiveAccountId = data.accountId || null
+        if (
+            capabilities.hasFinancial &&
+            effectiveAccountId &&
+            requestedRefundAmount > 0.009 &&
+            !isMpRefund &&
+            !(result as any)?.balance_deducted &&
+            (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED") &&
+            (data.refundStatus === "APPROVED" || (result as any)?.refund_transaction_id)
+        ) {
+            try {
+                const { error: balanceErr } = await supabase.rpc("apply_account_balance_delta", {
+                    p_account_id: effectiveAccountId,
+                    p_partner_id: request.partner_id,
+                    p_delta: -requestedRefundAmount,
+                })
+                if (balanceErr) {
+                    console.error("[processReturnRequest] Error deducting refund from finance account:", balanceErr)
+                }
+            } catch (balanceEx) {
+                console.error("[processReturnRequest] Exception deducting refund from finance account:", balanceEx)
+            }
+        }
+
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
         if (capabilities.hasStockMovements && (data.returnToInventory || returnToStockItems.length > 0)) await revalidateStockMovements(data.partnerId)
-        if (capabilities.hasFinancial && (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0)) await revalidateTransactions(data.partnerId)
+        if (capabilities.hasFinancial && (data.refundAmount > 0 || data.storeCreditAmount > 0 || requestedRefundAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0)) await revalidateTransactions(data.partnerId)
 
         if (buyerId && data.nextStatus) {
             try {
@@ -1608,7 +1705,7 @@ export async function processReturnRequestAction(
                 changeLines.push(`Equipe Dudit atualizou: ${changedFields.join(", ")}.`)
             }
             if (actionCtx?.reason?.trim()) {
-                changeLines.push(actionCtx.reason.trim())
+                changeLines.push(`Motivo: "${actionCtx.reason.trim()}"`)
             }
             if (changeLines.length === 0) {
                 changeLines.push("Equipe Dudit atualizou a solicitação.")
@@ -1636,6 +1733,34 @@ export async function processReturnRequestAction(
                     source: "manual",
                     storeId: effectiveStoreId,
                 })
+
+                if (request.order_id) {
+                    await logAuditEvent({
+                        partnerId: request.partner_id,
+                        actorUserId: adminActorId,
+                        actorName: "Equipe Dudit",
+                        entityType: "order",
+                        entityId: request.order_id,
+                        actionType: "updated",
+                        changeLines: [
+                            `Equipe Dudit atualizou a solicitação de devolução/troca (DVL-${data.requestId.slice(0, 6).toUpperCase()}).`,
+                            ...changeLines,
+                        ],
+                        metadata: {
+                            dudit_action: true,
+                            admin_actor_name: adminActorEmail || adminActorId,
+                            admin_actor_id: adminActorId,
+                            return_request_id: data.requestId,
+                            from_status: request.status,
+                            to_status: data.nextStatus || request.status,
+                            changed_fields: changedFields,
+                            reason: actionCtx?.reason?.trim() || null,
+                            ...(typeof actionCtx?.riskScore === "number" ? { risk_score: actionCtx.riskScore } : {}),
+                        },
+                        source: "manual",
+                        storeId: effectiveStoreId,
+                    })
+                }
 
                 await adminAuditLog({
                     adminUserId: adminActorId,

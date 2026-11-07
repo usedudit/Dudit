@@ -219,44 +219,33 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 if (!response.success) throw new Error(response.error)
                 const requestId = response.data?.id
                 if (requestId) {
-                    const processRes = await processReturnRequestAction({
+                    const nextStatus = data.status || "PENDING_REVIEW"
+                    const isApprovedStatus = ["APPROVED", "PROCESSING", "RESOLVED"].includes(nextStatus)
+                    const isRejectedStatus = nextStatus === "REJECTED"
+                    const refundVal = (isApprovedStatus && !isRejectedStatus) ? Number(data.refundValue || 0) : 0
+
+                    const initialProcessPayload = {
                         partnerId,
                         requestId,
                         action: "updated",
-                        nextStatus: data.status || "PENDING_REVIEW",
-                        refundAmount: Number(data.refundValue || 0),
-                        refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-                        refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
+                        nextStatus,
+                        refundAmount: refundVal,
+                        refundStatus: isApprovedStatus && refundVal > 0 ? "APPROVED" : (isRejectedStatus ? "FAILED" : "PENDING"),
+                        refundPaymentMethod: (isApprovedStatus && (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund"))) ? data.refundPaymentMethod || null : null,
                         returnToInventory: Boolean(data.returnToInventory),
                         returnToInventoryItems: data.returnToInventoryItems || null,
                         customerId: data.customerId || null,
-                        storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                        exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                        exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                        storeCreditAmount: (isApprovedStatus && data.resolutionType === "store_credit") ? Number(data.storeCreditValue || 0) : 0,
+                        exchangeItems: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeItems || [] : [],
+                        exchangeBalanceResolution: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeBalanceResolution || null : null,
                         notes: data.observations || "",
                         idempotencyKey: `erp-init-process:${requestId}`,
-                        accountId: data.accountId || null,
-                    })
+                        accountId: isApprovedStatus ? (data.accountId || null) : null,
+                    }
+                    const processRes = await processReturnRequestAction(initialProcessPayload)
                     if (!processRes.success) throw new Error(processRes.error)
                     if (processRes.success && (processRes as any).data?.mpPaymentNotFound) {
-                        setPendingProcessData({
-                            partnerId,
-                            requestId,
-                            action: "updated",
-                            nextStatus: data.status || "PENDING_REVIEW",
-                            refundAmount: Number(data.refundValue || 0),
-                            refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-                            refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
-                            returnToInventory: Boolean(data.returnToInventory),
-                            returnToInventoryItems: data.returnToInventoryItems || null,
-                            customerId: data.customerId || null,
-                            storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                            exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                            exchangeBalanceResolution: data.exchangeBalanceResolution || null,
-                            notes: data.observations || "",
-                            idempotencyKey: `erp-init-process:${requestId}`,
-                            accountId: data.accountId || null,
-                        })
+                        setPendingProcessData(initialProcessPayload)
                         setMpPaymentNotFoundChecked(false)
                         setShowMpPaymentNotFoundModal(true)
                         return
@@ -264,23 +253,28 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                 }
                 toast({ title: "Sucesso", description: "Solicitação criada com sucesso." })
             } else if (entityState.action === "edit" && entityState.entityId) {
+                const nextStatus = data.status
+                const isApprovedStatus = ["APPROVED", "PROCESSING", "RESOLVED"].includes(nextStatus || "")
+                const isRejectedStatus = nextStatus === "REJECTED"
+                const refundVal = (isApprovedStatus && !isRejectedStatus) ? Number(data.refundValue || 0) : 0
+
                 const processPayload: Record<string, any> = {
                     partnerId,
                     requestId: entityState.entityId,
                     action: "updated",
-                    nextStatus: data.status,
-                    refundAmount: Number(data.refundValue || 0),
-                    refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-                    refundPaymentMethod: (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund")) ? data.refundPaymentMethod || null : null,
+                    nextStatus,
+                    refundAmount: refundVal,
+                    refundStatus: isApprovedStatus && refundVal > 0 ? "APPROVED" : (isRejectedStatus ? "FAILED" : "PENDING"),
+                    refundPaymentMethod: (isApprovedStatus && (data.resolutionType === "refund" || (data.resolutionType === "exchange" && data.exchangeBalanceResolution === "refund"))) ? data.refundPaymentMethod || null : null,
                     returnToInventory: Boolean(data.returnToInventory),
                     returnToInventoryItems: data.returnToInventoryItems || null,
                     customerId: data.customerId || null,
-                    storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-                    exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-                    exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                    storeCreditAmount: (isApprovedStatus && data.resolutionType === "store_credit") ? Number(data.storeCreditValue || 0) : 0,
+                    exchangeItems: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeItems || [] : [],
+                    exchangeBalanceResolution: (isApprovedStatus && data.resolutionType === "exchange") ? data.exchangeBalanceResolution || null : null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
-                    accountId: data.accountId || null,
+                    accountId: isApprovedStatus ? (data.accountId || null) : null,
                 }
                 const response = await processReturnRequestAction(processPayload)
                 if (!response.success) throw new Error(response.error)

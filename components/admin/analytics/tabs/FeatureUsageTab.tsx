@@ -17,6 +17,7 @@ import {
 } from "@/lib/icons"
 import { Badge } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
+import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
 import type { FeatureUsageData, FeatureUsageMetric } from "@/app/actions/admin/analytics"
 
 interface FeatureUsageTabProps {
@@ -57,31 +58,33 @@ export function FeatureUsageTab({ data }: FeatureUsageTabProps) {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header Banner */}
-            <div className="p-6 rounded-[24px] bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                        <TrendingUpIcon className="text-brand-green" size={22} /> Adoção & Uso de Funcionalidades do Ecossistema
-                    </h2>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                        Mapeamento das ferramentas mais e menos utilizadas pelos parceiros para direcionar melhorias e suporte.
-                    </p>
-                </div>
-                <Badge variant="green" className="self-start md:self-auto py-1 px-3">
-                    {totalPlatformInteractions.toLocaleString("pt-BR")} Interações Totais
-                </Badge>
-            </div>
+            {/* Header Banner - Using DashboardSectionCard */}
+            <DashboardSectionCard
+                title="Adoção & Uso de Funcionalidades do Ecossistema"
+                icon={TrendingUpIcon}
+                action={
+                    <Badge variant="green" className="self-start md:self-auto py-1 px-3">
+                        {totalPlatformInteractions.toLocaleString("pt-BR")} Interações Totais
+                    </Badge>
+                }
+                className="mb-0"
+            >
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                    Mapeamento das ferramentas mais e menos utilizadas pelos parceiros para direcionar melhorias e suporte.
+                </p>
+            </DashboardSectionCard>
 
             {/* Top Metric Cards - Using HorizontalKPICard from ERP */}
             {kpiItems.length > 0 && <HorizontalKPICard items={kpiItems} />}
 
             {/* Top Highlights Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Mais Utilizadas */}
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-green-200 dark:border-green-900/30 p-6">
-                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold mb-4 text-base">
-                        <CheckCircleIcon size={20} /> 🔥 Funcionalidades Campeãs de Uso
-                    </div>
+                {/* Mais Utilizadas - Using DashboardSectionCard */}
+                <DashboardSectionCard
+                    title="Funcionalidades Campeãs de Uso"
+                    icon={CheckCircleIcon}
+                    className="mb-0 border-green-200 dark:border-green-900/30"
+                >
                     <div className="flex flex-col gap-3">
                         {mostUsedFeatures.map((f: FeatureUsageMetric, index: number) => {
                             const Icon = getIconComponent(f.iconName)
@@ -110,13 +113,14 @@ export function FeatureUsageTab({ data }: FeatureUsageTabProps) {
                             )
                         })}
                     </div>
-                </div>
+                </DashboardSectionCard>
 
-                {/* Menos Utilizadas / Oportunidades */}
-                <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-amber-200 dark:border-amber-900/30 p-6">
-                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold mb-4 text-base">
-                        <AlertCircleIcon size={20} /> 💡 Subutilizadas / Oportunidades de Adoção
-                    </div>
+                {/* Menos Utilizadas / Oportunidades - Using DashboardSectionCard */}
+                <DashboardSectionCard
+                    title="Subutilizadas / Oportunidades de Adoção"
+                    icon={AlertCircleIcon}
+                    className="mb-0 border-amber-200 dark:border-amber-900/30"
+                >
                     <div className="flex flex-col gap-3">
                         {leastUsedFeatures.map((f: FeatureUsageMetric) => {
                             const Icon = getIconComponent(f.iconName)
@@ -145,14 +149,15 @@ export function FeatureUsageTab({ data }: FeatureUsageTabProps) {
                             )
                         })}
                     </div>
-                </div>
+                </DashboardSectionCard>
             </div>
 
-            {/* Complete Ranking Table & Progress Bars */}
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border p-6">
-                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-base mb-1">
-                    Ranking Geral de Volume por Módulo
-                </h3>
+            {/* Complete Ranking Table & Progress Bars - Using DashboardSectionCard */}
+            <DashboardSectionCard
+                title="Ranking Geral de Volume por Módulo"
+                icon={TagIcon}
+                className="mb-0"
+            >
                 <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-6">
                     Volume total de registros e ações geradas no período selecionado
                 </p>
@@ -199,7 +204,7 @@ export function FeatureUsageTab({ data }: FeatureUsageTabProps) {
                         )
                     })}
                 </div>
-            </div>
+            </DashboardSectionCard>
         </div>
     )
 }

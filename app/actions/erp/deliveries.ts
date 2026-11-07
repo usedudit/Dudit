@@ -1503,7 +1503,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       finalDeliveryId = created.id
     }
 
-    const isPlatformRequest = payload.deliveryPersonId === "platform:dudit_network" || payload.deliveryPersonId === "dudit_network"
+    const isPlatformRequest = payload.deliveryPersonId === "platform:dudit_network" || payload.deliveryPersonId === "dudit_network" || payload.platformDriverId === "dudit_network"
+    const hasPlatformDriver = isPlatformRequest || !!payload.platformDriverId
 
     if (isPlatformRequest) {
       await getAdminClient()
@@ -1527,7 +1528,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       if (assignmentRows.length > 0) {
         await getAdminClient().from("delivery_assignments").insert(assignmentRows)
       }
-    } else {
+    } else if (!hasPlatformDriver) {
       // Se for entrega própria / equipe / outro entregador, CANCELA qualquer solicitação de plataforma pendente
       await getAdminClient()
         .from("delivery_assignments")
@@ -2831,8 +2832,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     if (updateError) return { success: false as const, error: updateError.message }
 
-    const isExplicitPlatformNetworkRequest = payload.deliveryPersonId === "platform:dudit_network"
-    const isExplicitUnassignOrLocal = payload.deliveryPersonId !== undefined && !payload.deliveryPersonId?.startsWith("platform:")
+    const isExplicitPlatformNetworkRequest = payload.deliveryPersonId === "platform:dudit_network" || payload.platformDriverId === "dudit_network"
+    const isExplicitUnassignOrLocal = payload.deliveryPersonId !== undefined && !payload.deliveryPersonId?.startsWith("platform:") && !payload.platformDriverId
 
     if (isExplicitUnassignOrLocal && payload.deliveryPersonId !== delivery.delivery_person_id) {
       await getAdminClient()

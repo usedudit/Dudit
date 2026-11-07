@@ -61,7 +61,7 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
       .order("created_at", { ascending: false }),
     admin
       .from("audit_logs")
-      .select("id, action_type, metadata, change_lines, source, created_at, actor_name")
+      .select("id, action_type, metadata, change_lines, source, created_at, actor_name, actor_user_id, user_id")
       .eq("entity_type", "return_request")
       .eq("entity_id", returnRequestId)
       .order("created_at", { ascending: true }),
@@ -79,11 +79,16 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
     event_type: e.action_type || "updated",
     from_status: e.metadata?.from_status || null,
     to_status: e.metadata?.to_status || null,
+    previous_status: e.metadata?.from_status || null,
+    new_status: e.metadata?.to_status || null,
+    notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
+    change_lines: Array.isArray(e.change_lines) ? e.change_lines : [],
     message: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.message || e.metadata?.notes || "Atualização"),
     metadata: e.metadata || {},
     source: e.source || "system",
     created_at: e.created_at,
-    actor_name: e.actor_name || "Sistema"
+    actor_name: e.actor_name || "Sistema",
+    changed_by: e.actor_user_id || e.user_id || null,
   }))
 
   const normalized = normalizeAdminReturnRow({ ...request, auditLogs: returnEvents })

@@ -281,7 +281,7 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
   const supabase = getAdminClient()
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("buyer_id, customer_id, partner_id")
+    .select("buyer_id, customer_id, partner_id, customer_name, stores(name)")
     .eq("id", orderId)
     .single()
 
@@ -294,8 +294,54 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
   }
 
   const { getOrderHistoryEntries } = await import("@/lib/services/order-history.service")
+  const { resolveTimelineActorName, humanizeTimelineChangeLine } = await import("@/lib/utils/formatters")
   try {
-    const entries = await getOrderHistoryEntries(orderId, order.partner_id)
+    const rawEntries = await getOrderHistoryEntries(orderId, order.partner_id)
+    const storeName = (order.stores as any)?.name || null
+    const entries = rawEntries
+      .map((e) => {
+        const actorName = resolveTimelineActorName({
+          entry: e,
+          viewer: "customer",
+          orderCustomerName: order.customer_name,
+          storeName,
+          buyerId: order.buyer_id,
+        })
+
+        let changeLines = (e.change_lines || []).map((l) => humanizeTimelineChangeLine(l)).filter(Boolean)
+
+        // Filter out internal seller notes edits from buyer view
+        changeLines = changeLines.filter(
+          (l) =>
+            !l.toLowerCase().includes("observações do pedido atualizadas") &&
+            !l.toLowerCase().includes("alterou as observações do pedido"),
+        )
+
+        // Filter false refund/credit lines on rejected returns
+        const isRejected =
+          e.metadata?.to_status === "REJECTED" ||
+          e.entry_type === "return_rejected" ||
+          changeLines.some((l) => l.toLowerCase().includes("recusad") || l.toLowerCase().includes("rejeitad"))
+
+        if (isRejected) {
+          changeLines = changeLines.filter(
+            (l) =>
+              !l.startsWith("Valor do reembolso:") &&
+              !l.startsWith("Status do reembolso:") &&
+              !l.startsWith("Saldo da troca enviado para:") &&
+              !l.startsWith("Vale-compra gerado:") &&
+              !l.startsWith("Pedido de troca criado:"),
+          )
+        }
+
+        return {
+          ...e,
+          actor_name: actorName,
+          change_lines: changeLines,
+        }
+      })
+      .filter((e) => e.change_lines.length > 0)
+
     return { success: true, data: entries }
   } catch (err: any) {
     console.error("[getOrderHistoryForBuyerAction] error:", err)

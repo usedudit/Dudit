@@ -255,9 +255,6 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         <InfoRow label="Horário de saída" value={deliveryTime || "-"} />
                                     </>
                                 )}
-                                {!showDispatchFields && (
-                                    <InfoRow label="Saída" value="Será registrada ao enviar" />
-                                )}
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4">
@@ -299,9 +296,6 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                             disabled={isDeliveryLocked}
                                         />
                                     </>
-                                )}
-                                {!showDispatchFields && (
-                                    <InfoRow label="Saída" value="Será registrada ao enviar" />
                                 )}
                             </div>
                         )}
