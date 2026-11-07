@@ -9,19 +9,17 @@ import {
     CalendarIcon,
     ShoppingCartIcon,
     StoreIcon,
-    Users,
     TagIcon,
     SparklesIcon,
     BriefcaseIcon,
-    ArrowUpIcon,
-    FilterIcon,
 } from "@/lib/icons"
-import { Badge, Button, Input } from "@/components/reusable"
+import { Badge, Input } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
+import { AnalyticsChartCard } from "../AnalyticsChartCard"
 import type { MarketplaceDemandMetrics, ZeroResultTerm } from "@/lib/types/analytics"
 import { isBotSearch } from "@/lib/search/bot-detection"
-import { DashboardLineChart, DashboardBarChart } from "@/components/erp/dashboard/charts/DashboardCharts"
+import { DashboardLineChart } from "@/components/erp/dashboard/charts/DashboardCharts"
 
 interface MarketplaceDemandTabProps {
     data: MarketplaceDemandMetrics
@@ -52,7 +50,7 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
     const filteredZeroTerms = topZeroResultTerms.filter(t =>
         !isBotSearch(t.term) &&
         (t.term.toLowerCase().includes(searchTermFilter.toLowerCase()) ||
-        (t.suggestedCategory && t.suggestedCategory.toLowerCase().includes(searchTermFilter.toLowerCase())))
+            (t.suggestedCategory && t.suggestedCategory.toLowerCase().includes(searchTermFilter.toLowerCase())))
     )
 
     const lineChartData = dailyTimeline.map(item => ({
@@ -92,9 +90,47 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
         {
             title: "Contatos",
             value: contactClicks.toLocaleString("pt-BR"),
-            trend: "Conversão",
+            trend: totalSearches > 0 ? `${((contactClicks / totalSearches) * 100).toFixed(1)}% das buscas` : undefined,
             subtext: "Cliques em WhatsApp ou telefone da loja",
             icon: PhoneIcon,
+            iconBg: "bg-brand-green-light dark:bg-dark-border/40",
+            iconColor: "text-brand-dark dark:text-dark-heading",
+        },
+    ]
+
+    const secondaryKpiItems = [
+        {
+            title: "Agendamentos",
+            value: appointmentsCount.toLocaleString("pt-BR"),
+            trend: totalSearches > 0 ? `${((appointmentsCount / totalSearches) * 100).toFixed(1)}% das buscas` : undefined,
+            subtext: "Horários agendados em prestadores",
+            icon: CalendarIcon,
+            iconBg: "bg-brand-green-light dark:bg-dark-border/40",
+            iconColor: "text-brand-dark dark:text-dark-heading",
+        },
+        {
+            title: "Pedidos",
+            value: ordersCount.toLocaleString("pt-BR"),
+            trend: totalSearches > 0 ? `${((ordersCount / totalSearches) * 100).toFixed(1)}% das buscas` : undefined,
+            subtext: "Pedidos concluídos no marketplace",
+            icon: ShoppingCartIcon,
+            iconBg: "bg-brand-green-light dark:bg-dark-border/40",
+            iconColor: "text-brand-dark dark:text-dark-heading",
+        },
+        {
+            title: "Negócios ativos",
+            value: activeBusinessesCount.toLocaleString("pt-BR"),
+            subtext: "Lojas e prestadores com vitrine ativa",
+            icon: StoreIcon,
+            iconBg: "bg-brand-green-light dark:bg-dark-border/40",
+            iconColor: "text-brand-dark dark:text-dark-heading",
+        },
+        {
+            title: "Negócios com demanda",
+            value: businessesWithDemandCount.toLocaleString("pt-BR"),
+            trend: `${demandBusinessRate}% do total`,
+            subtext: "Receberam pedidos, contatos ou agendamentos",
+            icon: BriefcaseIcon,
             iconBg: "bg-brand-green-light dark:bg-dark-border/40",
             iconColor: "text-brand-dark dark:text-dark-heading",
         },
@@ -116,52 +152,8 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
             {/* Top KPI Cards */}
             <HorizontalKPICard items={kpiItems} />
 
-            {/* Secondary Metrics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <DashboardSectionCard
-                    title="Agendamentos"
-                    icon={CalendarIcon}
-                    action={<Badge variant="purple">Serviços</Badge>}
-                    className="mb-0 p-6"
-                >
-                    <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">Agendamentos</h3>
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{appointmentsCount.toLocaleString("pt-BR")}</p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">Horários agendados em prestadores</p>
-                </DashboardSectionCard>
-
-                <DashboardSectionCard
-                    title="Pedidos"
-                    icon={ShoppingCartIcon}
-                    action={<Badge variant="orange">Vendas</Badge>}
-                    className="mb-0 p-6"
-                >
-                    <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">Pedidos</h3>
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{ordersCount.toLocaleString("pt-BR")}</p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">Pedidos concluídos no marketplace</p>
-                </DashboardSectionCard>
-
-                <DashboardSectionCard
-                    title="Negócios ativos"
-                    icon={StoreIcon}
-                    action={<Badge variant="gray">Catálogo Ativo</Badge>}
-                    className="mb-0 p-6"
-                >
-                    <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">Negócios ativos</h3>
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{activeBusinessesCount.toLocaleString("pt-BR")}</p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">Lojas e prestadores com vitrine ativa</p>
-                </DashboardSectionCard>
-
-                <DashboardSectionCard
-                    title="Negócios com demanda"
-                    icon={BriefcaseIcon}
-                    action={<Badge variant="green">{demandBusinessRate}% do total</Badge>}
-                    className="mb-0 p-6"
-                >
-                    <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">Negócios com demanda</h3>
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{businessesWithDemandCount.toLocaleString("pt-BR")}</p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">Receberam pedidos, contatos ou agendamentos</p>
-                </DashboardSectionCard>
-            </div>
+            {/* Secondary KPI Cards */}
+            <HorizontalKPICard items={secondaryKpiItems} />
 
             {/* Strategic Diagnostic - Using DashboardSectionCard */}
             <DashboardSectionCard
@@ -199,11 +191,10 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                             return (
                                 <div
                                     key={index}
-                                    className={`p-4 rounded-[24px] border transition-all ${
-                                        isTopDemand
-                                            ? "bg-red-50/40 dark:bg-red-900/10 border-red-200 dark:border-red-900/30"
-                                            : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border"
-                                    }`}
+                                    className={`p-4 rounded-[24px] border transition-all ${isTopDemand
+                                        ? "bg-red-50/40 dark:bg-red-900/10 border-red-200 dark:border-red-900/30"
+                                        : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border"
+                                        }`}
                                 >
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                         <div className="flex flex-col gap-1 min-w-0">
@@ -256,24 +247,27 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                 )}
             </DashboardSectionCard>
 
-            {/* Timeline Chart - Using DashboardSectionCard */}
-            <DashboardSectionCard
-                title="Evolução Diária de Buscas & Conversão"
-                icon={CalendarIcon}
-                className="mb-0"
-            >
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-6">
-                    Acompanhamento do volume total de buscas vs buscas atendidas no período
-                </p>
-                <div className="h-[280px] w-full">
-                    <DashboardLineChart
-                        data={lineChartData}
-                        colors={["#059669", "#94a3b8"]}
-                        height="h-[280px]"
-                        showLegend={true}
-                    />
+            {/* Timeline Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12">
+                    <AnalyticsChartCard
+                        title="Evolução Diária de Buscas & Conversão"
+                        subtitle="Volume total de buscas vs buscas atendidas no período"
+                        icon={CalendarIcon}
+                        legendItems={[
+                            { label: "Buscas", color: "#79c325" },
+                            { label: "Buscas com resultado", color: "#94a3b8" },
+                        ]}
+                    >
+                        <DashboardLineChart
+                            data={lineChartData}
+                            colors={["#79c325", "#94a3b8"]}
+                            height="h-[280px]"
+                            legendLabels={{ value: "Buscas", secondary: "Buscas com resultado" }}
+                        />
+                    </AnalyticsChartCard>
                 </div>
-            </DashboardSectionCard>
+            </div>
         </div>
     )
 }

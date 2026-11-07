@@ -110,7 +110,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
         img.dataset.editorId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       }
       setSelectedImageId(img.dataset.editorId)
-      img.style.outline = "2px solid #059669"
+      img.style.outline = "2px solid #79c325"
       img.style.outlineOffset = "2px"
       updateOverlayPos()
       setShowActions(true)
@@ -478,7 +478,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           editor.appendChild(img)
         }
       }
-      img.style.outline = "2px solid #059669"
+      img.style.outline = "2px solid #79c325"
       img.style.outlineOffset = "2px"
       if (editor) onChange(editor.innerHTML)
       requestAnimationFrame(() => updateOverlayPos())
@@ -505,7 +505,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
         container.appendChild(img)
       }
     }
-    img.style.outline = "2px solid #059669"
+    img.style.outline = "2px solid #79c325"
     img.style.outlineOffset = "2px"
     if (editor) onChange(editor.innerHTML)
     requestAnimationFrame(() => updateOverlayPos())

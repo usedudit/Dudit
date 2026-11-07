@@ -8,14 +8,15 @@ import {
     BriefcaseIcon,
     SparklesIcon,
     ReloadIcon,
-    TrendingUpIcon,
     CalendarIcon,
     Settings2Icon,
-    FilterIcon,
-    ChevronDownIcon,
+    CheckIcon,
 } from "@/lib/icons"
-import { Badge, Button, Input, Dropdown, DropdownItem } from "@/components/reusable"
+import { Button, ActionsDropdown } from "@/components/reusable"
+import DropdownItem from "@/components/reusable/DropdownItem"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import { TabCountBadge } from "@/components/reusable/TabCountBadge"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { OverviewTab } from "./tabs/OverviewTab"
 import { MarketplaceDemandTab } from "./tabs/MarketplaceDemandTab"
 import { UserGrowthTab } from "./tabs/UserGrowthTab"
@@ -35,8 +36,6 @@ import {
 } from "@/app/actions/admin/analytics"
 import type { MarketplaceDemandMetrics } from "@/lib/types/analytics"
 import { toast } from "@/hooks/use-notification"
-import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
-import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 
 interface AdminAnalyticsDashboardProps {
     initialOverview: OverviewAnalyticsData
@@ -103,152 +102,114 @@ export default function AdminAnalyticsDashboard({
         refreshData(newPeriod)
     }
 
-    const getPeriodLabel = (p: AnalyticsPeriod) => PERIOD_OPTIONS.find(o => o.id === p)?.label || "30 dias"
-
     return (
-        <div className="p-6 md:p-8 max-w-[1700px] mx-auto space-y-8">
-            {/* Header & Controls */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-                <div>
-                    <h1 className="text-[28px] sm:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mb-2">
-                        Analytics da Dudit
-                    </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                        Inteligência de demanda da cidade, crescimento de usuários, saúde de parceiros e uso de features.
-                    </p>
-                </div>
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                {/* Period & Refresh Controls - ERP Style */}
-                <div className="flex flex-wrap items-center gap-2" data-period-dropdown>
-                    {/* Period Dropdown - ERP Style */}
-                    <Dropdown
-                        trigger={
-                            <button
-                                className="w-[160px] h-[42px] px-3 text-sm font-medium bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[12px] text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/50 transition-colors text-left flex items-center justify-between gap-2"
-                                aria-haspopup="true"
-                            >
-                                <CalendarIcon className="w-4 h-4 shrink-0" />
-                                <span className="truncate flex-1">{getPeriodLabel(period)}</span>
-                                <ChevronDownIcon className="w-4 h-4 shrink-0" />
-                            </button>
-                        }
-                        align="right"
-                        width="w-48"
-                    >
-                        {PERIOD_OPTIONS.map((opt) => (
-                            <DropdownItem
-                                key={opt.id}
-                                onClick={() => handlePeriodChange(opt.id)}
-                                className={`flex items-center gap-2 ${period === opt.id ? "text-brand-green font-semibold" : ""}`}
-                            >
-                                {period === opt.id && <span className="w-4 h-4 flex items-center justify-center"><ChevronDownIcon className="w-3 h-3 text-brand-green" /></span>}
-                                <span>{opt.label}</span>
-                            </DropdownItem>
-                        ))}
-                    </Dropdown>
-
-                    {/* Refresh Button */}
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        disabled={isPending}
-                        onClick={() => refreshData(period)}
-                        className="h-[42px] w-[42px] rounded-[12px] shrink-0"
-                        aria-label="Atualizar dados"
-                    >
-                        <ReloadIcon className={`w-5 h-5 ${isPending ? "animate-spin text-brand-green" : ""}`} />
-                    </Button>
-
-                    {/* Actions Dropdown with Settings2Icon - ERP Style */}
-                    <Dropdown
-                        trigger={
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-[42px] w-[42px] rounded-[12px] shrink-0"
-                                leftIcon={<Settings2Icon size={20} />}
-                            >
-                            </Button>
-                        }
-                        align="right"
-                        width="w-56"
-                        showChevron={false}
-                    >
-                        <DropdownItem onClick={() => refreshData(period)} disabled={isPending}>
-                            <ReloadIcon size={16} /> Atualizar dados
-                        </DropdownItem>
-                        <DropdownItem>
-                            <CalendarIcon size={16} /> Período personalizado
-                        </DropdownItem>
-                        <DropdownItem>
-                            <TrendingUpIcon size={16} /> Exportar relatório
-                        </DropdownItem>
-                    </Dropdown>
-                </div>
-            </div>
-
-            {/* Navigation Tabs Bar - ERP Style with DashboardSectionCard */}
-            <DashboardSectionCard
-                title="Navegação"
-                icon={AnalyticsIcon}
-                action={
-                    <div className="flex items-center gap-2">
-                        <Badge variant="green" className="py-1 px-3">
-                            {getPeriodLabel(period)}
-                        </Badge>
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Analytics da Dudit
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Inteligência de demanda da cidade, crescimento de usuários, saúde de parceiros e uso de features.
+                        </p>
                     </div>
-                }
-                className="mb-0"
-            >
-                <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as TabType)}>
-                    <TabsList className="grid w-full grid-cols-5">
-                        <TabsTrigger value="overview" icon={AnalyticsIcon}>
-                            Visão Geral
-                        </TabsTrigger>
-                        <TabsTrigger value="demanda" icon={SearchIcon}>
-                            Demanda & Buscas
-                            {demandData.searchesWithoutResults > 0 && (
-                                <span className="w-2 h-2 rounded-full bg-red-500 ml-1" />
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger value="usuarios" icon={Users}>
-                            Usuários & Retenção
-                        </TabsTrigger>
-                        <TabsTrigger value="parceiros" icon={BriefcaseIcon}>
-                            Parceiros & Planos
-                        </TabsTrigger>
-                        <TabsTrigger value="features" icon={SparklesIcon}>
-                            Uso de Features
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-            </DashboardSectionCard>
 
-            {/* Content Area */}
-            <div className={`transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-                {currentTab === "overview" && (
-                    <OverviewTab
-                        data={overviewData}
-                        onNavigateTab={(tabId) => setCurrentTab(tabId as TabType)}
-                    />
-                )}
+                    <div className="flex items-center gap-3">
+                        {/* Actions Dropdown (período + atualizar) */}
+                        <ActionsDropdown
+                            trigger={
+                                <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                                    Ações
+                                </Button>
+                            }
+                        >
+                            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                                Período
+                            </div>
+                            {PERIOD_OPTIONS.map((opt) => (
+                                <DropdownItem
+                                    key={opt.id}
+                                    onClick={() => handlePeriodChange(opt.id)}
+                                    className={period === opt.id ? "text-brand-green font-semibold" : ""}
+                                >
+                                    {period === opt.id ? <CheckIcon size={16} /> : <CalendarIcon size={16} />}
+                                    {opt.label}
+                                </DropdownItem>
+                            ))}
+                            <div className="my-1 h-px bg-brand-border dark:bg-dark-border" />
+                            <DropdownItem onClick={() => refreshData(period)} disabled={isPending}>
+                                <ReloadIcon size={16} className={isPending ? "animate-spin" : ""} />
+                                {isPending ? "Atualizando..." : "Atualizar dados"}
+                            </DropdownItem>
+                        </ActionsDropdown>
+                    </div>
+                </div>
 
-                {currentTab === "demanda" && (
-                    <MarketplaceDemandTab data={demandData} />
-                )}
+                {/* Tabs */}
+                <div className="mb-6 px-4 md:px-8">
+                    <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as TabType)}>
+                        <TabsList className="px-0">
+                            <TabsTrigger value="overview" icon={AnalyticsIcon}>
+                                Visão Geral
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="demanda"
+                                icon={SearchIcon}
+                                badge={demandData.searchesWithoutResults > 0 && <TabCountBadge count={demandData.searchesWithoutResults} variant="red" />}
+                            >
+                                Demanda & Buscas
+                            </TabsTrigger>
+                            <TabsTrigger value="usuarios" icon={Users}>
+                                Usuários & Retenção
+                            </TabsTrigger>
+                            <TabsTrigger value="parceiros" icon={BriefcaseIcon}>
+                                Parceiros & Planos
+                            </TabsTrigger>
+                            <TabsTrigger value="features" icon={SparklesIcon}>
+                                Uso de Features
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
 
-                {currentTab === "usuarios" && (
-                    <UserGrowthTab data={usersData} />
-                )}
+                {/* Content Area */}
+                <div className={`flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+                    {currentTab === "overview" && (
+                        <OverviewTab
+                            data={overviewData}
+                            onNavigateTab={(tabId) => setCurrentTab(tabId as TabType)}
+                        />
+                    )}
 
-                {currentTab === "parceiros" && (
-                    <PartnerPlansTab data={partnersData} />
-                )}
+                    {currentTab === "demanda" && (
+                        <MarketplaceDemandTab data={demandData} />
+                    )}
 
-                {currentTab === "features" && (
-                    <FeatureUsageTab data={featuresData} />
-                )}
+                    {currentTab === "usuarios" && (
+                        <UserGrowthTab data={usersData} />
+                    )}
+
+                    {currentTab === "parceiros" && (
+                        <PartnerPlansTab data={partnersData} />
+                    )}
+
+                    {currentTab === "features" && (
+                        <FeatureUsageTab data={featuresData} />
+                    )}
+                </div>
             </div>
-        </div>
+        </FadeIn>
     )
 }

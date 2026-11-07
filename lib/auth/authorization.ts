@@ -483,6 +483,9 @@ export async function requireOrderAccess(
     return { role: "seller" }
   }
 
+  const { data: da } = await supabase.from("delivery_assignments").select("id").eq("order_id", orderId).eq("driver_id", user.id).maybeSingle()
+  if (da) return { role: "seller" }
+
   throw new ForbiddenError("Você não tem acesso a este pedido")
 }
 

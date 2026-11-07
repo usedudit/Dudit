@@ -382,7 +382,7 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 
 export async function acceptDeliveryOfferAction(assignmentId: string) {
-  await requireDeliveryDriver()
+  const { user } = await requireDeliveryDriver()
   if (!assignmentId) return { success: false as const, error: "Oferta inválida." }
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("accept_delivery_offer", {
@@ -395,6 +395,46 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
 
   const orderId = (data as any)?.order_id
   if (orderId) {
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      const admin = getAdminClient()
+      const { data: driverProfile } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      const driverName = driverProfile?.full_name?.trim() || "Entregador"
+
+      const { data: da } = await admin
+        .from("delivery_assignments")
+        .select("partner_id, order_id, delivery_id")
+        .eq("id", assignmentId)
+        .maybeSingle()
+
+      if (da) {
+        await admin.from("audit_logs").insert({
+          table_name: "orders",
+          action: "DELIVERY_OFFER_ACCEPTED",
+          user_id: user.id,
+          actor_user_id: user.id,
+          partner_id: da.partner_id,
+          entity_type: "order",
+          entity_id: da.order_id,
+          action_type: "delivery_status_changed",
+          change_lines: ["Aceitou a entrega do pedido."],
+          metadata: {
+            assignment_id: assignmentId,
+            delivery_id: da.delivery_id,
+            is_driver: true,
+            driver_id: user.id,
+            driver_name: driverName,
+            driver_status: "accepted",
+          },
+          source: "delivery_driver_app",
+        })
+      }
+    } catch { }
+
     await revalidateOrderHistory(orderId)
   }
 
@@ -413,7 +453,7 @@ export async function transitionMyDeliveryAssignmentAction(params: {
   status: "accepted" | "picked_up" | "out_for_delivery" | "delivered" | "failed"
   failureReason?: string
 }) {
-  await requireDeliveryDriver()
+  const { user } = await requireDeliveryDriver()
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("transition_delivery_assignment", {
     p_assignment_id: params.assignmentId,
@@ -424,6 +464,54 @@ export async function transitionMyDeliveryAssignmentAction(params: {
 
   const orderId = (data as any)?.order_id
   if (orderId) {
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      const admin = getAdminClient()
+      const { data: driverProfile } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      const driverName = driverProfile?.full_name?.trim() || "Entregador"
+
+      const { data: da } = await admin
+        .from("delivery_assignments")
+        .select("partner_id, order_id, delivery_id")
+        .eq("id", params.assignmentId)
+        .maybeSingle()
+
+      if (da) {
+        let statusText = "atualizou o status da entrega."
+        if (params.status === "picked_up") statusText = "Retirou o pedido no estabelecimento para entrega."
+        else if (params.status === "out_for_delivery") statusText = "Saiu para entrega com o pedido."
+        else if (params.status === "delivered") statusText = "Entregou o pedido ao cliente."
+        else if (params.status === "failed") statusText = `Tentativa de entrega não realizada.${params.failureReason ? ` Motivo: ${params.failureReason.trim()}` : ""}`
+        else if (params.status === "accepted") statusText = "Aceitou a entrega do pedido."
+
+        await admin.from("audit_logs").insert({
+          table_name: "orders",
+          action: `DELIVERY_${params.status.toUpperCase()}`,
+          user_id: user.id,
+          actor_user_id: user.id,
+          partner_id: da.partner_id,
+          entity_type: "order",
+          entity_id: da.order_id,
+          action_type: "delivery_status_changed",
+          change_lines: [statusText],
+          metadata: {
+            assignment_id: params.assignmentId,
+            delivery_id: da.delivery_id,
+            is_driver: true,
+            driver_id: user.id,
+            driver_name: driverName,
+            driver_status: params.status,
+            failure_reason: params.failureReason?.trim() || null,
+          },
+          source: "delivery_driver_app",
+        })
+      }
+    } catch { }
+
     await revalidateOrderHistory(orderId)
   }
 
@@ -446,7 +534,7 @@ export async function setMyDeliveryAvailabilityAction(status: "available" | "off
 }
 
 export async function confirmDeliveryPaymentReceivedAction(assignmentId: string, note?: string) {
-  await requireDeliveryDriver()
+  const { user } = await requireDeliveryDriver()
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("confirm_delivery_payment_received", {
     p_assignment_id: assignmentId,
@@ -456,6 +544,60 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
 
   const orderId = (data as any)?.order_id
   if (orderId) {
+    try {
+      const { getAdminClient } = await import("@/lib/supabase/admin")
+      const admin = getAdminClient()
+      const { data: driverProfile } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      const driverName = driverProfile?.full_name?.trim() || "Entregador"
+
+      const { data: da } = await admin
+        .from("delivery_assignments")
+        .select("partner_id, order_id, amount_to_collect")
+        .eq("id", assignmentId)
+        .maybeSingle()
+
+      if (da) {
+        const { formatCurrency } = await import("@/lib/utils")
+        const amount = Number(da.amount_to_collect || 0)
+        const lines = [
+          amount > 0
+            ? `Recebido ${formatCurrency(amount)} via Dinheiro pelo entregador. Pedido totalmente pago.`
+            : "Pagamento recebido em dinheiro pelo entregador.",
+        ]
+        if (note?.trim()) {
+          lines.push(`Observação do recebimento: ${note.trim()}`)
+        }
+
+        await admin.from("audit_logs").insert({
+          table_name: "orders",
+          action: "DRIVER_PAYMENT_RECEIVED",
+          user_id: user.id,
+          actor_user_id: user.id,
+          partner_id: da.partner_id,
+          entity_type: "order",
+          entity_id: da.order_id,
+          action_type: "paid",
+          change_lines: lines,
+          metadata: {
+            oldStatus: "Pendente",
+            newStatus: "Pago",
+            statusScope: "payment",
+            is_driver: true,
+            driver_id: user.id,
+            driver_name: driverName,
+            payment_method: "dinheiro",
+            amount_received: amount,
+            assignment_id: assignmentId,
+          },
+          source: "delivery_driver_app",
+        })
+      }
+    } catch { }
+
     await revalidateOrderHistory(orderId)
   }
 
@@ -466,7 +608,7 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
   return { success: true as const, data }
 }
 
-export async function getDriverPaymentMethodsAction(assignmentId: string) {
+export async function getDriverPaymentMethodsAction(assignmentId: string, orderId?: string | null) {
   const { user } = await requireDeliveryDriver()
   if (!assignmentId) return { success: false as const, error: "ID inválido." }
 
@@ -475,7 +617,7 @@ export async function getDriverPaymentMethodsAction(assignmentId: string) {
 
   const { data: assignment, error: assignmentError } = await admin
     .from("delivery_assignments")
-    .select("partner_id, order_id, payment_confirmed_at")
+    .select("id, partner_id, order_id, delivery_id, payment_confirmed_at")
     .eq("id", assignmentId)
     .eq("driver_id", user.id)
     .maybeSingle()
@@ -483,6 +625,8 @@ export async function getDriverPaymentMethodsAction(assignmentId: string) {
   if (assignmentError || !assignment) {
     return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
   }
+
+  const targetOrderId = orderId || assignment.order_id
 
   const { data: methods, error: methodsError } = await admin
     .from("payment_methods")
@@ -546,11 +690,32 @@ export async function getDriverPaymentMethodsAction(assignmentId: string) {
     }
   }))
 
-  return { success: true as const, methods: processed, storeName, assignment }
+  const pixMethod = processed.find((m) => m.type === "pix" && m.pix_key)
+  const storePixKey = pixMethod?.pix_key || store?.business_info?.pix_key || null
+  const storePixKeyType = pixMethod?.pix_key_type || store?.business_info?.pix_key_type || null
+
+  const { data: order } = await admin
+    .from("orders")
+    .select(
+      "id, order_number, total_amount, paid_amount, situation, payment_method, payment_provider, mp_payment_id, payment_breakdown, notes, customer_name, buyer_id, order_items(id, product_name, quantity, product_price, subtotal, products(name, images))"
+    )
+    .eq("id", targetOrderId)
+    .maybeSingle()
+
+  return {
+    success: true as const,
+    methods: processed,
+    storeName,
+    storePixKey,
+    storePixKeyType,
+    assignment,
+    order: order || null,
+  }
 }
 
 export async function driverConfirmPaymentAction(params: {
   assignmentId: string
+  orderId?: string | null
   paymentMethod: string
   amountReceived?: number
   installments?: number
@@ -566,7 +731,7 @@ export async function driverConfirmPaymentAction(params: {
 
   const { data: assignment, error: lookupError } = await supabase
     .from("delivery_assignments")
-    .select("id, partner_id, order_id, driver_id")
+    .select("id, partner_id, order_id, delivery_id, driver_id")
     .eq("id", params.assignmentId)
     .eq("driver_id", user.id)
     .maybeSingle()
@@ -575,10 +740,12 @@ export async function driverConfirmPaymentAction(params: {
     return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
   }
 
+  const targetOrderId = params.orderId || assignment.order_id
+
   const { data: order } = await supabase
     .from("orders")
-    .select("total_amount, paid_amount")
-    .eq("id", assignment.order_id)
+    .select("id, order_number, total_amount, paid_amount, situation, store_id, buyer_id, customer_name, customer_id, finance_account_id, order_source, payment_breakdown, payment_method")
+    .eq("id", targetOrderId)
     .maybeSingle()
 
   if (!order) {
@@ -609,6 +776,7 @@ export async function driverConfirmPaymentAction(params: {
       p_installments: params.installments || 1,
       p_payment_method_id: params.paymentMethodId || null,
       p_note: params.note || null,
+      p_order_id: targetOrderId,
     })
 
     if (rpcError) {
@@ -618,8 +786,115 @@ export async function driverConfirmPaymentAction(params: {
       }
     }
 
+    const { getAdminClient } = await import("@/lib/supabase/admin")
+    const admin = getAdminClient()
+
+    // 1. Obter nome do entregador para os logs
+    const { data: driverProfile } = await admin
+      .from("user_profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+    const driverName = driverProfile?.full_name?.trim() || "Entregador"
+
+    const newSituation = (data as any)?.situation || "paid"
+    const confirmedAmount = Number((data as any)?.amount_received || amountReceived)
+    const { formatCurrency } = await import("@/lib/utils")
+    const { getPaymentStatusLabel } = await import("@/lib/orders/status")
+    const { formatPaymentMethodLabel } = await import("@/lib/utils/payment-method-label")
+
+    const methodLabel = formatPaymentMethodLabel(params.paymentMethod, null) || "Método não informado"
+    const isFullyPaid = newSituation === "paid"
+
+    const lines: string[] = [
+      `Recebido ${formatCurrency(confirmedAmount)} via ${methodLabel} pelo entregador.${isFullyPaid ? " Pedido totalmente pago." : ""}`,
+    ]
+    if (order.situation !== newSituation) {
+      lines.push(`alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(newSituation)}`)
+    }
+    if (params.note?.trim()) {
+      lines.push(`Observação do recebimento: ${params.note.trim()}`)
+    }
+
+    // 2. Registrar no audit_logs (Histórico do Pedido específico)
+    try {
+      await admin.from("audit_logs").insert({
+        table_name: "orders",
+        action: "DRIVER_PAYMENT_RECEIVED",
+        user_id: user.id,
+        actor_user_id: user.id,
+        partner_id: assignment.partner_id,
+        entity_type: "order",
+        entity_id: targetOrderId,
+        action_type: "paid",
+        change_lines: lines,
+        metadata: {
+          oldStatus: getPaymentStatusLabel(order.situation),
+          newStatus: getPaymentStatusLabel(newSituation),
+          statusScope: "payment",
+          is_driver: true,
+          driver_id: user.id,
+          driver_name: driverName,
+          payment_method: params.paymentMethod,
+          amount_received: confirmedAmount,
+          installments: params.installments || 1,
+          assignment_id: assignment.id,
+          order_id: targetOrderId,
+        },
+        source: "delivery_driver_app",
+        store_id: order.store_id || null,
+      })
+    } catch (auditErr) {
+      console.error("[driverConfirmPaymentAction] Audit log warning:", auditErr)
+    }
+
+    // 3. Sincronizar transação financeira e recebível do ERP
+    try {
+      const { createFinancialTransactionsForReceivedAmount } = await import("@/app/actions/erp/orders")
+      const { syncReceivableForOrder } = await import("@/lib/services/transaction.service")
+
+      const { data: updatedOrder } = await admin
+        .from("orders")
+        .select("payment_breakdown, situation, paid_amount")
+        .eq("id", targetOrderId)
+        .maybeSingle()
+
+      await createFinancialTransactionsForReceivedAmount(admin, {
+        orderId: targetOrderId,
+        orderNumber: order.order_number || targetOrderId,
+        partnerId: assignment.partner_id,
+        storeId: order.store_id || null,
+        totalAmount: totalAmount,
+        newBreakdown: updatedOrder?.payment_breakdown || [],
+        oldBreakdown: order.payment_breakdown || [],
+        paymentMethod: params.paymentMethod,
+        customerId: order.customer_id || order.buyer_id || null,
+        customerName: order.customer_name || null,
+        financeAccountId: order.finance_account_id || null,
+        orderSource: order.order_source || "manual",
+      })
+
+      await syncReceivableForOrder(admin, {
+        order_number: order.order_number || targetOrderId,
+        partner_id: assignment.partner_id,
+        store_id: order.store_id || null,
+        total_amount: totalAmount,
+        paid_amount: Number(updatedOrder?.paid_amount || (alreadyPaid + confirmedAmount)),
+        situation: updatedOrder?.situation || newSituation,
+        payment_method: params.paymentMethod,
+        customer_id: order.customer_id || order.buyer_id || null,
+        customer_name: order.customer_name || null,
+        finance_account_id: order.finance_account_id || null,
+        order_source: order.order_source || "manual",
+      })
+    } catch (finErr) {
+      console.error("[driverConfirmPaymentAction] Financial sync warning:", finErr)
+    }
+
+    await revalidateOrderHistory(targetOrderId)
     revalidatePath("/entregadores")
     revalidatePath("/entregadores/entregas")
+    revalidatePath(`/entregadores/entregas/${assignment.id}`)
     revalidatePath("/erp/entregas")
     revalidatePath("/erp/pedidos")
     revalidatePath("/erp/logistica")

@@ -456,7 +456,7 @@ export default function OrderDetailView({
     async function loadHistory() {
       if (activeTab !== "history" || historyLoaded) return;
       setHistoryLoading(true);
-      const res = await getOrderHistoryAction(orderId, partnerId);
+      const res = await getOrderHistoryAction(orderId, partnerId, adminContext);
       if (res.success) {
         setHistoryEntries(res.data || []);
         setHistoryLoaded(true);
@@ -1721,11 +1721,6 @@ export default function OrderDetailView({
                       <ActionsDropdown
                         onPrint={() =>
                           setPrintModalOrderId(order.id || order.order_number)
-                        }
-                        onEdit={
-                          onEditOrder && (adminContext || (canEdit && canRbac("orders.edit")))
-                            ? () => onEditOrder(order)
-                            : undefined
                         }
                         onCancel={
                           onCancelOrder

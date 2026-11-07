@@ -71,7 +71,8 @@ function mapReturnEventToHistoryEntry(
     const isDuditAction = Boolean(
         metadata.dudit_action ||
         event.source === "admin" ||
-        (event.actor_name && event.actor_name.includes("Equipe Dudit"))
+        (event.actor_name && String(event.actor_name).toLowerCase().includes("dudit")) ||
+        (actorName && String(actorName).toLowerCase().includes("dudit"))
     )
 
     if (actionType === "created") {

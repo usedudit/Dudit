@@ -64,7 +64,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!isBuyer && !isPartnerStaff) {
+    let isAssignedDriver = false
+    if (!isBuyer && !isPartnerStaff && order.id) {
+      const { data: da } = await adminClient
+        .from("delivery_assignments")
+        .select("id")
+        .eq("order_id", order.id)
+        .eq("driver_id", user.id)
+        .maybeSingle()
+      if (da) isAssignedDriver = true
+    }
+
+    if (!isBuyer && !isPartnerStaff && !isAssignedDriver) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 

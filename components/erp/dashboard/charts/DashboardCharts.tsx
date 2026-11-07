@@ -11,11 +11,11 @@ const config = {
   secondary: { label: "Período Anterior", color: "#D1D5DB" },
 } satisfies ChartConfig
 
-export const CHART_COLORS = ["#059669", "#003229", "#f3f9f6", "#bcf49d", "#fff085"]
+export const CHART_COLORS = ["#79c325", "#003229", "#f3f9f6", "#bcf49d", "#fff085"]
 
-export const CHART_COLORS_VIVID = ["#059669", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"]
+export const CHART_COLORS_VIVID = ["#79c325", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"]
 
-export const CHART_COLORS_CATEGORY = ["#059669", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#e11d48"]
+export const CHART_COLORS_CATEGORY = ["#79c325", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#e11d48"]
 
 export function formatCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0)
@@ -50,7 +50,7 @@ export function CustomChartTooltip({ active, payload, label, formatter, valuePre
       )}
       <div className="flex flex-col gap-1.5">
         {payload.map((entry: any, index: number) => {
-          const color = entry.color || entry.stroke || entry.fill || entry.payload?.fill || "var(--color-brand-green, #059669)"
+          const color = entry.color || entry.stroke || entry.fill || entry.payload?.fill || "var(--color-brand-green, #79c325)"
           const name = labels?.[entry.dataKey]
             ?? (entry.name === "value" ? "Este Período"
               : entry.name === "secondary" ? "Período Anterior"
@@ -86,7 +86,7 @@ export function CustomChartTooltip({ active, payload, label, formatter, valuePre
 export const CustomPieTooltip = ({ active, payload, formatter }: any) => {
   if (active && payload && payload.length) {
     const entry = payload[0]
-    const color = entry.payload.fill || entry.color || "var(--color-brand-green, #059669)"
+    const color = entry.payload.fill || entry.color || "var(--color-brand-green, #79c325)"
     const rawVal = entry.value
     const valFormatted = formatter
       ? formatter(rawVal)
@@ -116,7 +116,7 @@ export const CustomPieTooltip = ({ active, payload, formatter }: any) => {
 
 export function DashboardLineChart({
   data,
-  colors = ["#059669", "#94a3b8"],
+  colors = ["#79c325", "#94a3b8"],
   showLegend = false,
   legendLabels,
   format,

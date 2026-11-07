@@ -13,9 +13,7 @@ export default async function AdminReturnsPage() {
     return (
         <>
             <AdminHeader pageTitle="Trocas e devoluções" />
-            <div className="p-6 md:p-8 max-w-[1700px] mx-auto">
-                <ReturnsList initialData={initialData} initialStats={initialStats} />
-            </div>
+            <ReturnsList initialData={initialData} initialStats={initialStats} />
         </>
     )
 }

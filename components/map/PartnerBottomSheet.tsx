@@ -53,7 +53,7 @@ export function PartnerBottomSheet({ partner, onClose }: PartnerCardProps) {
 
             {partner.rating > 0 && (
               <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                <StarIcon size={14} fill="#059669" className="text-brand-green shrink-0" />
+                <StarIcon size={14} fill="#79c325" className="text-brand-green shrink-0" />
                 <span className="text-[13px] font-bold text-brand-dark">{partner.rating.toFixed(1)}</span>
               </div>
             )}

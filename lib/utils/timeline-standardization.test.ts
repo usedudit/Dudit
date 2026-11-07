@@ -76,6 +76,13 @@ describe("resolveTimelineActorName", () => {
     source: "system",
   }
 
+  const dummyEntryDriver = {
+    actor_user_id: "user-driver-1",
+    actor_name: "Adrian Murilo",
+    metadata: { is_driver: true, driver_id: "user-driver-1", driver_name: "Adrian Murilo" },
+    source: "delivery_driver_app",
+  }
+
   it("resolves actors correctly for customer viewer", () => {
     expect(resolveTimelineActorName({
       entry: dummyEntryCustomer,
@@ -108,6 +115,14 @@ describe("resolveTimelineActorName", () => {
       orderCustomerName: "Murilo Storari",
       storeName: "Dudit Store",
     })).toBe("Sistema")
+
+    expect(resolveTimelineActorName({
+      entry: dummyEntryDriver,
+      viewer: "customer",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Entregador")
   })
 
   it("resolves actors correctly for seller viewer", () => {
@@ -126,6 +141,14 @@ describe("resolveTimelineActorName", () => {
       orderCustomerName: "Murilo Storari",
       storeName: "Dudit Store",
     })).toBe("João Silva")
+
+    expect(resolveTimelineActorName({
+      entry: dummyEntryDriver,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Adrian Murilo (Entregador)")
 
     expect(resolveTimelineActorName({
       entry: dummyEntryDudit,
@@ -162,12 +185,51 @@ describe("resolveTimelineActorName", () => {
     })).toBe("João Silva (Vendedor)")
 
     expect(resolveTimelineActorName({
+      entry: dummyEntryDriver,
+      viewer: "admin",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Adrian Murilo (Entregador)")
+
+    expect(resolveTimelineActorName({
       entry: dummyEntryDudit,
       viewer: "admin",
       buyerId: "user-buyer-1",
       orderCustomerName: "Murilo Storari",
       storeName: "Dudit Store",
     })).toBe("Equipe Dudit (Carlos Moderador)")
+
+    // Never outputs "Equipe Dudit (Admin)" when admin identity is generic "Admin"
+    const dummyEntryDuditGeneric = {
+      actor_user_id: "user-admin-1",
+      actor_name: "Equipe Dudit (Admin)",
+      metadata: { dudit_action: true, admin_actor_name: "Admin" },
+      source: "admin",
+    }
+    expect(resolveTimelineActorName({
+      entry: dummyEntryDuditGeneric,
+      viewer: "admin",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Equipe Dudit")
+
+    expect(resolveTimelineActorName({
+      entry: dummyEntryDuditGeneric,
+      viewer: "seller",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Equipe Dudit")
+
+    expect(resolveTimelineActorName({
+      entry: dummyEntryDuditGeneric,
+      viewer: "customer",
+      buyerId: "user-buyer-1",
+      orderCustomerName: "Murilo Storari",
+      storeName: "Dudit Store",
+    })).toBe("Equipe Dudit")
 
     expect(resolveTimelineActorName({
       entry: dummyEntrySystem,

@@ -519,12 +519,12 @@ export function resolveTimelineActorName({
   buyerId,
 }: ResolveTimelineActorParams): string {
   const metadata = entry.metadata || {}
+  const rawActor = String(entry.actor_name || "").toLowerCase()
   const isDuditAction = Boolean(
     metadata.dudit_action ||
     metadata.is_admin_action ||
     metadata.admin_actor_name ||
-    entry.actor_name === "Equipe Dudit" ||
-    entry.actor_name === "Dudit" ||
+    rawActor.includes("dudit") ||
     entry.source === "admin"
   )
   const isSystem = Boolean(
@@ -543,17 +543,38 @@ export function resolveTimelineActorName({
       entry.entry_type === "return_created" ||
       (orderCustomerName && entry.actor_name === orderCustomerName))
   )
+  const isDriver = Boolean(
+    !isDuditAction &&
+    !isSystem &&
+    !isCustomer &&
+    (metadata.is_driver === true ||
+      metadata.driver_id ||
+      metadata.driver_action === true ||
+      entry.source === "delivery_driver_app" ||
+      entry.source === "delivery_driver" ||
+      rawActor.includes("entregador") ||
+      entry.entry_type === "delivery_payment_received" ||
+      entry.entry_type === "SINGLE_ORDER_DELIVERED")
+  )
 
   // 1. Ação da Equipe Dudit (Admin)
   if (isDuditAction) {
     if (viewer === "admin") {
-      const adminName =
+      const rawAdmin =
         metadata.admin_actor_name ||
-        (entry.actor_name && entry.actor_name.includes("(") ? entry.actor_name.replace(/.*?\((.*?)\).*/, "$1") : null) ||
-        "Admin"
-      return `Equipe Dudit (${adminName})`
+        (entry.actor_name && entry.actor_name.includes("(") ? entry.actor_name.replace(/.*?\((.*?)\).*/, "$1") : null)
+
+      const trimmedAdmin = rawAdmin ? String(rawAdmin).trim() : null
+      if (
+        trimmedAdmin &&
+        trimmedAdmin.toLowerCase() !== "admin" &&
+        trimmedAdmin.toLowerCase() !== "equipe dudit"
+      ) {
+        return `Equipe Dudit (${trimmedAdmin})`
+      }
+      return "Equipe Dudit"
     }
-    // Cliente e Vendedor só veem "Equipe Dudit"
+    // Cliente e Vendedor sempre veem apenas "Equipe Dudit"
     return "Equipe Dudit"
   }
 
@@ -571,7 +592,18 @@ export function resolveTimelineActorName({
     return `${customerDisplayName} (Cliente)`
   }
 
-  // 4. Ação do Vendedor / Lojista
+  // 4. Ação do Entregador
+  if (isDriver) {
+    if (viewer === "customer") {
+      return "Entregador"
+    }
+    const driverName = metadata.driver_name || entry.actor_name || "Entregador"
+    return String(driverName).toLowerCase().includes("entregador")
+      ? String(driverName)
+      : `${driverName} (Entregador)`
+  }
+
+  // 5. Ação do Vendedor / Lojista
   if (viewer === "customer") {
     // Cliente nunca vê nome pessoal do colaborador da loja; vê o nome da loja ou "Vendedor"
     return storeName || "Vendedor"

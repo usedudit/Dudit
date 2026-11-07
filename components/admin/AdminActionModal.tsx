@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { Button, Input } from "@/components/reusable"
+import { Button, FormTextarea, Input } from "@/components/reusable"
 
 export interface AdminActionPayload {
     reason: string
@@ -139,15 +139,12 @@ export default function AdminActionModal({
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1">
-                        Motivo / mensagem ao vendedor{requireReason ? " (obrigatório)" : " (opcional)"}
-                    </label>
-                    <textarea
+                    <FormTextarea
+                        label="Motivo / Mensagem"
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        rows={3}
-                        placeholder="Explique por que esta ação está sendo feita. O vendedor recebe isso como notificação na Dudit."
-                        className="w-full px-3 py-2 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/50 resize-none"
+                        placeholder="Explique por que esta ação está sendo feita..."
+                        rows={2}
                     />
                     {requireReason && (
                         <span className="text-[11px] text-brand-inactive-text mt-1 block">

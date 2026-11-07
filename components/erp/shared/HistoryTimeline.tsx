@@ -103,7 +103,22 @@ export function HistoryTimeline({
             <div className="relative space-y-0">
                 {entries.map((entry, index) => {
                     const Icon = getEntryIcon(entry)
-                    const isSystem = entry.actor_name.toLowerCase() === "sistema"
+                    const isSystem = entry.actor_name?.toLowerCase() === "sistema"
+                    const isDudit = Boolean(
+                        entry.highlight ||
+                        entry.actor_name?.toLowerCase().includes("dudit") ||
+                        entry.metadata?.dudit_action ||
+                        (entry.metadata as any)?.is_admin_action ||
+                        entry.metadata?.admin_actor_name
+                    )
+                    const isDriver = Boolean(
+                        entry.actor_name?.toLowerCase().includes("entregador") ||
+                        entry.metadata?.is_driver ||
+                        entry.metadata?.driver_id ||
+                        (entry.metadata as any)?.driver_action ||
+                        (entry as any).source === "delivery_driver_app" ||
+                        (entry as any).source === "delivery_driver"
+                    )
 
                     return (
                         <motion.div
@@ -115,17 +130,21 @@ export function HistoryTimeline({
                         >
                             {/* Icon Circle */}
                             <div className={cn(
-                                "absolute left-0 top-0 w-10 h-10 rounded-full flex border items-center justify-center shrink-0",
-                                entry.highlight
-                                    ? "bg-brand-green/15 border-brand-green/40"
-                                    : "bg-brand-slate dark:bg-dark-border/50 border-brand-border dark:border-dark-border"
+                                "absolute left-0 top-0 w-10 h-10 rounded-full flex border items-center justify-center shrink-0 transition-colors",
+                                isDudit
+                                    ? "bg-brand-green/20 border-brand-green text-brand-green dark:bg-brand-green/25 dark:border-brand-green"
+                                    : isDriver
+                                        ? "bg-brand-orange/15 border-brand-orange/40 text-brand-orange dark:bg-brand-orange/20 dark:border-brand-orange/50"
+                                        : "bg-brand-slate dark:bg-dark-border/50 border-brand-border dark:border-dark-border"
                             )}>
                                 <Icon
                                     size={16}
                                     className={cn(
-                                        entry.highlight
+                                        isDudit
                                             ? "text-brand-green"
-                                            : "text-brand-dark dark:text-dark-heading"
+                                            : isDriver
+                                                ? "text-brand-orange"
+                                                : "text-brand-dark dark:text-dark-heading"
                                     )}
                                 />
                             </div>
@@ -138,7 +157,10 @@ export function HistoryTimeline({
                             {/* Content */}
                             <div>
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
+                                    <span className={cn(
+                                        "font-bold text-[15px]",
+                                        isDudit ? "text-brand-green" : isDriver ? "text-brand-orange" : "text-brand-dark dark:text-dark-heading"
+                                    )}>
                                         {entry.actor_name}
                                     </span>
                                     <span className="text-[14px] text-brand-inactive-text dark:text-dark-body">

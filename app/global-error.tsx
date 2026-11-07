@@ -296,7 +296,7 @@ const styles = {
         justifyContent: "center",
         gap: "8px",
         borderRadius: "9999px",
-        backgroundColor: "#059669",
+        backgroundColor: "#79c325",
         padding: "10px 24px",
         fontSize: "14px",
         fontWeight: 600,

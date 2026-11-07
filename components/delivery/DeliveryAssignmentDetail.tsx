@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -18,6 +18,7 @@ import {
     CustomerCard,
     IconPlaceholder,
     SidebarCard,
+    FormTextarea,
 } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
@@ -173,14 +174,6 @@ export default function DeliveryAssignmentDetail({
                 (o.situation || "").toLowerCase()
             )
             return !isPaid
-        })
-    }, [ordersList, assignment])
-
-    const isCashPayment = React.useMemo(() => {
-        return ordersList.some((o: any) => {
-            const isCash = (o.payment_method || assignment.payment_method || "").toLowerCase().includes("dinheiro") || (o.payment_method || assignment.payment_method || "").toLowerCase().includes("cash")
-            const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((o.payment_status || assignment.payment_status || "").toLowerCase()) || ["paid", "concluído", "concluido", "approved", "pago"].includes((o.situation || "").toLowerCase())
-            return isCash && !isPaid
         })
     }, [ordersList, assignment])
 
@@ -974,7 +967,7 @@ export default function DeliveryAssignmentDetail({
                         footer={
                             <div className="flex justify-end gap-3 w-full">
                                 <Button variant="outline" onClick={() => setFailureOpen(false)}>Cancelar</Button>
-                                <Button variant="outlinered" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
+                                <Button variant="destructive" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
                                     Confirmar Falha
                                 </Button>
                             </div>
@@ -984,11 +977,11 @@ export default function DeliveryAssignmentDetail({
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                 Informe o motivo pelo qual a entrega não pôde ser concluída (ex: endereço incorreto, cliente ausente, problema com o veículo).
                             </p>
-                            <textarea
+                            <FormTextarea
                                 value={failureReason}
                                 onChange={(e) => setFailureReason(e.target.value)}
                                 placeholder="Descreva o motivo da falha..."
-                                className="w-full h-28 p-3 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-green/20"
+                                maxLength={2000}
                             />
                         </div>
                     </DefaultModal>
@@ -1303,12 +1296,32 @@ export default function DeliveryAssignmentDetail({
                 order={selectedPaymentOrder}
                 onSuccess={() => {
                     setShowPaymentModal(false)
-                    setAssignment((prev: any) => ({
-                        ...prev,
-                        payment_confirmed_at: new Date().toISOString(),
-                        payment_status: "paid",
-                        payment_method: selectedPaymentOrder?.payment_method || prev.payment_method,
-                    }))
+                    const paidOrderId = selectedPaymentOrder?.id || selectedPaymentOrder?.order_id
+                    setAssignment((prev: any) => {
+                        const updatedOrders = prev.orders?.map((o: any) => {
+                            if (o.order_id === paidOrderId || o.id === paidOrderId) {
+                                return {
+                                    ...o,
+                                    payment_status: "paid",
+                                    situation: "paid",
+                                    paid_amount: o.total_amount,
+                                }
+                            }
+                            return o
+                        })
+
+                        const allPaid = updatedOrders && updatedOrders.length > 0
+                            ? updatedOrders.every((o: any) => ["paid", "concluído", "concluido", "approved", "pago"].includes((o.payment_status || o.situation || "").toLowerCase()))
+                            : true
+
+                        return {
+                            ...prev,
+                            orders: updatedOrders || prev.orders,
+                            payment_confirmed_at: allPaid ? new Date().toISOString() : prev.payment_confirmed_at,
+                            payment_status: allPaid ? "paid" : prev.payment_status,
+                            payment_method: selectedPaymentOrder?.payment_method || prev.payment_method,
+                        }
+                    })
                 }}
             />
         </>

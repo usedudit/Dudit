@@ -3800,15 +3800,22 @@ export async function getFreshOrderPaymentDataAction(orderId: string, partnerId:
 export async function getOrderHistoryAction(
   orderId: string,
   partnerId: string,
+  adminContext = false
 ) {
   const user = await requireUser();
   if (!user) return { error: "Não autenticado" };
 
   let isAdmin = false;
-  try {
-    await requireAdminScope("moderation");
-    isAdmin = true;
-  } catch {
+  if (adminContext) {
+    try {
+      await requireAdminScope("moderation");
+      isAdmin = true;
+    } catch {
+      isAdmin = false;
+    }
+  }
+
+  if (!isAdmin) {
     await requirePermission(partnerId, "orders", "view");
   }
 
@@ -5122,7 +5129,10 @@ export async function updateERPOrderAction(
   if (adminBypass && adminActorId) {
     const actionCtx = opts?.actionCtx || null;
     const effectiveStoreId = (currentOrder as any).store_id || data.storeId || null;
-    const adminActorEmail = (await import("@/lib/supabase/admin").then(m => m.getAdminClient().auth.admin.getUserById(adminActorId)).then(r => r.data?.user?.email)).catch(() => null);
+    const adminActorEmail = await import("@/lib/supabase/admin")
+      .then((m) => m.getAdminClient().auth.admin.getUserById(adminActorId))
+      .then((r) => r.data?.user?.email)
+      .catch(() => null);
     const changeLinesForAudit: string[] = [];
 
     if (changeLines.length > 0) {

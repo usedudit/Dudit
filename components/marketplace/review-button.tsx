@@ -172,8 +172,8 @@ export function ReviewButton({
                           >
                             <StarIcon
                               size={42}
-                              color={star <= itemRating ? "#059669" : "#E5E7EB"}
-                              className={star <= itemRating ? "fill-[#059669]" : ""}
+                              color={star <= itemRating ? "#79c325" : "#E5E7EB"}
+                              className={star <= itemRating ? "fill-[#79c325]" : ""}
                             />
                           </button>
                         ))}
@@ -264,8 +264,8 @@ export function ReviewButton({
                               >
                                 <StarIcon
                                   size={28}
-                                  color={star <= itemRating ? "#059669" : "#E5E7EB"}
-                                  className={star <= itemRating ? "fill-[#059669]" : ""}
+                                  color={star <= itemRating ? "#79c325" : "#E5E7EB"}
+                                  className={star <= itemRating ? "fill-[#79c325]" : ""}
                                 />
                               </button>
                             ))}

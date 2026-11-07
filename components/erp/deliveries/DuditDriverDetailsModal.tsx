@@ -56,7 +56,7 @@ export default function DuditDriverDetailsModal({
                         Contato Direto com o Entregador:
                     </span>
                     <div className="grid grid-cols-2 gap-3">
-                        <a href={`tel:${driver.phone}`}>
+                        <a href={`tel:${driver.phone}`} target="_blank" rel="noopener noreferrer">
                             <Button
                                 variant="outline"
                                 leftIcon={<PhoneIcon size={14} className="text-brand-green" />}
@@ -67,7 +67,7 @@ export default function DuditDriverDetailsModal({
                     </div>
 
                     {whatsappUrl && (
-                        <a href={whatsappUrl}>
+                        <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
                             <Button
                                 variant="outline"
                                 leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}

@@ -5,7 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable";
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import { FadeIn } from "@/components/animations/FadeIn";
-import { ExportFileIcon, ReloadIcon, RotateIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon } from "@/lib/icons";
+import { ExportFileIcon, RotateIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon } from "@/lib/icons";
 import type { CursorPaginatedResult } from "@/lib/admin/types";
 import { getAdminReturnRequests, getAdminReturnRequestsStats, type AdminReturnStats } from "@/app/actions/admin/marketplace-ops";
 import { useMediaQuery } from "@/components/erp/hooks";
@@ -21,11 +21,8 @@ import AdminReturnDetailClientWrapper from "./AdminReturnDetailClientWrapper";
 import { PermissionProvider } from "@/lib/permission-context";
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
 import { StoreProvider } from "@/lib/store-context";
-import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard";
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard";
-import { FormSection } from "@/components/reusable/FormSection";
-import { Dropdown, DropdownItem } from "@/components/reusable/Dropdown";
-import { ThreeDotsIcon, ChevronDownIcon } from "@/lib/icons";
+import { TabCountBadge } from "@/components/reusable/TabCountBadge";
 import { cn } from "@/lib/utils";
 
 type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados";
@@ -360,66 +357,71 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
       <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
         <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
 
-          {/* Header Section - DashboardSectionCard + HorizontalKPICard */}
-          <DashboardSectionCard
-            title="Trocas e devoluções"
-            action={
-              <Dropdown
-                trigger={
-                  <Button variant="outline" size="icon" className="h-[42px] w-[42px] rounded-[12px] shrink-0" leftIcon={<ThreeDotsIcon size={20} />}>
-                  </Button>
-                }
-                align="right"
-                width="w-48"
-                showChevron={false}
-              >
-                <DropdownItem onClick={refreshRequests} disabled={isLoading}>
-                  <ReloadIcon size={16} /> Atualizar
-                </DropdownItem>
-                <DropdownItem onClick={() => toast.success("Exportação iniciada em segundo plano")}>
-                  <ExportFileIcon size={16} /> Exportar
-                </DropdownItem>
-              </Dropdown>
-            }
-            className="mb-0"
-          >
-            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-              Gerencie trocas, devoluções, créditos e reembolsos de todas as lojas.
-            </p>
-            {kpiItems.length > 0 && <HorizontalKPICard items={kpiItems} />}
-          </DashboardSectionCard>
+          {/* Desktop Header */}
+          <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+            <div className="flex flex-col gap-2 pt-1">
+              <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                Trocas e devoluções
+              </h1>
+              <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                Gerencie trocas, devoluções, créditos e reembolsos de todas as lojas.
+              </p>
+            </div>
 
-          {/* Tabs Section - DashboardSectionCard */}
-          <DashboardSectionCard
-            title="Filtros por Status"
-            className="mb-0"
-          >
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => toast.success("Exportação iniciada em segundo plano")}
+                leftIcon={<ExportFileIcon size={18} />}
+              >
+                Exportar
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="mb-6 px-4 md:px-8">
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ActiveTab)}>
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="Todos">Todos</TabsTrigger>
-                <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
-                <TabsTrigger value="Analise">Análise</TabsTrigger>
-                <TabsTrigger value="AguardandoCliente">Aguardando cliente</TabsTrigger>
-                <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
-                <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
+              <TabsList className="px-0">
+                <TabsTrigger value="Todos" icon={RotateIcon} badge={<TabCountBadge count={stats?.total ?? 0} variant="gray" />}>
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger value="Pendentes" icon={ClockIcon} badge={<TabCountBadge count={stats?.pending ?? 0} variant="yellow" />}>
+                  Pendentes
+                </TabsTrigger>
+                <TabsTrigger value="Analise" icon={AlertCircleIcon} badge={<TabCountBadge count={requests.filter((r) => ["UNDER_ANALYSIS", "ESCALATED"].includes(r.status)).length} variant="blue" />}>
+                  Análise
+                </TabsTrigger>
+                <TabsTrigger value="AguardandoCliente" icon={ClockIcon} badge={<TabCountBadge count={requests.filter((r) => r.status === "WAITING_CUSTOMER").length} variant="orange" />}>
+                  Aguardando cliente
+                </TabsTrigger>
+                <TabsTrigger value="Aprovados" icon={CheckCircleIcon} badge={<TabCountBadge count={stats?.approved ?? 0} variant="green" />}>
+                  Aprovados
+                </TabsTrigger>
+                <TabsTrigger value="Finalizados" icon={CheckCircleIcon} badge={<TabCountBadge count={stats?.completed ?? 0} variant="gray" />}>
+                  Finalizados
+                </TabsTrigger>
               </TabsList>
             </Tabs>
-          </DashboardSectionCard>
+          </div>
 
-          {/* Controls Section - FormSection */}
-          <FormSection hasSeparator>
-            <ReturnPageControls
-              search={search}
-              onSearchChange={setSearch}
-              onOpenFilter={() => setIsFilterSheetOpen(true)}
-              viewMode={effectiveViewMode}
-              onViewModeChange={setViewModeState}
-              onExport={() => toast.success("Exportação iniciada em segundo plano")}
-            />
-          </FormSection>
+          {/* Page Controls */}
+          <ReturnPageControls
+            search={search}
+            onSearchChange={setSearch}
+            onOpenFilter={() => setIsFilterSheetOpen(true)}
+            viewMode={effectiveViewMode}
+            onViewModeChange={setViewModeState}
+            onExport={() => toast.success("Exportação iniciada em segundo plano")}
+          />
 
           {/* List/Grid Content */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2">
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
+            {kpiItems.length > 0 && (
+              <div className="mb-4">
+                <HorizontalKPICard items={kpiItems} />
+              </div>
+            )}
             <AnimatePresence mode="wait">
               {isLoading && requests.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">

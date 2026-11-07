@@ -143,8 +143,21 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
       (entry.metadata as any)?.admin_actor_name
     )
 
+    const isDriverAction = Boolean(
+      entry.metadata?.is_driver ||
+      entry.metadata?.driver_id ||
+      entry.metadata?.driver_action ||
+      (entry as any).source === "delivery_driver_app" ||
+      (entry as any).source === "delivery_driver" ||
+      entry.entry_type === "SINGLE_ORDER_DELIVERED" ||
+      entry.entry_type === "delivery_payment_received"
+    )
+
     if (isDuditAction) {
       actorName = "Equipe Dudit"
+    } else if (isDriverAction) {
+      const resolvedName = (entry.metadata as any)?.driver_name || (entry.actor_user_id ? namesByUserId.get(entry.actor_user_id) : null) || "Entregador"
+      actorName = resolvedName.toLowerCase().includes("entregador") ? resolvedName : `${resolvedName} (Entregador)`
     }
 
     // Default line for return created if empty

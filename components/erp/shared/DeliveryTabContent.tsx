@@ -5,7 +5,7 @@ import {
     MotorbikeIcon,
     WhatsappIcon,
 } from "@/lib/icons"
-import { FormSection, ListItem, Badge, Button, DefaultModal, SidebarCard } from "@/components/reusable"
+import { FormSection, ListItem, Badge, Button, DefaultModal, SidebarCard, Tooltip } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import DeliveryAddressCard from "@/components/erp/shared/DeliveryAddressCard"
 import { formatDayMonth, formatTime, formatDeliveryDaysRange } from "@/lib/utils"
@@ -664,7 +664,7 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                 <ListItem
                     icon={<MotorbikeIcon />}
                     title="Entrega própria"
-                    description="Ainda não há um entregador atribuído a este pedido."
+                    description="Entregador próprio do estabelecimento"
                     className="px-4 py-3"
                 />
             </FormSection>
@@ -675,64 +675,28 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
         const driver = driverInfo.platformDriverData
         if (!driver) {
             return (
-                <FormSection title="Entregador">
-                    <div className="flex items-center gap-4">
-                        <UserProfileImage
-                            fullName={driverInfo.name}
-                            imageUrl={driverInfo.avatarUrl}
-                            className="w-10 h-10"
-                        />
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    Entregador da rede dudit - {driverInfo.name}
-                                </span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
-                                    Dudit
-                                </span>
-                            </div>
-                            <div className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 ? (
-                                    <span>{driverInfo.totalDeliveries} entregas realizadas</span>
-                                ) : (
-                                    <span>Entregador Parceiro</span>
-                                )}
-                                {driverInfo.vehicleType && <span>• {driverInfo.vehicleType}</span>}
-                            </div>
-                        </div>
-                    </div>
-                </FormSection>
-            )
-        }
-
-        return (
-            <>
-                <FormSection title="Entregador">
+                <FormSection hasSeparator title="Entregador">
                     <ListItem
                         title={
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                    Entregador da rede dudit - {driver.fullName || "Entregador"}
+                                    {driverInfo.name || "Entregador"}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
-                                    Dudit
-                                </span>
+                                <Tooltip text="Entregador da Rede Dudit">
+                                    <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                                </Tooltip>
                             </div>
                         }
                         description={
                             <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 ? (
-                                    <span>{driverInfo.totalDeliveries} entregas realizadas</span>
-                                ) : (
-                                    <span>Entregador Parceiro</span>
-                                )}
+                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
                                 {driverInfo.vehicleType && <span>• {driverInfo.vehicleType}</span>}
                             </div>
                         }
                         left={
                             <UserProfileImage
-                                fullName={driver.fullName || "Entregador"}
-                                imageUrl={driver.avatarUrl}
+                                fullName={driverInfo.name || "Entregador"}
+                                imageUrl={driverInfo.avatarUrl}
                                 className="w-10 h-10"
                             />
                         }
@@ -741,20 +705,64 @@ export const DeliveryDriverSection: React.FC<DeliveryDriverSectionProps> = ({
                                 ["sent", "out_for_delivery", "assigned", "accepted"].includes(
                                     driverInfo.driverStatus || deliveryStatus
                                 ) ? (
-                                <a
-                                    href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="shrink-0 p-2 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
-                                    title="Conversar no WhatsApp"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <WhatsappIcon size={16} className="text-[#25D366]" />
+                                <a href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                        variant="outline"
+                                        leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
+                                    >
+                                    </Button>
                                 </a>
                             ) : null
                         }
-                        showChevron={true}
-                        className="cursor-pointer"
+                        className="px-4 py-3"
+                        onClick={() => setIsDuditDriverModalOpen(true)}
+                    />
+                </FormSection>
+            )
+        }
+
+        return (
+            <>
+                <FormSection hasSeparator title="Entregador">
+                    <ListItem
+                        title={
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                    {driver?.fullName || "Entregador"}
+                                </span>
+                                <Tooltip text="Entregador da Rede Dudit">
+                                    <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                                </Tooltip>
+                            </div>
+                        }
+                        description={
+                            <div className="flex items-center gap-1.5 flex-wrap text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                {driverInfo.totalDeliveries && driverInfo.totalDeliveries > 0 && <span>{driverInfo.totalDeliveries} entregas realizadas</span>}
+                                {driverInfo.vehicleType && <span>• {driverInfo.vehicleType}</span>}
+                            </div>
+                        }
+                        left={
+                            <UserProfileImage
+                                fullName={driver?.fullName || "Entregador"}
+                                imageUrl={driver?.avatarUrl}
+                                className="w-10 h-10"
+                            />
+                        }
+                        right={
+                            driverInfo.phone &&
+                                ["sent", "out_for_delivery", "assigned", "accepted"].includes(
+                                    driverInfo.driverStatus || deliveryStatus
+                                ) ? (
+                                <a href={`https://wa.me/55${String(driverInfo.phone).replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                        variant="outline"
+                                        leftIcon={<WhatsappIcon size={14} className="text-brand-green" />}
+                                    >
+                                    </Button>
+                                </a>
+                            ) : null
+                        }
+                        className="px-4 py-3"
                         onClick={() => setIsDuditDriverModalOpen(true)}
                     />
 

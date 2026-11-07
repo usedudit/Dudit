@@ -7,63 +7,35 @@ import {
   Spinner,
   Badge,
   InfoCard,
+  Input,
+  Barcode,
+  Tooltip,
+  IconPlaceholder,
 } from "@/components/reusable"
 import {
   ChevronLeftIcon,
+  ChevronRightIcon,
   CheckCircleIcon,
   XIcon,
   MoneyIcon,
   QRCodeIcon,
   CreditCardIcon,
   FileIcon,
+  CopyIcon,
+  PrinterIcon,
 } from "@/lib/icons"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDateTime } from "@/lib/utils"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
 import QRCode from "qrcode"
 import { useToast } from "@/components/ui/use-toast"
 import { useModalLayer } from "@/lib/modal-stack"
-
-import type { PartnerPaymentMethod } from "@/components/erp/payments/shared/payment-utils"
-
-type DriverPartnerPaymentMethod = PartnerPaymentMethod & {
-  pix_key?: string | null
-  pix_key_type?: string | null
-  card_brand?: string | null
-  store_id?: string | null
-}
-import {
-  normalizeMethodType,
-  normalizePaymentMethodLabel,
-} from "@/components/erp/payments/shared/payment-utils"
-import { PixQrDisplayModal } from "@/components/erp/payments/shared/PixQrDisplayModal"
-import { CardPaymentView } from "@/components/erp/payments/shared/CardPaymentView"
-import { MoneyPaymentView } from "@/components/erp/payments/shared/MoneyPaymentView"
-
+import { ReceiptScallopEdge } from "@/components/erp/POSComponents"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import {
   getDriverPaymentMethodsAction,
   driverConfirmPaymentAction,
 } from "@/app/actions/delivery-drivers"
-
-const UNDEFINED_PAYMENT_PLACEHOLDERS = [
-  "método não definido",
-  "metodo nao definido",
-  "não informado",
-  "nao definido",
-  "",
-]
-
-const isPlaceholderMethod = (value?: string | null): boolean => {
-  const norm = String(value || "").trim().toLowerCase()
-  return UNDEFINED_PAYMENT_PLACEHOLDERS.some((p) => norm === p || norm.includes(p))
-}
-
-const PAYMENT_METHOD_ICONS: Record<string, React.ReactElement<any> | null> = {
-  cash: <MoneyIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-  pix: <QRCodeIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-  credit_card: <CreditCardIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-  debit_card: <CreditCardIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-  bank_transfer: <FileIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-}
 
 const standardTransition = { type: "spring" as const, stiffness: 380, damping: 30 }
 
@@ -71,275 +43,408 @@ interface DriverPaymentModalProps {
   isOpen: boolean
   onClose: () => void
   assignmentId: string
-  order: {
-    id: string
-    order_number?: string
-    total_amount?: number
-    paid_amount?: number
-    payment_method?: string
-    situation?: string
-    payment_breakdown?: any[]
-    order_items?: any[]
-    customer_name?: string
-    created_at?: string
-  }
+  order: any
   onSuccess?: () => void
 }
+
+const TransactionReceiptContent = ({
+  cart,
+  totalOrder,
+  totalPaid,
+  totalRemaining,
+  orderNumber,
+  customerName,
+}: {
+  cart: Array<{ name: string; quantity: number; unitPrice: number }>
+  totalOrder: number
+  totalPaid: number
+  totalRemaining: number
+  orderNumber?: string
+  customerName?: string
+}) => (
+  <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0 md:border-b md:border-r-0">
+    <div className="mb-6 flex justify-between items-center">
+      <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">
+        Detalhes do Pedido
+      </h3>
+      {orderNumber && (
+        <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">
+          {orderNumber}
+        </span>
+      )}
+    </div>
+
+    {customerName && (
+      <div className="mb-4 flex items-center gap-2">
+        <UserProfileImage fullName={customerName} className="w-6 h-6 text-xs" />
+        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
+          {customerName}
+        </span>
+      </div>
+    )}
+
+    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 space-y-4 max-h-[220px] md:max-h-[300px]">
+      {cart.map((item, idx) => (
+        <div key={idx} className="flex flex-col w-full">
+          <div className="flex justify-between items-start mb-1 w-full">
+            <span className="font-medium text-brand-dark dark:text-dark-heading text-[13px] leading-snug max-w-[80%]">
+              {item.name}
+            </span>
+            <span className="font-bold text-brand-dark dark:text-dark-heading text-xs whitespace-nowrap ml-2">
+              {item.quantity}x
+            </span>
+          </div>
+          <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+            {formatCurrency(item.unitPrice * item.quantity)}
+          </span>
+        </div>
+      ))}
+      {cart.length === 0 && (
+        <div className="py-4 text-center text-xs text-brand-inactive-text">
+          Valor do pedido: {formatCurrency(totalOrder)}
+        </div>
+      )}
+    </div>
+
+    <div className="mt-auto pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
+      <div className="space-y-2 mb-6">
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+            Total
+          </span>
+          <span className="font-bold text-brand-dark dark:text-dark-heading">
+            {formatCurrency(totalOrder)}
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+            Recebido
+          </span>
+          <span className="font-bold text-brand-green">
+            {formatCurrency(totalPaid)}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <span className="font-bold text-base text-brand-dark dark:text-dark-heading">
+          Restante
+        </span>
+        <span className="font-black text-2xl text-brand-orange tracking-tight">
+          {formatCurrency(totalRemaining)}
+        </span>
+      </div>
+    </div>
+
+    <ReceiptScallopEdge />
+  </div>
+)
 
 export default function DriverPaymentModal({
   isOpen,
   onClose,
   assignmentId,
-  order,
+  order: initialOrder,
   onSuccess,
 }: DriverPaymentModalProps) {
   const { toast } = useToast()
-  const [step, setStep] = useState<"loading" | "methods" | "payment" | "confirm" | "success">("loading")
+  const zIndex = useModalLayer(isOpen) ?? 50
+
   const [isAnimating, setIsAnimating] = useState(false)
+  const [step, setStep] = useState<"loading" | "main" | "processing" | "success" | "error">("loading")
+  const [errorMessage, setErrorMessage] = useState("")
 
-  const [methods, setMethods] = useState<DriverPartnerPaymentMethod[]>([])
-  const [isLoadingMethods, setIsLoadingMethods] = useState(true)
+  const [currentOrder, setCurrentOrder] = useState<any>(initialOrder)
   const [storeName, setStoreName] = useState("Loja")
+  const [storePixKey, setStorePixKey] = useState<string | null>(null)
+  const [storePixKeyType, setStorePixKeyType] = useState<string | null>(null)
+  const [methods, setMethods] = useState<any[]>([])
 
-  const [selectedMethod, setSelectedMethod] = useState<DriverPartnerPaymentMethod | null>(null)
-  const [amount, setAmount] = useState(0)
-  const [installments, setInstallments] = useState("1")
-  const [pixQrData, setPixQrData] = useState<{ payload: string; qrDataUrl: string } | null>(null)
-  const [generatingPix, setGeneratingPix] = useState(false)
+  // Mercado Pago
+  const [mpLoading, setMpLoading] = useState(false)
+  const [mpPaymentData, setMpPaymentData] = useState<{
+    pixData?: { qrCode: string; qrCodeBase64: string } | null
+    boletoData?: { barcode: string; ticketUrl: string } | null
+    chargeAmount?: number
+  } | null>(null)
+  const [syncingMp, setSyncingMp] = useState(false)
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  // Local Pix (chave da loja)
+  const [localPixQrData, setLocalPixQrData] = useState<{ payload: string; qrDataUrl: string } | null>(null)
+  const [generatingLocalPix, setGeneratingLocalPix] = useState(false)
 
-  // z-index dinâmico: este modal abre acima de tudo que já estava aberto.
-  const zIndex = useModalLayer(isOpen)
-
-  const orderTotal = useMemo(() => Number(order?.total_amount || 0), [order])
-  const orderPaid = useMemo(() => Number(order?.paid_amount || 0), [order])
-  const remainingBalance = useMemo(() => Math.max(0, orderTotal - orderPaid), [orderTotal, orderPaid])
-
-  const isFullyPaid = useMemo(() => {
-    return order?.situation === "paid" || remainingBalance <= 0.009
-  }, [order, remainingBalance])
-
-  const lockedMethod = useMemo(() => {
-    if (isFullyPaid) return null
-    const method = order?.payment_method
-    if (method && !isPlaceholderMethod(method)) return method
-    const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : []
-    const paidLeg = breakdown.find(
-      (leg: any) => leg && !isPlaceholderMethod(leg.method)
-    )
-    if (paidLeg?.method) return paidLeg.method
-    return null
-  }, [order, isFullyPaid])
-
-  const availableMethodTypes = useMemo(() => {
-    const types = new Set(
-      methods
-        .filter((m) => m.is_active !== false)
-        .map((m) => normalizeMethodType(m.type))
-    )
-    types.add("cash")
-    return types
-  }, [methods])
-
-  const activeMethods = useMemo(
-    () => methods.filter((m) => m.is_active !== false),
-    [methods],
-  )
-
-  useEffect(() => {
-    if (!isOpen) return
-    const controller = new AbortController()
-    setStep("loading")
-    setIsLoadingMethods(true)
-
-    getDriverPaymentMethodsAction(assignmentId)
-      .then((res) => {
-        if (controller.signal.aborted) return
-        if (res.success) {
-          setMethods(res.methods || [])
-          setStoreName(res.storeName || "Loja")
-          setAmount(remainingBalance)
-          setInstallments("1")
-          setStep("methods")
-        } else {
-          toast({
-            title: "Erro",
-            description: res.error || "Não foi possível carregar métodos de pagamento.",
-            variant: "destructive",
-          })
-          setStep("methods")
-        }
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return
-        toast({
-          title: "Erro",
-          description: err?.message || "Erro ao carregar métodos de pagamento.",
-          variant: "destructive",
-        })
-        setStep("methods")
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoadingMethods(false)
-      })
-
-    return () => controller.abort()
-  }, [isOpen, assignmentId, remainingBalance, toast])
+  const [copiedPix, setCopiedPix] = useState(false)
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null)
+  const [fallbackMethod, setFallbackMethod] = useState<string>("Dinheiro")
 
   useEffect(() => {
     if (isOpen) {
+      setCurrentOrder(initialOrder)
+      setStep("loading")
+      setErrorMessage("")
+      setMpPaymentData(null)
+      setLocalPixQrData(null)
+      setCopiedPix(false)
+      setPrintOrderId(null)
       const id = setTimeout(() => setIsAnimating(true), 50)
       return () => clearTimeout(id)
     } else {
       setIsAnimating(false)
     }
-  }, [isOpen])
+  }, [isOpen, initialOrder])
 
-  const handleSelectMethod = (method: DriverPartnerPaymentMethod) => {
-    setSelectedMethod(method)
-    setAmount(remainingBalance)
-    setInstallments("1")
-    setPixQrData(null)
-    setStep("payment")
-  }
+  // Hydrate order and store payment info
+  useEffect(() => {
+    if (!isOpen || !assignmentId) return
+    let active = true
+    const targetOrderId = initialOrder?.id || initialOrder?.order_id || null
 
-  const handleMethodTypeSelect = (type: string) => {
-    const methodType = normalizeMethodType(type)
-    const matches = activeMethods.filter((m) => normalizeMethodType(m.type) === methodType)
-    if (matches.length > 0) {
-      handleSelectMethod(matches[0])
-    } else {
-      const dummy: PartnerPaymentMethod = {
-        id: "",
-        name:
-          methodType === "cash" ? "Dinheiro" :
-          methodType === "pix" ? "Pix" :
-          methodType === "credit_card" ? "Cartão de Crédito" :
-          methodType === "debit_card" ? "Cartão de Débito" :
-          methodType === "bank_transfer" ? "Transferência" : "Outros",
-        type: methodType,
-        is_active: true,
-        max_installments: 1,
-      }
-      handleSelectMethod(dummy)
+    getDriverPaymentMethodsAction(assignmentId, targetOrderId)
+      .then((res) => {
+        if (!active) return
+        if (res.success) {
+          if (res.order) {
+            setCurrentOrder((prev: any) => ({ ...(prev || {}), ...res.order }))
+          }
+          if (res.storeName) setStoreName(res.storeName)
+          if (res.storePixKey) setStorePixKey(res.storePixKey)
+          if (res.storePixKeyType) setStorePixKeyType(res.storePixKeyType)
+          if (res.methods) setMethods(res.methods)
+          setStep("main")
+        } else {
+          setStep("main")
+        }
+      })
+      .catch((err) => {
+        if (!active) return
+        console.error("Error loading driver payment methods:", err)
+        setStep("main")
+      })
+
+    return () => {
+      active = false
     }
-  }
+  }, [isOpen, assignmentId])
 
-  const handleGeneratePix = useCallback(async () => {
-    if (!selectedMethod) return
-    setGeneratingPix(true)
+  // Target values
+  const targetOrder = currentOrder || initialOrder
+  const totalOrder = Number(targetOrder?.total_amount || 0)
+  const totalPaid = Number(targetOrder?.paid_amount || targetOrder?.amount_paid || 0)
+  const totalRemaining = Math.max(0, totalOrder - totalPaid)
+  const isFullyPaid = targetOrder?.situation === "paid" || totalRemaining <= 0.009
+
+  const orderNumber =
+    targetOrder?.order_number ||
+    (targetOrder?.id ? `#${String(targetOrder.id).slice(0, 8)}` : "")
+
+  const breakdown: any[] = useMemo(() => {
+    if (Array.isArray(targetOrder?.payment_breakdown) && targetOrder.payment_breakdown.length > 0) {
+      return targetOrder.payment_breakdown
+    }
+    return []
+  }, [targetOrder])
+
+  const isSplit = breakdown.length > 1
+
+  const isMpOrder = useMemo(() => {
+    return Boolean(
+      targetOrder?.payment_provider === "Mercado Pago" ||
+      targetOrder?.mp_payment_id ||
+      breakdown.some((leg) => {
+        const p = String(leg?.provider || "").toLowerCase()
+        const m = String(leg?.method || "").toLowerCase()
+        return p.includes("mercado pago") || m.includes("mercado pago")
+      })
+    )
+  }, [targetOrder, breakdown])
+
+  // Cash change analysis
+  const cashEntry = breakdown.find((leg) => {
+    const m = String(leg?.method || "").toLowerCase().trim()
+    return m === "cash" || m === "dinheiro"
+  })
+  const wantsChange =
+    (cashEntry as any)?.wantsChange ??
+    String(targetOrder?.payment_method || "").toLowerCase().includes("troco para")
+  const payWithAmount =
+    (cashEntry as any)?.payWithAmount ??
+    (() => {
+      const match = String(targetOrder?.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
+      if (match) {
+        const cleanNum = match[1].replace(/\./g, "").replace(",", ".")
+        return Number(cleanNum)
+      }
+      return null
+    })()
+  const cashChangeAmount = wantsChange && payWithAmount ? Math.max(0, payWithAmount - totalOrder) : 0
+
+  // Fetch Mercado Pago details if needed
+  useEffect(() => {
+    if (!isOpen || !targetOrder || isFullyPaid) return
+    const orderId = targetOrder.id || targetOrder.order_id
+    if (!orderId || !isMpOrder) return
+
+    setMpLoading(true)
+    fetch("/api/orders/retry-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return null
+        return res.json()
+      })
+      .then((data) => {
+        if (data && (data.pixData || data.boletoData)) {
+          setMpPaymentData(data)
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching MP data in DriverPaymentModal:", err)
+      })
+      .finally(() => {
+        setMpLoading(false)
+      })
+  }, [isOpen, targetOrder?.id, targetOrder?.order_id, isFullyPaid, isMpOrder])
+
+  // Generate local Pix if order is Pix and not Mercado Pago
+  const resolvedMethodName = String(
+    targetOrder?.payment_method || breakdown[0]?.method || ""
+  ).trim()
+
+  const isPixMethod =
+    !isMpOrder &&
+    (resolvedMethodName.toLowerCase().includes("pix") || fallbackMethod.toLowerCase().includes("pix"))
+
+  useEffect(() => {
+    if (!isOpen || isFullyPaid || !isPixMethod) return
+    if (localPixQrData || generatingLocalPix) return
+
+    const key = storePixKey || methods.find((m) => m.type === "pix")?.pix_key
+    if (!key) return
+
+    setGeneratingLocalPix(true)
     try {
       const payload = generateStaticPix(
-        selectedMethod.pix_key || "",
-        amount,
+        key,
+        totalRemaining,
         storeName || "Loja",
         "",
         "DUDIT",
-        selectedMethod.pix_key_type,
+        storePixKeyType
       )
-      const qrDataUrl = await QRCode.toDataURL(payload, { width: 300, margin: 2 })
-      setPixQrData({ payload, qrDataUrl })
+      QRCode.toDataURL(payload, { width: 300, margin: 2 })
+        .then((qrDataUrl) => {
+          setLocalPixQrData({ payload, qrDataUrl })
+        })
+        .catch(console.error)
+        .finally(() => setGeneratingLocalPix(false))
     } catch (err) {
-      console.error("Error generating Pix:", err)
-      toast({
-        title: "Erro",
-        description: "Não foi possível gerar o QR Code Pix.",
-        variant: "destructive",
-      })
-    } finally {
-      setGeneratingPix(false)
+      console.error("Error generating local Pix:", err)
+      setGeneratingLocalPix(false)
     }
-  }, [selectedMethod, amount, storeName, toast])
+  }, [
+    isOpen,
+    isFullyPaid,
+    isPixMethod,
+    storePixKey,
+    storePixKeyType,
+    methods,
+    totalRemaining,
+    storeName,
+    localPixQrData,
+    generatingLocalPix,
+  ])
 
-  useEffect(() => {
-    if (step === "payment" && selectedMethod) {
-      const methodType = normalizeMethodType(selectedMethod.type)
-      if (methodType === "pix" && !pixQrData && !generatingPix) {
-        if (selectedMethod.pix_key) {
-          void handleGeneratePix()
-        }
-      }
-    }
-  }, [step, selectedMethod, pixQrData, generatingPix, handleGeneratePix])
-
-  const handleConfirm = useCallback(async () => {
-    if (!selectedMethod) return
-    if (amount <= 0.009) {
-      toast({ title: "Aviso", description: "Informe o valor recebido.", variant: "warning" })
-      return
-    }
-    if (amount > orderTotal + 0.01) {
-      toast({
-        title: "Aviso",
-        description: `O valor não pode passar de R$${orderTotal.toFixed(2)} (total do pedido).`,
-        variant: "warning",
-      })
-      return
-    }
-
-    const methodType = normalizeMethodType(selectedMethod.type)
-    const isCash = methodType === "cash"
-    const isCardCredit = methodType === "credit_card"
-
-    const methodLabel = normalizePaymentMethodLabel(selectedMethod.name) ||
-      (isCash ? "Dinheiro" : methodType === "pix" ? "Pix" : methodType === "credit_card" ? "Cartão de Crédito" : methodType === "debit_card" ? "Cartão de Débito" : methodType === "bank_transfer" ? "Transferência" : "Outros")
-
-    setIsSubmitting(true)
-    setStep("confirm")
-
+  // Sync MP
+  const handleSyncMp = async () => {
+    const orderId = targetOrder?.id || targetOrder?.order_id
+    if (!orderId) return
+    setSyncingMp(true)
     try {
+      const res = await fetch("/api/orders/sync-payment-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.newStatus === "paid" || data.paymentStatus === "approved") {
+          toast({ title: "Pagamento Aprovado!", description: "Mercado Pago confirmou o pagamento." })
+          setStep("success")
+          onSuccess?.()
+        } else {
+          toast({ title: "Aguardando pagamento", description: "O pagamento ainda não foi identificado pelo Mercado Pago." })
+        }
+      } else {
+        toast({ title: "Aviso", description: "Não foi possível sincronizar no momento.", variant: "warning" })
+      }
+    } catch (err) {
+      console.error("Error syncing MP:", err)
+      toast({ title: "Erro", description: "Falha ao verificar com Mercado Pago.", variant: "destructive" })
+    } finally {
+      setSyncingMp(false)
+    }
+  }
+
+  // Confirm payment execution
+  const handleConfirmReceipt = async (methodOverride?: string) => {
+    if (isFullyPaid) {
+      toast({ title: "Aviso", description: "Este pedido já está pago.", variant: "warning" })
+      return
+    }
+
+    const finalMethod =
+      methodOverride ||
+      (resolvedMethodName && !resolvedMethodName.toLowerCase().includes("não definido")
+        ? resolvedMethodName
+        : fallbackMethod)
+
+    setStep("processing")
+    try {
+      const installments =
+        breakdown[0]?.installmentNumber ||
+        (finalMethod.toLowerCase().includes("crédito") ? 1 : 1)
+
+      const targetOrderId = targetOrder?.id || targetOrder?.order_id || null
+
       const res = await driverConfirmPaymentAction({
         assignmentId,
-        paymentMethod: methodLabel,
-        paymentMethodId: selectedMethod.id || null,
-        amountReceived: isCash ? Math.max(amount, orderTotal) : amount,
-        installments: isCardCredit ? Number(installments) : 1,
+        orderId: targetOrderId,
+        paymentMethod: finalMethod,
+        amountReceived: totalRemaining,
+        installments,
       })
 
       if (res.success) {
-        toast({ title: "Sucesso", description: "Pagamento confirmado com sucesso!" })
         setStep("success")
         onSuccess?.()
       } else {
-        toast({
-          title: "Erro",
-          description: res.error || "Falha ao registrar recebimento.",
-          variant: "destructive",
-        })
-        setStep("payment")
+        setErrorMessage(res.error || "Não foi possível confirmar o recebimento.")
+        setStep("error")
       }
     } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err?.message || "Ocorreu um erro ao confirmar.",
-        variant: "destructive",
-      })
-      setStep("payment")
-    } finally {
-      setIsSubmitting(false)
+      setErrorMessage(err?.message || "Erro inesperado ao registrar o pagamento.")
+      setStep("error")
     }
-  }, [selectedMethod, amount, installments, orderTotal, assignmentId, onSuccess, toast])
+  }
 
   const handleSafeClose = () => {
     setIsAnimating(false)
     setTimeout(() => {
       onClose()
-      setStep("methods")
+      setStep("loading")
     }, 200)
   }
 
-  const methodTypeLabel = selectedMethod ? normalizePaymentMethodLabel(selectedMethod.name) : ""
-  const showReceipt = order?.order_items && order.order_items.length > 0
-
   const receiptCart = useMemo(() => {
-    const items = order?.order_items || []
+    const items = targetOrder?.order_items || targetOrder?.items || []
     return items.map((item: any) => ({
       name: item.products?.name || item.product_name || item.name || "Item",
       quantity: Number(item.quantity || 1),
-      unitPrice: Number(item.product_price || item.unit_price || item.unitPrice || 0),
-    })) as Array<{ name: string; quantity: number; unitPrice: number }>
-  }, [order])
+      unitPrice: Number(item.product_price || item.unit_price || item.unitPrice || item.price || 0),
+    }))
+  }, [targetOrder])
 
   if (!isOpen) return null
 
@@ -352,431 +457,623 @@ export default function DriverPaymentModal({
       />
 
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-200 ease-out ${isAnimating ? "opacity-100" : "opacity-0"}`}
-        style={{ zIndex }}
+        className="fixed inset-0 flex items-center justify-center p-3 md:p-6 pointer-events-none"
+        style={{ zIndex: zIndex + 1 }}
       >
-        <div className={`
-          relative bg-white dark:bg-dark-surface w-full h-full
-          md:h-[85vh] md:max-w-[1100px] md:rounded-3xl
-          flex flex-col md:flex-row overflow-hidden z-10
-          ${isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"}
-        `}>
-          {/* === LEFT: RECEIPT (Desktop) === */}
-          {showReceipt && step !== "success" && (
-            <div className="hidden md:flex w-[40%] bg-brand-gray dark:bg-dark-border/50 p-8 flex-col relative z-20 overflow-y-auto">
-              <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-6">Resumo</h2>
-              <div className="space-y-2 mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-brand-inactive-text dark:text-dark-body">Pedido</span>
-                  <span className="font-medium text-brand-dark dark:text-dark-heading">#{order?.order_number || "N/A"}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-brand-inactive-text dark:text-dark-body">Cliente</span>
-                  <span className="font-medium text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
-                    {order?.customer_name || "Cliente"}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-brand-inactive-text dark:text-dark-body">Data</span>
-                  <span className="font-medium text-brand-dark dark:text-dark-heading">
-                    {order?.created_at ? new Date(order.created_at).toLocaleDateString("pt-BR") : "-"}
-                  </span>
-                </div>
-              </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 10 }}
+          animate={{ opacity: isAnimating ? 1 : 0, scale: isAnimating ? 1 : 0.96, y: isAnimating ? 0 : 10 }}
+          exit={{ opacity: 0, scale: 0.96, y: 10 }}
+          transition={standardTransition}
+          className="bg-white dark:bg-dark-surface w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden pointer-events-auto max-h-[92vh] border border-brand-border dark:border-dark-border"
+        >
+          {/* LEFT COLUMN: RECEIPT */}
+          <div className="w-full md:w-[40%] flex flex-col shrink-0">
+            <TransactionReceiptContent
+              cart={receiptCart}
+              totalOrder={totalOrder}
+              totalPaid={totalPaid}
+              totalRemaining={totalRemaining}
+              orderNumber={orderNumber}
+              customerName={targetOrder?.customer_name}
+            />
+          </div>
 
-              <div className="border-t border-brand-border dark:border-dark-border w-full mb-6" />
-
-              <div className="space-y-4">
-                {receiptCart.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-brand-inactive-text dark:text-dark-body">
-                      {item.quantity}x {item.name}
-                    </span>
-                    <span className="font-medium text-brand-dark dark:text-dark-heading">
-                      {formatCurrency(item.quantity * item.unitPrice)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t border-brand-border dark:border-dark-border w-full mt-6 pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
-                  <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(orderTotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-brand-inactive-text dark:text-dark-body">Recebido</span>
-                  <span className="font-bold text-brand-green">{formatCurrency(orderPaid)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* === RIGHT: ACTIONS === */}
-          <div className="w-full md:w-[60%] bg-white dark:bg-dark-surface flex flex-col relative h-full">
+          {/* RIGHT COLUMN: ACTIONS */}
+          <div className="w-full md:w-[60%] bg-white dark:bg-dark-surface flex flex-col relative h-full overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3 overflow-hidden">
-                {step === "payment" && (
-                  <button
-                    onClick={() => { setStep("methods"); setSelectedMethod(null) }}
-                    className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
-                  >
-                    <ChevronLeftIcon size={20} />
-                  </button>
-                )}
-                <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading truncate">
-                  {step === "success"
-                    ? "Recebimento Confirmado"
-                    : selectedMethod
-                      ? normalizePaymentMethodLabel(selectedMethod.name) || selectedMethod.name
-                      : "Processar Pagamento"}
+            <div className="px-6 py-5 md:px-8 flex items-center justify-between border-b border-brand-border dark:border-dark-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <MoneyIcon size={20} className="text-brand-primary shrink-0" />
+                <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading truncate">
+                  Receber Pagamento {orderNumber ? `– ${orderNumber}` : ""}
                 </h2>
               </div>
-              <button onClick={handleSafeClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading hover:bg-gray-200 transition-colors">
-                <XIcon size={20} />
+              <button
+                onClick={handleSafeClose}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading hover:bg-gray-200 transition-colors shrink-0"
+              >
+                <XIcon size={18} />
               </button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 md:pb-10 relative custom-scrollbar">
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 md:px-8 custom-scrollbar flex flex-col justify-between">
               <AnimatePresence mode="wait">
-                {/* LOADING */}
+                {/* 1. LOADING */}
                 {step === "loading" && (
                   <motion.div
                     key="loading"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={standardTransition}
-                    className="flex flex-col items-center justify-center h-full gap-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center justify-center py-16 my-auto text-brand-inactive-text"
                   >
-                    <Spinner size={32} />
-                    <p className="text-brand-inactive-text dark:text-dark-body">Carregando métodos de pagamento...</p>
+                    <Spinner size={32} className="text-brand-primary mb-3" />
+                    <p className="text-sm font-medium">Carregando detalhes do pagamento...</p>
                   </motion.div>
                 )}
 
-                {/* SUCCESS */}
-                {step === "success" && (
+                {/* 2. MAIN STATE */}
+                {step === "main" && (
                   <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }} transition={standardTransition}
-                    className="flex flex-col items-center justify-center h-full text-center gap-6"
+                    key="main"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={standardTransition}
+                    className="flex flex-col gap-5 my-auto"
                   >
-                    <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
-                      <CheckCircleIcon size={40} />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                        Recebimento confirmado!
-                      </h3>
-                      <p className="text-brand-inactive-text dark:text-dark-body">
-                        {methodTypeLabel ? `${methodTypeLabel}` : "Pagamento"} registrado com sucesso.
-                      </p>
-                    </div>
-                    {amount > 0 && amount < orderTotal - 0.01 && (
+                    {/* Alerta de troco */}
+                    {wantsChange && payWithAmount !== null && (
                       <InfoCard
-                        color="orange"
-                        message={`Ainda faltam ${formatCurrency(Math.max(0, orderTotal - amount))} para pagamento total.`}
+                        color="blue"
+                        message={`O cliente solicitou troco para ${formatCurrency(payWithAmount)}. Troco a devolver: ${formatCurrency(cashChangeAmount)}.`}
                       />
                     )}
-                  </motion.div>
-                )}
 
-                {/* METHODS SELECTOR */}
-                {step === "methods" && !lockedMethod && (
-                  <motion.div
-                    key="methods"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={standardTransition}
-                    className="flex flex-col gap-6"
-                  >
-                    {isFullyPaid && (
-                      <InfoCard color="green" message="Este pedido já está pago." />
-                    )}
-
-                    {!isFullyPaid && (
-                      <>
-                        <div className="space-y-2">
-                          <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            Selecione o método de pagamento
-                          </h3>
-                          <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Valor a receber: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(remainingBalance)}</strong>
-                          </p>
+                    {/* Pedido já totalmente pago */}
+                    {isFullyPaid ? (
+                      <div className="py-10 text-center flex flex-col items-center">
+                        <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/40 text-brand-green flex items-center justify-center mb-4">
+                          <CheckCircleIcon size={36} />
+                        </div>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                          Este pedido já está pago
+                        </h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                          Não há valores pendentes para receber nesta entrega.
+                        </p>
+                      </div>
+                    ) : isMpOrder ? (
+                      /* MERCADO PAGO CASE */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
+                              <img
+                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                alt="Mercado Pago"
+                                className="w-6 h-6 object-contain"
+                              />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
+                                <Badge variant="orange" className="text-[10px] scale-90">Pendente</Badge>
+                              </h4>
+                              <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                {mpPaymentData?.boletoData
+                                  ? "Linha digitável gerada no pedido"
+                                  : "Escaneie o QR Code ou copie a chave Pix"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSyncMp}
+                            disabled={syncingMp}
+                            className="h-8 text-xs font-semibold"
+                          >
+                            {syncingMp ? <Spinner size={12} className="mr-1.5" /> : null}
+                            Verificar
+                          </Button>
                         </div>
 
-                        {isLoadingMethods ? (
-                          <div className="grid grid-cols-2 gap-4">
-                            {[1, 2, 3, 4].map((i) => (
-                              <div key={i} className="h-28 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50 dark:bg-dark-border/10 animate-pulse flex items-center justify-center">
-                                <Spinner size={16} />
-                              </div>
-                            ))}
+                        {mpLoading && (
+                          <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                            <Spinner size={24} className="text-brand-primary mb-2" />
+                            <span className="text-xs">Buscando QR Code no Mercado Pago...</span>
                           </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            {availableMethodTypes.has("cash") && (
-                              <MethodCard icon="cash" label="Dinheiro" onClick={() => handleMethodTypeSelect("cash")} />
+                        )}
+
+                        {/* Pix MP QR Code */}
+                        {mpPaymentData?.pixData && (
+                          <div className="flex flex-col items-center gap-3 pt-2">
+                            {mpPaymentData.pixData.qrCodeBase64 && (
+                              <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
+                                <img
+                                  src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
+                                  alt="PIX QR Code"
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
                             )}
-                            {availableMethodTypes.has("pix") && (
-                              <MethodCard icon="pix" label="Pix" onClick={() => handleMethodTypeSelect("pix")} />
-                            )}
-                            {availableMethodTypes.has("credit_card") && (
-                              <MethodCard icon="credit_card" label="Cartão de Crédito" onClick={() => handleMethodTypeSelect("credit_card")} />
-                            )}
-                            {availableMethodTypes.has("debit_card") && (
-                              <MethodCard icon="debit_card" label="Cartão de Débito" onClick={() => handleMethodTypeSelect("debit_card")} />
-                            )}
-                            {availableMethodTypes.has("bank_transfer") && (
-                              <MethodCard icon="bank_transfer" label="Transferência" onClick={() => handleMethodTypeSelect("bank_transfer")} />
-                            )}
-                            {availableMethodTypes.has("other") && (
-                              <MethodCard icon="other" label="Outros" onClick={() => handleMethodTypeSelect("other")} />
+                            <div className="text-center">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Pix</span>
+                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                              </span>
+                            </div>
+                            {mpPaymentData.pixData.qrCode && (
+                              <div className="w-full flex gap-2">
+                                <Input
+                                  variant="full-rounded"
+                                  readOnly
+                                  value={mpPaymentData.pixData.qrCode}
+                                  className="flex-1 h-10 truncate text-xs"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (mpPaymentData?.pixData?.qrCode) {
+                                      navigator.clipboard.writeText(mpPaymentData.pixData.qrCode)
+                                      setCopiedPix(true)
+                                      toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." })
+                                      setTimeout(() => setCopiedPix(false), 2000)
+                                    }
+                                  }}
+                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                  title="Copiar código Pix"
+                                >
+                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                </Button>
+                              </div>
                             )}
                           </div>
                         )}
-                      </>
+
+                        {/* Boleto MP */}
+                        {mpPaymentData?.boletoData && (
+                          <div className="flex flex-col items-center gap-3 pt-2">
+                            {mpPaymentData.boletoData.barcode && (
+                              <div className="w-full overflow-hidden bg-white p-2 rounded-xl border flex justify-center">
+                                <Barcode
+                                  value={mpPaymentData.boletoData.barcode}
+                                  format="CODE128"
+                                  width={1.5}
+                                  height={45}
+                                  displayValue={false}
+                                  margin={4}
+                                  className="w-full max-w-xs"
+                                />
+                              </div>
+                            )}
+                            <div className="text-center">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Boleto</span>
+                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                              </span>
+                            </div>
+                            {mpPaymentData.boletoData.barcode && (
+                              <div className="w-full flex gap-2">
+                                <Input
+                                  variant="full-rounded"
+                                  readOnly
+                                  value={mpPaymentData.boletoData.barcode}
+                                  className="flex-1 h-10 truncate text-xs"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (mpPaymentData?.boletoData?.barcode) {
+                                      navigator.clipboard.writeText(mpPaymentData.boletoData.barcode)
+                                      setCopiedPix(true)
+                                      toast({ title: "Copiado!", description: "Linha digitável copiada." })
+                                      setTimeout(() => setCopiedPix(false), 2000)
+                                    }
+                                  }}
+                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                  title="Copiar código de barras"
+                                >
+                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="pt-2">
+                          <Button
+                            variant="default"
+                            className="w-full h-11 font-bold"
+                            onClick={() => handleConfirmReceipt("Pix Mercado Pago")}
+                          >
+                            Confirmar Recebimento do Cliente
+                          </Button>
+                        </div>
+                      </div>
+                    ) : isPixMethod ? (
+                      /* PIX DA LOJA CASE */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center shrink-0 border border-teal-100 dark:border-teal-900/30">
+                            <QRCodeIcon size={24} className="text-teal-600 dark:text-teal-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                              Pix da Loja ({storeName})
+                              <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
+                            </h4>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                              {storePixKey
+                                ? `Chave: ${storePixKey}`
+                                : "Chave Pix configurada pela loja"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* QR Code gerado */}
+                        {localPixQrData?.qrDataUrl ? (
+                          <div className="flex flex-col items-center gap-3 pt-2">
+                            <div className="w-44 h-44 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center shadow-sm">
+                              <img
+                                src={localPixQrData.qrDataUrl}
+                                alt="PIX QR Code"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                            <div className="text-center">
+                              <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a transferir</span>
+                              <span className="text-2xl font-black text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(totalRemaining)}
+                              </span>
+                            </div>
+                            {storePixKey && (
+                              <div className="w-full flex gap-2">
+                                <Input
+                                  variant="full-rounded"
+                                  readOnly
+                                  value={storePixKey}
+                                  className="flex-1 h-10 truncate text-xs"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(storePixKey)
+                                    setCopiedPix(true)
+                                    toast({ title: "Copiado!", description: "Chave Pix copiada." })
+                                    setTimeout(() => setCopiedPix(false), 2000)
+                                  }}
+                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                  title="Copiar chave Pix"
+                                >
+                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ) : generatingLocalPix ? (
+                          <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                            <Spinner size={24} className="text-brand-primary mb-2" />
+                            <span className="text-xs">Gerando QR Code Pix da loja...</span>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Valor a receber</span>
+                            <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mb-2">
+                              {formatCurrency(totalRemaining)}
+                            </span>
+                            {storePixKey ? (
+                              <div className="w-full flex gap-2 mt-2">
+                                <Input
+                                  variant="full-rounded"
+                                  readOnly
+                                  value={storePixKey}
+                                  className="flex-1 h-10 truncate text-xs"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(storePixKey)
+                                    setCopiedPix(true)
+                                    toast({ title: "Copiado!", description: "Chave Pix copiada." })
+                                    setTimeout(() => setCopiedPix(false), 2000)
+                                  }}
+                                  className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                >
+                                  {copiedPix ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+
+                        <InfoCard
+                          color="blue"
+                          message="Solicite ao cliente o pagamento via Pix. Após conferir o comprovante, confirme o recebimento."
+                        />
+
+                        <Button
+                          variant="default"
+                          className="w-full h-11 font-bold"
+                          onClick={() => handleConfirmReceipt("Pix")}
+                        >
+                          Confirmar Recebimento do Pix
+                        </Button>
+                      </div>
+                    ) : resolvedMethodName.toLowerCase().includes("cartão") || resolvedMethodName.toLowerCase().includes("cartao") || resolvedMethodName.toLowerCase().includes("crédito") || resolvedMethodName.toLowerCase().includes("débito") ? (
+                      /* CARTÃO CRÉDITO OU DÉBITO */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/30">
+                            <CreditCardIcon size={24} className="text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                              {resolvedMethodName}
+                              <Badge variant="orange" className="text-[10px] scale-90">Na Maquininha</Badge>
+                            </h4>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                              Valor pré-definido pelo vendedor
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-2">
+                          <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a passar na maquininha</span>
+                          <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mt-0.5">
+                            {formatCurrency(totalRemaining)}
+                          </span>
+                          {breakdown[0]?.installmentNumber > 1 && (
+                            <span className="text-xs font-semibold text-brand-primary block mt-1">
+                              {breakdown[0].installmentNumber}x de {formatCurrency(totalRemaining / breakdown[0].installmentNumber)}
+                            </span>
+                          )}
+                        </div>
+
+                        <InfoCard
+                          color="blue"
+                          message="Passe o cartão do cliente na maquininha. Assim que a maquininha aprovar a transação, confirme abaixo."
+                        />
+
+                        <Button
+                          variant="default"
+                          className="w-full h-11 font-bold"
+                          onClick={() => handleConfirmReceipt(resolvedMethodName)}
+                        >
+                          Confirmar Recebimento no Cartão
+                        </Button>
+                      </div>
+                    ) : resolvedMethodName.toLowerCase().includes("dinheiro") || resolvedMethodName.toLowerCase().includes("cash") ? (
+                      /* DINHEIRO (CASH) */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/30">
+                            <MoneyIcon size={24} className="text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                              Pagamento em Dinheiro
+                              <Badge variant="orange" className="text-[10px] scale-90">A Receber</Badge>
+                            </h4>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                              Recebimento presencial na entrega
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center my-2">
+                          <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor a receber</span>
+                          <span className="text-2xl font-black text-brand-dark dark:text-dark-heading block mt-0.5">
+                            {formatCurrency(totalRemaining)}
+                          </span>
+                          {wantsChange && payWithAmount ? (
+                            <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border flex justify-around text-xs">
+                              <span>Paga com: <strong>{formatCurrency(payWithAmount)}</strong></span>
+                              <span className="text-brand-orange">Troco: <strong>{formatCurrency(cashChangeAmount)}</strong></span>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <Button
+                          variant="default"
+                          className="w-full h-11 font-bold"
+                          onClick={() => handleConfirmReceipt("Dinheiro")}
+                        >
+                          Confirmar Recebimento em Dinheiro
+                        </Button>
+                      </div>
+                    ) : isSplit ? (
+                      /* SPLIT BREAKDOWN */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                          Pagamento Dividido ({breakdown.length} formas)
+                        </h4>
+                        <div className="space-y-2">
+                          {breakdown.map((leg, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-3 rounded-lg border bg-brand-gray dark:bg-dark-border/30 text-sm">
+                              <div>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading block">{leg.method || "Método"}</span>
+                                {leg.installmentNumber > 1 && (
+                                  <span className="text-xs text-brand-inactive-text">{leg.installmentNumber}x</span>
+                                )}
+                              </div>
+                              <span className="font-bold text-brand-primary">{formatCurrency(leg.amount || leg.effectiveAmount || 0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button
+                          variant="default"
+                          className="w-full h-11 font-bold mt-2"
+                          onClick={() => handleConfirmReceipt(targetOrder?.payment_method || "Múltiplos Meios")}
+                        >
+                          Confirmar Recebimento de Todas as Formas
+                        </Button>
+                      </div>
+                    ) : (
+                      /* FALLBACK: SELECTOR RÁPIDO */
+                      <div className="flex flex-col gap-4 rounded-xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface">
+                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                          Selecione como o cliente está pagando:
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          {["Dinheiro", "Pix", "Cartão de Crédito", "Cartão de Débito"].map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setFallbackMethod(m)}
+                              className={`p-3 rounded-xl border text-sm font-bold transition-all text-left ${fallbackMethod === m ? "border-brand-primary bg-brand-primary/5 text-brand-primary" : "border-brand-border dark:border-dark-border hover:bg-gray-50"}`}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="p-3 rounded-xl bg-brand-gray dark:bg-dark-border/40 text-center">
+                          <span className="text-xs text-brand-inactive-text block">Valor a confirmar</span>
+                          <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(totalRemaining)}
+                          </span>
+                        </div>
+                        <Button
+                          variant="default"
+                          className="w-full h-11 font-bold"
+                          onClick={() => handleConfirmReceipt(fallbackMethod)}
+                        >
+                          Confirmar Recebimento em {fallbackMethod}
+                        </Button>
+                      </div>
                     )}
                   </motion.div>
                 )}
 
-                {/* LOCKED METHOD (auto-enter payment view) */}
-                {step === "methods" && lockedMethod && (
+                {/* 3. PROCESSING STATE */}
+                {step === "processing" && (
                   <motion.div
-                    key="locked"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    key="processing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={standardTransition}
-                    className="flex flex-col gap-6"
+                    className="w-full h-full flex flex-col items-center justify-center py-16 text-center my-auto"
                   >
-                    <div className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50 dark:bg-dark-border/20">
-                      <span className="text-sm text-brand-inactive-text dark:text-dark-body">Método definido:</span>
-                      <Badge variant="blue">{lockedMethod}</Badge>
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-brand-green to-[#10b981] flex items-center justify-center mb-6 relative">
+                      <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping" />
+                      <MoneyIcon size={44} className="text-white" />
                     </div>
-
-                    <Button
-                      variant="outline"
-                      className="w-full h-14"
-                      onClick={() => {
-                        const matches = activeMethods.filter(
-                          (m) =>
-                            normalizePaymentMethodLabel(m.name) === normalizePaymentMethodLabel(lockedMethod) ||
-                            normalizeMethodType(m.type) === normalizeMethodType(lockedMethod)
-                        )
-                        if (matches.length > 0) {
-                          handleSelectMethod(matches[0])
-                        } else {
-                          const methodType = normalizeMethodType(lockedMethod)
-                          const dummy: DriverPartnerPaymentMethod = {
-                            id: "",
-                            name: normalizePaymentMethodLabel(lockedMethod) || lockedMethod,
-                            type: methodType,
-                            is_active: true,
-                            max_installments: 1,
-                          }
-                          handleSelectMethod(dummy)
-                        }
-                      }}
-                    >
-                      Confirmar como {lockedMethod}
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full h-12"
-                      onClick={() => setStep("methods")}
-                      disabled={!lockedMethod}
-                    >
-                      Escolher outro método
-                    </Button>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-1">
+                      Processando recebimento...
+                    </h3>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
+                      Registrando pagamento no pedido e atualizando o sistema.
+                    </p>
                   </motion.div>
                 )}
 
-                {/* PAYMENT VIEW */}
-                {step === "payment" && selectedMethod && (
+                {/* 4. SUCCESS STATE */}
+                {step === "success" && (
                   <motion.div
-                    key="payment"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
                     transition={standardTransition}
-                    className="flex flex-col gap-6"
+                    className="w-full h-full flex flex-col p-4 md:p-6 my-auto justify-center"
                   >
-                    {renderPaymentView()}
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-950/40 flex items-center justify-center text-brand-green shrink-0">
+                        <CheckCircleIcon size={32} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                          Pedido {orderNumber}
+                        </h2>
+                        <p className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">
+                          Recebimento registrado com sucesso!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-6 mb-8 border-l-4 border-brand-green pl-4">
+                      <div>
+                        <span className="block text-xs font-medium text-brand-inactive-text mb-0.5">Total do Pedido</span>
+                        <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                          {formatCurrency(totalOrder)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="block text-xs font-medium text-brand-inactive-text mb-0.5">Valor Recebido</span>
+                        <div className="text-xl font-bold text-brand-green">
+                          {formatCurrency(totalRemaining > 0 ? totalRemaining : totalOrder)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        variant="outline"
+                        className="flex-1 h-11"
+                        leftIcon={<PrinterIcon size={16} />}
+                        onClick={() => setPrintOrderId(targetOrder?.id || targetOrder?.order_number)}
+                      >
+                        Imprimir Recibo
+                      </Button>
+                      <Button
+                        variant="default"
+                        className="flex-1 h-11 font-bold"
+                        onClick={handleSafeClose}
+                      >
+                        Concluir
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 5. ERROR STATE */}
+                {step === "error" && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={standardTransition}
+                    className="w-full h-full flex flex-col items-center justify-center py-10 text-center my-auto"
+                  >
+                    <IconPlaceholder
+                      placeholderType="image"
+                      imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                      imageAlt="Erro no recebimento"
+                      title="Não foi possível concluir"
+                      subtitle={errorMessage}
+                    />
+                    <Button
+                      variant="outline"
+                      className="mt-6"
+                      onClick={() => setStep("main")}
+                    >
+                      Tentar Novamente
+                    </Button>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-
-            {/* Bottom Action Bar */}
-            {step === "payment" && selectedMethod && !isSubmitting && (
-              <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
-                <Button variant="outline" className="flex-1 h-[52px]" onClick={() => setStep("methods")}>
-                  Voltar
-                </Button>
-                <Button className="flex-1 h-[52px]" onClick={handleConfirm}>
-                  Confirmar Recebimento
-                </Button>
-              </div>
-            )}
-
-            {step === "confirm" && (
-              <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
-                <Button variant="outline" className="flex-1 h-[52px]" disabled>
-                  Processando...
-                </Button>
-                <Button className="flex-1 h-[52px]" disabled>
-                  <Spinner size={16} className="mr-2" />
-                  Aguarde...
-                </Button>
-              </div>
-            )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* Pix QR Modal */}
-      {pixQrData && selectedMethod && (
-        <PixQrDisplayModal
-          isOpen={!!pixQrData}
-          onClose={() => setPixQrData(null)}
-          qrCode={pixQrData.qrDataUrl}
-          payload={pixQrData.payload}
-          amount={amount}
-          subtitle={`Pix - ${order?.order_number ? `#${order.order_number}` : ""}`}
-          onConfirmPayment={handleConfirm}
-          isConfirming={isSubmitting}
+      {/* Impressão de recibo */}
+      {printOrderId && (
+        <SaleReceiptPrintModal
+          isOpen={Boolean(printOrderId)}
+          onClose={() => setPrintOrderId(null)}
+          orderId={printOrderId}
         />
       )}
     </>
-  )
-
-  function renderPaymentView() {
-    if (!selectedMethod) return null
-    const methodType = normalizeMethodType(selectedMethod.type)
-    const label = normalizePaymentMethodLabel(selectedMethod.name) || selectedMethod.name
-    const total = remainingBalance
-    const isCash = methodType === "cash"
-
-    if (methodType === "pix") {
-      return (
-        <div className="flex flex-col items-center justify-center gap-6 pt-4">
-          <div className="text-center">
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-2">Valor a receber</p>
-            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</div>
-          </div>
-          {pixQrData ? (
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-sm text-brand-inactive-text dark:text-dark-body">Mostre este QR Code ao cliente</p>
-              <img src={pixQrData.qrDataUrl} alt="QR Code Pix" className="w-48 h-48" />
-              <Button onClick={handleConfirm} disabled={isSubmitting} isLoading={isSubmitting}>
-                Confirmar Recebimento via Pix
-              </Button>
-            </div>
-          ) : generatingPix ? (
-            <div className="flex items-center gap-2 text-brand-inactive-text">
-              <Spinner size={16} />
-              <span>Gerando QR Code Pix...</span>
-            </div>
-          ) : !selectedMethod.pix_key ? (
-            <InfoCard color="orange" message="Este método Pix não possui chave configurada pelo parceiro." />
-          ) : (
-            <Button onClick={handleGeneratePix} disabled={generatingPix} isLoading={generatingPix}>
-              Gerar QR Code Pix
-            </Button>
-          )}
-        </div>
-      )
-    }
-
-    if (methodType === "cash") {
-      return (
-        <div className="flex flex-col gap-6">
-          <MoneyPaymentView
-            amount={amount}
-            onAmountChange={(v) => setAmount(Math.max(0, v))}
-            baseAllocated={amount}
-            flatAmount
-            totalPaid={amount}
-            totalNeed={total}
-            showNumpad={false}
-          />
-        </div>
-      )
-    }
-
-    if (methodType === "credit_card") {
-      const maxInst = selectedMethod.max_installments || 1
-      const installmentsOptions = Array.from({ length: Math.max(1, maxInst) }, (_, i) => i + 1)
-      return (
-        <div className="flex flex-col gap-6">
-          <CardPaymentView
-            amount={total}
-            onAmountChange={setAmount}
-            baseAllocated={total}
-            flatAmount
-            installments={installments}
-            onInstallmentsChange={setInstallments}
-            maxInstallments={maxInst}
-            readOnlyInstallments={false}
-            totalPaid={total}
-            totalNeed={total}
-          />
-          {installmentsOptions.length > 1 && (
-            <div className="text-center text-sm text-brand-inactive-text dark:text-dark-body">
-              {formatCurrency(total / Number(installments))} x {installments} parcelas
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    if (methodType === "debit_card" || methodType === "bank_transfer" || methodType === "other") {
-      return (
-        <div className="flex flex-col items-center justify-center gap-6 pt-8">
-          <div className="text-center">
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-2">Valor a receber</p>
-            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</div>
-            <div className="mt-2 text-sm text-brand-inactive-text dark:text-dark-body">
-              Método: <Badge variant="blue">{label}</Badge>
-            </div>
-          </div>
-          <Button onClick={handleConfirm} disabled={isSubmitting} isLoading={isSubmitting}>
-            Confirmar Recebimento
-          </Button>
-        </div>
-      )
-    }
-
-    return (
-      <InfoCard color="orange" message={`Método "${label}" não suportado para confirmação de recebimento.`} />
-    )
-  }
-}
-
-function MethodCard({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: string
-  label: string
-  onClick: () => void
-}) {
-  const iconMap: Record<string, React.ReactElement> = {
-    cash: <MoneyIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-    pix: <QRCodeIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-    credit_card: <CreditCardIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-    debit_card: <CreditCardIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-    bank_transfer: <FileIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-    other: <MoneyIcon size={24} className="text-brand-dark dark:text-dark-heading" />,
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col items-center justify-center gap-3 h-28 rounded-2xl border-2 border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors"
-    >
-      {iconMap[icon]}
-      <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{label}</span>
-    </button>
   )
 }

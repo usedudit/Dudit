@@ -234,7 +234,7 @@ export async function Dashboard({
             <CardHeader
               icon={TrendingUpIcon}
               title="Faturamento"
-              legendItems={[{ label: "Este Período", color: "#059669" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
+              legendItems={[{ label: "Este Período", color: "#79c325" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
             />
             <DashboardLineChart data={evoData} format="currency" />
           </div>
@@ -264,7 +264,7 @@ export async function Dashboard({
               title="Total de Pedidos"
               subtitle={`${ordersTotal} pedido${ordersTotal === 1 ? "" : "s"} no período`}
             />
-            <DashboardBarChart data={ordersBarData} colors={["#059669"]} format="number" />
+            <DashboardBarChart data={ordersBarData} colors={["#79c325"]} format="number" />
           </div>
         </div>
         <div className="lg:col-span-4">

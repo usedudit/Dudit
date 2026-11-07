@@ -234,8 +234,8 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                                     <StarIcon
                                                         key={star}
                                                         size={16}
-                                                        color={star <= review.rating ? "#059669" : "#E5E7EB"}
-                                                        className={star <= review.rating ? "fill-[#059669]" : ""}
+                                                        color={star <= review.rating ? "#79c325" : "#E5E7EB"}
+                                                        className={star <= review.rating ? "fill-[#79c325]" : ""}
                                                     />
                                                 ))}
                                             </div>
@@ -309,8 +309,8 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                 >
                                     <StarIcon
                                         size={42}
-                                        color={star <= editRating ? "#059669" : "#E5E7EB"}
-                                        className={star <= editRating ? "fill-[#059669]" : ""}
+                                        color={star <= editRating ? "#79c325" : "#E5E7EB"}
+                                        className={star <= editRating ? "fill-[#79c325]" : ""}
                                     />
                                 </button>
                             ))}

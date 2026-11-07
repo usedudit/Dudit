@@ -114,7 +114,7 @@ export async function sendPushToUser(params: {
               title: params.title,
               body: params.body,
               icon: "icon_192",
-              color: "#059669",
+              color: "#79c325",
               clickAction: targetUrl,
               priority: "high",
               defaultSound: true,

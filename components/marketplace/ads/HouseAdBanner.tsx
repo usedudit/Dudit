@@ -77,7 +77,7 @@ export function HouseAdBanner({ variant = "banner", className = "" }: HouseAdBan
                     </p>
                 </div>
 
-                <div className="shrink-0 flex items-center gap-1.5 bg-[#10b981] group-hover:bg-[#059669] text-[#002820] font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-xs group-hover:scale-[1.02]">
+                <div className="shrink-0 flex items-center gap-1.5 bg-[#10b981] group-hover:bg-[#79c325] text-[#002820] font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-xs group-hover:scale-[1.02]">
                     <span>Anunciar</span>
                     <svg className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />

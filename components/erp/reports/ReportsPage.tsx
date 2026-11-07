@@ -337,7 +337,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Vendas"
-                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
                         <DashboardLineChart data={evoData} format="currency" />
                     </div>
@@ -374,9 +374,9 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                         <CardHeader
                             icon={ClockIcon}
                             title="Pedidos por Hora"
-                            legendItems={[{ label: "Volume de Pedidos", color: "#059669" }]}
+                            legendItems={[{ label: "Volume de Pedidos", color: "#79c325" }]}
                         />
-                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={["#059669"]} legendLabels={{ value: "Volume de Pedidos" }} />
+                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={["#79c325"]} legendLabels={{ value: "Volume de Pedidos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -403,7 +403,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Principais Categorias" legendItems={[{ label: "Receita", color: "#059669" }]} />
+                        <CardHeader icon={TagIcon} title="Principais Categorias" legendItems={[{ label: "Receita", color: "#79c325" }]} />
                         <DashboardBarChart
                             data={(productsData?.categorySales || salesData.topProducts || []).slice(0, 6).map((p, i) => ({
                                 label: p.label || (p as any).title || "",
@@ -516,9 +516,9 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Vendas e Devoluções"
-                            legendItems={[{ label: "Produtos Vendidos", color: "#059669" }, { label: "Produtos Devolvidos", color: "#ef4444" }]}
+                            legendItems={[{ label: "Produtos Vendidos", color: "#79c325" }, { label: "Produtos Devolvidos", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} format="currency" legendLabels={{ vendidos: "Produtos Vendidos", devolvidos: "Produtos Devolvidos" }} />
+                        <DashboardLineChart data={mergedEvolution} colors={["#79c325", "#ef4444"]} format="currency" legendLabels={{ vendidos: "Produtos Vendidos", devolvidos: "Produtos Devolvidos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -542,9 +542,9 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                         <CardHeader
                             icon={MoneyIcon}
                             title="Faturamento vs Devoluções"
-                            legendItems={[{ label: "Vendido", color: "#059669" }, { label: "Devolvido", color: "#ef4444" }, { label: "Líquido", color: "#0284c7" }]}
+                            legendItems={[{ label: "Vendido", color: "#79c325" }, { label: "Devolvido", color: "#ef4444" }, { label: "Líquido", color: "#0284c7" }]}
                         />
-                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} format="currency" />
+                        <DashboardBarChart data={faturamentoData} colors={["#79c325", "#ef4444", "#0284c7"]} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -585,7 +585,7 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                             title="Curva ABC"
                             subtitle={salesData?.abcCurve?.length ? `${salesData.abcCurve.filter(a => a.category === "A").length} prod. A · ${salesData.abcCurve.filter(a => a.category === "B").length} prod. B · ${salesData.abcCurve.filter(a => a.category === "C").length} prod. C` : undefined}
                             legendItems={[
-                                { label: "Classe A (≤50%)", color: "#059669" },
+                                { label: "Classe A (≤50%)", color: "#79c325" },
                                 { label: "Classe B (50-80%)", color: "#f59e0b" },
                                 { label: "Classe C (>80%)", color: "#ef4444" },
                             ]}
@@ -594,9 +594,9 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                             data={(salesData?.abcCurve || []).slice(0, 6).map(a => ({
                                 label: a.label,
                                 value: a.value,
-                                fill: a.category === "A" ? "#059669" : a.category === "B" ? "#f59e0b" : "#ef4444",
+                                fill: a.category === "A" ? "#79c325" : a.category === "B" ? "#f59e0b" : "#ef4444",
                             }))}
-                            colors={["#059669", "#f59e0b", "#ef4444"]}
+                            colors={["#79c325", "#f59e0b", "#ef4444"]}
                             format="currency"
                             height="h-[200px]"
                         />
@@ -663,7 +663,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                         <CardHeader
                             icon={WrenchIcon}
                             title="Faturamento por Serviço"
-                            legendItems={[{ label: "Receita", color: "#059669" }]}
+                            legendItems={[{ label: "Receita", color: "#79c325" }]}
                         />
                         <DashboardLineChart data={serviceChartData} legendLabels={{ value: "Receita" }} />
                     </div>
@@ -822,7 +822,7 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                         <CardHeader
                             icon={CalendarIcon}
                             title="Evolução de Agendamentos"
-                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
                         <DashboardLineChart data={evoData} />
                     </div>
@@ -847,9 +847,9 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                         <CardHeader
                             icon={ClockIcon}
                             title="Agendamentos por Hora"
-                            legendItems={[{ label: "Volume", color: "#059669" }]}
+                            legendItems={[{ label: "Volume", color: "#79c325" }]}
                         />
-                        <DashboardBarChart data={hourlyData} colors={["#059669"]} legendLabels={{ value: "Volume" }} />
+                        <DashboardBarChart data={hourlyData} colors={["#79c325"]} legendLabels={{ value: "Volume" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -867,12 +867,12 @@ function AppointmentsSection({ appointmentsData }: { appointmentsData: Appointme
                         <CardHeader icon={TargetIcon} title="Taxa de Comparecimento" />
                         <DashboardDonutChart
                             data={[
-                                { label: "Presentes", value: appointmentsData.attendanceRate, fill: "#059669" },
+                                { label: "Presentes", value: appointmentsData.attendanceRate, fill: "#79c325" },
                                 { label: "Ausentes", value: Math.max(100 - appointmentsData.attendanceRate, 0), fill: "#ef4444" },
                             ]}
                             totalValue={`${appointmentsData.attendanceRate}%`}
                             totalLabel="Taxa"
-                            colors={["#059669", "#ef4444"]}
+                            colors={["#79c325", "#ef4444"]}
                         />
                     </div>
                 </div>
@@ -960,7 +960,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Entregas por Período"
-                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Este Período", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
                         <DashboardLineChart data={evoData} />
                     </div>
@@ -1066,12 +1066,12 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                         <CardHeader icon={TargetIcon} title="Pontualidade" />
                         <DashboardDonutChart
                             data={[
-                                { label: "No Prazo", value: deliveryData.metrics.onTimeRate, fill: "#059669" },
+                                { label: "No Prazo", value: deliveryData.metrics.onTimeRate, fill: "#79c325" },
                                 { label: "Atrasadas", value: Math.max(100 - deliveryData.metrics.onTimeRate, 0), fill: "#ef4444" },
                             ]}
                             totalValue={`${deliveryData.metrics.onTimeRate}%`}
                             totalLabel="No Prazo"
-                            colors={["#059669", "#ef4444"]}
+                            colors={["#79c325", "#ef4444"]}
                         />
                     </div>
                 </div>
@@ -1154,7 +1154,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Ordens de Serviço"
-                            legendItems={[{ label: "Ordens", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                            legendItems={[{ label: "Ordens", color: "#79c325" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
                         <DashboardLineChart data={evoData} legendLabels={{ value: "Ordens", secondary: "Período Anterior" }} />
                     </div>
@@ -1385,9 +1385,9 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                         <CardHeader
                             icon={MoneyIcon}
                             title="Fluxo de Caixa"
-                            legendItems={[{ label: "Entradas", color: "#059669" }, { label: "Saídas", color: "#ef4444" }]}
+                            legendItems={[{ label: "Entradas", color: "#79c325" }, { label: "Saídas", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} format="currency" legendLabels={{ value: "Entradas", secondary: "Saídas" }} />
+                        <DashboardLineChart data={cashflowData} colors={["#79c325", "#ef4444"]} format="currency" legendLabels={{ value: "Entradas", secondary: "Saídas" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1454,7 +1454,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                         <CardHeader
                             icon={TagIcon}
                             title="Maiores Despesas"
-                            legendItems={[{ label: "Categoria", color: "#059669" }]}
+                            legendItems={[{ label: "Categoria", color: "#79c325" }]}
                         />
                         <DashboardBarChart
                             data={(financialData.expensesByCategory || []).slice(0, 6).map(e => ({ label: String(e.label), value: Number(e.value) }))}
@@ -1539,7 +1539,7 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
 
     const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
     const statusPie = [
-        { label: "Ativos", value: customerData.activeCustomers, fill: "#059669" },
+        { label: "Ativos", value: customerData.activeCustomers, fill: "#79c325" },
         { label: "Recorrentes", value: customerData.recurringCustomers, fill: "#2563eb" },
         { label: "Novos", value: customerData.newCustomers, fill: "#f59e0b" },
         { label: "Inativos 90d", value: customerData.inactiveCustomers, fill: "#94a3b8" },
@@ -1561,9 +1561,9 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Ativos vs Novos Clientes"
-                            legendItems={[{ label: "Ativos", color: "#059669" }, { label: "Novos", color: "#2563eb" }]}
+                            legendItems={[{ label: "Ativos", color: "#79c325" }, { label: "Novos", color: "#2563eb" }]}
                         />
-                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} legendLabels={{ value: "Ativos", secondary: "Novos" }} />
+                        <DashboardLineChart data={evoData} colors={["#79c325", "#2563eb"]} legendLabels={{ value: "Ativos", secondary: "Novos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1709,9 +1709,9 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Evolução de Faturamento por Canal"
-                            legendItems={[{ label: "Online", color: "#059669" }, { label: "Presencial", color: "#2563eb" }, { label: "Outros", color: "#f59e0b" }]}
+                            legendItems={[{ label: "Online", color: "#79c325" }, { label: "Presencial", color: "#2563eb" }, { label: "Outros", color: "#f59e0b" }]}
                         />
-                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} format="currency" legendLabels={{ online: "Online", presencial: "Presencial", outros: "Outros" }} />
+                        <DashboardLineChart data={evoMultiLine} colors={["#79c325", "#2563eb", "#f59e0b"]} format="currency" legendLabels={{ online: "Online", presencial: "Presencial", outros: "Outros" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1874,9 +1874,9 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Atendimentos por Dia"
-                            legendItems={[{ label: "Atendimentos", color: "#059669" }]}
+                            legendItems={[{ label: "Atendimentos", color: "#79c325" }]}
                         />
-                        <DashboardLineChart data={evoData} colors={["#059669"]} legendLabels={{ value: "Atendimentos" }} />
+                        <DashboardLineChart data={evoData} colors={["#79c325"]} legendLabels={{ value: "Atendimentos" }} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -2213,7 +2213,7 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
     if (!subscriptionData) return <SectionPlaceholder title="Assinaturas Recorrentes" description="Dados e métricas de assinaturas indisponíveis." />
 
     const statusDonutData = [
-        { label: "Ativas", value: subscriptionData.activeCount, fill: "#059669" },
+        { label: "Ativas", value: subscriptionData.activeCount, fill: "#79c325" },
         { label: "Pausadas", value: subscriptionData.pausedCount, fill: "#f59e0b" },
         { label: "Pendentes", value: subscriptionData.delinquentCount, fill: "#ef4444" },
         { label: "Canceladas", value: subscriptionData.cancelledCount, fill: "#94a3b8" },
@@ -2262,7 +2262,7 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
                             data={statusDonutData}
                             totalValue={String(subscriptionData.activeCount + subscriptionData.pausedCount + subscriptionData.delinquentCount + subscriptionData.cancelledCount)}
                             totalLabel="Total"
-                            colors={["#059669", "#f59e0b", "#ef4444", "#94a3b8"]}
+                            colors={["#79c325", "#f59e0b", "#ef4444", "#94a3b8"]}
                         />
                     </div>
                 </div>
@@ -2321,12 +2321,12 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
                         <CardHeader icon={TargetIcon} title="Retenção de Assinantes" />
                         <DashboardDonutChart
                             data={[
-                                { label: "Renovados", value: subscriptionData.renewalRate, fill: "#059669" },
+                                { label: "Renovados", value: subscriptionData.renewalRate, fill: "#79c325" },
                                 { label: "Churn", value: subscriptionData.churnRate, fill: "#ef4444" },
                             ]}
                             totalValue={`${subscriptionData.renewalRate.toFixed(0)}%`}
                             totalLabel="Retenção"
-                            colors={["#059669", "#ef4444"]}
+                            colors={["#79c325", "#ef4444"]}
                         />
                     </div>
                 </div>

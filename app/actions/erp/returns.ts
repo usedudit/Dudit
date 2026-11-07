@@ -468,17 +468,12 @@ export async function getReturnRequestDetailsAction(
     opts?: { adminBypass?: boolean },
 ) {
     try {
-        let isAdmin = Boolean(opts?.adminBypass)
+        const isAdmin = Boolean(opts?.adminBypass)
         if (isAdmin) {
             await requireAdminScope("moderation")
         } else {
-            try {
-                await requireAdminScope("moderation")
-                isAdmin = true
-            } catch {
-                const access = await requirePermission(partnerId, "orders", "view")
-                assertPermission(access, "orders.list")
-            }
+            const access = await requirePermission(partnerId, "orders", "view")
+            assertPermission(access, "orders.list")
         }
         const supabase = createAdminClient()
         const { data, error } = await supabase
@@ -564,14 +559,24 @@ export async function getReturnRequestDetailsAction(
 
         const returnEvents = (auditLogsData || []).map((e: any) => {
             const meta = e.metadata || e.new_values || {}
-            const isDuditAction = Boolean(meta.dudit_action || (meta as any).is_admin_action || e.actor_name === "Equipe Dudit" || e.source === "admin")
+            const isDuditAction = Boolean(
+                meta.dudit_action ||
+                (meta as any)?.is_admin_action ||
+                e.actor_name === "Equipe Dudit" ||
+                e.source === "admin" ||
+                String(e.actor_name || "").toLowerCase().includes("dudit")
+            )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
 
             if (isDuditAction) {
                 if (isAdmin) {
-                    const adminName = meta.admin_actor_name || "Admin"
-                    actorName = `Equipe Dudit (${adminName})`
+                    const rawAdmin = meta.admin_actor_name || null
+                    if (rawAdmin && String(rawAdmin).trim().toLowerCase() !== "admin" && String(rawAdmin).trim().toLowerCase() !== "equipe dudit") {
+                        actorName = `Equipe Dudit (${String(rawAdmin).trim()})`
+                    } else {
+                        actorName = "Equipe Dudit"
+                    }
                 } else {
                     delete sanitizedMeta.admin_actor_name
                     delete sanitizedMeta.admin_actor_id
@@ -631,7 +636,10 @@ export async function getReturnRequestDetailsAction(
     }
 }
 
-export async function getReturnAuditLogsAction(requestId: string) {
+export async function getReturnAuditLogsAction(
+    requestId: string,
+    opts?: { adminBypass?: boolean }
+) {
     try {
         const user = await requireUser()
         if (!user) return { success: false as const, error: "Não autenticado" }
@@ -644,11 +652,10 @@ export async function getReturnAuditLogsAction(requestId: string) {
             .maybeSingle()
         if (requestError) throw requestError
         if (!request) return { success: false as const, error: "Solicitação de devolução não encontrada." }
-        let isAdmin = false
-        try {
+        const isAdmin = Boolean(opts?.adminBypass)
+        if (isAdmin) {
             await requireAdminScope("moderation")
-            isAdmin = true
-        } catch {
+        } else {
             const access = await requirePermission(request.partner_id, "orders", "view", user)
             assertPermission(access, "orders.list")
             const requestStoreId = request.store_id || (request as any).orders?.store_id
@@ -665,14 +672,24 @@ export async function getReturnAuditLogsAction(requestId: string) {
         if (error) throw error
         const events = (data || []).map((e: any) => {
             const meta = e.metadata || e.new_values || {}
-            const isDuditAction = Boolean(meta.dudit_action || (meta as any).is_admin_action || e.actor_name === "Equipe Dudit" || e.source === "admin")
+            const isDuditAction = Boolean(
+                meta.dudit_action ||
+                (meta as any)?.is_admin_action ||
+                e.actor_name === "Equipe Dudit" ||
+                e.source === "admin" ||
+                String(e.actor_name || "").toLowerCase().includes("dudit")
+            )
             let actorName = e.actor_name || "Sistema"
             let sanitizedMeta = { ...meta }
 
             if (isDuditAction) {
                 if (isAdmin) {
-                    const adminName = meta.admin_actor_name || "Admin"
-                    actorName = `Equipe Dudit (${adminName})`
+                    const rawAdmin = meta.admin_actor_name || null
+                    if (rawAdmin && String(rawAdmin).trim().toLowerCase() !== "admin" && String(rawAdmin).trim().toLowerCase() !== "equipe dudit") {
+                        actorName = `Equipe Dudit (${String(rawAdmin).trim()})`
+                    } else {
+                        actorName = "Equipe Dudit"
+                    }
                 } else {
                     delete sanitizedMeta.admin_actor_name
                     delete sanitizedMeta.admin_actor_id

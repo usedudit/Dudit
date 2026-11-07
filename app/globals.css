@@ -635,12 +635,12 @@ tbody tr {
 
 /* Custom selection colors */
 ::selection {
-  background: #059669;
+  background: #79c325;
   color: #fff;
 }
 
 ::-moz-selection {
-  background: #059669;
+  background: #79c325;
   color: #fff;
 }
 
@@ -1341,7 +1341,7 @@ select:disabled,
 
 .dmp-address-icon {
   margin-top: 2px;
-  color: #059669;
+  color: #79c325;
   flex-shrink: 0;
   display: flex;
 }
@@ -1389,7 +1389,7 @@ select:disabled,
   justify-content: center;
   padding: 6px 10px;
   border-radius: 8px;
-  background: #059669;
+  background: #79c325;
   color: #ffffff !important;
   font-size: 11px;
   font-weight: 600;
@@ -1402,7 +1402,7 @@ select:disabled,
 }
 
 .dark .dmp-button {
-  background: #059669;
+  background: #79c325;
   color: #ffffff !important;
 }
 

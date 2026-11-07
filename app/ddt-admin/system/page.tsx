@@ -22,14 +22,12 @@ export default async function AdminSystemPage() {
   return (
     <>
       <AdminHeader pageTitle="Sistema & Manutenção" />
-      <div className="p-6 md:p-8 max-w-[1700px] mx-auto">
-        <SystemMaintenancePage
-          initialState={{
-            maintenance,
-            announcement,
-          }}
-        />
-      </div>
+      <SystemMaintenancePage
+        initialState={{
+          maintenance,
+          announcement,
+        }}
+      />
     </>
   )
 }

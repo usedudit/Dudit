@@ -29,7 +29,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
         shippingCost: 0,
     }), [services])
     const subtotal = pricingResult.subtotal;
-    const tax = 0; 
+    const tax = 0;
     const discount = 0;
     const total = pricingResult.finalTotal;
 
@@ -46,16 +46,16 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
 
     const handleMethodSelect = (method: string) => {
         setIsPaymentMethodModalOpen(false);
-        
+
         if (method === 'Dinheiro') {
             setIsCashInputOpen(true);
         } else if (method === 'Outros') {
             setIsOthersInputOpen(true);
         } else if (method === 'Dividir pagamento') {
             setIsPaymentMethodModalOpen(true);
-            setCurrentEditingPaymentId(null); 
+            setCurrentEditingPaymentId(null);
         } else {
-             addOrUpdatePayment(method, remaining > 0 ? remaining : total);
+            addOrUpdatePayment(method, remaining > 0 ? remaining : total);
         }
     };
 
@@ -64,9 +64,9 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
             setPayments(prev => prev.map(p => p.id === currentEditingPaymentId ? { ...p, method, amount } : p));
         } else {
             if (payments.length === 1 && payments[0].amount === total) {
-                 setPayments([{ id: 1, method, amount }]);
+                setPayments([{ id: 1, method, amount }]);
             } else {
-                 setPayments(prev => [...prev, { id: Date.now(), method, amount }]);
+                setPayments(prev => [...prev, { id: Date.now(), method, amount }]);
             }
         }
         setCurrentEditingPaymentId(null);
@@ -76,7 +76,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
         addOrUpdatePayment('Dinheiro', amount);
         setIsCashInputOpen(false);
     }
-    
+
     const handleOthersConfirm = (amount: number) => {
         addOrUpdatePayment('Outros', amount);
         setIsOthersInputOpen(false);
@@ -119,15 +119,15 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-black/50 transition-opacity"
                 onClick={onClose}
             />
-            
-            <motion.div 
+
+            <motion.div
                 initial={{ x: '120%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '120%' }}
@@ -151,16 +151,16 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                     <Button variant="outline" className="h-8 text-xs font-bold px-3 border-brand-border rounded-full" leftIcon={<Trash2 size={14} />}>Reset</Button>
                                 </div>
                             </div>
-                            
+
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
-                                
+
                                 {/* Service List */}
                                 <div className="space-y-3">
                                     {services.map((service: any, idx: number) => (
-                                        <ServiceItemCard 
+                                        <ServiceItemCard
                                             key={idx}
                                             service={service}
-                                            onRemove={() => {}} // No-op for demo
+                                            onRemove={() => { }} // No-op for demo
                                             showActions={false}
                                             promotions={[]}
                                         />
@@ -170,9 +170,9 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
 
                             {/* Bottom Section */}
                             <div className="p-4 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
-                                 
-                                 {/* Customer Card */}
-                                 <div className="flex items-center justify-between py-2 mb-4">
+
+                                {/* Customer Card */}
+                                <div className="flex items-center justify-between py-2 mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-lg">
                                             {clientName.charAt(0)}
@@ -183,15 +183,15 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                         </div>
                                     </div>
                                     <button className="text-xs font-bold text-brand-dark underline decoration-gray-300">Alterar</button>
-                                 </div>
+                                </div>
 
-                                 <div className="rounded-2xl p-0 border-0 mb-4">
-                                     {/* Promo Code */}
+                                <div className="rounded-2xl p-0 border-0 mb-4">
+                                    {/* Promo Code */}
                                     <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl mb-3">
                                         <div className="flex items-center gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
                                             <TicketIcon /> Promo (10%)
                                         </div>
-                                        <button className="bg-[#059669] hover:bg-[#047857] text-white px-3 py-1 rounded-full text-xs font-bold transition-colors">Change</button>
+                                        <button className="bg-[#79c325] hover:bg-[#047857] text-white px-3 py-1 rounded-full text-xs font-bold transition-colors">Change</button>
                                     </div>
 
                                     {/* Payment Method Row */}
@@ -207,7 +207,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                             Change <ChevronRight size={10} />
                                         </div>
                                     </div>
-                                    
+
                                     {/* Totals */}
                                     <div className="space-y-2 text-sm pt-2">
                                         <div className="flex justify-between text-brand-inactive-text">
@@ -227,11 +227,11 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                                             <span className="text-xl font-bold text-brand-dark">${total}</span>
                                         </div>
                                     </div>
-                                 </div>
+                                </div>
 
-                                <Button 
+                                <Button
                                     onClick={handlePay}
-                                    className="w-full h-[52px] text-base font-bold bg-[#059669] hover:bg-[#047857] rounded-full shadow-lg shadow-green-200 dark:shadow-none"
+                                    className="w-full h-[52px] text-base font-bold bg-[#79c325] hover:bg-[#047857] rounded-full shadow-lg shadow-green-200 dark:shadow-none"
                                 >
                                     {isFullyPaid ? 'Continue' : 'Pagar Parcialmente'}
                                 </Button>
@@ -240,7 +240,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                     )}
 
                     {step === 'processing' && (
-                        <motion.div 
+                        <motion.div
                             key="processing"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -258,15 +258,15 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
                             </div>
                         </motion.div>
                     )}
-                    
+
                     {step === 'receipt' && (
-                        <motion.div 
-                             key="receipt"
-                             initial={{ opacity: 0 }}
-                             animate={{ opacity: 1 }}
-                             exit={{ opacity: 0 }}
-                             transition={{ duration: 0.5 }}
-                             className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-dark-surface h-full relative"
+                        <motion.div
+                            key="receipt"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-dark-surface h-full relative"
                         >
                             {/* Inner Content with slide up */}
                             <motion.div
@@ -285,95 +285,95 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess, par
 
                                 {/* Actual Receipt Details Area - The main view for Receipt */}
                                 <div className="absolute inset-0 bg-white dark:bg-dark-surface z-20 flex flex-col">
-                                     <div className="p-6 h-full overflow-y-auto">
-                                          <div className="flex justify-between items-start mb-6">
-                                              <Badge variant="green" className="bg-[#15803d] text-white border-none text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                                                  <Check size={12} strokeWidth={3} /> Concluído
-                                              </Badge>
-                                              
-                                              <div className="flex gap-3">
-                                                  <Button className="bg-[#111827] text-white hover:bg-black rounded-full h-9 text-xs font-bold px-4" onClick={onClose}>Nova reserva</Button>
-                                                  
-                                                  <Dropdown 
-                                                    width="w-56" 
-                                                    align="right" 
+                                    <div className="p-6 h-full overflow-y-auto">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <Badge variant="green" className="bg-[#15803d] text-white border-none text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                                <Check size={12} strokeWidth={3} /> Concluído
+                                            </Badge>
+
+                                            <div className="flex gap-3">
+                                                <Button className="bg-[#111827] text-white hover:bg-black rounded-full h-9 text-xs font-bold px-4" onClick={onClose}>Nova reserva</Button>
+
+                                                <Dropdown
+                                                    width="w-56"
+                                                    align="right"
                                                     showChevron={false}
                                                     trigger={
                                                         <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50">
                                                             <MoreHorizontal size={18} className="text-brand-dark" />
                                                         </button>
                                                     }
-                                                  >
-                                                      <div className="px-3 py-2 text-xs font-bold text-brand-dark mb-1">Ações rápidas</div>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><RefreshCcw size={14} /> Reembolsar venda</DropdownItem>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><Edit3 size={14} /> Editar detalhes da venda</DropdownItem>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><FileText size={14} /> Adicionar nota</DropdownItem>
-                                                      <div className="h-px bg-gray-100 my-1"></div>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><Mail size={14} /> E-mail</DropdownItem>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><Printer size={14} /> Imprimir</DropdownItem>
-                                                      <DropdownItem className="gap-2 text-brand-dark"><FileText size={14} /> Baixar PDF</DropdownItem>
-                                                      <div className="h-px bg-gray-100 my-1"></div>
-                                                      <DropdownItem className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50">Anular venda</DropdownItem>
-                                                  </Dropdown>
-                                              </div>
-                                          </div>
+                                                >
+                                                    <div className="px-3 py-2 text-xs font-bold text-brand-dark mb-1">Ações rápidas</div>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><RefreshCcw size={14} /> Reembolsar venda</DropdownItem>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><Edit3 size={14} /> Editar detalhes da venda</DropdownItem>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><FileText size={14} /> Adicionar nota</DropdownItem>
+                                                    <div className="h-px bg-gray-100 my-1"></div>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><Mail size={14} /> E-mail</DropdownItem>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><Printer size={14} /> Imprimir</DropdownItem>
+                                                    <DropdownItem className="gap-2 text-brand-dark"><FileText size={14} /> Baixar PDF</DropdownItem>
+                                                    <div className="h-px bg-gray-100 my-1"></div>
+                                                    <DropdownItem className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50">Anular venda</DropdownItem>
+                                                </Dropdown>
+                                            </div>
+                                        </div>
 
-                                          <div className="text-left mb-6">
-                                              <h1 className="text-3xl font-bold text-brand-dark dark:text-dark-heading mb-1">Venda</h1>
-                                              <div className="text-sm text-brand-inactive-text">dom 11 jan 2026 • Ecolibrium</div>
-                                          </div>
+                                        <div className="text-left mb-6">
+                                            <h1 className="text-3xl font-bold text-brand-dark dark:text-dark-heading mb-1">Venda</h1>
+                                            <div className="text-sm text-brand-inactive-text">dom 11 jan 2026 • Ecolibrium</div>
+                                        </div>
 
-                                          {/* Customer Card */}
-                                          <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between mb-6 bg-white dark:bg-dark-surface shadow-sm">
-                                              <span className="font-bold text-brand-dark dark:text-dark-heading">{clientName}</span>
-                                              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                                                  <User size={20} className="stroke-current" />
-                                              </div>
-                                          </div>
+                                        {/* Customer Card */}
+                                        <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 flex items-center justify-between mb-6 bg-white dark:bg-dark-surface shadow-sm">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{clientName}</span>
+                                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                                <User size={20} className="stroke-current" />
+                                            </div>
+                                        </div>
 
-                                          {/* Sale Details */}
-                                          <div className="border border-brand-border dark:border-dark-border rounded-xl p-6 bg-white dark:bg-dark-surface shadow-sm text-left">
-                                              <div className="mb-4">
-                                                  <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Venda #14</h3>
-                                                  <div className="text-sm text-brand-inactive-text">dom 11 jan 2026</div>
-                                              </div>
+                                        {/* Sale Details */}
+                                        <div className="border border-brand-border dark:border-dark-border rounded-xl p-6 bg-white dark:bg-dark-surface shadow-sm text-left">
+                                            <div className="mb-4">
+                                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Venda #14</h3>
+                                                <div className="text-sm text-brand-inactive-text">dom 11 jan 2026</div>
+                                            </div>
 
-                                              <div className="space-y-4 mb-4">
-                                                  {services.map((s: any, i: number) => (
-                                                      <div key={i} className="flex justify-between items-start">
-                                                          <div>
-                                                              <div className="font-medium text-brand-dark dark:text-dark-heading">{s.name}</div>
-                                                              <div className="text-xs text-brand-inactive-text">{s.startTime ? `${s.startTime} • ` : ''}{s.duration}min • {s.staff}</div>
-                                                          </div>
-                                                          <div className="font-medium text-brand-dark dark:text-dark-heading">R$ {s.price}</div>
-                                                      </div>
-                                                  ))}
-                                              </div>
+                                            <div className="space-y-4 mb-4">
+                                                {services.map((s: any, i: number) => (
+                                                    <div key={i} className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="font-medium text-brand-dark dark:text-dark-heading">{s.name}</div>
+                                                            <div className="text-xs text-brand-inactive-text">{s.startTime ? `${s.startTime} • ` : ''}{s.duration}min • {s.staff}</div>
+                                                        </div>
+                                                        <div className="font-medium text-brand-dark dark:text-dark-heading">R$ {s.price}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
 
-                                              <div className="border-t border-brand-border dark:border-dark-border my-4"></div>
+                                            <div className="border-t border-brand-border dark:border-dark-border my-4"></div>
 
-                                              <div className="space-y-2 mb-4">
-                                                  <div className="flex justify-between text-brand-inactive-text text-sm">
-                                                      <span>Subtotal</span>
-                                                      <span>R$ {subtotal}</span>
-                                                  </div>
-                                                  <div className="flex justify-between font-bold text-brand-dark dark:text-dark-heading text-base">
-                                                      <span>Total</span>
-                                                      <span>R$ {total}</span>
-                                                  </div>
-                                              </div>
+                                            <div className="space-y-2 mb-4">
+                                                <div className="flex justify-between text-brand-inactive-text text-sm">
+                                                    <span>Subtotal</span>
+                                                    <span>R$ {subtotal}</span>
+                                                </div>
+                                                <div className="flex justify-between font-bold text-brand-dark dark:text-dark-heading text-base">
+                                                    <span>Total</span>
+                                                    <span>R$ {total}</span>
+                                                </div>
+                                            </div>
 
-                                              <div className="border-t border-brand-border dark:border-dark-border my-4"></div>
+                                            <div className="border-t border-brand-border dark:border-dark-border my-4"></div>
 
-                                              <div className="flex justify-between items-start">
-                                                  <div>
-                                                      <div className="font-medium text-brand-dark dark:text-dark-heading">Pago com {payments[0].method}</div>
-                                                      <div className="text-xs text-brand-inactive-text">dom 11 jan 2026 às 16:03</div>
-                                                  </div>
-                                                  <div className="font-medium text-brand-dark dark:text-dark-heading">R$ {total}</div>
-                                              </div>
-                                          </div>
-                                     </div>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-medium text-brand-dark dark:text-dark-heading">Pago com {payments[0].method}</div>
+                                                    <div className="text-xs text-brand-inactive-text">dom 11 jan 2026 às 16:03</div>
+                                                </div>
+                                                <div className="font-medium text-brand-dark dark:text-dark-heading">R$ {total}</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </motion.div>
                         </motion.div>
