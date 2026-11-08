@@ -18,7 +18,8 @@ import { useEntityState } from "@/hooks/use-entity-state"
 import AdminOrderDetailClientWrapper from "./AdminOrderDetailClientWrapper"
 import { AdminOrderDetailView } from "./AdminOrderDetailView"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
-import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
+import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { getOrderDeliveryBadgeMeta } from "@/lib/orders/delivery-badge"
 
 type SortKey = "order_number" | "customer" | "channel" | "date" | "total" | "status" | "seller"
 type SortDirection = "asc" | "desc"
@@ -342,7 +343,7 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
     // Grid card component (matching ERP OrderGridCard exactly, plus seller column)
     const renderGridCard = (order: any) => {
         const paymentMeta = getPaymentStatusMeta(order.situation)
-        const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
+        const deliveryBadge = getOrderDeliveryBadgeMeta(order)
         const returns = Array.isArray(order.return_requests) ? order.return_requests : []
         const hasRefund = Boolean(
             order.is_refunded ||
@@ -392,13 +393,15 @@ export default function OrdersList({ initialData, initialStats }: OrdersListProp
                                     ) : (
                                         <Badge variant={paymentMeta.variant} icon={<MoneyIcon />} className="whitespace-nowrap" />
                                     )}
-                                    {!order.hasOnlyServices && order.situation !== "cancelled" && (
-                                        <Badge variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "orange" : "gray"} icon={
-                                            order.delivery_type === "pickup"
-                                                ? <StoreIcon />
-                                                : <TruckIcon />
+                                    {deliveryBadge.show && (
+                                        <Badge variant={deliveryBadge.variant} icon={
+                                            deliveryBadge.isCarrierDelivery && deliveryBadge.carrierBrandIcon
+                                                ? <img src={deliveryBadge.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                                : deliveryBadge.isPickup
+                                                    ? <StoreIcon />
+                                                    : <TruckIcon />
                                         } className="whitespace-nowrap">
-                                            {deliveryMeta}
+                                            {deliveryBadge.label}
                                         </Badge>
                                     )}
                                 </div>

@@ -144,3 +144,110 @@ export async function adminListBillingSubscriptionsAction(params?: {
         return { success: false, error: error?.message || "Erro ao listar assinaturas." }
     }
 }
+
+export interface AdminGrantPartnerPlanInput {
+    partnerId: string
+    planSlug: "free" | "crescer" | "escalar" | string
+    durationMonths?: number
+    isLifetime?: boolean
+    notes?: string
+}
+
+/**
+ * Concede um plano manualmente a um parceiro com período específico ou vitalício.
+ * Define payment_provider = 'manual' e mercado_pago_subscription_id = null
+ * para que o cron do Mercado Pago nunca verifique nem cancele o plano.
+ */
+export async function adminGrantPartnerPlanAction(
+    input: AdminGrantPartnerPlanInput
+): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
+    try {
+        const admin = await requireAdminScope("billing_control", "admin")
+        const supabase = getAdminClient()
+
+        if (!input.partnerId) {
+            return { success: false, error: "partnerId é obrigatório" }
+        }
+
+        const normalizedSlug = input.planSlug.trim().toLowerCase()
+        const { data: plan, error: planError } = await supabase
+            .from("plans")
+            .select("*")
+            .eq("slug", normalizedSlug)
+            .single()
+
+        if (planError || !plan) {
+            return { success: false, error: `Plano '${input.planSlug}' não encontrado.` }
+        }
+
+        const now = new Date()
+        let periodEnd: Date
+        if (input.isLifetime) {
+            periodEnd = new Date("2099-12-31T23:59:59.000Z")
+        } else {
+            const months = input.durationMonths && input.durationMonths > 0 ? input.durationMonths : 1
+            periodEnd = new Date(now)
+            periodEnd.setMonth(periodEnd.getMonth() + months)
+        }
+
+        // Cancela assinaturas ativas/pendentes/past_due anteriores para evitar conflito com idx_subscriptions_active_partner
+        const { data: existingSubs } = await supabase
+            .from("subscriptions")
+            .select("id, mercado_pago_subscription_id")
+            .eq("partner_id", input.partnerId)
+            .in("status", ["active", "trialing", "past_due", "pending"])
+
+        if (existingSubs && existingSubs.length > 0) {
+            const { cancelMpPreapproval } = await import("@/lib/services/mercadopago/subscriptions")
+            for (const sub of existingSubs) {
+                if (sub.mercado_pago_subscription_id) {
+                    try {
+                        await cancelMpPreapproval(sub.mercado_pago_subscription_id)
+                    } catch {}
+                }
+                await supabase
+                    .from("subscriptions")
+                    .update({
+                        status: "cancelled",
+                        cancelled_at: now.toISOString(),
+                        ended_at: now.toISOString(),
+                        updated_at: now.toISOString(),
+                    })
+                    .eq("id", sub.id)
+            }
+        }
+
+        // Insere a nova assinatura manual.
+        // mercado_pago_subscription_id = NULL garante que o cron do MP nunca vai mexer nem cancelar!
+        const { data: newSub, error: insertError } = await supabase
+            .from("subscriptions")
+            .insert({
+                partner_id: input.partnerId,
+                plan_id: plan.id,
+                plan_snapshot: plan,
+                mercado_pago_subscription_id: null,
+                status: "active",
+                payment_provider: "manual",
+                current_period_start: now.toISOString(),
+                current_period_end: periodEnd.toISOString(),
+                cancel_at_period_end: false,
+                past_due_at: null,
+                pending_plan_id: null,
+            })
+            .select("id")
+            .single()
+
+        if (insertError || !newSub) {
+            return { success: false, error: insertError?.message || "Erro ao criar assinatura manual" }
+        }
+
+        // Invalida o cache do plano para surtir efeito imediato no ERP
+        const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
+        invalidatePartnerPlanCache(input.partnerId)
+
+        return { success: true, subscriptionId: newSub.id }
+    } catch (err: any) {
+        console.error("[adminGrantPartnerPlanAction] Error:", err)
+        return { success: false, error: err?.message || "Erro interno" }
+    }
+}

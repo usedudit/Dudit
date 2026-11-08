@@ -44,13 +44,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params }: Props) {
     const { cidadeUf } = await params
 
-    // Evitar que rotas institucionais e de ajuda sejam capturadas pela rota dinâmica de cidade
-    if (cidadeUf === "ajuda" || cidadeUf === "institucional") {
+    // Evitar que rotas institucionais, de ajuda ou do sistema sejam capturadas pela rota dinâmica de cidade
+    if (cidadeUf === "ajuda" || cidadeUf === "institucional" || cidadeUf === "banned") {
         redirect(`/${cidadeUf}`)
     }
 
     if (!isValidCitySlug(cidadeUf)) {
-        if (cidadeUf.includes(".") || cidadeUf.length < 3) {
+        if (cidadeUf.includes(".") || cidadeUf.length < 3 || cidadeUf === "banned") {
             notFound()
         }
 

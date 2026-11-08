@@ -1,5 +1,4 @@
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { checkAndClearExpiredBan } from "@/lib/auth/ban-check"
+import { getBannedUserProfile } from "@/lib/auth/ban-check"
 import { redirect } from "next/navigation"
 import BannedView from "@/components/admin/BannedView"
 import { getCurrentUser } from "@/lib/auth/authorization"
@@ -11,18 +10,10 @@ export default async function BannedPage() {
         redirect("/auth/login")
     }
 
-    const supabase = await getSupabaseServerClient()
-
-    const isBanned = await checkAndClearExpiredBan(user.id)
-    if (!isBanned) {
+    const bannedProfile = await getBannedUserProfile(user.id)
+    if (!bannedProfile) {
         redirect("/")
     }
 
-    const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("banned_at, banned_until, banned_reason, banned_case_id, full_name")
-        .eq("user_id", user.id)
-        .single()
-
-    return <BannedView profile={profile} user={user} />
+    return <BannedView profile={bannedProfile} user={user} />
 }

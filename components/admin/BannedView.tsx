@@ -1,12 +1,10 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
 import { motion } from "framer-motion"
 import { AlertCircleIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import { InfoCard } from "@/components/reusable"
-import MarketplaceFooter from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { EnforcementAppealModal } from "@/components/erp/EnforcementAppealModal"
 
@@ -25,16 +23,16 @@ WavesBackground.displayName = "WavesBackground"
 // ─── Shell compartilhado ─────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
     return (
-        <div className="min-h-screen flex flex-col font-sans bg-brand-gray">
+        <div className="min-h-screen flex flex-col font-sans bg-brand-gray dark:bg-dark-bg text-brand-dark dark:text-white">
             {/* HEADER */}
-            <header className="w-full bg-white border-b border-brand-border sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
+            <header className="w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-white/10 sticky top-0 z-50 h-[70px] flex items-center shadow-sm">
                 <div className="container mx-auto px-4 max-w-[1300px] flex justify-between items-center h-full">
-                    <Link href="/" prefetch={false} className="shrink-0 cursor-pointer">
+                    <div className="shrink-0 flex items-center">
                         <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={110} height={32} className="h-8 w-auto" />
-                    </Link>
-                    <nav>
-                        <Button asChild className="h-10 px-6 text-sm font-medium"><Link href="https://dudit.com.br/auth/login?mode=partner">Anuncie grátis</Link></Button>
-                    </nav>
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        Acesso Suspenso
+                    </span>
                 </div>
             </header>
 
@@ -44,18 +42,24 @@ function Shell({ children }: { children: React.ReactNode }) {
                     <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>
 
-                <div className="w-full flex flex-col items-center pt-[60px] pb-12 z-10 px-4">
+                <div className="w-full flex flex-col items-center pt-[50px] pb-12 z-10 px-4">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
+                        className="bg-white dark:bg-dark-surface rounded-2xl shadow-xl w-full max-w-[540px] p-8 md:p-10 flex flex-col items-center text-center space-y-6 border border-brand-border/60 dark:border-white/10"
                     >
                         {children}
                     </motion.div>
                 </div>
             </main>
 
-            <MarketplaceFooter />
+            <footer className="w-full h-[68px] py-6 border-t border-brand-border dark:border-white/10 bg-white dark:bg-dark-surface mt-auto">
+                <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
+                    <p className="text-brand-inactive-text dark:text-white/60 text-xs sm:text-sm font-medium tracking-tight">
+                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                    </p>
+                </div>
+            </footer>
         </div>
     )
 }
@@ -101,32 +105,22 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
         setTimeout(() => setCopiedAll(false), 2500)
     }
 
-    const handleSignOut = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleSignOut = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault()
         try {
-            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;"
+            document.cookie = "active_partner_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;"
+            document.cookie = "active_store_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0;"
             localStorage.removeItem("dudit_city")
+            localStorage.removeItem("active_partner_id")
+            localStorage.removeItem("active_store_id")
             await supabase.auth.signOut({ scope: "local" })
             window.location.href = "/auth/login"
         } catch (error) {
             console.error("Erro ao sair da conta:", error)
+            window.location.href = "/auth/login"
         }
     }
-
-    // Monta o e-mail pré-formatado para contestação
-    const mailSubject = encodeURIComponent(`[Recurso Dudit] Solicitação de Revisão - Protocolo #${caseId}`)
-    const mailBody = encodeURIComponent(
-        `Olá equipe de suporte da Dudit,\n\n` +
-        `Gostaria de solicitar a revisão e recurso do bloqueio da minha conta sob o protocolo #${caseId}.\n\n` +
-        `--- Informações do Caso ---\n` +
-        `• Protocolo do Caso: ${caseId}\n` +
-        `• ID do Usuário: ${profile?.user_id || user?.id || "N/A"}\n` +
-        `• E-mail cadastrado: ${user?.email || "N/A"}\n` +
-        `• Motivo registrado: ${reasonText}\n\n` +
-        `--- Justificativa do Recurso ---\n` +
-        `[Por favor, descreva aqui seus argumentos ou esclarecimentos sobre o ocorrido]:\n\n`
-    )
-    const appealMailUrl = `mailto:contato@dudit.com.br?subject=${mailSubject}&body=${mailBody}`
 
     return (
         <Shell>
@@ -135,16 +129,16 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             </div>
 
             <div>
-                <h2 className="text-2xl font-bold text-brand-dark mb-2">Conta Suspensa</h2>
-                <p className="text-brand-inactive-text text-sm">
+                <h2 className="text-2xl font-bold text-brand-dark dark:text-white mb-2">Conta Suspensa</h2>
+                <p className="text-brand-inactive-text dark:text-white/60 text-sm">
                     O acesso a esta conta foi restrito por inconformidade com os Termos de Serviço da Dudit.
                 </p>
             </div>
 
             {/* Protocolo / Case ID Card */}
-            <div className="w-full bg-brand-gray/80 rounded-2xl p-4 border border-brand-border text-left space-y-3">
+            <div className="w-full bg-brand-gray/80 dark:bg-white/5 rounded-2xl p-4 border border-brand-border dark:border-white/10 text-left space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                    <span className="text-xs font-bold text-brand-inactive-text dark:text-white/50 uppercase tracking-wider">
                         Protocolo do Caso
                     </span>
                     <button
@@ -154,11 +148,11 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                         {copied ? "✓ Copiado!" : "Copiar Protocolo"}
                     </button>
                 </div>
-                <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-brand-border">
-                    <code className="font-mono text-sm font-bold text-brand-dark tracking-wide">
+                <div className="flex items-center justify-between bg-white dark:bg-dark-surface px-3.5 py-2.5 rounded-xl border border-brand-border dark:border-white/10">
+                    <code className="font-mono text-sm font-bold text-brand-dark dark:text-white tracking-wide">
                         {caseId}
                     </code>
-                    <span className="text-[11px] font-semibold text-brand-inactive-text">
+                    <span className="text-[11px] font-semibold text-brand-inactive-text dark:text-white/50">
                         {isPermanent ? "Permanente" : `Até ${unbanDate}`}
                     </span>
                 </div>
@@ -211,7 +205,7 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             </div>
 
             <form onSubmit={handleSignOut} className="w-full flex justify-center pt-2">
-                <button type="submit" className="text-sm text-brand-inactive-text hover:text-brand-red font-medium transition-colors">
+                <button type="submit" className="text-sm text-brand-inactive-text dark:text-white/60 hover:text-brand-red font-medium transition-colors cursor-pointer">
                     ← Sair da conta
                 </button>
             </form>

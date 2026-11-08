@@ -270,46 +270,9 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     // No-op, detail view has its own print button
   }, []);
 
-  // If viewing detail (read-only)
-  if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
-    const currentReq = requests.find(r => r.id === entityState.entityId);
-    const partnerId = currentReq?.partnerId || "";
-
-    return (
-      <PermissionProvider
-        role="OWNER"
-        routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
-        partnerId={partnerId}
-        businessInfo={{}}
-        planSlug="escalar"
-      >
-        <StoreProvider
-          partnerId={partnerId}
-        >
-          <ReturnDetailView
-            orderId={entityState.entityId}
-            onBack={closeEntity}
-            onEdit={handleEdit}
-            onPrint={handlePrint}
-            initialRequest={currentReq}
-            adminContext={true}
-          />
-        </StoreProvider>
-      </PermissionProvider>
-    );
-  }
-
-  // If editing - use admin edit form
-  if (entityState.isOpen && entityState.action === "edit" && entityState.entityId) {
-    return (
-      <AdminReturnDetailClientWrapper
-        returnId={entityState.entityId}
-        onBack={closeEntity}
-      />
-    );
-  }
-
   // KPI Items for HorizontalKPICard
+  // IMPORTANTE: precisa ficar antes dos returns condicionais abaixo.
+  // Hooks não podem ser chamados condicionalmente (React error #300).
   const kpiItems = useMemo(() => {
     if (!stats) return [];
     return [
@@ -351,6 +314,45 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
       },
     ];
   }, [stats]);
+
+  // If viewing detail (read-only)
+  if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+    const currentReq = requests.find(r => r.id === entityState.entityId);
+    const partnerId = currentReq?.partnerId || "";
+
+    return (
+      <PermissionProvider
+        role="OWNER"
+        routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+        partnerId={partnerId}
+        businessInfo={{}}
+        planSlug="escalar"
+      >
+        <StoreProvider
+          partnerId={partnerId}
+        >
+          <ReturnDetailView
+            orderId={entityState.entityId}
+            onBack={closeEntity}
+            onEdit={handleEdit}
+            onPrint={handlePrint}
+            initialRequest={currentReq}
+            adminContext={true}
+          />
+        </StoreProvider>
+      </PermissionProvider>
+    );
+  }
+
+  // If editing - use admin edit form
+  if (entityState.isOpen && entityState.action === "edit" && entityState.entityId) {
+    return (
+      <AdminReturnDetailClientWrapper
+        returnId={entityState.entityId}
+        onBack={closeEntity}
+      />
+    );
+  }
 
   return (
     <>

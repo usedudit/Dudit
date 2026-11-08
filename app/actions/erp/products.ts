@@ -26,7 +26,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
-import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
+import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter, adjustItemUsageCounter } from "@/lib/services/subscription.service"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
@@ -268,7 +268,7 @@ export async function deleteProductAction(productId: string, reason?: string | n
     const actionStart = performance.now()
     await requireRateLimit(RateLimitCategory.PRODUCT_DELETE)
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "delete", "id, partner_id, sku, name")
+        const product = await fetchProductAndVerifyOwnership(productId, "delete", "id, partner_id, sku, name, status, deleted_at")
 
         const user = await requireUser()
         const admin = getAdminClient()
@@ -277,6 +277,10 @@ export async function deleteProductAction(productId: string, reason?: string | n
         const payload = buildSoftDeletePayload(user.id, reason)
         const deleteResult = await admin.from("products").update(payload).eq("id", productId)
         if (deleteResult.error) return { error: deleteResult.error.message }
+
+        if (product.status !== "deleted" && !product.deleted_at && product.status !== "arquivado") {
+            await adjustItemUsageCounter(product.partner_id, "products_count", -1)
+        }
 
         // 2. Fetch IP and write to audit logs (logAuditEvent)
         const reqHeaders = await headers()
@@ -309,14 +313,26 @@ export async function deleteProductAction(productId: string, reason?: string | n
 
 export async function restoreProductAction(productId: string) {
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name, status, deleted_at")
         const user = await requireUser()
         const admin = getAdminClient()
+
+        const wasCounted = Boolean(product.deleted_at) || product.status === "deleted" || product.status === "arquivado"
+        if (wasCounted) {
+            const limitCheck = await checkLimit(product.partner_id, "items")
+            if (!limitCheck.allowed) {
+                return { error: limitCheck.message || "Limite de produtos do seu plano atingido. Faça upgrade para restaurar este item." }
+            }
+        }
 
         // 1. Explicit restore update
         const payload = buildRestorePayload("ativo")
         const restoreResult = await admin.from("products").update(payload).eq("id", productId)
         if (restoreResult.error) return { error: restoreResult.error.message }
+
+        if (wasCounted) {
+            await adjustItemUsageCounter(product.partner_id, "products_count", 1)
+        }
 
         // 2. Fetch IP and write to audit logs
         const reqHeaders = await headers()
@@ -348,13 +364,17 @@ export async function restoreProductAction(productId: string) {
 
 export async function archiveProductAction(productId: string) {
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name, status, deleted_at")
         const user = await requireUser()
         const admin = getAdminClient()
 
         const payload = buildArchivePayload("arquivado")
         const { error } = await admin.from("products").update(payload).eq("id", productId)
         if (error) return { error: error.message }
+
+        if (product.status !== "arquivado" && product.status !== "deleted" && !product.deleted_at) {
+            await adjustItemUsageCounter(product.partner_id, "products_count", -1)
+        }
 
         const reqHeaders = await headers()
         const ip = getTrustedClientIP(reqHeaders)
@@ -379,18 +399,25 @@ export async function archiveProductAction(productId: string) {
 
 export async function unarchiveProductAction(productId: string) {
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name")
+        const product = await fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, sku, name, status, deleted_at")
         const user = await requireUser()
         const admin = getAdminClient()
 
-        const limitCheck = await checkLimit(product.partner_id, "items")
-        if (!limitCheck.allowed) {
-            return { error: limitCheck.message || "Limite de produtos do seu plano atingido. Faça upgrade para reativar este item." }
+        const wasArchived = product.status === "arquivado" || product.status === "archived"
+        if (wasArchived) {
+            const limitCheck = await checkLimit(product.partner_id, "items")
+            if (!limitCheck.allowed) {
+                return { error: limitCheck.message || "Limite de produtos do seu plano atingido. Faça upgrade para reativar este item." }
+            }
         }
 
         const payload = buildRestorePayload("ativo")
         const { error } = await admin.from("products").update(payload).eq("id", productId)
         if (error) return { error: error.message }
+
+        if (wasArchived) {
+            await adjustItemUsageCounter(product.partner_id, "products_count", 1)
+        }
 
         const reqHeaders = await headers()
         const ip = getTrustedClientIP(reqHeaders)
@@ -2722,12 +2749,19 @@ export async function deleteProductsInBatchAction(productIds: string[], reason?:
         const admin = getAdminClient()
 
         // Fetch products details first for audit logging
-        const { data: products } = await admin.from("products").select("id, name, sku").in("id", sanitized)
+        const { data: products } = await admin.from("products").select("id, name, sku, status, deleted_at").in("id", sanitized)
 
         // 1. Explicit batch update (soft delete)
         const payload = buildSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("products").update(payload).in("id", sanitized).eq("partner_id", partnerId)
         if (error) return { error: error.message }
+
+        const countableProducts = (products || []).filter(
+            (p: any) => p.status !== "deleted" && p.status !== "arquivado" && !p.deleted_at,
+        ).length
+        if (countableProducts > 0) {
+            await adjustItemUsageCounter(partnerId, "products_count", -countableProducts)
+        }
 
         // 2. Log audit event for each product in batch
         const reqHeaders = await headers()

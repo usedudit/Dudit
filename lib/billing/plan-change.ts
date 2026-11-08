@@ -257,6 +257,7 @@ async function endSubscriptionAtPeriodEnd(
       status: "cancelled",
       previousStatus: "active",
       cancellationReason: "user",
+      skipArchiving: true,
     })
   } catch (syncErr: any) {
     console.error("[PlanChange] Billing sync after cancellation failed:", syncErr?.message)

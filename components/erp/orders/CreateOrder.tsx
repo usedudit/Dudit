@@ -10,6 +10,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pdv"
@@ -249,6 +250,7 @@ export default function CreateOrder({
     const { planSlug, role, hasSpecific, canRbac } = usePermissions()
     const canDiscount = hasSpecific("orders", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
+    const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
     const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
     const { selectedStore } = useStore()
@@ -846,6 +848,10 @@ export default function CreateOrder({
     }, [isDiscountModalOpen, discountValue, discountType, couponCode])
 
     const handleOpenShippingSheet = useCallback(async () => {
+        if (isFreePlan) {
+            openPlanUpgrade("escalar")
+            return
+        }
         if (selectedCustomer?.id) {
             const addr = selectedCustomer.addresses?.[0]
             setShippingCustomerDetails({
@@ -871,7 +877,7 @@ export default function CreateOrder({
         }
         setCustomerSelectIntent("shipping-preflight")
         setIsCustomerSheetOpen(true)
-    }, [selectedCustomer, partnerId])
+    }, [selectedCustomer, partnerId, isFreePlan, openPlanUpgrade])
 
     useEffect(() => {
         let active = true
@@ -1923,6 +1929,10 @@ export default function CreateOrder({
     }, [teamMembers, sellerPartnerUserId])
 
     const handleDeliveryMethodChange = useCallback((method: 'delivery' | 'pickup') => {
+        if (isFreePlan && method === "delivery") {
+            openPlanUpgrade("escalar")
+            return
+        }
         setDeliveryMethod(method)
         if (method === "pickup") {
             setShippingFee("0")
@@ -1944,7 +1954,7 @@ export default function CreateOrder({
                 return isValid ? prev : "not_sent"
             }
         })
-    }, [isCarrierDelivery, existingCarrierShipment?.status])
+    }, [isCarrierDelivery, existingCarrierShipment?.status, isFreePlan, openPlanUpgrade])
 
     useEffect(() => {
         if (deliveryMethod === "delivery") {
@@ -2562,7 +2572,13 @@ export default function CreateOrder({
                                             isCarrierDelivery={isCarrierDelivery}
                                             deliveryBreakdown={deliveryBreakdown}
                                             existingCarrierShipment={existingCarrierShipment}
-                                            onOpenCarrierShippingSheet={() => setIsShippingSheetOpen(true)}
+                                            onOpenCarrierShippingSheet={() => {
+                                                if (isFreePlan) {
+                                                    openPlanUpgrade("escalar")
+                                                    return
+                                                }
+                                                setIsShippingSheetOpen(true)
+                                            }}
                                             role={role}
                                             adminContext={adminContext}
                                         />
@@ -2637,6 +2653,10 @@ export default function CreateOrder({
                         const isPreflight = customerSelectIntent === "shipping-preflight"
                         if (isPreflight) {
                             setCustomerSelectIntent("default")
+                            if (isFreePlan) {
+                                openPlanUpgrade("escalar")
+                                return
+                            }
                             const addr = normalized?.addresses?.[0]
                             setShippingCustomerDetails({
                                 id: customer.id,
@@ -2888,6 +2908,11 @@ export default function CreateOrder({
                                 isLoading={isApplyingCoupon}
                                 onClick={async () => {
                                     if (globalDiscountType === "coupon") {
+                                        if (isFreePlan) {
+                                            setIsDiscountModalOpen(false)
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
                                         setIsDiscountModalOpen(false)
                                         setIsCouponSheetOpen(true)
                                         return
@@ -2944,7 +2969,14 @@ export default function CreateOrder({
                                 }
                             />
                             <ListItem
-                                onClick={() => setGlobalDiscountType("coupon")}
+                                onClick={() => {
+                                    if (isFreePlan) {
+                                        setIsDiscountModalOpen(false)
+                                        openPlanUpgrade("crescer")
+                                        return
+                                    }
+                                    setGlobalDiscountType("coupon")
+                                }}
                                 icon={FileIcon}
                                 title="Cupom"
                                 description="Utiliza um cupom de desconto pré-cadastrado"
@@ -2954,7 +2986,14 @@ export default function CreateOrder({
                                         name="globalDiscountType"
                                         value="coupon"
                                         checked={globalDiscountType === "coupon"}
-                                        onChange={() => setGlobalDiscountType("coupon")}
+                                        onChange={() => {
+                                            if (isFreePlan) {
+                                                setIsDiscountModalOpen(false)
+                                                openPlanUpgrade("crescer")
+                                                return
+                                            }
+                                            setGlobalDiscountType("coupon")
+                                        }}
                                     />
                                 }
                             />
@@ -2994,6 +3033,10 @@ export default function CreateOrder({
                                     className="w-full"
                                     onClick={() => {
                                         setIsDiscountModalOpen(false)
+                                        if (isFreePlan) {
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
                                         setIsCouponSheetOpen(true)
                                     }}
                                 >
@@ -3085,6 +3128,11 @@ export default function CreateOrder({
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
                     onApply={({ shippingFee: fee, isCustom, breakdown, deliveryAddress: addr, deliveryStatus: nextDeliveryStatus }: any) => {
+                        if (isFreePlan) {
+                            setIsShippingSheetOpen(false)
+                            openPlanUpgrade("escalar")
+                            return
+                        }
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
                         setIsCustomShipping(!!isCustom)
                         setDeliveryBreakdown(breakdown || null)

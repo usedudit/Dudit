@@ -1064,6 +1064,11 @@ export async function banUser(
         metadata: { case_id: caseId, reason: reason.trim(), targetName: user.full_name, durationDays: durationDays || "permanent", bannedUntil, riskScore },
     })
 
+    try {
+        const { safeRevalidateTag } = await import("@/lib/utils/revalidation")
+        await safeRevalidateTag(`user-ban-${targetUserId}`)
+    } catch {}
+
     // If user has partner, deactivate their products + increment risk_score
     const { data: partner } = await supabase
         .from("partners")
@@ -1093,7 +1098,7 @@ export async function banUser(
                     reason: reason.trim(),
                     audience: "customer",
                     scope: "platform",
-                    url: "/banned",
+                    url: "/",
                 },
                 idempotencyKey: `user_banned:${targetUserId}:${caseId}:${Date.now()}`,
                 origin: "system",
@@ -1172,6 +1177,7 @@ export async function unbanUser(
         const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
         const { revalidatePath } = await import("next/cache")
         await revalidateUserAccess(targetUserId)
+        await safeRevalidateTag(`user-ban-${targetUserId}`)
         revalidatePath("/select-erp")
         revalidatePath("/erp", "layout")
     } catch (e) {

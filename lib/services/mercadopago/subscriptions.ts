@@ -522,6 +522,7 @@ export async function cancelMpSubscription(
       status: "cancelled",
       previousStatus: sub.status,
       cancellationReason: "user",
+      skipArchiving: true,
     })
   } catch (syncErr: any) {
     SecureLogger.error("Failed to sync billing on cancellation", { error: syncErr.message, subscriptionId: sub.id })

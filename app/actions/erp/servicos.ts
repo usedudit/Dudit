@@ -23,7 +23,7 @@ import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
-import { checkLimit } from "@/lib/services/subscription.service"
+import { checkLimit, adjustItemUsageCounter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import {
     evaluatePricing,
@@ -515,7 +515,7 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name, status, deleted_at").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "delete", user)
@@ -524,6 +524,10 @@ export async function deleteServiceAction(serviceId: string, reason?: string | n
         const payload = buildSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        if (existing.status !== "deleted" && existing.status !== "arquivado" && !existing.deleted_at) {
+            await adjustItemUsageCounter(existing.partner_id, "services_count", -1)
+        }
 
         await invalidateServiceCache(serviceId, existing.partner_id, 'delete')
 
@@ -562,14 +566,26 @@ export async function restoreServiceAction(serviceId: string): Promise<ActionRes
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name, status, deleted_at").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "edit", user)
 
+        const wasCounted = Boolean(existing.deleted_at) || existing.status === "deleted" || existing.status === "arquivado"
+        if (wasCounted) {
+            const limitCheck = await checkLimit(existing.partner_id, "services")
+            if (!limitCheck.allowed) {
+                return errorResponse(limitCheck.message || "Limite de serviços do seu plano atingido. Faça upgrade para restaurar este item.")
+            }
+        }
+
         const payload = buildRestorePayload("ativo")
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        if (wasCounted) {
+            await adjustItemUsageCounter(existing.partner_id, "services_count", 1)
+        }
 
         await invalidateServiceCache(serviceId, existing.partner_id, 'update')
 
@@ -606,7 +622,7 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name, status, deleted_at").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "edit", user)
@@ -614,6 +630,10 @@ export async function archiveServiceAction(serviceId: string): Promise<ActionRes
         const payload = buildArchivePayload("arquivado")
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        if (existing.status !== "arquivado" && existing.status !== "deleted" && !existing.deleted_at) {
+            await adjustItemUsageCounter(existing.partner_id, "services_count", -1)
+        }
 
         await invalidateServiceCache(serviceId, existing.partner_id, 'delete')
         await revalidateServices(existing.partner_id, serviceId)
@@ -631,19 +651,26 @@ export async function unarchiveServiceAction(serviceId: string): Promise<ActionR
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, sku, name, status, deleted_at").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePermission(existing.partner_id, "services", "edit", user)
 
-        const limitCheck = await checkLimit(existing.partner_id, "services")
-        if (!limitCheck.allowed) {
-            return errorResponse(limitCheck.message || "Limite de serviços do seu plano atingido. Faça upgrade para reativar este item.")
+        const wasArchived = existing.status === "arquivado" || existing.status === "archived"
+        if (wasArchived) {
+            const limitCheck = await checkLimit(existing.partner_id, "services")
+            if (!limitCheck.allowed) {
+                return errorResponse(limitCheck.message || "Limite de serviços do seu plano atingido. Faça upgrade para reativar este item.")
+            }
         }
 
         const payload = buildRestorePayload("ativo")
         const { error } = await admin.from("services").update(payload).eq("id", serviceId)
         if (error) return errorResponse(error.message)
+
+        if (wasArchived) {
+            await adjustItemUsageCounter(existing.partner_id, "services_count", 1)
+        }
 
         const reqHeaders = await headers()
         const ip = getTrustedClientIP(reqHeaders)
@@ -676,7 +703,7 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
         if (!serviceIds || serviceIds.length === 0) return errorResponse("Nenhum serviço selecionado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("id, partner_id, name, sku").in("id", serviceIds)
+        const { data: existing, error: fetchError } = await admin.from("services").select("id, partner_id, name, sku, status, deleted_at").in("id", serviceIds)
         if (fetchError || !existing || existing.length === 0) return errorResponse("Serviços não encontrados")
 
         const partnerId = existing[0].partner_id
@@ -688,6 +715,13 @@ export async function deleteServicesInBatchAction(serviceIds: string[], reason?:
         const payload = buildSoftDeletePayload(user.id, reason)
         const { error } = await admin.from("services").update(payload).in("id", serviceIds)
         if (error) return errorResponse(error.message)
+
+        const countableServices = existing.filter(
+            (s: any) => s.status !== "deleted" && s.status !== "arquivado" && !s.deleted_at,
+        ).length
+        if (countableServices > 0) {
+            await adjustItemUsageCounter(partnerId, "services_count", -countableServices)
+        }
 
         await Promise.all(serviceIds.map(id => removeFromExploreRedis(id, "servico", true)))
 

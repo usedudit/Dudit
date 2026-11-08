@@ -36,6 +36,7 @@ import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from '@/lib/permission-context';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
+import { usePlanUpgrade } from '@/components/erp/subscription/PlanUpgradeModal';
 import { useModalLayer } from '@/lib/modal-stack';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 import { calculatePaymentAmounts } from '@/lib/payments/calculation';
@@ -409,6 +410,7 @@ const PaymentModal = ({
     const { toast } = useToast();
     const { selectedStore } = useStore();
     const { planSlug } = usePermissions();
+    const { openPlanUpgrade } = usePlanUpgrade();
     const { theme } = useTheme();
     const isDark = theme === "dark";
     const isFreePlan = !hasMinimumPlan(planSlug, "crescer");
@@ -2752,6 +2754,10 @@ const PaymentModal = ({
     };
 
     const handleGeneratePixWithKey = async (keyToUse: string, typeToUse: string) => {
+        if (isFreePlan) {
+            openPlanUpgrade("crescer");
+            return;
+        }
         if (!selectedMethodId) return;
         setIsGeneratingPix(true);
         try {
@@ -2777,6 +2783,10 @@ const PaymentModal = ({
     };
 
     const handleGeneratePix = async () => {
+        if (isFreePlan) {
+            openPlanUpgrade("crescer");
+            return;
+        }
         if (!selectedMethodId) return;
 
         setIsGeneratingPix(true);

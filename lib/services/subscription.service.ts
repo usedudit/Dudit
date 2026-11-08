@@ -129,6 +129,7 @@ export async function expirePastDueSubscription(sub: {
       // transition so the partner gets the cancellation notification.
       previousStatus: "past_due",
       cancellationReason: "payment_failure",
+      skipArchiving: true,
     })
   } catch (err: any) {
     console.error("[SUBSCRIPTION] Failed to sync billing on grace expiry:", err?.message)
@@ -794,4 +795,56 @@ export async function decrement_usage_counter(partnerId: string, counterName: st
     p_amount: amount,
   })
   if (error) console.error(`[SUBSCRIPTION] Error decrementing counter ${counterName}:`, error.message)
+}
+
+/**
+ * Adjust the products/services counters directly.
+ *
+ * These two counters are normally maintained by AFTER INSERT / AFTER DELETE
+ * triggers on `products` and `services`. The app soft-deletes and archives via
+ * UPDATE, so the triggers never fire and the RPC allowlist intentionally rejects
+ * these columns (to avoid double counting on real INSERT/DELETE). This helper
+ * keeps the counters in sync when an item leaves/returns to the countable set.
+ */
+export async function adjustItemUsageCounter(
+  partnerId: string,
+  counterName: "products_count" | "services_count",
+  delta: number,
+): Promise<void> {
+  if (!partnerId || !Number.isFinite(delta) || delta === 0) return
+
+  const admin = getAdminClient()
+  const { data: counters, error } = await admin
+    .from("usage_counters")
+    .select(counterName)
+    .eq("partner_id", partnerId)
+    .maybeSingle()
+
+  if (error) {
+    console.error(`[SUBSCRIPTION] Error reading counter ${counterName}:`, error.message)
+    return
+  }
+
+  if (!counters) {
+    if (delta > 0) {
+      const { error: insertError } = await admin
+        .from("usage_counters")
+        .insert({ partner_id: partnerId, [counterName]: delta })
+      if (insertError) {
+        console.error(`[SUBSCRIPTION] Error creating counter ${counterName}:`, insertError.message)
+      }
+    }
+    return
+  }
+
+  const current = Number((counters as any)[counterName] ?? 0)
+  const next = Math.max(0, current + delta)
+  const { error: updateError } = await admin
+    .from("usage_counters")
+    .update({ [counterName]: next, updated_at: new Date().toISOString() })
+    .eq("partner_id", partnerId)
+
+  if (updateError) {
+    console.error(`[SUBSCRIPTION] Error updating counter ${counterName}:`, updateError.message)
+  }
 }

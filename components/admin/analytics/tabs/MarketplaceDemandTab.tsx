@@ -138,17 +138,6 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header - Using DashboardSectionCard */}
-            <DashboardSectionCard
-                title="Inteligência de Buscas & Demanda do Marketplace"
-                icon={SearchIcon}
-                className="mb-0"
-            >
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                    Métricas de buscas na cidade, conversão em contatos/pedidos e diagnóstico das demandas reprimidas (buscas sem resultado).
-                </p>
-            </DashboardSectionCard>
-
             {/* Top KPI Cards */}
             <HorizontalKPICard items={kpiItems} />
 

@@ -10,6 +10,7 @@ import { generateStaticPix } from "@/lib/utils/pix-generator"
 import { useStore } from "@/lib/store-context"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import QRCode from "qrcode"
 import {
   buildAvailableMethodTypes,
@@ -70,6 +71,7 @@ export function BalancePaymentCollector({
 }: BalancePaymentCollectorProps) {
   const { selectedStore } = useStore()
   const { planSlug } = usePermissions()
+  const { openPlanUpgrade } = usePlanUpgrade()
   const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
   const { methods, isLoading } = usePaymentMethods(partnerId, selectedStore?.id)
   const activeMethods = useMemo(
@@ -298,6 +300,10 @@ export function BalancePaymentCollector({
   }, [amount, installments, selectedMethod, view, remainingBalance, emitLegs])
 
   const handleGeneratePixWithKey = async (keyToUse: string, typeToUse: string) => {
+    if (isFreePlan) {
+      openPlanUpgrade("crescer")
+      return null
+    }
     if (!selectedMethod?.id) return null
     setGeneratingPix(true)
     try {
@@ -319,6 +325,10 @@ export function BalancePaymentCollector({
   }
 
   const handleGeneratePix = async (pixAmount: number) => {
+    if (isFreePlan) {
+      openPlanUpgrade("crescer")
+      return null
+    }
     if (!selectedMethod?.id) return null
     if (hasPixKey && savedPixKey) {
       setGeneratingPix(true)

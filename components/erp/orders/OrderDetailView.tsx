@@ -2252,7 +2252,6 @@ export default function OrderDetailView({
                                       `/erp/ordens-de-servico?view=${sourceServiceOrder.id}`,
                                     )
                                   }
-                                  type="button"
                                 >
                                   Ver OS
                                 </Button>

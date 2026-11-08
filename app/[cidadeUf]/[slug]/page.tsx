@@ -84,9 +84,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityTermPage({ params }: Props) {
   const { cidadeUf, slug } = await params
 
-  // Evitar que rotas institucionais e de ajuda sejam capturadas pela rota dinâmica de cidade/termo
-  if (cidadeUf === "ajuda" || cidadeUf === "institucional") {
+  // Evitar que rotas institucionais, de ajuda ou do sistema sejam capturadas pela rota dinâmica de cidade/termo
+  if (cidadeUf === "ajuda" || cidadeUf === "institucional" || cidadeUf === "banned") {
     redirect(`/${cidadeUf}${slug ? `/${slug}` : ""}`)
+  }
+
+  if (slug === "banned") {
+    notFound()
   }
 
   if (cidadeUf.length === 2) {
@@ -94,7 +98,7 @@ export default async function CityTermPage({ params }: Props) {
   }
 
   if (!isValidCitySlug(cidadeUf)) {
-    if (cidadeUf.includes('.') || slug.includes('.')) {
+    if (cidadeUf.includes('.') || slug.includes('.') || slug === 'banned') {
       notFound()
     }
     redirect(`/explorar?q=${slug}`)

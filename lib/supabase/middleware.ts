@@ -465,6 +465,7 @@ export async function middleware(request: NextRequest) {
   // never used for authentication, authorization, or user identification.
   requestHeaders.set("x-dudit-request-id", requestId)
   requestHeaders.set("x-dudit-request-start", String(requestStartedAt))
+  requestHeaders.set("x-pathname", pathname)
   // Identity headers are never trusted by server-side authorization. Remove
   // client-supplied copies before forwarding the request internally.
   requestHeaders.delete("x-user-id")
@@ -656,9 +657,14 @@ export async function middleware(request: NextRequest) {
 
           // Process ban check result
           if (needsBanCheck && runtimeStatus?.is_banned === true) {
-            console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
-            const bannedUrl = new URL("/banned", request.url)
-            return NextResponse.redirect(bannedUrl)
+            console.log(`[MIDDLEWARE] User ${user.id} is BANNED`)
+            if (pathname.startsWith("/api/") || isServerAction || isPost) {
+              return new NextResponse(
+                JSON.stringify({ error: "Sua conta está suspensa.", banned: true }),
+                { status: 403, headers: { "Content-Type": "application/json" } }
+              )
+            }
+            requestHeaders.set("x-user-banned", "1")
           }
 
           if (needsBanCheck && runtimeStatus?.ban_expired === true) {

@@ -153,16 +153,37 @@ async function resolveMarketplaceProfileCpf(
 ): Promise<string | null> {
   if (!userId) return null
 
-  const { data } = await supabase
-    .from("user_profiles")
-    .select("cpf")
-    .eq("user_id", userId)
-    .maybeSingle()
+  // Try to get CPF from user_profiles first (if column exists)
+  let cpf = null
+  try {
+    const { data } = await supabase
+      .from("user_profiles")
+      .select("cpf")
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (data?.cpf) {
+      cpf = data.cpf
+    }
+  } catch (e) {
+    // Column might not exist, fall back to customers table
+  }
 
-  if (!data?.cpf) return null
+  // Fallback: get CPF from customers table
+  if (!cpf) {
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("cpf")
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (customer?.cpf) {
+      cpf = customer.cpf
+    }
+  }
+
+  if (!cpf) return null
 
   try {
-    const rawCpf = String(data.cpf)
+    const rawCpf = String(cpf)
     const decrypted = rawCpf.startsWith("v1:") || rawCpf.startsWith("v2:")
       ? await (await import("@/lib/crypto")).decryptCPF(rawCpf)
       : rawCpf

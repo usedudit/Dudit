@@ -48,6 +48,11 @@ export interface SubscriptionSyncOptions {
   cancellationReason?: "payment_failure" | "user" | "expired" | null
   /** Set false to suppress partner notifications (migrations/backfills). */
   notify?: boolean
+  /**
+   * Set true when the caller already ran the downgrade archiver. Avoids doing
+   * the work twice on paths like past-due expiry that archive explicitly.
+   */
+  skipArchiving?: boolean
 }
 
 export interface SubscriptionSyncResult {
@@ -187,6 +192,7 @@ export async function supersedeOtherSubscriptions(
       previousStatus: other.status,
       cancellationReason: "user",
       notify: false,
+      skipArchiving: true,
     })
   }
 }
@@ -494,6 +500,25 @@ export async function syncSubscriptionToBilling(
     invalidatePartnerPlanCache(sub.partner_id)
   } catch {
     // non-critical
+  }
+
+  // ── 7. Downgrade resources when a real cancellation lands ──
+  // Webhooks may cancel a subscription directly (no scheduled change), so the
+  // archiver must run here too. `skipArchiving` prevents duplicate work on
+  // callers that already archive (past-due expiry / scheduled cancellation).
+  if (
+    !options.skipArchiving &&
+    sub.status === "cancelled" &&
+    ["active", "trialing", "past_due"].includes(String(previousStatus))
+  ) {
+    try {
+      const { enforcePlanLimitsAndArchiveExcess } = await import(
+        "@/lib/services/subscription-archiver.service"
+      )
+      await enforcePlanLimitsAndArchiveExcess(sub.partner_id)
+    } catch (archErr: any) {
+      console.error("[BillingSync] Archiving after cancellation failed:", archErr?.message)
+    }
   }
 
   return {

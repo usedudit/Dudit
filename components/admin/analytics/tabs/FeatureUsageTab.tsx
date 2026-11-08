@@ -58,22 +58,6 @@ export function FeatureUsageTab({ data }: FeatureUsageTabProps) {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header Banner - Using DashboardSectionCard */}
-            <DashboardSectionCard
-                title="Adoção & Uso de Funcionalidades do Ecossistema"
-                icon={TrendingUpIcon}
-                action={
-                    <Badge variant="green" className="self-start md:self-auto py-1 px-3">
-                        {totalPlatformInteractions.toLocaleString("pt-BR")} Interações Totais
-                    </Badge>
-                }
-                className="mb-0"
-            >
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                    Mapeamento das ferramentas mais e menos utilizadas pelos parceiros para direcionar melhorias e suporte.
-                </p>
-            </DashboardSectionCard>
-
             {/* Top Metric Cards - Using HorizontalKPICard from ERP */}
             {kpiItems.length > 0 && <HorizontalKPICard items={kpiItems} />}
 

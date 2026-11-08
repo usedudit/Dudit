@@ -18,6 +18,7 @@ import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import {
     deletePreSaleDraftAction,
     finalizePreSaleAction,
@@ -141,6 +142,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }), [businessInfo])
     const canDiscount = hasSpecific("pos", "can_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
+    const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
     const isMobile = useMediaQuery("(max-width: 1024px)")
     const csrfToken = useCSRFToken()
 
@@ -1560,6 +1562,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }
 
     const openShippingSheetWithCustomer = useCallback((customerId: string, fallbackCustomer?: any) => {
+        if (isFreePlan) {
+            openPlanUpgrade("escalar")
+            return
+        }
         const selected = fallbackCustomer || customers.find((c) => c.id === customerId)
         if (selected) {
             const addr = (selected as any).addresses?.[0]
@@ -1589,16 +1595,20 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 setShippingCustomerDetails(details.data)
             }
         })
-    }, [partnerId, customers])
+    }, [partnerId, customers, isFreePlan, openPlanUpgrade])
 
     const handleOpenShippingSheet = useCallback(() => {
+        if (isFreePlan) {
+            openPlanUpgrade("escalar")
+            return
+        }
         if (selectedCustomerId) {
             openShippingSheetWithCustomer(selectedCustomerId)
             return
         }
         setCustomerSelectIntent("shipping-preflight")
         setIsSelectCustomerOpen(true)
-    }, [selectedCustomerId, openShippingSheetWithCustomer])
+    }, [selectedCustomerId, openShippingSheetWithCustomer, isFreePlan, openPlanUpgrade])
 
     const requestRemoveShipping = useCallback(() => {
         setIsRemoveShippingAlertOpen(true)
@@ -1615,6 +1625,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }, [notifySuccess])
 
     const applyCouponCode = useCallback(async (rawCode: string) => {
+        if (isFreePlan) {
+            openPlanUpgrade("crescer")
+            return
+        }
         const code = String(rawCode || "").trim().toUpperCase()
         if (!code) {
             notifyError("Informe um código de cupom.")
@@ -1670,8 +1684,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         activePreSaleId,
         cart,
         isApplyingCoupon,
+        isFreePlan,
         notifyError,
         notifySuccess,
+        openPlanUpgrade,
         partnerId,
         selectedCustomerId,
         shippingFee,
@@ -2338,6 +2354,11 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 </Button>
                                 <Button className="flex-1" isLoading={isApplyingCoupon} onClick={async () => {
                                     if (globalDiscountType === "coupon") {
+                                        if (isFreePlan) {
+                                            setIsGlobalDiscountModalOpen(false)
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
                                         setIsGlobalDiscountModalOpen(false)
                                         setIsCouponSheetOpen(true)
                                         return
@@ -2406,7 +2427,14 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     }
                                 />
                                 <ListItem
-                                    onClick={() => setGlobalDiscountType("coupon")}
+                                    onClick={() => {
+                                        if (isFreePlan) {
+                                            setIsGlobalDiscountModalOpen(false)
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
+                                        setGlobalDiscountType("coupon")
+                                    }}
                                     icon={FileIcon}
                                     title="Cupom"
                                     description="Utiliza um cupom de desconto pré-cadastrado"
@@ -2416,7 +2444,14 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                             name="globalDiscountType"
                                             value="coupon"
                                             checked={globalDiscountType === "coupon"}
-                                            onChange={() => setGlobalDiscountType("coupon")}
+                                            onChange={() => {
+                                                if (isFreePlan) {
+                                                    setIsGlobalDiscountModalOpen(false)
+                                                    openPlanUpgrade("crescer")
+                                                    return
+                                                }
+                                                setGlobalDiscountType("coupon")
+                                            }}
                                         />
                                     }
                                 />
@@ -2456,6 +2491,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                         className="w-full"
                                         onClick={() => {
                                             setIsGlobalDiscountModalOpen(false)
+                                            if (isFreePlan) {
+                                                openPlanUpgrade("crescer")
+                                                return
+                                            }
                                             setIsCouponSheetOpen(true)
                                         }}
                                     >

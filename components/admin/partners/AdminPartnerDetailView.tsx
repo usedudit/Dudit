@@ -699,10 +699,7 @@ export function AdminPartnerDetailView({
                                                     )}
                                                 </SidebarCard>
 
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                        Avaliação de Risco
-                                                    </h3>
+                                                <SidebarCard hasSeparator hasTopStrip title="Avaliação de Risco">
                                                     <div className="flex justify-between items-center text-sm">
                                                         <span className="text-brand-inactive-text">Score Atual</span>
                                                         <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
@@ -720,12 +717,9 @@ export function AdminPartnerDetailView({
                                                     >
                                                         Ajustar Score
                                                     </Button>
-                                                </div>
+                                                </SidebarCard>
 
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                        Identificadores
-                                                    </h3>
+                                                <SidebarCard hasSeparator hasTopStrip title="Identificadores">
                                                     <div className="space-y-2 text-xs">
                                                         {(store.suspended_case_id || partner?.suspended_case_id) && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
@@ -745,7 +739,7 @@ export function AdminPartnerDetailView({
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
+                                                </SidebarCard>
                                             </div>
                                         </div>
                                     </FadeIn>

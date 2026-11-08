@@ -70,22 +70,6 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header Description - Using DashboardSectionCard */}
-            <DashboardSectionCard
-                title="Painel Executivo de Saúde da Dudit"
-                icon={TrendingUpIcon}
-                action={
-                    <Badge variant="green" className="py-1 px-3">
-                        Período: {data.periodRange.label}
-                    </Badge>
-                }
-                className="mb-0 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/5 dark:to-transparent border-emerald-500/20"
-            >
-                <p className="text-xs sm:text-sm text-brand-inactive-text dark:text-dark-body">
-                    Consolidado de crescimento de usuários, atividade de parceiros e inteligência de demanda do marketplace.
-                </p>
-            </DashboardSectionCard>
-
             {/* Top KPI Cards - Using HorizontalKPICard from ERP */}
             <HorizontalKPICard items={kpiItems} />
 
@@ -217,13 +201,12 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                                                     {item.term}
                                                 </div>
                                                 {item.demandType && (
-                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                        item.demandType === 'contratar'
-                                                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
-                                                            : item.demandType === 'loja'
+                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.demandType === 'contratar'
+                                                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
+                                                        : item.demandType === 'loja'
                                                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                                                             : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
-                                                    }`}>
+                                                        }`}>
                                                         {item.demandType === 'contratar' ? 'Contratar' : item.demandType === 'loja' ? 'Loja' : 'Comprar'}
                                                     </span>
                                                 )}

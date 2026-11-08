@@ -32,6 +32,8 @@ import {
     ActionsDropdown,
     DropdownItem,
     FormTextarea,
+    SidebarCard,
+    InfoCard,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -337,137 +339,123 @@ export function AdminUserDetailView({
                                     <TabsContent value="profile" className="mt-0">
                                         <FadeIn key="profile">
                                             {isBanned && (
-                                                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
-                                                    <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                                Usuário Bloqueado / Banido
-                                                            </h3>
-                                                            {profile.banned_case_id && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        navigator.clipboard.writeText(profile.banned_case_id)
-                                                                        toast.success("Protocolo do caso copiado!")
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
-                                                                    title="Clique para copiar o protocolo"
-                                                                >
-                                                                    <span>Caso: {profile.banned_case_id}</span>
-                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
-                                                                </button>
+                                                <>
+                                                    <InfoCard
+                                                        title="Usuário Bloqueado / Banido"
+                                                        message={`Motivo: ${profile.banned_reason || "Sem motivo informado."} • Banido em: ${formatDate(profile.banned_at)}${profile.banned_until ? ` • Vigência até: ${formatDate(profile.banned_until)}` : " • Permanente"}`}
+                                                        color="red"
+                                                        bottomElement={<Button
+                                                            variant="link"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(profile.banned_case_id)
+                                                                toast.success("Protocolo do caso copiado!")
+                                                            }}
+                                                        >
+                                                            <span>Caso: {profile.banned_case_id}</span>
+                                                            <span className="text-[10px] uppercase font-sans font-semibold">
+                                                                Copiar
+                                                            </span>
+                                                        </Button>} />
+
+                                                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                        {/* Coluna principal */}
+                                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
+                                                            <FormSection title="Dados Pessoais & Conta">
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">Nome Completo</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {profile.full_name || "Não informado"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">E-mail de Login</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {authUser?.email || "Sem e-mail"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">Telefone</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {profile.phone || "Não informado"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">CPF</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {profile.cpf || "Não informado"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">Provedor de Login</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {formatProviderLabel(authUser?.app_metadata?.provider)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs font-semibold text-brand-inactive-text block">Data de Cadastro</span>
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                            {formatDate(profile.created_at)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </FormSection>
+
+                                                            {/* Lojas vinculadas */}
+                                                            {partner && partner.stores && partner.stores.length > 0 && (
+                                                                <FormSection title="Lojas Vinculadas como Parceiro" hasSeparator>
+                                                                    <div className="space-y-3">
+                                                                        {partner.stores.map((s: any) => (
+                                                                            <ListItem
+                                                                                key={s.id}
+                                                                                icon={StoreIcon}
+                                                                                title={s.name}
+                                                                                description={`Score de Risco: ${s.risk_score || 0} pts • ${s.is_active ? "Ativa" : "Suspensa"}`}
+                                                                                right={<Link
+                                                                                    href={`/ddt-admin/partners?view=${s.id}`}
+                                                                                    className="text-xs font-bold text-brand-green hover:underline"
+                                                                                >
+                                                                                    Ver Loja
+                                                                                </Link>}
+                                                                                className="px-4 py-3" />
+                                                                        ))}
+                                                                    </div>
+                                                                </FormSection>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
-                                                            Motivo: {profile.banned_reason || "Sem motivo informado."} • Banido em: {formatDate(profile.banned_at)}
-                                                            {profile.banned_until ? ` • Vigência até: ${formatDate(profile.banned_until)}` : " • Permanente"}
-                                                        </p>
+
+                                                        {/* Sidebar */}
+                                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
+                                                            <SidebarCard hasSeparator hasTopStrip title=" Score de Risco do Usuário">
+                                                                <div className="flex justify-between items-center text-sm">
+                                                                    <span className="text-brand-inactive-text">Pontuação Atual</span>
+                                                                    <Badge variant={(profile.risk_score || 0) >= 50 ? "red" : (profile.risk_score || 0) >= 25 ? "orange" : "gray"}>
+                                                                        {profile.risk_score || 0} pts
+                                                                    </Badge>
+                                                                </div>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setNewRiskScore(String(profile.risk_score || 0))
+                                                                        setRiskModalOpen(true)
+                                                                    }}
+                                                                    className="w-full mt-4"
+                                                                >
+                                                                    Ajustar Score
+                                                                </Button>
+                                                            </SidebarCard>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                </>
                                             )}
-
-                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                                {/* Coluna principal */}
-                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12 space-y-6">
-                                                    <FormSection title="Dados Pessoais & Conta">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Nome Completo</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {profile.full_name || "Não informado"}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">E-mail de Login</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {authUser?.email || "Sem e-mail"}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Telefone</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {profile.phone || "Não informado"}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">CPF</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {profile.cpf || "Não informado"}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Provedor de Login</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {formatProviderLabel(authUser?.app_metadata?.provider)}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Data de Cadastro</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {formatDate(profile.created_at)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </FormSection>
-
-                                                    {/* Lojas vinculadas */}
-                                                    {partner && partner.stores && partner.stores.length > 0 && (
-                                                        <FormSection title={`Lojas Vinculadas como Parceiro (${partner.stores.length})`} hasSeparator>
-                                                            <div className="space-y-3">
-                                                                {partner.stores.map((s: any) => (
-                                                                    <ListItem
-                                                                        key={s.id}
-                                                                        icon={StoreIcon}
-                                                                        title={s.name}
-                                                                        description={`Score de Risco: ${s.risk_score || 0} pts • ${s.is_active ? "Ativa" : "Suspensa"}`}
-                                                                        right={
-                                                                            <Link
-                                                                                href={`/ddt-admin/partners?view=${s.id}`}
-                                                                                className="text-xs font-bold text-brand-green hover:underline"
-                                                                            >
-                                                                                Ver Loja →
-                                                                            </Link>
-                                                                        }
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </FormSection>
-                                                    )}
-                                                </div>
-
-                                                {/* Sidebar */}
-                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Score de Risco do Usuário
-                                                        </h3>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text">Pontuação Atual</span>
-                                                            <Badge variant={(profile.risk_score || 0) >= 50 ? "red" : (profile.risk_score || 0) >= 25 ? "orange" : "gray"}>
-                                                                {profile.risk_score || 0} pts
-                                                            </Badge>
-                                                        </div>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setNewRiskScore(String(profile.risk_score || 0))
-                                                                setRiskModalOpen(true)
-                                                            }}
-                                                            className="w-full mt-4 text-xs"
-                                                        >
-                                                            Ajustar Score
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </FadeIn>
+                                    </FadeIn>
                                     </TabsContent>
 
                                     {/* Aba 2: Compras */}
                                     <TabsContent value="orders" className="mt-0">
                                         <FadeIn key="orders">
-                                            <FormSection title={`Histórico de Compras (${orders.length})`} hasSeparator>
+                                            <FormSection title="Histórico de Compras">
                                                 {orders.length === 0 ? (
                                                     <IconPlaceholder
                                                         icon={ShoppingCartIcon}
@@ -493,10 +481,11 @@ export function AdminUserDetailView({
                                                                             href={`/ddt-admin/orders?view=${o.id}`}
                                                                             className="text-xs font-bold text-brand-green hover:underline"
                                                                         >
-                                                                            Ver Pedido →
+                                                                            Ver Pedido
                                                                         </Link>
                                                                     </div>
                                                                 }
+                                                                className="px-4 py-3"
                                                             />
                                                         ))}
                                                     </div>
@@ -508,7 +497,7 @@ export function AdminUserDetailView({
                                     {/* Aba 3: Devoluções */}
                                     <TabsContent value="returns" className="mt-0">
                                         <FadeIn key="returns">
-                                            <FormSection title={`Histórico de Trocas & Devoluções (${returns.length})`} hasSeparator>
+                                            <FormSection title="Histórico de Trocas & Devoluções" hasSeparator>
                                                 {returns.length === 0 ? (
                                                     <IconPlaceholder
                                                         icon={ReturnIcon}
@@ -534,10 +523,11 @@ export function AdminUserDetailView({
                                                                             href={`/ddt-admin/returns?view=${r.id}`}
                                                                             className="text-xs font-bold text-brand-green hover:underline"
                                                                         >
-                                                                            Ver Devolução →
+                                                                            Ver Devolução
                                                                         </Link>
                                                                     </div>
                                                                 }
+                                                                className="px-y py-3"
                                                             />
                                                         ))}
                                                     </div>
@@ -549,7 +539,7 @@ export function AdminUserDetailView({
                                     {/* Aba 4: Auditoria */}
                                     <TabsContent value="audit" className="mt-0">
                                         <FadeIn key="audit">
-                                            <FormSection title={`Logs de Auditoria (${auditEvents.length})`} hasSeparator>
+                                            <FormSection title="Logs de Auditoria">
                                                 {auditEvents.length === 0 ? (
                                                     <IconPlaceholder
                                                         icon={ClockIcon}
@@ -587,11 +577,11 @@ export function AdminUserDetailView({
                             </div>
                         </div>
                     </Tabs>
-                </div>
-            </FadeIn>
+                </div >
+            </FadeIn >
 
             {/* Mobile bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+            < div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
                 <div className="flex-1">
                     <ActionsDropdown fullWidth trigger={
                         <Button variant="outline" className="w-full h-12">
@@ -615,15 +605,16 @@ export function AdminUserDetailView({
                         )}
                     </ActionsDropdown>
                 </div>
-            </div>
+            </div >
 
             {/* Modal: Ajustar Score de Risco */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={riskModalOpen}
                 onClose={() => {
                     setRiskModalOpen(false)
                     setRiskTitle("")
-                }}
+                }
+                }
                 title="Ajustar Score de Risco do Usuário"
             >
                 <div className="space-y-4 pt-2">
@@ -677,10 +668,10 @@ export function AdminUserDetailView({
                         </Button>
                     </div>
                 </div>
-            </DefaultModal>
+            </DefaultModal >
 
             {/* Modal: Banir Usuário */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={banModalOpen}
                 onClose={() => setBanModalOpen(false)}
                 onConfirm={handleConfirmBan}
@@ -692,7 +683,7 @@ export function AdminUserDetailView({
             />
 
             {/* Modal: Desbanir Usuário */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={unbanModalOpen}
                 onClose={() => setUnbanModalOpen(false)}
                 onConfirm={handleConfirmUnban}

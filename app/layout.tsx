@@ -18,6 +18,8 @@ import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-feature
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner"
 import { getGlobalAnnouncementConfig } from "@/lib/services/system-settings.service"
 import { PostHogProvider } from "@/providers/posthog-provider"
+import { getBannedUserProfile } from "@/lib/auth/ban-check"
+import BannedView from "@/components/admin/BannedView"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
@@ -245,6 +247,31 @@ export default async function RootLayout({
     // auth, manutencao). The client-side SupabaseProvider will fetch the user
     // lazily if needed, saving ~50-150ms on these routes.
     const user = isPublicPage ? null : await getCurrentUser()
+    const bannedProfile = user ? await getBannedUserProfile(user.id) : null
+
+    if (bannedProfile && user) {
+        return (
+            <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>
+                <head>
+                    <title>Conta Suspensa | Dudit</title>
+                    <meta name="robots" content="noindex, nofollow" />
+                </head>
+                <body className="font-sans">
+                    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+                        <PostHogProvider>
+                            <SupabaseProvider initialUser={user} initialSessionData={null}>
+                                <QueryProvider>
+                                    <NotificationProvider>
+                                        <BannedView profile={bannedProfile} user={user} />
+                                    </NotificationProvider>
+                                </QueryProvider>
+                            </SupabaseProvider>
+                        </PostHogProvider>
+                    </ThemeProvider>
+                </body>
+            </html>
+        )
+    }
 
     const initialAnnouncement = await getGlobalAnnouncementConfig()
 

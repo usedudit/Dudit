@@ -85,7 +85,9 @@ export async function getAdminMarketplaceOrders(
             order_source,
             created_at,
             stores!left(id, name, logo_url, phone, partner_id, partners!left(id)),
-            order_items(id, product_name, quantity),
+            order_items(id, product_name, quantity, service_id, line_type),
+            order_shipments(id, status, kind, carrier, provider_slug, service_code, service_name, price, tracking_number, tracking_url, label_url, external_label_id, created_at, updated_at, paid_at, delivered_at, cancelled_at),
+            delivery_breakdown,
             return_requests!order_id(id, status, desired_resolution, approved_resolution, refund_amount)
         `)
 
@@ -172,17 +174,27 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
     // Get buyer profile if available
     let buyerProfile = null
     if (order.buyer_id) {
+        // Get profile from user_profiles (marketplace profile)
         const { data: profile } = await admin
             .from("user_profiles")
-            .select("user_id, full_name, avatar_url, phone, cpf, birth_date, risk_score")
+            .select("user_id, full_name, avatar_url, phone, risk_score")
             .eq("user_id", order.buyer_id)
             .maybeSingle()
 
-        if (profile?.cpf) {
-            try {
-                profile.cpf = await (await import("@/lib/crypto")).decryptCpfIfEncrypted(profile.cpf)
-            } catch {
-                profile.cpf = null
+        // Get CPF from customers table (ERP customer data)
+        let cpf = null
+        if (order.buyer_id) {
+            const { data: customer } = await admin
+                .from("customers")
+                .select("cpf")
+                .eq("user_id", order.buyer_id)
+                .maybeSingle()
+            if (customer?.cpf) {
+                try {
+                    cpf = await (await import("@/lib/crypto")).decryptCpfIfEncrypted(customer.cpf)
+                } catch {
+                    cpf = null
+                }
             }
         }
 
@@ -191,10 +203,11 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
             const { data: authUser } = await admin.auth.admin.getUserById(order.buyer_id)
             buyerProfile = {
                 ...(profile || {}),
+                cpf,
                 email: authUser?.user?.email || null,
             }
         } catch {
-            buyerProfile = profile
+            buyerProfile = { ...(profile || {}), cpf }
         }
     }
 
@@ -250,47 +263,56 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
     // If no platform driver, check if there's a store delivery driver (via deliveries table)
     if (!deliveryDriver && order.partner_id) {
         try {
-            const { data: storeDelivery } = await admin
-                .from("deliveries")
-                .select("id, status, started_at, completed_at, notes, delivery_person_id, courier_name, courier_phone")
-                .contains("order_ids", [orderId])
+            // First find the delivery_id from delivery_orders for this order
+            const { data: deliveryOrder } = await admin
+                .from("delivery_orders")
+                .select("delivery_id")
+                .eq("order_id", orderId)
                 .maybeSingle()
 
-            if (storeDelivery) {
-                let courierName = storeDelivery.courier_name
-                let courierPhone = storeDelivery.courier_phone
-                let courierAvatar = null
+            if (deliveryOrder?.delivery_id) {
+                const { data: storeDelivery } = await admin
+                    .from("deliveries")
+                    .select("id, status, started_at, delivered_at, notes, delivery_person_id")
+                    .eq("id", deliveryOrder.delivery_id)
+                    .maybeSingle()
 
-                if (storeDelivery.delivery_person_id) {
-                    const { data: partnerUser } = await admin
-                        .from("partner_users")
-                        .select("user_id")
-                        .eq("id", storeDelivery.delivery_person_id)
-                        .maybeSingle()
+                if (storeDelivery) {
+                    let courierName = null
+                    let courierPhone = null
+                    let courierAvatar = null
 
-                    if (partnerUser?.user_id) {
-                        const { data: partnerUserProf } = await admin
-                            .from("user_profiles")
-                            .select("full_name, phone, avatar_url")
-                            .eq("user_id", partnerUser.user_id)
+                    if (storeDelivery.delivery_person_id) {
+                        const { data: partnerUser } = await admin
+                            .from("partner_users")
+                            .select("user_id")
+                            .eq("id", storeDelivery.delivery_person_id)
                             .maybeSingle()
-                        if (partnerUserProf) {
-                            courierName = partnerUserProf.full_name || courierName
-                            courierPhone = partnerUserProf.phone || courierPhone
-                            courierAvatar = partnerUserProf.avatar_url
+
+                        if (partnerUser?.user_id) {
+                            const { data: partnerUserProf } = await admin
+                                .from("user_profiles")
+                                .select("full_name, phone, avatar_url")
+                                .eq("user_id", partnerUser.user_id)
+                                .maybeSingle()
+                            if (partnerUserProf) {
+                                courierName = partnerUserProf.full_name
+                                courierPhone = partnerUserProf.phone
+                                courierAvatar = partnerUserProf.avatar_url
+                            }
                         }
                     }
-                }
 
-                deliveryDriver = {
-                    type: "store_internal", // Entregador da Loja
-                    driver_id: storeDelivery.delivery_person_id || null,
-                    full_name: courierName || "Entregador da Loja",
-                    avatar_url: courierAvatar,
-                    phone: courierPhone,
-                    delivery_status: storeDelivery.status,
-                    started_at: storeDelivery.started_at,
-                    notes: storeDelivery.notes,
+                    deliveryDriver = {
+                        type: "store_internal", // Entregador da Loja
+                        driver_id: storeDelivery.delivery_person_id || null,
+                        full_name: courierName || "Entregador da Loja",
+                        avatar_url: courierAvatar,
+                        phone: courierPhone,
+                        delivery_status: storeDelivery.status,
+                        started_at: storeDelivery.started_at,
+                        notes: storeDelivery.notes,
+                    }
                 }
             }
         } catch (e) {

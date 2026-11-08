@@ -50,6 +50,9 @@ import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariant
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import AlertModal from "@/components/reusable/AlertModal"
 import { Package } from "@/lib/icons"
+import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface ServiceOrderFormProps {
     partnerId: string
@@ -84,6 +87,9 @@ const getLocalTimeString = (d: Date) => {
 
 export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, editData }: ServiceOrderFormProps) {
     const { toast } = useToast()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const isFreePlan = !hasMinimumPlan(planSlug, "crescer")
     const [activeTab, setActiveTab] = useState("general")
     const editPolicy = editData?.status
         ? getServiceOrderEditPolicy(editData.status as ServiceOrderStatus)
@@ -502,6 +508,10 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     }, [pricingPreview])
 
     const handleApplyCoupon = async () => {
+        if (isFreePlan) {
+            openPlanUpgrade("crescer")
+            return
+        }
         if (!couponCode.trim()) {
             toast({ description: "Informe o código do cupom." })
             return
@@ -2181,6 +2191,11 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                             isLoading={isApplyingCoupon}
                             onClick={async () => {
                                 if (globalDiscountType === "coupon") {
+                                    if (isFreePlan) {
+                                        setIsDiscountModalOpen(false)
+                                        openPlanUpgrade("crescer")
+                                        return
+                                    }
                                     setIsDiscountModalOpen(false)
                                     setIsCouponSheetOpen(true)
                                     return
@@ -2237,7 +2252,14 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                             }
                         />
                         <ListItem
-                            onClick={() => setGlobalDiscountType("coupon")}
+                            onClick={() => {
+                                if (isFreePlan) {
+                                    setIsDiscountModalOpen(false)
+                                    openPlanUpgrade("crescer")
+                                    return
+                                }
+                                setGlobalDiscountType("coupon")
+                            }}
                             icon={FileIcon}
                             title="Cupom"
                             description="Utiliza um cupom de desconto pré-cadastrado"
@@ -2247,7 +2269,14 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                     name="globalDiscountType"
                                     value="coupon"
                                     checked={globalDiscountType === "coupon"}
-                                    onChange={() => setGlobalDiscountType("coupon")}
+                                    onChange={() => {
+                                        if (isFreePlan) {
+                                            setIsDiscountModalOpen(false)
+                                            openPlanUpgrade("crescer")
+                                            return
+                                        }
+                                        setGlobalDiscountType("coupon")
+                                    }}
                                 />
                             }
                         />
@@ -2287,6 +2316,10 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                 className="w-full"
                                 onClick={() => {
                                     setIsDiscountModalOpen(false)
+                                    if (isFreePlan) {
+                                        openPlanUpgrade("crescer")
+                                        return
+                                    }
                                     setIsCouponSheetOpen(true)
                                 }}
                             >

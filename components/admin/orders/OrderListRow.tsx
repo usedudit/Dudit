@@ -6,7 +6,8 @@ import { Badge, Checkbox, Tooltip } from "@/components/reusable"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { ReturnIcon, TruckIcon, StoreIcon, MoneyIcon, UserIcon, ShoppingCartIcon } from "@/lib/icons"
-import { getPaymentStatusMeta, getDeliveryStatusLabelForType, getFulfillmentModeLabel } from "@/lib/orders/status"
+import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { getOrderDeliveryBadgeMeta } from "@/lib/orders/delivery-badge"
 
 interface ColumnDef {
     id: string
@@ -44,8 +45,6 @@ const OrderListRow = React.memo((
 
     // Use shared payment status meta (same as ERP)
     const paymentMeta = getPaymentStatusMeta(order.situation)
-    const deliveryMeta = getDeliveryStatusLabelForType(order.delivery_status, order.delivery_type)
-    const deliveryTypeLabel = getFulfillmentModeLabel(order.delivery_type)
 
     // Seller/Partner name from the joined data (via stores)
     const store = order.stores || {}
@@ -137,7 +136,10 @@ const OrderListRow = React.memo((
                     </span>
                 )
 
-            case "status":
+            case "status": {
+                const paymentMeta = getPaymentStatusMeta(order.situation)
+                const deliveryBadge = getOrderDeliveryBadgeMeta(order)
+
                 return (
                     <div className="flex items-center gap-1.5 flex-wrap">
                         {order.situation === "cancelled" ? (
@@ -149,20 +151,23 @@ const OrderListRow = React.memo((
                                 {paymentMeta.label}
                             </Badge>
                         )}
-                        {order.delivery_status && order.situation !== "cancelled" && (
+                        {deliveryBadge.show && (
                             <Badge
-                                variant={deliveryMeta === "Entregue" ? "green" : deliveryMeta === "Enviado" ? "blue" : deliveryMeta === "Pronto para retirada" ? "orange" : "gray"}
+                                variant={deliveryBadge.variant}
                                 icon={
-                                    order.delivery_type === "pickup"
-                                        ? <StoreIcon />
-                                        : <TruckIcon />
+                                    deliveryBadge.isCarrierDelivery && deliveryBadge.carrierBrandIcon
+                                        ? <img src={deliveryBadge.carrierBrandIcon} alt="Transportadora" className="object-contain" />
+                                        : deliveryBadge.isPickup
+                                            ? <StoreIcon />
+                                            : <TruckIcon />
                                 }
                             >
-                                {deliveryMeta}
+                                {deliveryBadge.label}
                             </Badge>
                         )}
                     </div>
                 )
+            }
 
             case "seller":
                 return (
