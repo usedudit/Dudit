@@ -1,14 +1,10 @@
 "use client"
 
-import React, { useState, useEffect, useTransition } from "react"
-import { DefaultModal, Button, Input, FormTextarea, Badge, Checkbox, InfoCard, ListItem, PhoneInput, EmailInput, IconPlaceholder, ThreeDotsLoader, FormSection } from "@/components/reusable"
+import { useState, useEffect, useTransition } from "react"
+import { DefaultModal, Button, Input, FormTextarea, Checkbox, InfoCard, ListItem, PhoneInput, EmailInput, IconPlaceholder, ThreeDotsLoader, FormSection } from "@/components/reusable"
 import {
-    StoreIcon,
-    AlertCircleIcon,
     CheckCircleIcon,
-    AlertTriangleIcon,
-    MailIcon,
-    ClockIcon,
+    UserIcon,
 } from "@/lib/icons"
 import {
     submitEnforcementAppealAction,
@@ -162,29 +158,58 @@ export function EnforcementAppealModal({
             description={`Protocolo oficial: #${caseId}`}
             footer={
                 <div className="flex items-center justify-end gap-3 pt-2">
-                    <Button variant="outline" onClick={onClose} disabled={isPending}>
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleSubmitAppeal}
-                        disabled={isPending || !truthConfirmed || appealStatement.trim().length < 15}
-                    >
-                        {isPending ? "Enviando Recurso..." : "Enviar Recurso para Análise"}
-                    </Button>
+                    {/* State 1: Submitted Success - only "Concluir" */}
+                    {isSubmittedSuccess && (
+                        <Button onClick={onClose} className="w-full sm:w-auto" disabled={isPending}>
+                            Concluir
+                        </Button>
+                    )}
+
+                    {/* State 2: Existing Appeal (Pending) - only "Fechar" */}
+                    {existingAppeal && !isSubmittedSuccess && (
+                        <Button onClick={onClose} className="w-full sm:w-auto h-12" disabled={isPending}>
+                            Fechar
+                        </Button>
+                    )}
+
+                    {/* State 3: Open Form - "Cancelar" and "Enviar Recurso" */}
+                    {!isSubmittedSuccess && !existingAppeal && !isCheckingStatus && (
+                        <>
+                            <Button variant="outline" onClick={onClose} disabled={isPending}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleSubmitAppeal}
+                                disabled={isPending || !truthConfirmed || appealStatement.trim().length < 15}
+                            >
+                                {isPending ? "Enviando Recurso..." : "Enviar Recurso para Análise"}
+                            </Button>
+                        </>
+                    )}
+
+                    {/* Loading state - no buttons or just disabled */}
+                    {isCheckingStatus && (
+                        <Button disabled className="w-full sm:w-auto">
+                            Carregando...
+                        </Button>
+                    )}
                 </div>
             }
         >
             <div className="space-y-5 pt-2">
-                {/* Header Info */}
-                <ListItem
-                    title={entityName}
-                    description={`ID do caso: #${caseId}`}
-                    icon={StoreIcon}
-                />
+                {/* Header Info - show in form (recorrer) and existing appeal (acompanhamento), hide in success */}
+                {!isSubmittedSuccess && (
+                    <ListItem
+                        title={entityName}
+                        description={`ID do caso: #${caseId}`}
+                        icon={UserIcon}
+                        className="px-4 py-3"
+                    />
+                )}
 
                 {/* Loading status */}
                 {isCheckingStatus && (
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center py-8">
                         <ThreeDotsLoader />
                     </div>
                 )}
@@ -194,7 +219,7 @@ export function EnforcementAppealModal({
                     <>
                         <IconPlaceholder
                             title="Recurso Enviado com Sucesso!"
-                            subtitle={`Seus esclarecimentos foram recebidos e encaminhados para a equipe de moderação e auditoria.Um e-mail de confirmação com o protocolo foi enviado para <strong>${contactEmail}</strong>.`}
+                            subtitle="Seus esclarecimentos foram recebidos e encaminhados para a equipe de moderação e auditoria."
                             icon={CheckCircleIcon}
                         />
 
@@ -203,12 +228,6 @@ export function EnforcementAppealModal({
                             title="Prazo de Resposta"
                             message="Nossa equipe analisa os recursos em até 2 a 3 dias úteis. Você será notificado por e-mail e no painel assim que houver um parecer."
                         />
-
-                        <div className="pt-2">
-                            <Button onClick={onClose} className="w-full">
-                                Concluir
-                            </Button>
-                        </div>
                     </>
                 )}
 
@@ -219,11 +238,11 @@ export function EnforcementAppealModal({
                             color="orange"
                             title="Recurso em Análise pela Moderação"
                             message={
-                                <div className="space-y-2 text-xs">
+                                <div className="space-y-2">
                                     <p>
                                         Já existe uma solicitação de recurso protocolada sob o número <strong>#{existingAppeal.caseId}</strong>.
                                     </p>
-                                    <p className="opacity-80">
+                                    <p>
                                         Data de envio: {new Date(existingAppeal.createdAt).toLocaleDateString("pt-BR", {
                                             day: "2-digit",
                                             month: "2-digit",
@@ -241,16 +260,6 @@ export function EnforcementAppealModal({
                                 &ldquo;{existingAppeal.appealStatement}&rdquo;
                             </div>
                         </FormSection>
-
-                        <div className="text-brand-inactive-text dark:text-dark-body mt-2">
-                            <strong>Status Atual:</strong> Em análise. Para evitar duplicidades na fila, novos envios ficam bloqueados até a conclusão da análise deste recurso.
-                        </div>
-
-                        <div className="pt-2 flex w-full">
-                            <Button onClick={onClose} className="h-12">
-                                Fechar
-                            </Button>
-                        </div>
                     </div>
                 )}
 

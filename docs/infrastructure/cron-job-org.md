@@ -1,6 +1,6 @@
 # Cron jobs no cron-job.org - operação e checklist
 
-Runbook dos jobs agendados no **cron-job.org** para o Dudit: o que existe, como
+Runbook dos jobs agendados no **cron-job.org** para a Dudit: o que existe, como
 criar do zero, como rotacionar os segredos, o que cada rota devolve e o que fazer
 quando um job falha.
 

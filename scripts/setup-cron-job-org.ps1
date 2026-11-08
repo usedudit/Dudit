@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Cria os cron jobs do Dudit no cron-job.org via REST API.
+  Cria os cron jobs da Dudit no cron-job.org via REST API.
 
 .DESCRIPTION
   Le os segredos das variaveis de ambiente e cria os jobs que ainda nao existem.

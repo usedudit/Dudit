@@ -1229,6 +1229,7 @@ export function CheckoutPageClient() {
     }
 
     const handleSetDefaultAddress = async (addrId: string) => {
+        if (!userId) return
         try {
             const token = csrfToken || await fetchCSRFTokenSingleton() || ""
             const result = await setDefaultAddressAction(addrId, "user", userId, token)

@@ -7,7 +7,7 @@ import { checkTextSafety } from "@/lib/moderation/moderation-service"
  */
 export async function moderateFields(
   fields: Array<string | null | undefined>,
-  options?: { userId?: string }
+  options?: { userId?: string; asyncMode?: boolean }
 ): Promise<ModerationResult> {
   try {
     const texts = fields
@@ -16,7 +16,11 @@ export async function moderateFields(
 
     if (texts.length === 0) return { valid: true }
 
-    const result = await checkTextSafety(texts, options?.userId)
+    // Por padrão no fluxo de usuário (interactive actions), usamos asyncMode: true
+    // para não travar a requisição esperando cold start da Cloudflare Workers AI.
+    // A blocklist local (pt-BR) continua bloqueando termos ofensivos instantaneamente (< 0.1ms).
+    const asyncMode = options?.asyncMode ?? true
+    const result = await checkTextSafety(texts, options?.userId, { asyncMode })
 
     if (!result.passed) {
       return {
@@ -44,8 +48,9 @@ export async function moderateProductContent(data: {
   description?: string
   imageKeysForModeration?: string[]
   userId?: string
+  asyncMode?: boolean
 }): Promise<ModerationResult> {
-  return moderateFields([data.name, data.description], { userId: data.userId })
+  return moderateFields([data.name, data.description], { userId: data.userId, asyncMode: data.asyncMode })
 }
 
 /**
@@ -55,8 +60,9 @@ export async function moderateStoreContent(data: {
   name?: string | null
   description?: string | null
   userId?: string
+  asyncMode?: boolean
 }): Promise<ModerationResult> {
-  return moderateFields([data.name, data.description], { userId: data.userId })
+  return moderateFields([data.name, data.description], { userId: data.userId, asyncMode: data.asyncMode })
 }
 
 /**
@@ -65,6 +71,7 @@ export async function moderateStoreContent(data: {
 export async function moderateReviewContent(data: {
   comment?: string | null
   userId?: string
+  asyncMode?: boolean
 }): Promise<ModerationResult> {
-  return moderateFields([data.comment], { userId: data.userId })
+  return moderateFields([data.comment], { userId: data.userId, asyncMode: data.asyncMode })
 }

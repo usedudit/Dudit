@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { after, type NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { validateFile, validateMagicBytes } from "@/lib/security/file-validator"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
@@ -231,25 +231,42 @@ async function handleUpload(request: NextRequest) {
         shouldSaveToR2: true,
       }
     } else {
-      const analysis = await moderateImageWithBase64(buffer.toString("base64"))
-      if (analysis.isUnavailable) {
-        // Fail closed: never publish unmoderated content during provider outages.
-        return NextResponse.json(
-          { error: "A moderação de imagens está temporariamente indisponível. Tente novamente em alguns minutos." },
-          { status: 503 },
-        )
-      } else {
-        decision = decideImageStatus(analysis)
+      // Moderação assíncrona/otimista:
+      // Não bloqueia o upload nem segura a requisição HTTP por 2-3s esperando o Sightengine.
+      // O upload prossegue imediatamente, e a checagem no Sightengine roda em background via after().
+      decision = {
+        status: "APPROVED",
+        message: "Imagem aprovada.",
+        shouldSaveToR2: true,
       }
 
-      await cacheImageModeration(
-        imageHash,
-        analysis.riskLevel,
-        analysis.confidence,
-        analysis.categories,
-        decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
-        imagePHash,
-      )
+      // Agenda a análise de moderação e gravação em cache no background
+      const base64Payload = buffer.toString("base64")
+      try {
+        after(async () => {
+          try {
+            const analysis = await moderateImageWithBase64(base64Payload)
+            if (!analysis.isUnavailable) {
+              const bgDecision = decideImageStatus(analysis)
+              await cacheImageModeration(
+                imageHash,
+                analysis.riskLevel,
+                analysis.confidence,
+                analysis.categories,
+                bgDecision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
+                imagePHash,
+              )
+              if (bgDecision.status === "FLAGGED") {
+                console.warn(`[UPLOAD MODERATION] Imagem marcada para revisão em background: hash=${imageHash}`)
+              }
+            }
+          } catch (bgErr) {
+            console.error("[UPLOAD MODERATION] Falha na moderação em background:", bgErr)
+          }
+        })
+      } catch (scheduleErr) {
+        console.warn("[UPLOAD MODERATION] after() indisponível; agendamento ignorado:", scheduleErr)
+      }
     }
 
     if (!decision.shouldSaveToR2) {

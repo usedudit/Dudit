@@ -5,10 +5,10 @@
 Existem 3 modelos reais de assinatura com fulfillment:
 
 1. **Box fixo** (HelloFresh, Amazon Subscribe & Save): a cada ciclo o sistema gera UM pedido com a quantidade completa e entrega de uma vez. Sem parciais.
-2. **Carteira de créditos / entitlement** (ClassPass, academias "10 aulas por mês", clubes): o cliente tem N créditos por período, usa quando quiser dentro da janela, cada uso consome 1 crédito, saldo zera/expira no fim do período. **Este é o modelo que o Dudit já usa para serviços** (`subscription_item_credits` + RPC `consume_credits_fifo`).
+2. **Carteira de créditos / entitlement** (ClassPass, academias "10 aulas por mês", clubes): o cliente tem N créditos por período, usa quando quiser dentro da janela, cada uso consome 1 crédito, saldo zera/expira no fim do período. **Este é o modelo que a Dudit já usa para serviços** (`subscription_item_credits` + RPC `consume_credits_fifo`).
 3. **Leiteiro / jornal / clube do pão**: vendedor define agenda OU cliente retira/entrega parcialmente dentro da janela de entitlement; cada saída debita o saldo; cobrança é mensal e separada do fulfillment. **Este é o modelo do exemplo dos 18 pães** - é o modelo 2 estendido a produtos.
 
-Conclusão: o modelo correto para o Dudit é **unificar serviços e produtos no modelo de créditos/entitlement por ciclo** (serviços já funcionam assim; produtos precisam estender o mesmo sistema). O pedido automático do ciclo vira **somente registro financeiro da cobrança**; estoque e logística passam a acontecer nos pedidos de entrega/agendamento criados com créditos.
+Conclusão: o modelo correto para a Dudit é **unificar serviços e produtos no modelo de créditos/entitlement por ciclo** (serviços já funcionam assim; produtos precisam estender o mesmo sistema). O pedido automático do ciclo vira **somente registro financeiro da cobrança**; estoque e logística passam a acontecer nos pedidos de entrega/agendamento criados com créditos.
 
 Decisão: ciclo só cobra, entregas baixam estoque.
 

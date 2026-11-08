@@ -37,7 +37,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </header>
 
             <main className="flex-grow relative flex flex-col items-center">
-                <div className="w-full bg-[#003229] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
+                <div className="w-full bg-[#09211b] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
                     <WavesBackground />
                     <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>
@@ -53,9 +53,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </div>
             </main>
 
-            <footer className="w-full h-[68px] py-6 border-t border-brand-border dark:border-white/10 bg-white dark:bg-dark-surface mt-auto">
+            <footer className="w-full h-[68px] py-6 border-t border-white/10 bg-brand-dark dark:bg-dark-surface">
                 <div className="max-w-[1400px] mx-auto px-6 flex flex-col md:flex-row justify-center items-center">
-                    <p className="text-brand-inactive-text dark:text-white/60 text-xs sm:text-sm font-medium tracking-tight">
+                    <p className="text-white text-xs sm:text-sm font-medium tracking-tight">
                         © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                     </p>
                 </div>
@@ -136,25 +136,22 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             </div>
 
             {/* Protocolo / Case ID Card */}
-            <div className="w-full bg-brand-gray/80 dark:bg-white/5 rounded-2xl p-4 border border-brand-border dark:border-white/10 text-left space-y-3">
+            <div className="w-full text-left space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-brand-inactive-text dark:text-white/50 uppercase tracking-wider">
+                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-heading">
                         Protocolo do Caso
                     </span>
-                    <button
-                        onClick={handleCopyCaseId}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-brand-green hover:underline cursor-pointer"
-                    >
-                        {copied ? "✓ Copiado!" : "Copiar Protocolo"}
-                    </button>
                 </div>
-                <div className="flex items-center justify-between bg-white dark:bg-dark-surface px-3.5 py-2.5 rounded-xl border border-brand-border dark:border-white/10">
-                    <code className="font-mono text-sm font-bold text-brand-dark dark:text-white tracking-wide">
+                <div className="flex items-center justify-between bg-white dark:bg-dark-surface px-3.5 py-2.5 rounded-full border border-brand-border dark:border-dark-border">
+                    <code className="text-sm font-bold text-brand-dark dark:text-white">
                         {caseId}
                     </code>
-                    <span className="text-[11px] font-semibold text-brand-inactive-text dark:text-white/50">
-                        {isPermanent ? "Permanente" : `Até ${unbanDate}`}
-                    </span>
+                    <Button
+                        variant="link"
+                        onClick={handleCopyCaseId}
+                    >
+                        {copied ? "Copiado!" : "Copiar Protocolo"}
+                    </Button>
                 </div>
             </div>
 
@@ -164,8 +161,8 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                     title="Motivo Registrado"
                     message={
                         <div className="space-y-1.5">
-                            <p className="font-semibold text-sm">{reasonText}</p>
-                            <p className="text-xs opacity-75">
+                            <p>{reasonText}</p>
+                            <p>
                                 {isPermanent
                                     ? `Decisão aplicada em: ${banDate}`
                                     : `Vigência: de ${banDate} até ${unbanDate}`
@@ -178,9 +175,9 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             </div>
 
             {/* Instruções de Recurso */}
-            <div className="w-full text-left bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
+            <div className="w-full text-left pt-4 border-t border-brand-border dark:border-dark-border text-sm text-brand-dark dark:text-dark-body">
                 <p className="font-bold mb-1">Deseja recorrer ou tirar dúvidas?</p>
-                <p className="text-blue-800/80 dark:text-blue-300/80">
+                <p>
                     Se você acredita que esta ação foi aplicada incorretamente, você pode submeter uma solicitação de recurso informando seu protocolo acima para que nossa equipe reavalie a decisão.
                 </p>
             </div>
@@ -188,9 +185,8 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             {/* Ações de Recurso */}
             <div className="w-full space-y-2.5">
                 <Button
-                    type="button"
                     onClick={() => setIsAppealModalOpen(true)}
-                    className="w-full h-[46px] text-[15px] font-bold"
+                    className="w-full h-[46px]"
                 >
                     Recorrer da Decisão
                 </Button>
@@ -198,16 +194,16 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                 <Button
                     variant="outline"
                     onClick={handleCopyFullCase}
-                    className="w-full h-[40px] text-xs font-semibold"
+                    className="w-full h-[40px]"
                 >
                     {copiedAll ? "✓ Dados do caso copiados!" : "Copiar resumo completo do caso"}
                 </Button>
             </div>
 
             <form onSubmit={handleSignOut} className="w-full flex justify-center pt-2">
-                <button type="submit" className="text-sm text-brand-inactive-text dark:text-white/60 hover:text-brand-red font-medium transition-colors cursor-pointer">
-                    ← Sair da conta
-                </button>
+                <Button type="submit" variant="link" className="text-red-700 dark:text-red-300/80 hover:text-red-800 dark:hover:text-red-300">
+                    Sair da conta
+                </Button>
             </form>
 
             <EnforcementAppealModal

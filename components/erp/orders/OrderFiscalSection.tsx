@@ -17,7 +17,7 @@ interface OrderFiscalSectionProps {
 /**
  * Documento fiscal do pedido.
  *
- * O Dudit não emite NF-e/NFS-e: o vendedor emite por fora e informa o número
+ * A Dudit não emite NF-e/NFS-e: o vendedor emite por fora e informa o número
  * aqui. Comprador PF não tem obrigação (MEI pode usar a DASN-Simei; nano é
  * dispensado). Comprador PJ exige nota antes do envio — mas o envio pode ser
  * liberado com registro, para não travar a operação.

@@ -67,7 +67,7 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
             const partnerId = partner.id
             const partnerUserId = partner.user_id
 
-            // 2. Orçamentos pelo Dudit: fluxo da loja + feature do plano
+            // 2. Orçamentos pela Dudit: fluxo da loja + feature do plano
             // (o free tem cota de 10/mês). A cota é validada logo abaixo.
             const capabilities = await resolveMarketplaceCapabilities(partnerId, {
                 storeId: (service as any).store_id || input.storeId || null,

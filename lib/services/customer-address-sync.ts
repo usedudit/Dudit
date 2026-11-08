@@ -93,6 +93,14 @@ export async function syncUserDefaultAddressToErpCustomers(
 
     const { data: customers, error: custErr } = await query
 
+    type CustomerRow = {
+      id: string
+      partner_id: string | null
+      marketplace_user_id: string | null
+      user_id: string | null
+      email: string | null
+    }
+
     if (custErr) {
       console.error(
         "[customer-address-sync] Erro ao buscar clientes vinculados:",
@@ -105,10 +113,12 @@ export async function syncUserDefaultAddressToErpCustomers(
       return { success: true, syncedCount: 0, partnerIds: [] }
     }
 
+    const typedCustomers = (customers || []) as CustomerRow[]
+
     // 2. Se houver clientes que bateram por email sem marketplace_user_id, vincula
-    const unlinkedIds = customers
-      .filter((c) => !c.marketplace_user_id)
-      .map((c) => c.id)
+    const unlinkedIds = typedCustomers
+      .filter((c: CustomerRow) => !c.marketplace_user_id)
+      .map((c: CustomerRow) => c.id)
 
     if (unlinkedIds.length > 0) {
       await admin
@@ -117,7 +127,7 @@ export async function syncUserDefaultAddressToErpCustomers(
         .in("id", unlinkedIds)
     }
 
-    const customerIds = customers.map((c) => c.id)
+    const customerIds = typedCustomers.map((c: CustomerRow) => c.id)
 
     // 3. Busca endereços existentes de todos esses clientes
     const { data: existingAddresses, error: addrErr } = await admin
@@ -144,10 +154,12 @@ export async function syncUserDefaultAddressToErpCustomers(
     const addressIdsToUpdate: string[] = []
     const customersNeedingInsert: Array<{ id: string; partner_id: string }> = []
 
-    for (const cust of customers) {
+    for (const cust of typedCustomers) {
       const addrs = addrMap.get(cust.id) || []
       if (addrs.length === 0) {
-        customersNeedingInsert.push(cust)
+        if (cust.partner_id) {
+          customersNeedingInsert.push({ id: cust.id, partner_id: cust.partner_id })
+        }
       } else {
         // Seleciona o endereço principal / padrão a ser atualizado
         let targetAddr = addrs.find((a) => a.is_default)
@@ -160,7 +172,9 @@ export async function syncUserDefaultAddressToErpCustomers(
         if (!targetAddr) {
           // Se o cliente só tiver endereço de cobrança ("billing"), não sobrescreve
           if (addrs.every((a) => a.address_type === "billing")) {
-            customersNeedingInsert.push(cust)
+            if (cust.partner_id) {
+              customersNeedingInsert.push({ id: cust.id, partner_id: cust.partner_id })
+            }
             continue
           }
           targetAddr = addrs[0]
@@ -238,20 +252,20 @@ export async function syncUserDefaultAddressToErpCustomers(
 
     // 7. Revalida caches dos clientes e das lojas (parceiros)
     await Promise.allSettled(
-      customerIds.map((cId) => revalidateAddresses("customer", cId))
+      customerIds.map((cId: string) => revalidateAddresses("customer", cId))
     )
 
     const uniquePartnerIds = Array.from(
-      new Set(customers.map((c) => c.partner_id).filter(Boolean))
+      new Set(typedCustomers.map((c: CustomerRow) => c.partner_id).filter(Boolean)) as Set<string>
     )
 
     await Promise.allSettled(
-      uniquePartnerIds.map((pId) => revalidateCustomers(pId))
+      uniquePartnerIds.map((pId: string) => revalidateCustomers(pId))
     )
 
     return {
       success: true,
-      syncedCount: customers.length,
+      syncedCount: typedCustomers.length,
       partnerIds: uniquePartnerIds,
     }
   } catch (err: any) {

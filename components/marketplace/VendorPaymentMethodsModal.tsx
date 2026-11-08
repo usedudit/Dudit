@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { DefaultModal, ListItem, FormSection } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { formatCurrency } from "@/lib/utils"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
@@ -98,6 +99,11 @@ export function VendorPaymentMethodsModal({
 
     const [installmentOptions, setInstallmentOptions] = useState<any[]>([])
     const [isLoadingInstallments, setIsLoadingInstallments] = useState(false)
+    const [activeTab, setActiveTab] = useState("payment-methods")
+
+    // Determine if we should show tabs (only if there's a credit card method with installment capability)
+    const hasInstallmentCapability = creditMethods.length > 0 && maxCcInstallments > 1
+    const shouldShowTabs = hasInstallmentCapability
 
     useEffect(() => {
         if (!isOpen || !ccMethod?.id || price <= 0) {
@@ -130,6 +136,149 @@ export function VendorPaymentMethodsModal({
         }
     }, [isOpen, ccMethod?.id, price])
 
+    const renderPaymentMethodsContent = () => (
+        <div className="space-y-6">
+            {mpConnected && (
+                <FormSection title="Pagamento online">
+                    <div className="space-y-3">
+                        <ListItem
+                            className="!border-none !bg-transparent p-0 cursor-default"
+                            icon={
+                                <img
+                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                    alt="Mercado Pago"
+                                    className="w-6 h-6 object-contain shrink-0"
+                                />
+                            }
+                            title="Mercado Pago"
+                            description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
+                        />
+                    </div>
+                </FormSection>
+            )}
+
+            {hasPaymentSections ? (
+                <FormSection title="Pagamento na retirada/entrega">
+                    <div className="space-y-5">
+                        {hasSimplePayments && (
+                            <div>
+                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">À Vista / Imediato</h4>
+                                <div className="flex flex-wrap gap-2.5">
+                                    {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
+                                    {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
+                                    {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
+                                </div>
+                            </div>
+                        )}
+
+                        {debitMethods.length > 0 && (
+                            <div>
+                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
+                                {debitBrands.length > 0 ? (
+                                    <CardBrands brands={debitBrands} />
+                                ) : (
+                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
+                                )}
+                            </div>
+                        )}
+
+                        {creditMethods.length > 0 && (
+                            <div>
+                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
+                                {creditBrands.length > 0 ? (
+                                    <CardBrands brands={creditBrands} />
+                                ) : (
+                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </FormSection>
+            ) : !mpConnected ? (
+                <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
+                    Nenhum meio de pagamento cadastrado por este vendedor.
+                </div>
+            ) : null}
+        </div>
+    )
+
+    const renderInstallmentOptionsContent = () => (
+        <div className="space-y-4">
+            {creditMethods.length === 0 ? (
+                <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
+                    Nenhuma opção de parcelamento disponível (sem cartão de crédito configurado).
+                </div>
+            ) : isLoadingInstallments ? (
+                <div className="text-center py-6 text-xs text-brand-inactive-text dark:text-dark-body select-none">
+                    Carregando opções de parcelamento...
+                </div>
+            ) : installmentOptions.length > 0 ? (
+                <div className="border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                    {installmentOptions.map((opt, idx) => {
+                        const isEven = idx % 2 === 0
+                        return (
+                            <div
+                                key={opt.installments}
+                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading transition-colors ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"}`}
+                            >
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold text-[13px] sm:text-sm">
+                                        {opt.installments}x de {formatCurrency(opt.installmentValue)}
+                                    </span>
+                                    {opt.hasInterest ? (
+                                        <span className="text-[11px] text-brand-green dark:text-green-400 mt-0.5 font-medium">
+                                            {opt.interestPercent > 0
+                                                ? `Com juros (${opt.interestPercent.toFixed(1).replace('.', ',')}% a.m.)`
+                                                : "Com juros"}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                            Sem Juros
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(opt.finalAmount)}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : maxCcInstallments > 1 ? (
+                // Fallback: show basic installments without interest info
+                <div className="border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                    {Array.from({ length: maxCcInstallments }, (_, idx) => {
+                        const count = idx + 1
+                        const val = price / count
+                        const isEven = idx % 2 === 0
+                        return (
+                            <div
+                                key={count}
+                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"}`}
+                            >
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold text-[13px] sm:text-sm">
+                                        {count}x de {formatCurrency(val)}
+                                    </span>
+                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        {count === 1 ? "À vista" : "Consultar juros"}
+                                    </span>
+                                </div>
+                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(price)}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
+                    Parcelamento não disponível para este meio de pagamento.
+                </div>
+            )}
+        </div>
+    )
+
     return (
         <DefaultModal
             isOpen={isOpen}
@@ -137,134 +286,26 @@ export function VendorPaymentMethodsModal({
             title={`Meios de pagamento de ${storeName}`}
             maxWidth="2xl"
         >
-            <div className="py-2 space-y-6">
-                {mpConnected && (
-                    <FormSection title="Pagamento online">
-                        <div className="space-y-3">
-                            <ListItem
-                                className="!border-none !bg-transparent p-0 cursor-default"
-                                icon={
-                                    <img
-                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                        alt="Mercado Pago"
-                                        className="w-6 h-6 object-contain shrink-0"
-                                    />
-                                }
-                                title="Mercado Pago"
-                                description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
-                            />
-                        </div>
-                    </FormSection>
+            <div className="py-2">
+                {shouldShowTabs ? (
+                    <>
+                        <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="payment-methods">
+                            <TabsList className="border-b border-brand-border dark:border-dark-border">
+                                <TabsTrigger value="payment-methods">Meios de pagamento</TabsTrigger>
+                                <TabsTrigger value="installments">Opções de parcelamento</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="payment-methods">
+                                {renderPaymentMethodsContent()}
+                            </TabsContent>
+                            <TabsContent value="installments">
+                                {renderInstallmentOptionsContent()}
+                            </TabsContent>
+                        </Tabs>
+                    </>
+                ) : (
+                    // No tabs - just show payment methods (installments not available or not loaded)
+                    renderPaymentMethodsContent()
                 )}
-
-                {hasPaymentSections ? (
-                    <FormSection title="Pagamento na retirada/entrega">
-                        <div className="space-y-5">
-                            {hasSimplePayments && (
-                                <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">À Vista / Imediato</h4>
-                                    <div className="flex flex-wrap gap-2.5">
-                                        {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
-                                        {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
-                                        {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
-                                    </div>
-                                </div>
-                            )}
-
-                            {debitMethods.length > 0 && (
-                                <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
-                                    {debitBrands.length > 0 ? (
-                                        <CardBrands brands={debitBrands} />
-                                    ) : (
-                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {creditMethods.length > 0 && (
-                                <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
-                                    {creditBrands.length > 0 ? (
-                                        <CardBrands brands={creditBrands} />
-                                    ) : (
-                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
-                                    )}
-
-                                    {maxCcInstallments > 1 && price > 0 && (
-                                        <div className="mt-4">
-                                            <span className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
-
-                                            {isLoadingInstallments ? (
-                                                <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text dark:text-dark-body select-none">
-                                                    Carregando opções de parcelamento...
-                                                </div>
-                                            ) : installmentOptions.length > 0 ? (
-                                                <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
-                                                    {installmentOptions.map((opt, idx) => {
-                                                        const isEven = idx % 2 === 0
-                                                        return (
-                                                            <div
-                                                                key={opt.installments}
-                                                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading transition-colors ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
-                                                                    }`}
-                                                            >
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="font-bold text-[13px] sm:text-sm">
-                                                                        {opt.installments}x de {formatCurrency(opt.installmentValue)}
-                                                                    </span>
-                                                                    {!opt.hasInterest && (
-                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                            Sem Juros
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(opt.finalAmount)}
-                                                                </span>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
-                                                    {Array.from({ length: maxCcInstallments }, (_, idx) => {
-                                                        const count = idx + 1
-                                                        const val = price / count
-                                                        const isEven = idx % 2 === 0
-                                                        return (
-                                                            <div
-                                                                key={count}
-                                                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
-                                                                    }`}
-                                                            >
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="font-bold text-[13px] sm:text-sm">
-                                                                        {count}x de {formatCurrency(val)}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                        Sem Juros
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(price)}
-                                                                </span>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </FormSection>
-                ) : !mpConnected ? (
-                    <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
-                        Nenhum meio de pagamento cadastrado por este vendedor.
-                    </div>
-                ) : null}
             </div>
         </DefaultModal>
     )

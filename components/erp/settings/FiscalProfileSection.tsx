@@ -101,7 +101,7 @@ export function FiscalProfileSection({
         <InfoCard
           color="blue"
           title="Enquadramento e limite anual"
-          message="O Dudit não emite nota fiscal. Aqui você informa como o negócio está enquadrado para calcular o limite de faturamento e avisar antes de estourar."
+          message="A Dudit não emite nota fiscal. Aqui você informa como o negócio está enquadrado para calcular o limite de faturamento e avisar antes de estourar."
         />
 
         <FormDropdown
@@ -200,9 +200,8 @@ export function FiscalProfileSection({
                 </div>
 
                 <div
-                  className={`grid grid-cols-1 gap-3 text-xs ${
-                    value.taxProfile === "mei" ? "sm:grid-cols-3" : "sm:grid-cols-2"
-                  }`}
+                  className={`grid grid-cols-1 gap-3 text-xs ${value.taxProfile === "mei" ? "sm:grid-cols-3" : "sm:grid-cols-2"
+                    }`}
                 >
                   <div>
                     <p className="text-brand-inactive-text dark:text-dark-body">Restante até o limite</p>

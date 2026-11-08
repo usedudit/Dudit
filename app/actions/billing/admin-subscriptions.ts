@@ -169,6 +169,41 @@ export async function adminGrantPartnerPlanAction(
             return { success: false, error: "partnerId é obrigatório" }
         }
 
+        // Auto-resolve se o ID passado for store_id ou user_id em vez de partner_id
+        let effectivePartnerId = input.partnerId
+        const { data: pCheck } = await supabase
+            .from("partners")
+            .select("id")
+            .eq("id", effectivePartnerId)
+            .maybeSingle()
+
+        if (!pCheck) {
+            const { data: storeCheck } = await supabase
+                .from("stores")
+                .select("partner_id")
+                .eq("id", effectivePartnerId)
+                .maybeSingle()
+
+            if (storeCheck?.partner_id) {
+                effectivePartnerId = storeCheck.partner_id
+            } else {
+                const { data: userCheck } = await supabase
+                    .from("partners")
+                    .select("id")
+                    .eq("user_id", effectivePartnerId)
+                    .maybeSingle()
+
+                if (userCheck?.id) {
+                    effectivePartnerId = userCheck.id
+                } else {
+                    return {
+                        success: false,
+                        error: `Nenhum parceiro encontrado para o ID '${input.partnerId}' (não existe em partners, stores ou users).`,
+                    }
+                }
+            }
+        }
+
         const normalizedSlug = input.planSlug.trim().toLowerCase()
         const { data: plan, error: planError } = await supabase
             .from("plans")
@@ -194,7 +229,7 @@ export async function adminGrantPartnerPlanAction(
         const { data: existingSubs } = await supabase
             .from("subscriptions")
             .select("id, mercado_pago_subscription_id")
-            .eq("partner_id", input.partnerId)
+            .eq("partner_id", effectivePartnerId)
             .in("status", ["active", "trialing", "past_due", "pending"])
 
         if (existingSubs && existingSubs.length > 0) {
@@ -222,7 +257,7 @@ export async function adminGrantPartnerPlanAction(
         const { data: newSub, error: insertError } = await supabase
             .from("subscriptions")
             .insert({
-                partner_id: input.partnerId,
+                partner_id: effectivePartnerId,
                 plan_id: plan.id,
                 plan_snapshot: plan,
                 mercado_pago_subscription_id: null,
@@ -243,7 +278,7 @@ export async function adminGrantPartnerPlanAction(
 
         // Invalida o cache do plano para surtir efeito imediato no ERP
         const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
-        invalidatePartnerPlanCache(input.partnerId)
+        invalidatePartnerPlanCache(effectivePartnerId)
 
         return { success: true, subscriptionId: newSub.id }
     } catch (err: any) {

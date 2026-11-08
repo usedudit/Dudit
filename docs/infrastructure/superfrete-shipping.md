@@ -31,7 +31,7 @@ A SuperFrete gera o `secret_token` **na criação** do webhook e assina cada
 requisição com `X-ME-Signature` (HMAC-SHA256 do corpo cru). Não existe endpoint
 para consultar o secret depois.
 
-Por isso o Dudit **recria** o webhook a cada conexão/reativação:
+Por isso a Dudit **recria** o webhook a cada conexão/reativação:
 
 1. lista os webhooks da conta (`GET /api/v0/webhook`);
 2. remove os que apontam para `/api/shipping/superfrete/webhook`;

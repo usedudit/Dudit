@@ -17,7 +17,7 @@ import ReturnPageControls from "@/components/erp/returns/ReturnPageControls";
 import type { ReturnRequest } from "@/components/erp/returns/types";
 import { getReturnResolutionLabel } from "@/lib/returns/types";
 import { ReturnDetailView } from "@/components/erp/returns/ReturnDetailView";
-import AdminReturnDetailClientWrapper from "./AdminReturnDetailClientWrapper";
+import AdminReturnDetailView from "./AdminReturnDetailView";
 import { PermissionProvider } from "@/lib/permission-context";
 import { ROUTE_PERMISSION_PRESETS } from "@/lib/permissions/route-permissions";
 import { StoreProvider } from "@/lib/store-context";
@@ -270,51 +270,6 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     // No-op, detail view has its own print button
   }, []);
 
-  // KPI Items for HorizontalKPICard
-  // IMPORTANTE: precisa ficar antes dos returns condicionais abaixo.
-  // Hooks não podem ser chamados condicionalmente (React error #300).
-  const kpiItems = useMemo(() => {
-    if (!stats) return [];
-    return [
-      {
-        title: "Total",
-        value: stats.total.toLocaleString("pt-BR"),
-        trend: "Todas as solicitações",
-        subtext: "Cadastradas no sistema",
-        icon: RotateIcon,
-        iconBg: "bg-brand-green-light dark:bg-dark-border/40",
-        iconColor: "text-brand-dark dark:text-dark-heading",
-      },
-      {
-        title: "Pendentes",
-        value: stats.pending.toLocaleString("pt-BR"),
-        trend: "Aguardando análise",
-        subtext: "Precisam de ação",
-        icon: AlertCircleIcon,
-        iconBg: "bg-yellow-100 dark:bg-yellow-900/30",
-        iconColor: "text-yellow-600 dark:text-yellow-400",
-      },
-      {
-        title: "Em Análise / Aprovados",
-        value: stats.approved.toLocaleString("pt-BR"),
-        trend: "Processando",
-        subtext: "Aprovados ou aguardando item",
-        icon: ClockIcon,
-        iconBg: "bg-blue-100 dark:bg-blue-900/30",
-        iconColor: "text-blue-600 dark:text-blue-400",
-      },
-      {
-        title: "Finalizados",
-        value: stats.completed.toLocaleString("pt-BR"),
-        trend: stats.rejected > 0 ? `${stats.rejected} rejeitados` : "Concluídos",
-        subtext: "Resolvidos ou expirados",
-        icon: CheckCircleIcon,
-        iconBg: "bg-green-100 dark:bg-green-900/30",
-        iconColor: "text-green-600 dark:text-green-400",
-      },
-    ];
-  }, [stats]);
-
   // If viewing detail (read-only)
   if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
     const currentReq = requests.find(r => r.id === entityState.entityId);
@@ -346,11 +301,24 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
 
   // If editing - use admin edit form
   if (entityState.isOpen && entityState.action === "edit" && entityState.entityId) {
+    const currentReq = requests.find(r => r.id === entityState.entityId);
+    const partnerId = currentReq?.partnerId || "";
+
     return (
-      <AdminReturnDetailClientWrapper
-        returnId={entityState.entityId}
-        onBack={closeEntity}
-      />
+      <PermissionProvider
+        role="OWNER"
+        routePermissions={ROUTE_PERMISSION_PRESETS.OWNER}
+        partnerId={partnerId}
+        businessInfo={{}}
+        planSlug="escalar"
+      >
+        <StoreProvider partnerId={partnerId}>
+          <AdminReturnDetailView
+            detail={{ request: currentReq }}
+            onBack={closeEntity}
+          />
+        </StoreProvider>
+      </PermissionProvider>
     );
   }
 
@@ -419,11 +387,6 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
 
           {/* List/Grid Content */}
           <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
-            {kpiItems.length > 0 && (
-              <div className="mb-4">
-                <HorizontalKPICard items={kpiItems} />
-              </div>
-            )}
             <AnimatePresence mode="wait">
               {isLoading && requests.length === 0 ? (
                 <div className="h-[400px] flex items-center justify-center">

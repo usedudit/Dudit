@@ -126,7 +126,11 @@ export async function middleware(request: NextRequest) {
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
     const [seg1, seg2] = segments;
 
-    if (!seg1.includes('.')) {
+    // Skip redirect for known static pages like mapa-do-site
+    const STATIC_PAGES = new Set(['mapa-do-site', 'sitemap.xml', 'robots.txt', 'manifest.webmanifest']);
+    if (STATIC_PAGES.has(seg1)) {
+      // Let the request pass through to the actual page
+    } else if (!seg1.includes('.')) {
       const VALID_UFS = new Set(['ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to']);
       const isCitySlug = (slug: string) => {
         const match = slug.match(/-([a-z]{2})$/i);

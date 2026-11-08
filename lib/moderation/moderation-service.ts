@@ -307,7 +307,7 @@ export type ModerationResponse = {
 export async function checkTextSafety(
   texts: string[],
   userId?: string,
-  options?: { timeoutMs?: number }
+  options?: { timeoutMs?: number; asyncMode?: boolean }
 ): Promise<ModerationResponse> {
   const cleaned = (texts ?? []).map((t) => (t ?? "").trim()).filter(Boolean)
   if (cleaned.length === 0) return { passed: true }
@@ -366,17 +366,24 @@ export async function checkTextSafety(
     // uma chamada, melhor: evita um segundo cold start e metade do custo.
     const uncached = pending.filter((p) => !verdicts.has(p.normalized))
     if (uncached.length > 0) {
-      const classified = await classifyTexts(uncached, timeoutMs)
+      if (options?.asyncMode) {
+        // Otimização assíncrona: textos novos não travam a requisição interativa.
+        // Sinaliza degraded para que o chamador persista o item imediatamente e
+        // agende a checagem profunda em background (via after() / Trigger.dev).
+        degraded = true
+      } else {
+        const classified = await classifyTexts(uncached, timeoutMs)
 
-      await Promise.all(
-        classified.map(async ({ item, verdict }) => {
-          verdicts.set(item.normalized, verdict)
-          if (!verdict.degraded) {
-            const cacheKey = `moderation:text:${CACHE_VERSION}:${await sha256(item.normalized)}`
-            await writeCache(cacheKey, { safe: verdict.safe, categories: verdict.categories })
-          }
-        })
-      )
+        await Promise.all(
+          classified.map(async ({ item, verdict }) => {
+            verdicts.set(item.normalized, verdict)
+            if (!verdict.degraded) {
+              const cacheKey = `moderation:text:${CACHE_VERSION}:${await sha256(item.normalized)}`
+              await writeCache(cacheKey, { safe: verdict.safe, categories: verdict.categories })
+            }
+          })
+        )
+      }
     }
 
     for (const { original, normalized } of pending) {

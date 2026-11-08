@@ -161,4 +161,24 @@ describe("checkTextSafety", () => {
     expect(result.flaggedTexts).toHaveLength(1)
     expect(result.flaggedTexts?.[0].text).toContain("descricao ruim")
   })
+
+  it("em asyncMode: true retorna degraded sem chamar a IA para textos fora do cache", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+
+    const result = await mod.checkTextSafety(["Produto novo em folha"], undefined, { asyncMode: true })
+
+    expect(result.passed).toBe(true)
+    expect(result.degraded).toBe(true)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("em asyncMode: true ainda bloqueia na hora se a blocklist local identificar termo proibido", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+
+    const result = await mod.checkTextSafety(["preto imundo"], undefined, { asyncMode: true })
+
+    expect(result.passed).toBe(false)
+    expect(result.reason).toContain("Discurso de ódio")
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })

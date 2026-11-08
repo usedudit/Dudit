@@ -1174,7 +1174,7 @@ export async function unbanUser(
 
     // Revalidação de cache instantânea
     try {
-        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidateUserAccess, safeRevalidateTag } = await import("@/lib/utils/revalidation")
         const { revalidatePath } = await import("next/cache")
         await revalidateUserAccess(targetUserId)
         await safeRevalidateTag(`user-ban-${targetUserId}`)

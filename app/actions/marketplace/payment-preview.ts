@@ -1,6 +1,6 @@
 "use server"
 
-import { requireUser } from "@/lib/auth/authorization"
+import { getCurrentUser } from "@/lib/auth/server-user"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { computePaymentLine, type PaymentMethodFeeConfig } from "@/lib/payments/financial-engine"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
@@ -125,7 +125,9 @@ export async function previewMarketplacePaymentAction(input: {
   originalAmount: number
   installmentNumber?: number
 }) {
-  await requireUser()
+  // Allow unauthenticated users to preview payment methods (public storefront)
+  // Only verify user exists if there's a session, but don't redirect
+  await getCurrentUser()
 
   const adminSupabase = createAdminClient()
   
@@ -194,7 +196,8 @@ export async function previewMarketplacePaymentAction(input: {
       installmentOptions.push({
         installments: i,
         installmentValue: calc.installmentAmounts[0] || 0,
-        hasInterest: calc.interestAmount > 0 && (feeConfig.feeBearer === "customer" || feeConfig.installmentFeeBearer === "customer"),
+        hasInterest: calc.interestAmount > 0,
+        interestPercent: calc.interestAmount > 0 ? calc.appliedInterestPercent : 0,
         totalInterest: calc.interestAmount,
         installmentCostAmount: calc.installmentCostAmount,
         totalFee: calc.feeAmount,

@@ -143,7 +143,7 @@ function buildPaymentFailedEmailHtml(
       </p>
     </div>
     <p style="color: #555; line-height: 1.6;">
-      Acesse o Dudit para atualizar seu método de pagamento ou entre em contato com o suporte.
+      Acesse a Dudit para atualizar seu método de pagamento ou entre em contato com o suporte.
     </p>
     <p style="color: #888; font-size: 13px; margin-bottom: 0;">
       Caso tenha alguma dúvida, entre em contato conosco.

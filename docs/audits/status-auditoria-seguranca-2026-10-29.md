@@ -1,4 +1,4 @@
-# Auditoria de segurança do Dudit — registro de andamento
+# Auditoria de segurança da Dudit — registro de andamento
 
 **Data do registro:** 29/10/2026  
 **Status:** em andamento; este documento registra o ponto de retomada, não uma aprovação para lançamento.  
@@ -554,7 +554,7 @@ O workspace também apresenta outras alterações e exclusões de documentação
 
 No registro original, a migration havia sido criada, mas não aplicada; nesta retomada, o usuário informou que aplicou também a migration corretiva de estorno. Esse estado não foi confirmado pelo ledger ou por consulta ao schema do banco. Antes de novas aplicações, confirmar ledger e ambiente e revisar as policies antigas e os papéis reais do schema. Como as migrations substituem policies para fechar acesso cruzado, um rollback que restaure policies permissivas pode reabrir a falha; se houver incompatibilidade, prefira uma migration corretiva/forward-fix. Não alterar policies em produção sem validação própria e plano operacional.
 
-**Conclusão deste registro:** há correções localizadas implementadas e testes focados aprovados, mas a auditoria permanece incompleta. Não usar este documento como declaração de que o Dudit está seguro ou pronto para lançamento.
+**Conclusão deste registro:** há correções localizadas implementadas e testes focados aprovados, mas a auditoria permanece incompleta. Não usar este documento como declaração de que a Dudit está seguro ou pronto para lançamento.
 
 ### Anexos de pedidos — 03/11/2026
 
@@ -895,7 +895,7 @@ Foi criado `npm run migrate:r2-private`, que lista objetos no bucket público, c
 
 **3. Falha de Autorização e Vínculo de Cliente em Assinaturas Recorrentes (CWE-285):**
 - **Vulnerabilidade identificada:**
-  - No Dudit, compradores de marketplace vinculam-se a registros da tabela `customers` prioritariamente através da coluna `marketplace_user_id` (com constraint UNIQUE `(partner_id, marketplace_user_id)`). Clientes pré-existentes na base do lojista (ERP) que compram no marketplace têm `marketplace_user_id` preenchido, mas `user_id` mantido como `NULL`.
+  - Na Dudit, compradores de marketplace vinculam-se a registros da tabela `customers` prioritariamente através da coluna `marketplace_user_id` (com constraint UNIQUE `(partner_id, marketplace_user_id)`). Clientes pré-existentes na base do lojista (ERP) que compram no marketplace têm `marketplace_user_id` preenchido, mas `user_id` mantido como `NULL`.
   - Nas Server Actions de cliente de assinaturas (`app/actions/marketplace/recurring-subscriptions.ts`):
     - `getMyRecurringSubscriptionsAction` e `getMyRecurringCreditsAction` realizavam `.eq("user_id", user.id)`, retornando lista vazia para compradores com cadastro preenchido apenas por `marketplace_user_id`.
     - `getMyRecurringSubscriptionExecutionsAction`, `updateMySubscriptionStatus` (pausa/cancelamento), `skipMyNextRecurringExecutionAction`, `updateMySubscriptionShippingAddressAction`, `changeMySubscriptionPaymentMethodAction`, `decideSubscriptionPriceChangeAction` e `bookServiceWithCreditAction` verificavam `customers!inner(user_id)` com `sub.customers?.user_id !== user.id`. Clientes legítimos eram rejeitados com erro "Assinatura não encontrada".

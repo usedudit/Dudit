@@ -1,5 +1,5 @@
 /**
- * Regras de enquadramento tributário usadas pelo Dudit.
+ * Regras de enquadramento tributário usadas pela Dudit.
  *
  * Escopo do produto: MEI + Pessoa Física. Não há suporte a ME/EPP do Simples
  * (CRT 1/2) nem a emissão de documento fiscal.

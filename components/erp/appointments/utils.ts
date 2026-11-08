@@ -163,11 +163,11 @@ export const getAppointmentStyle = (status: string) => {
     // In Progress -> Brand Dark / Teal
     if (s === 'iniciado' || s === 'in progress') {
         return {
-            container: 'bg-[#003229]/10 dark:bg-[#003229]/30 border-[#003229]/20 dark:border-[#003229]/40',
-            bar: 'bg-[#003229]',
-            title: 'text-[#003229] dark:text-[#e0f2f1]',
+            container: 'bg-[#09211b]/10 dark:bg-[#09211b]/30 border-[#09211b]/20 dark:border-[#09211b]/40',
+            bar: 'bg-[#09211b]',
+            title: 'text-[#09211b] dark:text-[#e0f2f1]',
             text: 'text-[#004d40] dark:text-[#b2dfdb]',
-            dot: 'bg-[#003229]'
+            dot: 'bg-[#09211b]'
         };
     }
 
