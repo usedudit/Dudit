@@ -1,18 +1,20 @@
 import posthog from "posthog-js"
 
 /**
- * Common Marketplace events
+ * Marketplace / buyer funnel events.
+ *
+ * Keep this list honest: only events that are actually captured somewhere in
+ * the app belong here. Events that are not wired are removed instead of
+ * pretending the funnel is instrumented.
  */
 export type MarketplaceEvent =
     | "product_viewed"
-    | "service_viewed"
     | "storefront_viewed"
     | "add_to_cart_clicked"
     | "buy_now_clicked"
     | "whatsapp_lead_clicked"
     | "checkout_started"
-    | "delivery_fee_calculated"
-    | "coupon_applied"
+    | "checkout_failed"
     | "payment_method_selected"
     | "order_submitted"
     | "search_performed"
@@ -21,28 +23,45 @@ export type MarketplaceEvent =
     | "review_submitted"
 
 /**
- * Common Merchant / ERP events
+ * Authentication funnel events. Never include e-mail, phone or other PII in
+ * the properties of these events.
+ */
+export type AuthEvent =
+    | "signup_started"
+    | "signup_completed"
+    | "login_succeeded"
+    | "login_failed"
+    | "password_reset_requested"
+    | "password_reset_completed"
+
+/**
+ * Merchant / ERP activation and payment events.
  */
 export type ErpEvent =
     | "partner_wizard_step"
-    | "partner_mode_selected"
     | "partner_created"
-    | "first_product_created"
-    | "first_sale_recorded"
-    | "pos_sale_completed"
-    | "cash_register_opened"
-    | "cash_register_closed"
-    | "service_order_created"
-    | "service_order_signed"
-    | "xml_imported"
+    | "product_created"
+    | "sale_completed"
+    | "payment_approved"
+    | "payment_failed"
     | "feature_paywall_viewed"
     | "plan_upgrade_clicked"
+    | "plan_upgrade_started"
+    | "plan_upgrade_completed"
+    | "subscription_cancelled"
+
+/**
+ * Account lifecycle events.
+ */
+export type AccountEvent =
+    | "account_deletion_requested"
+    | "account_deletion_completed"
 
 /**
  * Capture an analytics event safely from client components
  */
 export function trackEvent(
-    event: MarketplaceEvent | ErpEvent | (string & {}),
+    event: MarketplaceEvent | AuthEvent | ErpEvent | AccountEvent | (string & {}),
     properties?: Record<string, any>
 ) {
     if (typeof window === "undefined") return

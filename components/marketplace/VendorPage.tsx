@@ -1255,6 +1255,16 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [updateTabsScrollState, allTabs.length])
 
+    // Funnel event: one capture per storefront id.
+    useEffect(() => {
+        if (!partner?.id) return
+        trackEvent("storefront_viewed", {
+            partner_id: partner.partner_id || partner.id,
+            store_id: partner.store_id || partner.id,
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [partner?.id])
+
     const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.storeName), [partner.phone, partner.storeName])
     const updateCategoryUrl = useCallback((
         tag: string | null,

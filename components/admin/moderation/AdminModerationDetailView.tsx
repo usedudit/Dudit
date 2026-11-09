@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
 import {
     ChevronLeftIcon,
     CheckCircleIcon,
@@ -10,6 +10,7 @@ import {
     UserIcon,
     ClockIcon,
     ThreeDotsIcon,
+    XIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -19,7 +20,6 @@ import {
     TabsTrigger,
     TabsContent,
     FormSection,
-    Input,
     ActionsDropdown,
     DropdownItem,
     SidebarCard,
@@ -27,16 +27,17 @@ import {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import DefaultModal from "@/components/reusable/DefaultModal"
 import { useSidebar } from "@/lib/sidebar-context"
 import { toast } from "@/hooks/use-notification"
 import {
     approveModeration,
     rejectModeration,
+    removeModerationImage,
+    getAdminEntityTimeline,
 } from "@/app/actions/admin/moderation"
-import { removeImage } from "@/app/actions/admin/moderation-v2"
+import { useAdminActionModal } from "../AdminActionModal"
+import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ModerationItem } from "@/lib/admin/types"
-import { useTransition } from "react"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
@@ -78,11 +79,13 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
     const scrollRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
 
-    // Modals
-    const [showApproveModal, setShowApproveModal] = useState(false)
-    const [showFullRejectModal, setShowFullRejectModal] = useState(false)
-    const [rejectReason, setRejectReason] = useState("")
+    // Admin Action Modal
+    const { modal: actionModal, runAction } = useAdminActionModal()
     const [removedImages, setRemovedImages] = useState<Set<string>>(new Set())
+
+    // Timeline entries
+    const [timelineEntries, setTimelineEntries] = useState<HistoryEntry[]>([])
+    const [isLoadingTimeline, setIsLoadingTimeline] = useState(false)
 
     // Lightbox
     const [showLightbox, setShowLightbox] = useState(false)
@@ -103,6 +106,24 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
     const statusMeta = getStatusMeta(item.moderation_status)
     const typeLabel = getTypeLabel(item.type)
 
+    const loadTimeline = useCallback(async () => {
+        setIsLoadingTimeline(true)
+        try {
+            const res = await getAdminEntityTimeline(item.id, item.type as any)
+            if (res.success && res.data) {
+                setTimelineEntries(res.data)
+            }
+        } finally {
+            setIsLoadingTimeline(false)
+        }
+    }, [item.id, item.type])
+
+    useEffect(() => {
+        if (activeTab === "timeline") {
+            loadTimeline()
+        }
+    }, [activeTab, loadTimeline])
+
     useEffect(() => {
         if (!setHeaderOverride) return
         setHeaderOverride({
@@ -122,40 +143,84 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
         setShowLightbox(true)
     }
 
-    const handleRemoveImageByIndex = (index: number) => {
+    const handleRemoveImageByIndex = async (index: number) => {
         const url = visibleImages[index]
-        startTransition(async () => {
-            const result = await removeImage("product", item.id, url, "images", 0, undefined, item.partner_id)
-            if (result.success) {
-                toast.success("Imagem removida!")
-                setRemovedImages(prev => new Set(prev).add(url))
-            } else {
-                toast.error(result.error || "Erro ao remover imagem")
-            }
+        if (!url) return
+
+        await runAction({
+            title: "Remover imagem da moderação",
+            description: `Deseja remover esta imagem do ${typeLabel.toLowerCase()} "${item.title}"?`,
+            changedFields: ["1 imagem removida"],
+            force: true,
+            confirmLabel: "Remover Imagem",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await removeModerationImage(item.id, url, item.type as any, {
+                    reason: payload.reason || null,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success("Imagem removida com sucesso!")
+                    setRemovedImages(prev => new Set(prev).add(url))
+                    if (visibleImages.length <= 1) {
+                        setShowLightbox(false)
+                    } else if (index >= visibleImages.length - 1) {
+                        setLightboxIndex(Math.max(0, visibleImages.length - 2))
+                    }
+                    loadTimeline()
+                    return { success: true }
+                }
+                return { success: false, error: result.error }
+            },
         })
     }
 
-    const handleApprove = () => {
-        startTransition(async () => {
-            const result = await approveModeration(item.id, item.type as any)
-            if (result.success) {
-                toast.success(`${typeLabel} aprovado com sucesso!`)
-                onBack()
-            } else {
-                toast.error(result.error || `Erro ao aprovar ${typeLabel.toLowerCase()}`)
-            }
+    const handleApprove = async () => {
+        await runAction({
+            title: `Aprovar ${typeLabel}`,
+            description: `Confirmar aprovação do ${typeLabel.toLowerCase()} "${item.title}"? O item ficará visível imediatamente na vitrine.`,
+            changedFields: ["Status de moderação: Aprovado"],
+            force: true,
+            confirmLabel: "Aprovar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await approveModeration(item.id, item.type as any, {
+                    reason: payload.reason || null,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${typeLabel} aprovado com sucesso!`)
+                    onBack()
+                    return { success: true }
+                }
+                return { success: false, error: result.error }
+            },
         })
     }
 
-    const handleFullReject = () => {
-        startTransition(async () => {
-            const result = await rejectModeration(item.id, rejectReason, item.type as any)
-            if (result.success) {
-                toast.success(`${typeLabel} rejeitado com sucesso!`)
-                onBack()
-            } else {
-                toast.error(result.error || `Erro ao rejeitar ${typeLabel.toLowerCase()}`)
-            }
+    const handleFullReject = async () => {
+        await runAction({
+            title: `Rejeitar ${typeLabel}`,
+            description: `Confirmar rejeição do ${typeLabel.toLowerCase()} "${item.title}"? O item não será exibido na vitrine e o vendedor receberá a notificação.`,
+            changedFields: ["Status de moderação: Rejeitado"],
+            requireReason: true,
+            confirmLabel: "Rejeitar",
+            notifyLabel: "Enviar notificação ao vendedor pelo Dudit",
+            runner: async (payload) => {
+                const result = await rejectModeration(item.id, payload.reason, item.type as any, {
+                    reason: payload.reason,
+                    riskScore: payload.riskScore,
+                    notifySeller: payload.notifySeller,
+                })
+                if (result.success) {
+                    toast.success(`${typeLabel} rejeitado com sucesso!`)
+                    onBack()
+                    return { success: true }
+                }
+                return { success: false, error: result.error }
+            },
         })
     }
 
@@ -201,30 +266,40 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown>
-                                            {item.moderation_status !== "approved" && (
-                                                <DropdownItem onClick={() => setShowApproveModal(true)} disabled={isPending}>
-                                                    <CheckCircleIcon size={16} className="text-brand-green" /> Aprovar {typeLabel}
-                                                </DropdownItem>
-                                            )}
-                                            {(item.type === "product" || item.type === "service") && (
-                                                <DropdownItem
-                                                    onClick={() => {
-                                                        if (item.type === "product") {
-                                                            window.open(`/erp/produtos/${item.id}`, "_blank")
-                                                        } else {
-                                                            window.open(`/erp/servicos?edit=${item.id}`, "_blank")
-                                                        }
-                                                    }}
-                                                >
-                                                    <EditIcon size={16} /> Editar no ERP
-                                                </DropdownItem>
-                                            )}
-                                            <DropdownItem onClick={() => setShowFullRejectModal(true)} disabled={isPending}>
-                                                <TrashIcon size={16} className="text-brand-red" /> Rejeitar {typeLabel}
-                                            </DropdownItem>
-                                        </ActionsDropdown>
+                                    <div className="hidden md:flex items-center gap-2 shrink-0 ml-3">
+                                        {item.moderation_status !== "approved" && (
+                                            <Button
+                                                size="sm"
+                                                onClick={handleApprove}
+                                                className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-9 px-3 text-xs font-semibold"
+                                            >
+                                                <CheckCircleIcon size={14} /> Aprovar {typeLabel}
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={handleFullReject}
+                                            className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold"
+                                        >
+                                            <TrashIcon size={14} /> Rejeitar {typeLabel}
+                                        </Button>
+                                        {(item.type === "product" || item.type === "service") && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    if (item.type === "product") {
+                                                        window.open(`/erp/produtos/${item.id}`, "_blank")
+                                                    } else {
+                                                        window.open(`/erp/servicos?edit=${item.id}`, "_blank")
+                                                    }
+                                                }}
+                                                className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold"
+                                            >
+                                                <EditIcon size={14} /> Editar no ERP
+                                            </Button>
+                                        )}
                                     </div>
 
                                     {/* Tabs */}
@@ -233,6 +308,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                             <TabsTrigger value="general">Geral</TabsTrigger>
                                             <TabsTrigger value="store">Loja & Proprietário</TabsTrigger>
                                             <TabsTrigger value="images">Imagens ({visibleImages.length || 0})</TabsTrigger>
+                                            <TabsTrigger value="timeline">Histórico</TabsTrigger>
                                         </TabsList>
                                     </div>
                                 </div>
@@ -470,19 +546,63 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                         <FadeIn key="images">
                                             <div className="space-y-4">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                        Imagens do {typeLabel} ({visibleImages.length})
-                                                    </h3>
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                            Imagens do {typeLabel} ({visibleImages.length})
+                                                        </h3>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            Clique em qualquer imagem para inspecioná-la em tela cheia e moderar.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {item.moderation_status !== "approved" && (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={handleApprove}
+                                                                className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-8 px-3 text-xs font-semibold"
+                                                            >
+                                                                <CheckCircleIcon size={14} /> Aprovar {typeLabel}
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={handleFullReject}
+                                                            className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold"
+                                                        >
+                                                            <TrashIcon size={14} /> Rejeitar {typeLabel}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                                 <ProductImagesSection
                                                     images={visibleImages}
                                                     onImageUpload={() => { }}
                                                     onRemoveImage={handleRemoveImageByIndex}
                                                     onSetPrimaryImage={() => { }}
-                                                    isEditing={item.type === "product" || item.type === "service"}
+                                                    isEditing={true}
                                                     moderationStatus={item.moderation_status as any}
                                                     onImageClick={openLightbox}
                                                 />
+                                            </div>
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    {/* Timeline Tab */}
+                                    <TabsContent value="timeline" className="mt-0">
+                                        <FadeIn key="timeline">
+                                            <div className="max-w-[900px]">
+                                                {isLoadingTimeline ? (
+                                                    <div className="py-12 flex flex-col items-center justify-center text-sm text-brand-inactive-text gap-2">
+                                                        <ClockIcon size={24} className="animate-spin text-brand-green" />
+                                                        <span>Carregando histórico do item...</span>
+                                                    </div>
+                                                ) : (
+                                                    <HistoryTimeline
+                                                        entries={timelineEntries}
+                                                        title="Histórico de Auditoria e Eventos"
+                                                        emptyMessage="Este item ainda não possui eventos de auditoria."
+                                                    />
+                                                )}
                                             </div>
                                         </FadeIn>
                                     </TabsContent>
@@ -494,103 +614,47 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
             </FadeIn>
 
             {/* Mobile Bottom Action Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <div className="flex-1">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
+                {item.moderation_status !== "approved" && (
+                    <Button
+                        onClick={handleApprove}
+                        className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white h-11 text-xs font-semibold flex items-center justify-center gap-1.5"
+                    >
+                        <CheckCircleIcon size={16} /> Aprovar
+                    </Button>
+                )}
+                <Button
+                    variant="destructive"
+                    onClick={handleFullReject}
+                    className="flex-1 h-11 text-xs font-semibold flex items-center justify-center gap-1.5"
+                >
+                    <TrashIcon size={16} /> Rejeitar
+                </Button>
+                {(item.type === "product" || item.type === "service") && (
                     <ActionsDropdown
-                        fullWidth
                         trigger={
-                            <Button variant="outline" className="w-full h-12">
+                            <Button variant="outline" className="w-11 h-11 p-0 flex items-center justify-center">
                                 <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
                             </Button>
                         }
                     >
-                        {item.moderation_status !== "approved" && (
-                            <DropdownItem onClick={() => setShowApproveModal(true)} disabled={isPending}>
-                                <CheckCircleIcon size={16} className="text-brand-green" /> Aprovar
-                            </DropdownItem>
-                        )}
-                        {(item.type === "product" || item.type === "service") && (
-                            <DropdownItem
-                                onClick={() => {
-                                    if (item.type === "product") {
-                                        window.open(`/erp/produtos/${item.id}`, "_blank")
-                                    } else {
-                                        window.open(`/erp/servicos?edit=${item.id}`, "_blank")
-                                    }
-                                }}
-                            >
-                                <EditIcon size={16} /> Editar no ERP
-                            </DropdownItem>
-                        )}
-                        <DropdownItem onClick={() => setShowFullRejectModal(true)} disabled={isPending}>
-                            <TrashIcon size={16} className="text-brand-red" /> Rejeitar
+                        <DropdownItem
+                            onClick={() => {
+                                if (item.type === "product") {
+                                    window.open(`/erp/produtos/${item.id}`, "_blank")
+                                } else {
+                                    window.open(`/erp/servicos?edit=${item.id}`, "_blank")
+                                }
+                            }}
+                        >
+                            <EditIcon size={16} /> Editar no ERP
                         </DropdownItem>
                     </ActionsDropdown>
-                </div>
+                )}
             </div>
 
-            {/* Approve Modal */}
-            <DefaultModal
-                isOpen={showApproveModal}
-                onClose={() => setShowApproveModal(false)}
-                title={`Aprovar ${typeLabel}`}
-                maxWidth="sm"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => setShowApproveModal(false)} disabled={isPending}>Cancelar</Button>
-                        <Button onClick={handleApprove} isLoading={isPending}>Confirmar Aprovação</Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col items-center text-center gap-4 py-4">
-                    <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
-                        <CheckCircleIcon size={32} />
-                    </div>
-                    <div>
-                        <p className="text-brand-dark dark:text-dark-heading font-bold text-lg">Confirmar aprovação?</p>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
-                            {item.type === "product"
-                                ? `O produto "${item.title}" ficará visível imediatamente.`
-                                : `O serviço "${item.title}" ficará visível imediatamente.`}
-                        </p>
-                    </div>
-                </div>
-            </DefaultModal>
-
-            {/* Full Reject Modal */}
-            <DefaultModal
-                isOpen={showFullRejectModal}
-                onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
-                title={`Rejeitar ${typeLabel}`}
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setShowFullRejectModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
-                        <Button
-                            variant="destructive"
-                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                            onClick={handleFullReject}
-                            isLoading={isPending}
-                        >
-                            Confirmar Rejeição
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">O item será removido da fila e o parceiro receberá o motivo da rejeição.</p>
-                    <Input
-                        name="full-reject-reason"
-                        label="Motivo da rejeição"
-                        placeholder="Explique detalhadamente o motivo da rejeição..."
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                        multiline
-                        rows={3}
-                        required
-                    />
-                </div>
-            </DefaultModal>
+            {/* Admin Action Modal (Salvar alterações, Aprovar, Rejeitar, Remover imagem) */}
+            {actionModal}
 
             {/* Image Lightbox */}
             <ImageLightbox
@@ -599,17 +663,38 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                 images={allImages}
                 currentIndex={lightboxIndex}
                 onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
+                onRemoveImage={handleRemoveImageByIndex}
+                onApprove={handleApprove}
+                onReject={handleFullReject}
+                typeLabel={typeLabel}
+                isApproved={item.moderation_status === "approved"}
             />
         </>
     )
 }
 
-function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
+function ImageLightbox({
+    isOpen,
+    onClose,
+    images,
+    currentIndex,
+    onNavigate,
+    onRemoveImage,
+    onApprove,
+    onReject,
+    typeLabel,
+    isApproved,
+}: {
     isOpen: boolean
     onClose: () => void
     images: string[]
     currentIndex: number
     onNavigate: (dir: 1 | -1) => void
+    onRemoveImage: (index: number) => void
+    onApprove: () => void
+    onReject: () => void
+    typeLabel: string
+    isApproved: boolean
 }) {
     // z-index dinâmico: o lightbox abre acima de tudo que já estava aberto.
     const zIndex = useModalLayer(isOpen)
@@ -619,18 +704,75 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
     const currentImage = images[currentIndex]
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" style={{ zIndex }} onClick={onClose}>
-            <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+        <div
+            className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center select-none"
+            style={{ zIndex }}
+            onClick={onClose}
+        >
+            {/* Top Action Bar */}
+            <div
+                className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 md:px-6 py-3 bg-black/70 backdrop-blur-md border-b border-white/10"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center gap-3">
+                    <span className="text-white font-medium text-xs md:text-sm bg-white/10 px-3 py-1 rounded-full">
+                        Imagem {currentIndex + 1} de {images.length}
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => onRemoveImage(currentIndex)}
+                        className="flex items-center gap-1.5 h-8 md:h-9 px-2.5 md:px-3 text-xs font-semibold"
+                    >
+                        <TrashIcon size={14} /> Remover esta imagem
+                    </Button>
+
+                    {!isApproved && (
+                        <Button
+                            size="sm"
+                            onClick={onApprove}
+                            className="bg-brand-green hover:bg-brand-green/90 text-white flex items-center gap-1.5 h-8 md:h-9 px-2.5 md:px-3 text-xs font-semibold"
+                        >
+                            <CheckCircleIcon size={14} /> Aprovar {typeLabel}
+                        </Button>
+                    )}
+
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onReject}
+                        className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5 h-8 md:h-9 px-2.5 md:px-3 text-xs font-semibold"
+                    >
+                        <TrashIcon size={14} className="text-brand-red" /> Rejeitar {typeLabel}
+                    </Button>
+
+                    <button
+                        onClick={onClose}
+                        className="text-white/80 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 ml-1 md:ml-3"
+                        title="Fechar visualizador"
+                    >
+                        <XIcon size={20} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Central Image View */}
+            <div className="relative w-full h-full max-w-[90vw] max-h-[82vh] flex items-center justify-center mt-12 mb-6">
                 <img
                     src={currentImage}
                     alt={`Imagem ${currentIndex + 1} de ${images.length}`}
-                    className="max-w-full max-h-full object-contain"
+                    className="max-w-full max-h-full object-contain select-none"
+                    onClick={(e) => e.stopPropagation()}
                 />
+
                 {images.length > 1 && (
                     <>
                         <button
                             onClick={(e) => { e.stopPropagation(); onNavigate(-1) }}
-                            className="absolute left-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            className="absolute left-2 md:left-4 text-white/80 hover:text-white transition-colors p-2.5 rounded-full bg-black/60 hover:bg-black/80"
                         >
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="15 18 9 12 15 6" />
@@ -638,26 +780,14 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); onNavigate(1) }}
-                            className="absolute right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
+                            className="absolute right-2 md:right-4 text-white/80 hover:text-white transition-colors p-2.5 rounded-full bg-black/60 hover:bg-black/80"
                         >
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="9 18 15 12 9 6" />
                             </svg>
                         </button>
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
-                            {currentIndex + 1} / {images.length}
-                        </div>
                     </>
                 )}
-                <button
-                    onClick={(e) => { e.stopPropagation(); onClose() }}
-                    className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
-                >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
             </div>
         </div>
     )

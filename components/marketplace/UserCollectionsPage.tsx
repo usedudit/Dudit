@@ -29,9 +29,15 @@ interface Collection {
 
 interface UserCollectionsPageProps {
     collections: Collection[]
+    userProfile?: any
+    cartCount?: number
 }
 
-export function UserCollectionsPage({ collections: initialCollections }: UserCollectionsPageProps) {
+export function UserCollectionsPage({
+    collections: initialCollections,
+    userProfile,
+    cartCount,
+}: UserCollectionsPageProps) {
     const router = useRouter()
     const [collections] = useState(initialCollections)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -79,20 +85,19 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
     }
 
     return (
-        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
-            <MarketplaceHeader simpleTitle="Minhas coleções" />
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+            <MarketplaceHeader simpleTitle="Minhas coleções" userProfile={userProfile} cartCount={cartCount} />
 
-            <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
-                <div className="hidden lg:block items-center mb-8">
-                    {/* Header */}
-
-                    <div className="flex items-center justify-between mb-8">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-24 lg:pb-20 mt-[78px] lg:mt-[108px] relative">
+                {/* Header (desktop) */}
+                <div className="hidden lg:block mb-8">
+                    <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                 Minhas Coleções
-                                {initialCollections.length > 0 && (
+                                {collections.length > 0 && (
                                     <span className="text-brand-inactive-text dark:text-dark-body font-bold text-base lg:text-lg ml-2">
-                                        ({initialCollections.length})
+                                        ({collections.length})
                                     </span>
                                 )}
                             </h1>
@@ -100,65 +105,65 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
                                 Organize seus produtos e serviços favoritos em coleções personalizadas
                             </p>
                         </div>
-                        {initialCollections.length > 0 && (
+                        {collections.length > 0 && (
                             <Button
                                 onClick={() => setIsCreateModalOpen(true)}
                                 leftIcon={<PlusIcon size={18} />}
                                 variant="default"
-                                className="hidden sm:flex"
                             >
                                 Nova Coleção
                             </Button>
                         )}
                     </div>
-
-                    {/* Content */}
-                    {initialCollections.length === 0 ? (
-                        <div className="flex justify-center py-12">
-                            <IconPlaceholder
-                                placeholderType="image"
-                                imageSrc="https://img.dudit.com.br/static/mascots/Favoritos.png"
-                                imageAlt="Suas coleções estão vazias"
-                                title="Suas coleções estão vazias"
-                                subtitle="Crie coleções para organizar seus produtos e serviços favoritos!"
-                                itemButton={{
-                                    text: "Criar Coleção",
-                                    action: () => setIsCreateModalOpen(true),
-                                    variant: "default",
-                                }}
-                            />
-                        </div>
-                    ) : (
-                        <>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 lg:gap-5" style={{ gridAutoRows: "min-content" }}>
-                                {paginatedCollections.map((collection) => (
-                                    <CollectionCard key={collection.id} collection={collection} className="w-full" />
-                                ))}
-                            </div>
-
-                            {totalPages > 1 && (
-                                <div className="mt-8">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        onPageChange={handlePageChange}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Mobile Sticky Button */}
-                            <div className="sm:hidden fixed bottom-20 right-4 z-40">
-                                <Button
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    variant="default"
-                                    className="w-12 h-12 rounded-full flex items-center justify-center p-0 shadow-lg"
-                                >
-                                    <PlusIcon size={24} />
-                                </Button>
-                            </div>
-                        </>
-                    )}
                 </div>
+
+                {/* Content */}
+                {collections.length === 0 ? (
+                    <div className="flex justify-center py-12">
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/Favoritos.png"
+                            imageAlt="Suas coleções estão vazias"
+                            title="Suas coleções estão vazias"
+                            subtitle="Crie coleções para organizar seus produtos e serviços favoritos!"
+                            itemButton={{
+                                text: "Criar Coleção",
+                                action: () => setIsCreateModalOpen(true),
+                                variant: "default",
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 lg:gap-5" style={{ gridAutoRows: "min-content" }}>
+                            {paginatedCollections.map((collection) => (
+                                <CollectionCard key={collection.id} collection={collection} className="w-full" />
+                            ))}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div className="mt-8">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={handlePageChange}
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Tablet/Mobile Bottom Menu */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] flex items-center justify-center shadow-lg">
+                <Button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    leftIcon={<PlusIcon size={18} />}
+                    variant="default"
+                    className="w-full sm:max-w-md flex items-center justify-center gap-2 font-semibold text-sm h-11"
+                >
+                    Nova Coleção
+                </Button>
             </div>
 
             <MarketplaceFooter />

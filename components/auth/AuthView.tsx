@@ -17,9 +17,25 @@ import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
 import { getSafeRedirectPath } from "@/lib/security/safe-redirect"
+import { trackEvent } from "@/lib/analytics"
+import { logPasswordResetRequestedAction } from "@/app/actions/auth/audit"
 
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
+
+/**
+ * Maps a Supabase auth error to a stable, PII-free reason code for analytics
+ * and audit logs.
+ */
+function getLoginFailureReason(err: any): string {
+    const code = String(err?.code || "").toLowerCase()
+    const message = String(err?.message || "").toLowerCase()
+    if (code === "email_not_confirmed" || message.includes("email not confirmed")) return "email_not_confirmed"
+    if (code === "invalid_credentials" || message.includes("invalid login credentials")) return "invalid_credentials"
+    if (code === "captcha_failed" || message.includes("captcha")) return "captcha_failed"
+    if (code === "over_request_rate_limit" || message.includes("rate limit")) return "rate_limited"
+    return "unknown"
+}
 
 // Otimização: Static Background Memoized
 const WavesBackground = React.memo(() => (
@@ -195,6 +211,8 @@ export default function AuthView({
             if (mode === "signup") {
                 if (calculatePasswordScore(password) < 2) throw new Error("A senha deve ser média ou forte.")
 
+                trackEvent("signup_started", { method: "password" })
+
                 const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
                 const { data, error } = await supabase.auth.signUp({
                     email: cleanEmail,
@@ -220,6 +238,7 @@ export default function AuthView({
 
                 if (data.user) {
                     saveAnalyticsPreference(acceptedAnalytics)
+                    trackEvent("signup_completed", { method: "password" })
                     try {
                         await Promise.all(
                             CURRENT_LEGAL_DOCUMENTS.map((doc) =>
@@ -260,8 +279,10 @@ export default function AuthView({
                     console.error("[AUTH LOGIN ERROR]", signInError)
                     setTurnstileToken(null)
                     turnstileRef.current?.reset()
+                    const failureReason = getLoginFailureReason(signInError)
+                    trackEvent("login_failed", { reason: failureReason })
                     try {
-                        const lockoutRes = await handleLoginResult(cleanEmail, false)
+                        const lockoutRes = await handleLoginResult(cleanEmail, false, failureReason)
                         if (lockoutRes?.error) {
                             setError(lockoutRes.error)
                             setIsLoading(false)
@@ -306,6 +327,8 @@ export default function AuthView({
                     console.warn("[AUTH] clearFailedLogins warning:", clearErr)
                 }
 
+                trackEvent("login_succeeded", { method: "password" })
+
                 // Hard navigation to ensure all server cookies, headers, and fresh layout state are synchronized
                 window.location.assign(getSafeRedirectPath(nextParam))
             }
@@ -348,6 +371,12 @@ export default function AuthView({
                 setTurnstileToken(null)
                 turnstileRef.current?.reset()
                 throw error
+            }
+            trackEvent("password_reset_requested", { method: "email" })
+            try {
+                await logPasswordResetRequestedAction(email.trim().toLowerCase())
+            } catch (auditErr) {
+                console.warn("[AUTH] Failed to audit password reset request:", auditErr)
             }
             setVerifyContext("recovery")
             changeMode("verify-email")
@@ -463,7 +492,7 @@ export default function AuthView({
                                     </div>
                                 )}
 
-                                <button onClick={() => changeMode("login")} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">← Voltar para Login</button>
+                                <Button variant="link" onClick={() => changeMode("login")}>Voltar para Login</Button>
                             </motion.div>
                         )}
 

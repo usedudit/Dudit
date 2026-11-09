@@ -457,10 +457,6 @@ export async function createQuoteAction(data: {
             if (payloadValidationError) {
                 return errorResponse(payloadValidationError)
             }
-            const stockValidationError = await validateQuoteItemsStock(data.partnerId, data.items || [], supabase)
-            if (stockValidationError) {
-                return errorResponse(stockValidationError)
-            }
 
             // Map data to JSON for the Postgres RPC Function
             const itemsJson = data.items && data.items.length > 0 ? data.items.map((item, idx) => ({

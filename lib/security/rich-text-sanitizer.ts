@@ -24,10 +24,13 @@ const ALLOWED_ATTR = [
 export function sanitizeRichText(dirtyHtml?: string | null): string {
   if (!dirtyHtml || typeof dirtyHtml !== "string") return ""
 
-  return DOMPurify.sanitize(dirtyHtml, {
+  const clean = DOMPurify.sanitize(dirtyHtml, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
     ADD_ATTR: ["target"],
   })
+
+  // Remove residual outline/outline-offset (e.g. from editor selections previously saved in DB)
+  return clean.replace(/outline(?:-offset)?\s*:\s*[^;"]+;?/gi, "")
 }

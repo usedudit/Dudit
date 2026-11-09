@@ -4,6 +4,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkAccountLockout, recordFailedLogin, clearFailedLogins } from "@/lib/security/account-lockout"
 import { getCurrentUser } from "@/lib/auth/authorization"
+import { auditLog } from "@/lib/security/audit-logger"
 
 export async function preCheckLogin(email: string): Promise<{ allowed: boolean; error?: string }> {
     try {
@@ -31,7 +32,11 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
     return { allowed: true }
 }
 
-export async function handleLoginResult(email: string, success: boolean): Promise<{ error?: string }> {
+export async function handleLoginResult(
+    email: string,
+    success: boolean,
+    reason?: string
+): Promise<{ error?: string }> {
     try {
         await requireRateLimit(RateLimitCategory.AUTH_LOGIN)
     } catch {
@@ -48,10 +53,23 @@ export async function handleLoginResult(email: string, success: boolean): Promis
             const user = await getCurrentUser()
             if (user && user.email?.toLowerCase().trim() === cleanEmail) {
                 await clearFailedLogins(cleanEmail)
+                await auditLog({
+                    action: "auth.login",
+                    actorUserId: user.id,
+                    metadata: { method: "password" },
+                })
             }
             return {}
         } else {
             const { lockedNow } = await recordFailedLogin(cleanEmail)
+            await auditLog({
+                action: "auth.login_failed",
+                actorUserId: null,
+                metadata: {
+                    email: cleanEmail,
+                    reason: reason || (lockedNow ? "account_locked" : "invalid_credentials"),
+                },
+            })
             if (lockedNow) {
                 return {
                     error: "Sua conta foi bloqueada por 15 minutos devido a 10 tentativas malsucedidas consecutivas."

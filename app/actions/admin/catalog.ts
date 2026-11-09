@@ -65,6 +65,7 @@ import {
     normalizePlanFulfillmentModes,
     mapItemsToDb,
 } from "@/lib/recurring/plan-form-helpers"
+import { getAdminEntityTimeline } from "@/app/actions/admin/moderation"
 
 type AdminClient = ReturnType<typeof getAdminClient>
 
@@ -96,6 +97,7 @@ async function clientIp(): Promise<string> {
 async function partnerTimeline(entry: {
     partnerId: string
     actorUserId: string | null
+    actorName?: string | null
     entityType: "product" | "service" | "recurring_plan"
     entityId: string
     actionType: string
@@ -106,11 +108,12 @@ async function partnerTimeline(entry: {
         await logAuditEvent({
             partnerId: entry.partnerId,
             actorUserId: entry.actorUserId,
+            actorName: entry.actorName,
             entityType: entry.entityType,
             entityId: entry.entityId,
             actionType: entry.actionType as any,
             changeLines: entry.changeLines,
-            metadata: { ip_address: await clientIp(), ...(entry.metadata || {}) },
+            metadata: { ip_address: await clientIp(), is_admin_action: true, dudit_action: true, ...(entry.metadata || {}) },
             source: "manual",
         })
     } catch (e) {
@@ -323,7 +326,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
             ...logistics,
         }
 
-        const [suppliersRes, store, partnerRes, auditRes] = await Promise.all([
+        const [suppliersRes, store, partnerRes, timelineRes] = await Promise.all([
             admin
                 .from("suppliers")
                 .select("id, name, email, phone, cnpj, cpf, status")
@@ -331,12 +334,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
                 .order("name"),
             fetchHeadStore(admin, raw.partner_id),
             admin.from("partners").select("id, business_info").eq("id", raw.partner_id).maybeSingle(),
-            admin
-                .from("admin_audit_logs")
-                .select("*")
-                .eq("target_id", id)
-                .order("created_at", { ascending: false })
-                .limit(100),
+            getAdminEntityTimeline(id, "product"),
         ])
 
         const decryptCpfIfEncrypted = (await import("@/lib/crypto")).decryptCpfIfEncrypted
@@ -351,7 +349,7 @@ export async function getAdminCatalogProductDetail(productId: string) {
             suppliers,
             store,
             partner: partnerRes.data || null,
-            auditEvents: (auditRes.data as any[]) || [],
+            auditEvents: (timelineRes.data as any[]) || [],
         })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao carregar produto")
@@ -373,26 +371,21 @@ export async function getAdminCatalogServiceDetail(serviceId: string) {
         if (error) return errorResponse(error.message)
         if (!service) return errorResponse("Serviço não encontrado")
 
-        const [store, partnerRes, auditRes] = await Promise.all([
+        const [store, partnerRes, timelineRes] = await Promise.all([
             fetchHeadStore(admin, (service as any).partner_id),
             admin
                 .from("partners")
                 .select("id, business_info")
                 .eq("id", (service as any).partner_id)
                 .maybeSingle(),
-            admin
-                .from("admin_audit_logs")
-                .select("*")
-                .eq("target_id", id)
-                .order("created_at", { ascending: false })
-                .limit(100),
+            getAdminEntityTimeline(id, "service"),
         ])
 
         return successResponse({
             service,
             store,
             partner: partnerRes.data || null,
-            auditEvents: (auditRes.data as any[]) || [],
+            auditEvents: (timelineRes.data as any[]) || [],
         })
     } catch (e: any) {
         return errorResponse(e.message || "Erro ao carregar serviço")

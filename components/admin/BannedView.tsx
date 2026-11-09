@@ -142,7 +142,7 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                         Protocolo do Caso
                     </span>
                 </div>
-                <div className="flex items-center justify-between bg-white dark:bg-dark-surface px-3.5 py-2.5 rounded-full border border-brand-border dark:border-dark-border">
+                <div className="flex items-center justify-between">
                     <code className="text-sm font-bold text-brand-dark dark:text-white">
                         {caseId}
                     </code>
@@ -186,7 +186,7 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
             <div className="w-full space-y-2.5">
                 <Button
                     onClick={() => setIsAppealModalOpen(true)}
-                    className="w-full h-[46px]"
+                    className="w-full"
                 >
                     Recorrer da Decisão
                 </Button>
@@ -194,9 +194,9 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                 <Button
                     variant="outline"
                     onClick={handleCopyFullCase}
-                    className="w-full h-[40px]"
+                    className="w-full"
                 >
-                    {copiedAll ? "✓ Dados do caso copiados!" : "Copiar resumo completo do caso"}
+                    {copiedAll ? "Dados do caso copiados!" : "Copiar resumo completo do caso"}
                 </Button>
             </div>
 

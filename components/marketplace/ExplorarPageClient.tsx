@@ -388,6 +388,7 @@ export function ExplorarPageClient({
     // This syncs the server-provided initialMoreDistant* props into state whenever the search key changes,
     // preventing stale "more distant" results from a previous search from persisting.
     const prevQueryKeyRef = useRef(queryKeyString)
+    const lastTrackedSearchRef = useRef("")
     useEffect(() => {
         if (prevQueryKeyRef.current !== queryKeyString) {
             prevQueryKeyRef.current = queryKeyString
@@ -1013,6 +1014,24 @@ export function ExplorarPageClient({
         [applyBrowseFilters, dataToFilter]
     )
 
+    // Funnel event: capture each distinct search context once, after the
+    // current query finished loading so results_count is accurate. The raw term
+    // is intentionally not sent; only its length keeps the event PII-free.
+    useEffect(() => {
+        if (isLoading) return
+        const term = query.trim()
+        if (!term) return
+        const searchKey = `${term}:${currentType}:${selectedCitySlug}`
+        if (lastTrackedSearchRef.current === searchKey) return
+        lastTrackedSearchRef.current = searchKey
+        trackEvent("search_performed", {
+            term_length: term.length,
+            results_count: rawItems.length,
+            type: currentType,
+            city: selectedCitySlug,
+        })
+    }, [query, currentType, selectedCitySlug, rawItems.length, isLoading])
+
     // Apply urgency badges to more distant items
     const moreDistantItemsWithBadges = useMemo(() => {
         return applyVendorUrgencyBadges(moreDistantItems, userProfile?.userId || null)
@@ -1432,6 +1451,14 @@ export function ExplorarPageClient({
      * compartilhado e o botão "voltar" refletem o que está na tela.
      */
     const patchFilters = (patch: Partial<ExploreFilterState> & { sortBy?: SortOption }) => {
+        const changedFilters = Object.keys(patch)
+        if (changedFilters.length > 0) {
+            trackEvent("filter_applied", {
+                filters: changedFilters,
+                type: currentType,
+                city: selectedCitySlug,
+            })
+        }
         triggerFilterLoading()
         if (patch.categories) setSelectedCategories(patch.categories)
         if ("minPrice" in patch) setMinPrice(patch.minPrice as number | string)

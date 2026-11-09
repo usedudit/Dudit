@@ -220,3 +220,55 @@ export async function cacheImageModeration(
     // Se falhar, não quebra o upload - apenas não cacheou
   }
 }
+
+/**
+ * Normaliza um caminho ou URL de imagem para chave única de cache no Redis.
+ */
+export function normalizeImageKey(input: string): string {
+  if (!input || typeof input !== "string") return ""
+  let clean = input.trim()
+  clean = clean.replace(/^https?:\/\/[^\/]+\//i, "")
+  clean = clean.replace(/^\/+/, "")
+  clean = clean.split("?")[0].split("#")[0]
+  return clean.toLowerCase()
+}
+
+/**
+ * Registra o status de moderação diretamente pela URL/chave da imagem no Redis.
+ * Permite checagem instantânea O(1) sem recalcular hash de imagem já enviada.
+ */
+export async function cacheImageUrlStatus(
+  imageUrlOrKey: string,
+  status: "APPROVED" | "FLAGGED",
+  ttlSeconds: number = CACHE_TTL,
+): Promise<void> {
+  const normKey = normalizeImageKey(imageUrlOrKey)
+  if (!normKey) return
+  try {
+    const key = `moderation:img_status:v1:${normKey}`
+    await redis.setex(key, ttlSeconds, status)
+  } catch (err) {
+    console.warn("[IMAGE CACHE] Failed to cache image URL status in Redis:", err)
+  }
+}
+
+/**
+ * Consulta se uma URL/chave de imagem já tem decisão de moderação gravada no Redis.
+ */
+export async function getImageUrlStatus(
+  imageUrlOrKey: string,
+): Promise<"APPROVED" | "FLAGGED" | null> {
+  const normKey = normalizeImageKey(imageUrlOrKey)
+  if (!normKey) return null
+  try {
+    const key = `moderation:img_status:v1:${normKey}`
+    const res = await redis.get<string>(key)
+    if (res === "APPROVED" || res === "FLAGGED") {
+      return res
+    }
+    return null
+  } catch (err) {
+    console.warn("[IMAGE CACHE] Failed to get image URL status from Redis:", err)
+    return null
+  }
+}

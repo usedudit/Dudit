@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
-import { generateSKUBase } from "@/lib/utils/code-generators"
 import type { Product } from "@/lib/types/product"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
@@ -395,7 +394,7 @@ export default function ProductsPage({
             case 'view': return 'details'
             case 'edit': return 'edit'
             case 'create': return 'add'
-            case 'duplicate': return 'add'
+            case 'duplicate': return 'duplicate'
             default: return null
         }
     }, [entityState])
@@ -407,8 +406,9 @@ export default function ProductsPage({
         const target = currentEntity || products.find(p => p.id === entityState.entityId) || null
         if (!target) return null
         if (isDuplicating) {
-            const sku = generateSKUBase(target.name ? `${target.name} Copy` : undefined)
-            return { ...target, id: undefined, sku, images: (target as any).images || [] } as any
+            // O AddProductPage (mode "duplicate") já limpa o SKU, adiciona
+            // "(Cópia)" ao nome e marca isDuplicate para clonar as mídias.
+            return { ...target, id: undefined } as any
         }
         return target as any
     }, [entityState, currentEntity, products, isDuplicating])
@@ -616,7 +616,7 @@ export default function ProductsPage({
     const handleSaveProduct = async (formData: any) => {
         setIsSaving(true)
         try {
-            const isNewProduct = formMode === 'add'
+            const isNewProduct = formMode === 'add' || formMode === 'duplicate'
             const action = isNewProduct ? createProductComprehensiveAction : updateProductAction
             const payload = isNewProduct
                 ? {

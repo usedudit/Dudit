@@ -567,23 +567,16 @@ export function AdminEnforcementModal({
 
                         <div className="flex items-center justify-between gap-3 pt-2">
                             <Button
-                                type="button"
                                 variant="outline"
                                 onClick={handlePrevStep}
                                 disabled={isLoading}
-                                className="text-xs"
                             >
-                                ← Voltar ao Passo 1
+                                Voltar ao Passo 1
                             </Button>
                             <Button
-                                type="button"
-                                variant="filled"
+                                variant={isSuspend ? "destructive" : "default"}
                                 onClick={handleExecuteAction}
                                 disabled={isLoading || !acknowledged || !adminPassword}
-                                className={`text-xs font-bold ${isSuspend
-                                    ? "bg-brand-red hover:bg-brand-red/90 text-white"
-                                    : "bg-brand-green hover:bg-brand-green/90 text-white"
-                                    }`}
                             >
                                 {isLoading ? "Autenticando & Executando..." : isSuspend ? "Confirmar Suspensão" : "Confirmar Reativação"}
                             </Button>

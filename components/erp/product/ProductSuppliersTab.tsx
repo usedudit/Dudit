@@ -539,7 +539,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                     ))}
                 </div>
             ) : activeSuppliers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
+                <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface">
                     <IconPlaceholder
                         icon={TagIcon}
                         title="Nenhum fornecedor vinculado"

@@ -14,6 +14,7 @@ import {
     IconPlaceholder,
     InfoCard,
     FormDropdown,
+    ListItem,
 } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { requestSubscriptionRefundAction } from "@/app/actions/billing/refunds"
@@ -430,32 +431,27 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                                     {stagedDocs.length > 0 && (
                                         <div className="space-y-2.5">
                                             {stagedDocs.map((doc, idx) => (
-                                                <div
+                                                <ListItem
                                                     key={idx}
-                                                    className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border shadow-xs"
-                                                >
-                                                    <div className="flex items-center gap-3.5 min-w-0">
-                                                        <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs">
-                                                            <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                                                        </div>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                {doc.name}
-                                                            </span>
-                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                {formatFileSize(doc.size)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveDoc(idx)}
-                                                        className="p-2 text-brand-inactive-text hover:text-brand-red rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors ml-2 shrink-0"
-                                                        title="Remover documento"
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                                    icon={FileIcon}
+                                                    title={doc.name}
+                                                    description={formatFileSize(doc.size)}
+                                                    className="p-3.5"
+                                                    right={
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghostred"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleRemoveDoc(idx)
+                                                            }}
+                                                            title="Remover documento"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </Button>
+                                                    }
+                                                />
                                             ))}
                                         </div>
                                     )}

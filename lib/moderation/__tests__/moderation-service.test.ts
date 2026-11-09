@@ -56,6 +56,12 @@ describe("checkLocalBlocklist (camada local pt-BR)", () => {
     ["judeu sujo"],
     ["lugar de mulher é na cozinha"],
     ["mulher só serve pra lavar louça"],
+    ["vai tomar no cu"],
+    ["filho da puta"],
+    ["seu arrombado"],
+    ["vai se foder"],
+    ["venda de cocaina pura"],
+    ["arma de fogo barata"],
   ])("bloqueia: %s", (text) => {
     const verdict = mod.checkLocalBlocklist(text)
     expect(verdict.blocked).toBe(true)

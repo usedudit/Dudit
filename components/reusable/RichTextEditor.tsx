@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import type React from "react"
 import { useRef, useEffect, useState, useCallback } from "react"
@@ -103,15 +103,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
   const selectImage = useCallback((img: HTMLImageElement | null) => {
     if (selectedImgRef.current) {
       selectedImgRef.current.style.outline = ""
+      selectedImgRef.current.style.outlineOffset = ""
     }
     selectedImgRef.current = img
     if (img) {
+      img.style.outline = ""
+      img.style.outlineOffset = ""
       if (!img.dataset.editorId) {
         img.dataset.editorId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       }
       setSelectedImageId(img.dataset.editorId)
-      img.style.outline = "2px solid #79c325"
-      img.style.outlineOffset = "2px"
       updateOverlayPos()
       setShowActions(true)
     } else {
@@ -478,8 +479,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
           editor.appendChild(img)
         }
       }
-      img.style.outline = "2px solid #79c325"
-      img.style.outlineOffset = "2px"
       if (editor) onChange(editor.innerHTML)
       requestAnimationFrame(() => updateOverlayPos())
       return
@@ -505,8 +504,6 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
         container.appendChild(img)
       }
     }
-    img.style.outline = "2px solid #79c325"
-    img.style.outlineOffset = "2px"
     if (editor) onChange(editor.innerHTML)
     requestAnimationFrame(() => updateOverlayPos())
   }
@@ -617,7 +614,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ label, value, on
         {/* Image selection overlay */}
         {selectedImgRef.current && selectedImageId && (
           <div
-            className="rich-text-image-overlay absolute pointer-events-none z-10"
+            className="rich-text-image-overlay absolute pointer-events-none z-10 border-2 border-brand-green rounded-sm"
             style={{
               top: overlayPos.top,
               left: overlayPos.left,

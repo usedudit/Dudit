@@ -43,7 +43,7 @@ export function ReceiptA4Document({
                 className={
                     printMode
                         ? "w-full flex flex-col items-center p-0"
-                        : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
+                        : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
                 }
             >
                 {children}
@@ -66,9 +66,10 @@ type ReceiptA4PageProps = {
 export function ReceiptA4Page({ children, printMode = false, className = "" }: ReceiptA4PageProps) {
     return (
         <div
-            className={`w-[${A4_PAGE_WIDTH_CLASS}] min-w-[${A4_PAGE_WIDTH_CLASS}] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[${A4_PAGE_HEIGHT_CLASS}] flex flex-col ${
+            className={`w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] min-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col ${
                 printMode ? "pdf-print-page" : "shadow-md rounded-sm"
             } ${className}`.trim()}
+            style={{ width: "210mm", minWidth: "210mm", maxWidth: "210mm", height: "297mm", minHeight: "297mm" }}
         >
             {children}
         </div>

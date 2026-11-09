@@ -105,15 +105,17 @@ export function NotificationPanel({
 
 	if (grouped.length === 0) {
 		return (
-			<div className="flex h-full flex-col items-center justify-center">
+			<div className="flex h-full flex-col">
 				{pushBanner}
-				<IconPlaceholder
-					placeholderType="image"
-					imageSrc="https://img.dudit.com.br/static/mascots/Notificacoes.png"
-					imageAlt="Nenhuma notificação por aqui"
-					title="Nenhuma notificação por aqui"
-					subtitle="Quando tiver novidades, elas aparecerão aqui"
-				/>
+				<div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto custom-scrollbar">
+					<IconPlaceholder
+						placeholderType="image"
+						imageSrc="https://img.dudit.com.br/static/mascots/Notificacoes.png"
+						imageAlt="Nenhuma notificação por aqui"
+						title="Nenhuma notificação por aqui"
+						subtitle="Quando tiver novidades, elas aparecerão aqui"
+					/>
+				</div>
 			</div>
 		)
 	}

@@ -522,66 +522,57 @@ export function GenericAttachmentsTab({
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {/* Documentos salvos no banco */}
                                         {dbDocAttachments.map((att) => (
-                                            <div
+                                            <ListItem
                                                 key={att.id}
-                                                className="flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative"
-                                            >
-                                                <div
-                                                    onClick={() => handleDownloadDoc(att.file_key)}
-                                                    className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0 cursor-pointer hover:bg-brand-gray/50"
-                                                >
-                                                    <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                </div>
-                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleDownloadDoc(att.file_key)}>
-                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {att.file_name || "Anexo"}
-                                                    </p>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        {formatFileSize(att.file_size)}
-                                                    </p>
-                                                </div>
-                                                {canEdit && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => requestDeleteDoc(att.id)}
-                                                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute -top-2.5 -right-2.5 z-10"
-                                                        title="Remover anexo"
-                                                    >
-                                                        <TrashIcon className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                                icon={FileIcon}
+                                                title={att.file_name || "Anexo"}
+                                                description={formatFileSize(att.file_size)}
+                                                onClick={() => handleDownloadDoc(att.file_key)}
+                                                className="p-3.5"
+                                                right={
+                                                    canEdit ? (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghostred"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                requestDeleteDoc(att.id)
+                                                            }}
+                                                            title="Remover anexo"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
                                         ))}
 
                                         {/* Documentos staged/pendentes de envio */}
                                         {currentStagedFiles.map((stagedFile, index) => (
-                                            <div
+                                            <ListItem
                                                 key={`staged-doc-${index}`}
-                                                className="flex items-center gap-3 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/30 rounded-xl group relative"
-                                            >
-                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-primary/40 shrink-0">
-                                                    <FileIcon className="w-5 h-5 text-brand-primary" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {stagedFile.name}
-                                                    </p>
-                                                    <p className="text-xs text-brand-primary flex items-center gap-1">
-                                                        <span>{formatFileSize(stagedFile.size)}</span>
-                                                        <span>• Pendente de envio</span>
-                                                    </p>
-                                                </div>
-                                                {canEdit && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => requestDeleteDoc(`staged-doc-${index}`)}
-                                                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg absolute -top-2.5 -right-2.5 z-10"
-                                                        title="Remover anexo pendente"
-                                                    >
-                                                        <TrashIcon className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                                icon={FileIcon}
+                                                title={stagedFile.name}
+                                                description={`${formatFileSize(stagedFile.size)} • Pendente de envio`}
+                                                className="p-3.5"
+                                                right={
+                                                    canEdit ? (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghostred"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                requestDeleteDoc(`staged-doc-${index}`)
+                                                            }}
+                                                            title="Remover anexo pendente"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
                                         ))}
                                     </div>
                                     {canEdit && (
@@ -663,31 +654,27 @@ export function GenericAttachmentsTab({
                         {pendingFiles.length > 0 && (
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                                 {pendingFiles.map((pf) => (
-                                    <div
+                                    <ListItem
                                         key={pf.id}
-                                        className="p-3 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/10 dark:bg-dark-border/5 relative"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                                                <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </div>
-                                            <div className="flex-1 min-w-0 pr-6">
-                                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                    {pf.name}
-                                                </p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    {formatFileSize(pf.size)}
-                                                </p>
-                                            </div>
-                                            <button
+                                        icon={FileIcon}
+                                        title={pf.name}
+                                        description={formatFileSize(pf.size)}
+                                        className="p-3.5"
+                                        right={
+                                            <Button
                                                 type="button"
-                                                onClick={() => handleRemovePending(pf.id)}
-                                                className="text-brand-inactive-text hover:text-brand-red p-1 rounded-full transition-colors absolute top-3 right-3"
+                                                variant="ghostred"
+                                                size="icon"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleRemovePending(pf.id)
+                                                }}
+                                                title="Remover"
                                             >
                                                 <XIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
+                                            </Button>
+                                        }
+                                    />
                                 ))}
                             </div>
                         )}

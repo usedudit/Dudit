@@ -7,6 +7,7 @@ import { calculateProductTaxes } from "@/lib/fiscal-utils"
 import { createProductComprehensiveAction, updateProductAction } from "@/app/actions/erp/products"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { processImagesForModeration } from "@/lib/utils/image-processing"
+import { trackEvent } from "@/lib/analytics"
 
 interface UseProductFormProps {
   initialProduct?: any
@@ -118,6 +119,11 @@ export function useProductForm({ initialProduct, selectedStore, onSave, onBack }
 
           if (result.success) {
             toast({ title: "Sucesso", description: "Produto criado com sucesso" })
+            trackEvent("product_created", {
+              store_id: selectedStore?.id || null,
+              has_images: Array.isArray(productData.images) ? productData.images.length > 0 : false,
+              has_variants: Array.isArray(productData.pending_variants) ? productData.pending_variants.length > 0 : false,
+            })
           } else {
             toast({ title: "Erro", description: result.error || "Erro ao criar produto", variant: "destructive" })
           }

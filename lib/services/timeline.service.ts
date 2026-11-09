@@ -119,7 +119,8 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       actionType.includes("plan_") ||
       actionType.includes("upgrade") ||
       actionType.includes("downgrade") ||
-      ["billing", "subscription", "admin"].includes(String(input.entityType || "").toLowerCase())
+      ["billing", "subscription", "admin"].includes(String(input.entityType || "").toLowerCase()) ||
+      Boolean(input.metadata?.is_admin_action || input.metadata?.dudit_action || input.actorName?.includes("Dudit"))
 
     // Skip routine audit logging for partners on the Free plan
     if (input.partnerId && !isCriticalPlatformAction) {
@@ -138,7 +139,7 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
     // ─── Filter routine CRUD events (keep only important events) ───────────
     // Financial, security, billing, recurring events are always kept
     const entityType = String(input.entityType || "").toLowerCase()
-    const isRoutineCrudEvent = isRoutineCrud(actionType, entityType)
+    const isRoutineCrudEvent = isRoutineCrud(actionType, entityType, input.metadata || null)
     const isFinancialEvent = isFinancial(actionType)
     const isSecurityEvent = entityType === "security" || actionType.includes("invite_") || actionType.includes("auth_") || actionType.includes("role_") || actionType.includes("member_") || actionType.includes("partner_") || actionType.includes("document_") || actionType.includes("account_")
     const isBillingEvent = entityType === "billing" || actionType.includes("billing_")
@@ -376,7 +377,12 @@ export const getUserTimeline = cache(
  * Check if an event is a routine CRUD operation that can be safely skipped.
  * These events generate noise without significant audit value.
  */
-function isRoutineCrud(actionType: string, entityType: string): boolean {
+function isRoutineCrud(actionType: string, entityType: string, metadata?: Record<string, unknown> | null): boolean {
+  // Admin interventions are never considered routine CRUD
+  if (metadata?.is_admin_action || metadata?.dudit_action) {
+    return false
+  }
+
   // Entity types where routine CRUD is skipped
   const routineEntityTypes = new Set([
     "product", "service", "customer", "appointment",

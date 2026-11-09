@@ -50,7 +50,17 @@ export function getErrorMessage(error: any): string {
     "Signup is disabled": "O cadastro de novos usuários está temporariamente desativado.",
     "Provider not enabled": "Este método de login não está disponível no momento.",
     "Password is too short": "A senha deve ter pelo menos 8 caracteres.",
-    "New password should be different from the old password": "A nova senha deve ser diferente da atual.",
+    "Password should be at least 8 characters": "A senha deve ter pelo menos 8 caracteres.",
+    "New password should be different from the old password": "A nova senha deve ser diferente da senha anterior.",
+    "New password should be different from the old password.": "A nova senha deve ser diferente da senha anterior.",
+    "same_password": "A nova senha deve ser diferente da senha anterior.",
+    "weak_password": "A nova senha é muito fraca. Utilize pelo menos 8 caracteres, mesclando letras, números e símbolos.",
+
+    // PKCE & Cross-Device Auth Errors
+    "pkce_code_verifier_not_found": "Por segurança, este link de redefinição precisa ser aberto no mesmo navegador ou aparelho onde foi solicitado. Se preferir, solicite um novo link diretamente por este aparelho.",
+    "AuthPKCECodeVerifierMissingError": "Por segurança, este link de redefinição precisa ser aberto no mesmo navegador ou aparelho onde foi solicitado. Se preferir, solicite um novo link diretamente por este aparelho.",
+    "both auth code and code verifier should be non-empty": "Por segurança, este link de redefinição precisa ser aberto no mesmo navegador ou aparelho onde foi solicitado. Se preferir, solicite um novo link diretamente por este aparelho.",
+    "invalid request: both auth code and code verifier should be non-empty": "Por segurança, este link de redefinição precisa ser aberto no mesmo navegador ou aparelho onde foi solicitado. Se preferir, solicite um novo link diretamente por este aparelho.",
     "Database error saving new user": "Erro inesperado ao salvar usuário.",
     "Error sending confirmation email": "Erro ao enviar e-mail de confirmação.",
     "An unexpected response was received from the server": "Erro temporário de comunicação com o servidor. Tente novamente.",
@@ -78,6 +88,21 @@ export function getErrorMessage(error: any): string {
   if (code && errorMap[String(code)]) return errorMap[String(code)]
 
   // Substring search for common patterns
+  const lowerMessage = message.toLowerCase()
+  if (
+    lowerMessage.includes("different from the old password") ||
+    lowerMessage.includes("new password should be different") ||
+    lowerMessage.includes("same_password")
+  ) {
+    return "A nova senha deve ser diferente da senha anterior."
+  }
+  if (
+    lowerMessage.includes("pkce") ||
+    lowerMessage.includes("code verifier") ||
+    lowerMessage.includes("both auth code and code verifier")
+  ) {
+    return "Por segurança, este link de redefinição precisa ser aberto no mesmo navegador ou aparelho onde foi solicitado. Se preferir, solicite um novo link diretamente por este aparelho."
+  }
   if (message.includes("credentials") || message.includes("Invalid login")) return "E-mail ou senha incorretos."
   if (message.includes("user not found") || message.includes("User not found")) return "Conta não encontrada."
   if (message.includes("already registered") || message.includes("already exists")) return "Este e-mail já está cadastrado."

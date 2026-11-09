@@ -23,6 +23,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { logLogoutAction } from "@/app/actions/auth/audit"
 
 interface ERPHeaderProps {
     sidebarOpen?: boolean
@@ -152,6 +153,11 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const handleSignOut = async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
         localStorage.removeItem("dudit_city")
+        try {
+            await logLogoutAction()
+        } catch {
+            // Audit logging must never block logout.
+        }
         await supabase.auth.signOut({ scope: 'local' })
         window.location.href = "/"
     }

@@ -16,10 +16,7 @@ export async function moderateFields(
 
     if (texts.length === 0) return { valid: true }
 
-    // Por padrão no fluxo de usuário (interactive actions), usamos asyncMode: true
-    // para não travar a requisição esperando cold start da Cloudflare Workers AI.
-    // A blocklist local (pt-BR) continua bloqueando termos ofensivos instantaneamente (< 0.1ms).
-    const asyncMode = options?.asyncMode ?? true
+    const asyncMode = options?.asyncMode ?? false
     const result = await checkTextSafety(texts, options?.userId, { asyncMode })
 
     if (!result.passed) {

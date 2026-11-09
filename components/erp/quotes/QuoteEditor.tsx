@@ -12,11 +12,12 @@ import {
     EditIcon,
     FileIcon,
     TelegramIcon,
-    EyeIcon
+    EyeIcon,
+    Package
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge, FormTextarea } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge, FormTextarea, Tooltip } from '@/components/reusable';
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils";
@@ -402,8 +403,17 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                        <div className="flex justify-center">
+                                                        <div className="flex justify-center items-center gap-1.5">
                                                             <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="md" disabled={itemsLocked} />
+                                                            {!item.isService && !item.isBlank && !item.isManual && Boolean(item.id) && (Number(item.stock ?? 0) <= 0 || Number(item.qty || 0) > Number(item.stock ?? 0)) && (
+                                                                <Tooltip text="Produto sem estoque disponível no momento">
+                                                                    <Badge
+                                                                        variant="orange"
+                                                                        icon={<Package size={14} />}
+                                                                        className="shrink-0"
+                                                                    />
+                                                                </Tooltip>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -537,7 +547,18 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                                                 {!itemsLocked && (
                                                     <div className="flex items-center gap-4 mt-2">
-                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                            {!item.isService && !item.isBlank && !item.isManual && Boolean(item.id) && (Number(item.stock ?? 0) <= 0 || Number(item.qty || 0) > Number(item.stock ?? 0)) && (
+                                                                <Tooltip text="Produto sem estoque disponível no momento">
+                                                                    <Badge
+                                                                        variant="orange"
+                                                                        icon={<Package size={12} />}
+                                                                        className="shrink-0"
+                                                                    />
+                                                                </Tooltip>
+                                                            )}
+                                                        </div>
                                                         <div className="flex-1 max-w-[140px]">
                                                             <MoneyInput
                                                                 name={`item-price-mobile-${index}`}

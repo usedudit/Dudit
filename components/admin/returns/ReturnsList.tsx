@@ -270,7 +270,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
     // No-op, detail view has its own print button
   }, []);
 
-  // If viewing detail (read-only)
+  // If viewing detail (read-only) - use admin detail view (same UI as ERP but with admin features)
   if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
     const currentReq = requests.find(r => r.id === entityState.entityId);
     const partnerId = currentReq?.partnerId || "";
@@ -283,16 +283,10 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
         businessInfo={{}}
         planSlug="escalar"
       >
-        <StoreProvider
-          partnerId={partnerId}
-        >
-          <ReturnDetailView
-            orderId={entityState.entityId}
+        <StoreProvider partnerId={partnerId}>
+          <AdminReturnDetailView
+            detail={{ request: currentReq }}
             onBack={closeEntity}
-            onEdit={handleEdit}
-            onPrint={handlePrint}
-            initialRequest={currentReq}
-            adminContext={true}
           />
         </StoreProvider>
       </PermissionProvider>
@@ -316,6 +310,7 @@ export default function ReturnsList({ initialData, initialStats }: ReturnsListPr
           <AdminReturnDetailView
             detail={{ request: currentReq }}
             onBack={closeEntity}
+            initialMode="edit"
           />
         </StoreProvider>
       </PermissionProvider>

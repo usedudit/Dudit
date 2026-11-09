@@ -352,7 +352,7 @@ export function AdminUserDetailView({
                                                             }}
                                                         >
                                                             <span>Caso: {profile.banned_case_id}</span>
-                                                            <span className="text-[10px] uppercase font-sans font-semibold">
+                                                            <span className="text-sm font-semibold">
                                                                 Copiar
                                                             </span>
                                                         </Button>} />
@@ -449,7 +449,7 @@ export function AdminUserDetailView({
                                                     </div>
                                                 </>
                                             )}
-                                    </FadeIn>
+                                        </FadeIn>
                                     </TabsContent>
 
                                     {/* Aba 2: Compras */}

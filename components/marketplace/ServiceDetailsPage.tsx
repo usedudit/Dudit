@@ -33,6 +33,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { filterUnflaggedImages } from "@/lib/utils/product-display-images"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
@@ -719,11 +720,17 @@ export function ServiceDetailsPageClient({
     // ─── Derived ──────────────────────────────────────────────────────────────
 
     const serviceImages = useMemo(() => {
-        const images = (service.images || [])
+        const rawImages = (service.images || [])
             .filter((img: string) => typeof img === "string" && img.trim())
-            .map((img: string) => getR2ImageUrl(img, "large"))
+        const cleanImages = filterUnflaggedImages(
+            rawImages,
+            service.moderation_status,
+            (service as any).moderation_reason,
+            (service as any).flagged_images,
+        )
+        const images = cleanImages.map((img: string) => getR2ImageUrl(img, "large"))
         return images.length > 0 ? images : [PLACEHOLDER]
-    }, [service.images])
+    }, [service.images, service.moderation_status, (service as any).moderation_reason, (service as any).flagged_images])
 
     const galleryItems = useMemo(() => {
         return serviceImages.map((src: any) => ({ type: "image" as const, src }))

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard, ActionsDropdown } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard, ActionsDropdown, ListItem } from "@/components/reusable"
+import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
 import { ChevronLeftIcon, ChevronDownIcon, LinkIcon, EditIcon, SaveIcon, ThreeDotsIcon } from "@/lib/icons"
 import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -82,6 +83,7 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
     const [videoMeta, setVideoMeta] = useState<VideoMetadata>(EMPTY_VIDEO)
     const [tags, setTags] = useState<string[]>([])
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+    const [isTagsModalOpen, setIsTagsModalOpen] = useState(false)
 
     const [linkedItem, setLinkedItem] = useState<{ id: string; name: string; type: "product" | "service" } | null>(null)
     const [linkedCollectionUrl, setLinkedCollectionUrl] = useState("")
@@ -488,17 +490,36 @@ export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete,
                                                                 disabled={readOnly}
                                                             />
                                                             <div>
-                                                                <label className="mb-2 block text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                    Palavras-chave de busca
-                                                                </label>
-                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                                                    Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca.
-                                                                </p>
-                                                                <TagsInput
+                                                                <ListItem
+                                                                    title="Gerenciar palavras-chave"
+                                                                    description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
+                                                                    right={tags.length > 0 ? (
+                                                                        <div className="flex flex-wrap gap-1.5 max-w-[70%]">
+                                                                            {tags.slice(0, 3).map((tag: string, i: number) => (
+                                                                                <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
+                                                                                    {tag}
+                                                                                </Badge>
+                                                                            ))}
+                                                                            {tags.length > 3 && (
+                                                                                <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
+                                                                                    +{tags.length - 3}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : null}
+                                                                    showChevron
+                                                                    onClick={() => setIsTagsModalOpen(true)}
+                                                                    disabled={readOnly}
+                                                                    className={`cursor-pointer ${readOnly ? "opacity-50" : ""}`}
+                                                                />
+                                                                <TagsManagerModal
+                                                                    isOpen={isTagsModalOpen}
+                                                                    onClose={() => setIsTagsModalOpen(false)}
                                                                     tags={tags}
                                                                     onChange={setTags}
                                                                     disabled={readOnly}
-                                                                    placeholder="Adicionar tag..."
+                                                                    title="Palavras-chave de busca"
+                                                                    description="Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca."
                                                                 />
                                                             </div>
                                                         </div>

@@ -247,8 +247,7 @@ const SegmentsGrid = () => (
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xl font-bold text-brand-dark group-hover:text-brand-green transition-colors">{segment.title}</h4>
-                  <span className="text-brand-green text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Ver solução →</span>
+                  <h4 className="text-xl font-bold text-brand-dark hover:text-brand-green transition-colors">{segment.title}</h4>
                 </div>
                 <p className="text-brand-inactive-text text-sm leading-relaxed">{segment.description}</p>
               </div>

@@ -90,6 +90,17 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const turnstileRef = useRef<TurnstileRef>(null)
     const [error, setError] = useState<string | null>(null)
     const [partnerData, setPartnerData] = useState(initialPartnerData)
+
+    // Activation funnel: track each wizard step transition.
+    useEffect(() => {
+        trackEvent("partner_wizard_step", {
+            step,
+            mode: partnerData.businessInfo.mode || null,
+            logged_in: isUserLoggedIn,
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step])
+
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const [cropModalOpen, setCropModalOpen] = useState(false)
     const [categoryModalOpen, setCategoryModalOpen] = useState(false)
@@ -512,13 +523,12 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                     )}
                 </div>
 
-                <button
-                    type="button"
+                <Button
+                    variant="link"
                     onClick={onBack}
-                    className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium"
                 >
-                    ← Voltar para Login
-                </button>
+                    Voltar para Login
+                </Button>
             </motion.div>
         )
     }

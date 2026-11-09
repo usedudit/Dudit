@@ -57,7 +57,7 @@ export default async function SelectErpPage() {
     const onlySuspended = storeAccess.length === 0 && suspendedAccess.length > 0
 
     return (
-        <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-dark-background transition-colors duration-300">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-background transition-colors duration-300">
             <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
                     <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
@@ -101,15 +101,15 @@ export default async function SelectErpPage() {
                                             className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
                                         >
                                             <ListItem
-                                                className={`px-6 py-5 gap-4 ${isOwn ? "ring-2 ring-brand-primary/20 bg-brand-primary/5" : ""}`}
+                                                className={`px-4 py-3 ${isOwn ? "border-brand-green" : ""}`}
                                                 icon={StoreIcon}
                                                 title={
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="truncate">{access.storeName}</span>
                                                         {isOwn ? (
-                                                            <span className="text-xs font-bold text-brand-green">Sua loja · Matriz</span>
+                                                            <span className="font-bold text-brand-green">| Sua loja · Matriz</span>
                                                         ) : (
-                                                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</span>
+                                                            <span className="font-bold text-brand-inactive-text dark:text-dark-body">| {roleLabel}</span>
                                                         )}
                                                     </div>
                                                 }

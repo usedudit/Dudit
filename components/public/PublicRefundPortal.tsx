@@ -608,33 +608,16 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
 
                                     {parsedDocs.length > 0 && (
                                         <FormSection title={`Documentos em PDF (${parsedDocs.length})`} hasSeparator={imageUrls.length > 0}>
-                                            <div className="space-y-2.5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 {parsedDocs.map((doc, idx) => (
-                                                    <a
+                                                    <ListItem
                                                         key={idx}
-                                                        href={doc.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-dark-border/80 transition-all shadow-xs group"
-                                                    >
-                                                        <div className="flex items-center gap-3.5 min-w-0">
-                                                            <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs group-hover:bg-brand-gray dark:group-hover:bg-dark-border transition-colors">
-                                                                <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                                                            </div>
-                                                            <div className="flex flex-col min-w-0 text-left">
-                                                                <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                    {doc.name}
-                                                                </span>
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    {doc.size ? formatFileSize(doc.size) : "Documento PDF"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-gray hover:bg-gray-200 dark:bg-dark-border/40 dark:hover:bg-dark-border/80 text-brand-dark dark:text-dark-heading text-xs font-semibold transition-colors ml-2 shrink-0">
-                                                            <span>Abrir</span>
-                                                            <ShareIcon size={14} className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
-                                                        </div>
-                                                    </a>
+                                                        icon={FileIcon}
+                                                        title={doc.name}
+                                                        description={doc.size ? formatFileSize(doc.size) : "Documento PDF"}
+                                                        onClick={() => window.open(doc.url, "_blank")}
+                                                        className="p-3.5"
+                                                    />
                                                 ))}
                                             </div>
                                         </FormSection>

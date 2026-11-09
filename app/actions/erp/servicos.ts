@@ -34,6 +34,7 @@ import {
 } from "@/lib/erp/pricing-alerts"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
+import { scheduleDeferredImageModeration } from "@/lib/moderation/deferred-image-moderation"
 
 import { headers } from "next/headers"
 
@@ -300,7 +301,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             payment_requirement: data.payment_requirement || data.paymentRequirement || "full_payment",
             images: data.images || [],
             is_unavailable_type: data.isUnavailableType || data.is_unavailable_type || false,
-            moderation_status: data.requiresManualModeration || data.requires_manual_moderation ? 'pending_moderation' : 'approved',
+            moderation_status: data.requiresManualModeration || data.requires_manual_moderation ? 'flagged' : 'approved',
             created_at: getBrasiliaTime(),
             updated_at: getBrasiliaTime(),
         }
@@ -334,6 +335,15 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
                 partnerId: finalPartnerId,
                 autoApprove: !(data.requiresManualModeration || data.requires_manual_moderation),
                 texts: [data.name, data.description],
+            })
+        }
+
+        if (inserted?.id) {
+            await scheduleDeferredImageModeration({
+                entityType: "service",
+                entityId: inserted.id,
+                partnerId: finalPartnerId,
+                images: data.images || [],
             })
         }
 
@@ -468,7 +478,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.show_price_in_store !== undefined) payload.show_price_in_store = data.show_price_in_store
         if (data.showPriceInStore !== undefined) payload.show_price_in_store = data.showPriceInStore
         if (data.requiresManualModeration || data.requires_manual_moderation) {
-            payload.moderation_status = 'pending_moderation'
+            payload.moderation_status = 'flagged'
         }
 
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
@@ -498,6 +508,15 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
                 partnerId: existing.partner_id,
                 autoApprove: existing.moderation_status === "approved" && !(data.requiresManualModeration || data.requires_manual_moderation),
                 texts: [data.name, data.description],
+            })
+        }
+
+        if (data.images !== undefined) {
+            await scheduleDeferredImageModeration({
+                entityType: "service",
+                entityId: serviceId,
+                partnerId: existing.partner_id,
+                images: data.images || [],
             })
         }
 

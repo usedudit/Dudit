@@ -14,6 +14,7 @@ interface ListItemProps {
     titleClassName?: string
     descriptionClassName?: string
     className?: string
+    disabled?: boolean
 }
 
 export const ListItem: React.FC<ListItemProps> = ({
@@ -27,6 +28,7 @@ export const ListItem: React.FC<ListItemProps> = ({
     titleClassName = "",
     descriptionClassName = "",
     className = "",
+    disabled = false,
 }) => {
     const isComponent =
         typeof icon === "function" ||
@@ -69,17 +71,27 @@ export const ListItem: React.FC<ListItemProps> = ({
 
     return (
         <div
-            onClick={right ? handleContainerClick : onClick}
-            className={`group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer ${className}`}
+            onClick={disabled ? undefined : (right ? handleContainerClick : onClick)}
+            className={`group flex items-center rounded-2xl gap-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all ${className} ${disabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:border-brand-dark/30 dark:hover:border-brand-gray/30 cursor-pointer"
+                }`}
         >
             {left && <div className="shrink-0">{left}</div>}
 
             {icon && (
-                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors overflow-hidden">
                     {isComponent ? (
                         React.createElement(icon as React.ComponentType<any>, {
                             className: "text-brand-dark dark:text-dark-heading",
                         })
+                    ) : typeof icon === "string" ? (
+                        <img
+                            src={icon}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                        />
                     ) : (
                         icon
                     )}

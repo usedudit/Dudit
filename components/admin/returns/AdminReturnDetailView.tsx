@@ -157,6 +157,7 @@ const getReturnStatusMetaLocal = (status?: string | null) => {
 interface AdminReturnDetailViewProps {
   detail: any;
   onBack: () => void;
+  initialMode?: "view" | "edit";
 }
 
 type ReturnAdminActionContext = {
@@ -166,14 +167,14 @@ type ReturnAdminActionContext = {
   changedFields?: string[];
 };
 
-export default function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewProps) {
+export default function AdminReturnDetailView({ detail, onBack, initialMode = "view" }: AdminReturnDetailViewProps) {
   const { toast } = useToast();
   const { success: notifySuccess, error: notifyError } = useNotification();
   const { modal: actionModal, runAction } = useAdminActionModal();
   const [activeTab, setActiveTab] = useState("general");
   const [isScrolled, setIsScrolled] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(initialMode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [returnEvents, setReturnEvents] = useState<any[]>([]);

@@ -192,31 +192,37 @@ export function FavoritesPageClient({
 
     return (
         <>
-            <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-28 lg:pb-12 relative overflow-hidden">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
                 {/* Header */}
                 <div className="hidden lg:block items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                            Favoritos
+                            Meus Favoritos
+                            {counts.total > 0 && (
+                                <span className="text-brand-inactive-text dark:text-dark-body font-bold text-base lg:text-lg ml-2">
+                                    ({counts.total})
+                                </span>
+                            )}
                         </h1>
                         <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">Seus produtos e serviços salvos em um só lugar</p>
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as TabType); setCurrentPage(1) }}>
-                    <TabsList className="bg-transparent px-0 md:px-0 mb-6">
-                        {TAB_OPTIONS.map((tab) => (
-                            <TabsTrigger
-                                key={tab.value}
-                                value={tab.value}
-                                badge={<span className="ml-1 text-xs text-brand-inactive-text dark:text-dark-body">({tabCount(tab.value)})</span>}
-                            >
-                                {tab.label}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                </Tabs>
+                <div className="mb-6">
+                    <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as TabType); setCurrentPage(1) }} className="w-full">
+                        <TabsList className="mb-6">
+                            {TAB_OPTIONS.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                >
+                                    {tab.label} <span className="ml-1.5 text-xs font-normal">({tabCount(tab.value)})</span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
+                </div>
 
                 {/* Search & Sort Bar */}
                 {counts.total > 0 && (

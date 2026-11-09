@@ -125,6 +125,52 @@ export function generateSKUWithSuffix(baseSku: string, attempt: number): string 
 }
 
 /**
+ * Retorna um SKU livre para o parceiro antes do INSERT.
+ *
+ * O gerador semântico é determinístico para nomes com 2+ palavras (ex.:
+ * "Camiseta Azul Copy" sempre vira "CAM-AZU-COP"), então duplicar o mesmo
+ * produto duas vezes gera a mesma base. Sem esta checagem, o primeiro INSERT
+ * falha com 23505 (idx_products_partner_sku_unique) e só então o retry aplica
+ * um sufixo — o que polui os logs e faz o SKU salvo divergir do exibido.
+ *
+ * O retry no INSERT continua existindo como proteção contra corrida entre
+ * requisições concorrentes.
+ */
+export async function generateAvailableSKU(
+  supabase: SupabaseClient,
+  partnerId: string,
+  baseSku: string,
+): Promise<string> {
+  const base = (baseSku || "").trim()
+  if (!base || !partnerId) return base
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("sku")
+    .eq("partner_id", partnerId)
+    .like("sku", `${base}%`)
+    .limit(500)
+
+  // Em caso de falha na consulta, deixa o retry do INSERT resolver.
+  if (error) return base
+
+  const used = new Set(
+    (data || [])
+      .map((row: { sku: string | null }) => row.sku)
+      .filter((sku): sku is string => !!sku),
+  )
+
+  if (!used.has(base)) return base
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `${base}-${generateAlphaNumericCode(3)}`
+    if (!used.has(candidate)) return candidate
+  }
+
+  return `${base}-${Date.now().toString(36).toUpperCase().slice(-4)}`
+}
+
+/**
  * Gera um SKU único tentando manter a semântica do nome.
  * @deprecated Usar generateSKUBase + retry no INSERT para melhor performance.
  */

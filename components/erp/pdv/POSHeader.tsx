@@ -84,23 +84,38 @@ const POSHeader = memo(function POSHeader({
     }
 
     const focusLockSuffix = (
-        <button
-            type="button"
-            onClick={(e) => {
-                e.stopPropagation()
-                setFocusLock(!focusLock)
-                setTimeout(() => {
-                    inputRef.current?.focus()
-                }, 50)
-            }}
-            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
-                ? "text-brand-primary bg-brand-primary/15"
-                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
-                }`}
-            title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
-        >
-            {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
-        </button>
+        <div className="flex items-center gap-1">
+            {onOpenCamera && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenCamera()
+                    }}
+                    className="p-1.5 rounded-full text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition-colors flex items-center justify-center"
+                    title="Escanear com câmera"
+                >
+                    <CameraIcon className="w-4 h-4" />
+                </button>
+            )}
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation()
+                    setFocusLock(!focusLock)
+                    setTimeout(() => {
+                        inputRef.current?.focus()
+                    }, 50)
+                }}
+                className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
+                    ? "text-brand-primary bg-brand-primary/15"
+                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+                    }`}
+                title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
+            >
+                {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
+            </button>
+        </div>
     )
 
     const selectedCustomer = customers.find((c) => c.id === selectedCustomerId)

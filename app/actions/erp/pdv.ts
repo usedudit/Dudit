@@ -1001,12 +1001,12 @@ export async function getPOSInitialDataAction(
         supabase
           .from("products")
           .select(
-            "id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)",
+            "id, name, sku, gtin, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, has_variants, technical_specs, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)",
           )
           .eq("partner_id", partnerId)
           .eq("is_active", true)
           .order("created_at", { ascending: false })
-          .limit(150),
+          .limit(300),
         supabase
           .from("services")
           .select(

@@ -32,6 +32,7 @@ import { getServiceCheckoutSettingsAction } from '@/app/actions/marketplace/serv
 import { buildDepositCheckoutMeta } from '@/lib/services/marketplace-deposit-meta';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
+import { trackEvent } from '@/lib/analytics';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from '@/lib/permission-context';
@@ -1507,6 +1508,11 @@ const PaymentModal = ({
             const paymentMethod = responseData.paymentMethod;
 
             if (status === "approved") {
+                trackEvent("payment_approved", {
+                    payment_method: paymentMethod || null,
+                    provider: "Mercado Pago",
+                    amount: chargeTarget,
+                })
                 // Payment approved - register the sale via onConfirm.
                 // Merge with existing legs (e.g. sinal already paid) so we don't drop them.
                 const mpLabel = responseData.paymentMethodDisplayName || "Mercado Pago";
@@ -1569,10 +1575,19 @@ const PaymentModal = ({
                     });
                 }
             } else {
+                trackEvent("payment_failed", {
+                    payment_method: paymentMethod || null,
+                    provider: "Mercado Pago",
+                    status: status || "unknown",
+                })
                 setMpBrickError(`Pagamento não aprovado. Status: ${status || "desconhecido"}`);
                 setMpStep("error");
             }
         } catch (error: any) {
+            trackEvent("payment_failed", {
+                provider: "Mercado Pago",
+                status: "exception",
+            })
             console.error("Erro ao processar pagamento ERP MP:", error);
             setMpBrickError(error.message || "Falha ao processar o pagamento.");
             setMpStep("error");
@@ -1739,6 +1754,11 @@ const PaymentModal = ({
             const status = responseData.paymentStatus;
             const paymentMethod = responseData.paymentMethod;
             if (status === "approved") {
+                trackEvent("payment_approved", {
+                    payment_method: paymentMethod || null,
+                    provider: "Mercado Pago",
+                    amount: chargeTarget,
+                })
                 const mpLabel = responseData.paymentMethodDisplayName || "Boleto (Mercado Pago)";
                 const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
                 const mpLeg = {

@@ -92,11 +92,13 @@ export const PageHeader = ({
     subtitle,
     onBack,
     action,
+    hideMobileAction,
 }: {
     title: string
     subtitle: string
     onBack: () => void
     action?: React.ReactNode
+    hideMobileAction?: boolean
 }) => {
     const handleBack = () => onBack()
     return (
@@ -115,7 +117,7 @@ export const PageHeader = ({
                 </div>
                 {action && <div className="shrink-0">{action}</div>}
             </div>
-            {action && (
+            {action && !hideMobileAction && (
                 <div className="flex lg:hidden justify-end mb-4">
                     {action}
                 </div>

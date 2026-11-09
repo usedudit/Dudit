@@ -179,9 +179,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     const isMarketplaceLocked = isPaidOrder || !canRbac("orders.edit");
     const hasOnlyServices = items.length > 0 && items.every((item) => Boolean(item.isService));
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-        <div className="flex justify-between items-start text-[14px] gap-4">
-            <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
-            <div className="text-right">{value}</div>
+        <div className="flex flex-col">
+            <span className="text-sm text-brand-inactive-text dark:text-dark-body">{label}</span>
+            <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{value}</div>
         </div>
     )
 
@@ -746,13 +746,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                     <FormSection title="Configurações do Pedido" hasSeparator>
                         {isPaidOrder ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                                <PaymentRow label="Responsável" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"}</span>} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <PaymentRow label="Data do Pedido" value={formatDateString(orderDate)} />
+                                <PaymentRow label="Responsável" value={responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"} />
                                 {!hasOnlyServices && (
                                     <>
-                                        <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                                        <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))}</span>} />
+                                        <PaymentRow label="Método de Entrega" value={deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"} />
+                                        <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))} />
                                     </>
                                 )}
                             </div>
@@ -810,14 +810,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                     {isPaidOrder && (
                         <FormSection title="Pagamento" hasSeparator>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <PaymentRow
                                     label="Método de Pagamento"
                                     value={
-                                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} simplify />
-                                            <span className="text-brand-border dark:text-dark-border">|</span>
-                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{payStatusMeta.label}</span>
+                                            <span className="text-brand-border dark:text-dark-border font-normal">|</span>
+                                            <span>{payStatusMeta.label}</span>
                                         </div>
                                     }
                                 />
@@ -863,7 +863,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 line.amount > 0.009 &&
                                                                 line.baseAmount - line.amount > 0.009;
                                                             return (
-                                                                <span key={`${line.label}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                <span key={`${line.label}-${index}`} className="text-brand-dark dark:text-dark-heading font-semibold text-sm">
                                                                     {line.label}: {formatCurrency(line.amount)}
                                                                     {hasInstallments ? (
                                                                         <span className="text-brand-muted font-normal">
@@ -887,10 +887,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     )
                                 })()}
 
-                                <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
+                                <PaymentRow label="Valor Original" value={formatCurrency(subtotal)} />
 
                                 {!isQuickMode && (
-                                    <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                                    <PaymentRow label="Conta de recebimento" value={accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"} />
                                 )}
 
                                 {deliveryMethod !== "pickup" && (Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
@@ -898,14 +898,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         label="Valor da Entrega"
                                         value={
                                             (originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
-                                                <div className="text-right">
-                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span>
                                                         {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
                                                     </span>
-                                                    <span className="text-brand-orange"> - Subsidiado pela loja</span>
+                                                    <span className="text-brand-orange text-sm font-normal"> - Subsidiado pela loja</span>
                                                 </div>
                                             ) : (
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>
+                                                formatCurrency(shippingFee)
                                             )
                                         }
                                     />
@@ -914,21 +914,21 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {Number(otherCosts || 0) > 0 && (
                                     <PaymentRow
                                         label="Outros Custos"
-                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(otherCosts)}</span>}
+                                        value={formatCurrency(otherCosts)}
                                     />
                                 )}
 
                                 {Number(discountAmount || 0) > 0 && (
                                     <PaymentRow
                                         label="Desconto do Pedido"
-                                        value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
+                                        value={<span className="text-brand-green">- {formatCurrency(discountAmount)}</span>}
                                     />
                                 )}
 
                                 {couponDiscountAmount > 0 && (
                                     <PaymentRow
                                         label="Desconto por Cupom"
-                                        value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                        value={<span className="text-brand-green">- {formatCurrency(couponDiscountAmount)}</span>}
                                     />
                                 )}
 
@@ -939,14 +939,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 originalPaymentMethod === "store_credit" ? "Vale-compra" :
                                                     "Desconto do Método"
                                         }
-                                        value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                        value={<span className="text-brand-green">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                     />
                                 )}
 
                                 {effectivePaymentMethodExtraAmount > 0 && (
                                     <PaymentRow
                                         label="Taxa do Método"
-                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>}
+                                        value={`+ ${formatCurrency(effectivePaymentMethodExtraAmount)}`}
                                     />
                                 )}
 
@@ -1460,13 +1460,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 {/* 3. Configurações do Pedido (Mobile) */}
                 <FormSection title="Configurações do Pedido" hasSeparator>
                     {isPaidOrder ? (
-                        <div className="space-y-4 text-left">
-                            <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
-                            <PaymentRow label="Responsável" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"}</span>} />
+                        <div className="space-y-5 text-left">
+                            <PaymentRow label="Data do Pedido" value={formatDateString(orderDate)} />
+                            <PaymentRow label="Responsável" value={responsibleOptions?.find(opt => opt.value === sellerPartnerUserId)?.label || "Não informado"} />
                             {!hasOnlyServices && (
                                 <>
-                                    <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
-                                    <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))}</span>} />
+                                    <PaymentRow label="Método de Entrega" value={deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"} />
+                                    <PaymentRow label={deliveryMethod === "pickup" ? "Status da Retirada" : isCarrierDelivery ? "Status de Envio (Transportadora)" : "Status de Entrega"} value={deliveryStatusOptions?.find(opt => opt.value === deliveryStatus)?.label || (isCarrierDelivery ? getCarrierStatusLabel(deliveryStatus) : getDeliveryStatusLabelForType(deliveryStatus, deliveryMethod))} />
                                 </>
                             )}
                         </div>
@@ -1525,14 +1525,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 {/* 4. Dados do Pagamento (Mobile) */}
                 {isPaidOrder && (
                     <FormSection title="Pagamento" hasSeparator>
-                        <div className="space-y-4 text-left">
+                        <div className="space-y-5 text-left">
                             <PaymentRow
                                 label="Método de Pagamento"
                                 value={
-                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} simplify />
-                                        <span className="text-brand-border dark:text-dark-border">|</span>
-                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{payStatusMeta.label}</span>
+                                        <span className="text-brand-border dark:text-dark-border font-normal">|</span>
+                                        <span>{payStatusMeta.label}</span>
                                     </div>
                                 }
                             />
@@ -1578,7 +1578,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             line.amount > 0.009 &&
                                                             line.baseAmount - line.amount > 0.009;
                                                         return (
-                                                            <span key={`${line.label}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                            <span key={`${line.label}-${index}`} className="text-brand-dark dark:text-dark-heading font-semibold text-sm">
                                                                 {line.label}: {formatCurrency(line.amount)}
                                                                 {hasInstallments ? (
                                                                     <span className="text-brand-muted font-normal">
@@ -1602,10 +1602,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 )
                             })()}
 
-                            <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
+                            <PaymentRow label="Valor Original" value={formatCurrency(subtotal)} />
 
                             {!isQuickMode && (
-                                <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                                <PaymentRow label="Conta de recebimento" value={accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"} />
                             )}
 
                             {deliveryMethod !== "pickup" && (Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
@@ -1613,14 +1613,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label="Valor da Entrega"
                                     value={
                                         (originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
-                                            <div className="text-right">
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span>
                                                     {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
                                                 </span>
-                                                <span className="text-brand-orange"> - Subsidiado pela loja</span>
+                                                <span className="text-brand-orange text-sm font-normal"> - Subsidiado pela loja</span>
                                             </div>
                                         ) : (
-                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>
+                                            formatCurrency(shippingFee)
                                         )
                                     }
                                 />
@@ -1629,21 +1629,21 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             {Number(otherCosts || 0) > 0 && (
                                 <PaymentRow
                                     label="Outros Custos"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(otherCosts)}</span>}
+                                    value={formatCurrency(otherCosts)}
                                 />
                             )}
 
                             {Number(discountAmount || 0) > 0 && (
                                 <PaymentRow
                                     label="Desconto do Pedido"
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
+                                    value={<span className="text-brand-green">- {formatCurrency(discountAmount)}</span>}
                                 />
                             )}
 
                             {couponDiscountAmount > 0 && (
                                 <PaymentRow
                                     label="Desconto por Cupom"
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                    value={<span className="text-brand-green">- {formatCurrency(couponDiscountAmount)}</span>}
                                 />
                             )}
 
@@ -1654,14 +1654,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             originalPaymentMethod === "store_credit" ? "Vale-compra" :
                                                 "Desconto do Método"
                                     }
-                                    value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                    value={<span className="text-brand-green">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                 />
                             )}
 
                             {effectivePaymentMethodExtraAmount > 0 && (
                                 <PaymentRow
                                     label="Taxa do Método"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>}
+                                    value={`+ ${formatCurrency(effectivePaymentMethodExtraAmount)}`}
                                 />
                             )}
 

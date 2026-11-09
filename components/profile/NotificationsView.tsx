@@ -117,24 +117,36 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
   )
 
   return (
-    <motion.div key="notifications-view" {...fade} className="w-full">
-      {/* Header */}
-      <div className="hidden lg:flex mb-8 items-center gap-4">
-        <Button
-          variant="filled"
-          onClick={() => navigate("main")}
-          className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
-        >
-          <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-            Notificações
-          </h1>
-          <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">
-            Escolha quais notificações você deseja receber.
-          </p>
+    <motion.div key="notifications-view" {...fade} className="w-full pb-24 lg:pb-0">
+      {/* Header (desktop) */}
+      <div className="hidden lg:flex mb-8 items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="filled"
+            onClick={() => navigate("main")}
+            className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
+          >
+            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+              Notificações
+            </h1>
+            <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">
+              Escolha quais notificações você deseja receber.
+            </p>
+          </div>
         </div>
+
+        {!isLoading && !error && (
+          <Button
+            onClick={handleSave}
+            isLoading={saving}
+            variant="default"
+          >
+            {saving ? "Salvando..." : "Salvar preferências"}
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -185,9 +197,15 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
         </div>
       )}
 
+      {/* Tablet/Mobile Bottom Menu */}
       {!isLoading && !error && (
-        <div className="mt-8">
-          <Button onClick={handleSave} isLoading={saving}>
+        <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] flex items-center justify-center shadow-lg">
+          <Button
+            onClick={handleSave}
+            isLoading={saving}
+            variant="default"
+            className="w-full sm:max-w-md flex items-center justify-center font-semibold text-sm h-11"
+          >
             {saving ? "Salvando..." : "Salvar preferências"}
           </Button>
         </div>

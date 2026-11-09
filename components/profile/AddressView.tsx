@@ -279,17 +279,16 @@ export const AddressView = ({
     )
 
     return (
-        <motion.div key="address" {...fade} className="w-full">
+        <motion.div key="address" {...fade} className="w-full pb-24 lg:pb-0">
             <PageHeader
                 title="Endereços"
                 subtitle="Gerencie seus endereços de entrega."
                 onBack={() => navigate("main")}
+                hideMobileAction
                 action={addresses.length < 5 ? (
-                    <div className="hidden lg:flex">
-                        <Button onClick={startCreate} className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm">
-                            <PlusIcon size={16} /> Adicionar endereço
-                        </Button>
-                    </div>
+                    <Button onClick={startCreate} leftIcon={<PlusIcon size={18} />} variant="default">
+                        Novo endereço
+                    </Button>
                 ) : undefined}
             />
 
@@ -385,14 +384,16 @@ export const AddressView = ({
                 {editingId !== null && renderForm()}
             </DefaultModal>
 
-            {/* Fixed full-width new-address button for tablet/mobile */}
-            {addresses.length < 4 && (
-                <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3">
+            {/* Tablet/Mobile Bottom Menu */}
+            {addresses.length < 5 && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] flex items-center justify-center shadow-lg">
                     <Button
                         onClick={startCreate}
-                        className="w-full flex items-center justify-center gap-1.5 font-semibold text-sm"
+                        leftIcon={<PlusIcon size={18} />}
+                        variant="default"
+                        className="w-full sm:max-w-md flex items-center justify-center gap-2 font-semibold text-sm h-11"
                     >
-                        <PlusIcon size={18} /> Adicionar endereço
+                        Novo endereço
                     </Button>
                 </div>
             )}

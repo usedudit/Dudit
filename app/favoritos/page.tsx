@@ -43,15 +43,17 @@ export default async function FavoritosPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
             <MarketplaceHeader simpleTitle="Meus favoritos" userProfile={userProfile} cartCount={cartCount} />
 
-            <FavoritesPageClient
-                userProfile={userProfile}
-                cartCount={cartCount}
-                initialItems={initialItems}
-                initialCounts={initialCounts}
-            />
+            <main className="flex-1 w-full flex flex-col">
+                <FavoritesPageClient
+                    userProfile={userProfile}
+                    cartCount={cartCount}
+                    initialItems={initialItems}
+                    initialCounts={initialCounts}
+                />
+            </main>
 
             <MarketplaceFooter />
         </div>

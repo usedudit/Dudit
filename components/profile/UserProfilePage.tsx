@@ -20,6 +20,7 @@ import { SecurityView } from "./SecurityView"
 import { ReviewsView } from "./ReviewsView"
 import { NotificationsView } from "./NotificationsView"
 import { AlertCircleIcon } from "@/lib/icons"
+import { trackEvent } from "@/lib/analytics"
 
 const VALID_VIEWS: View[] = ["main", "informacoes-da-conta", "enderecos", "seguranca", "avaliacoes", "notificacoes"]
 const isValidView = (val: any): val is View => typeof val === "string" && VALID_VIEWS.includes(val as View)
@@ -136,6 +137,7 @@ export function UserProfilePage({
             }
 
             if (res.success) {
+                trackEvent("account_deletion_requested", { method: "email_code" })
                 setDeleteMaskedEmail(res.maskedEmail || "seu e-mail")
                 setDeleteStep("verify_code")
                 setDeleteCode("")
@@ -187,6 +189,7 @@ export function UserProfilePage({
             }
 
             if (res.success) {
+                trackEvent("account_deletion_completed", { method: "email_code" })
                 setDeleteStep("success")
                 try {
                     const supabase = createClient()
@@ -512,9 +515,9 @@ export function UserProfilePage({
     return (
         <>
             <MarketplaceHeader simpleTitle={getViewTitle()} />
-            <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+            <div className="min-h-screen bg-white dark:bg-dark-background lg:pt-[110px] font-sans flex flex-col">
                 <style>{`.animate-fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}</style>
-                <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1300px] mt-16 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     <AnimatePresence mode="wait">
                         {currentView === "main" && <MainView key="main" navigate={navigate} />}
                         {currentView === "informacoes-da-conta" && (

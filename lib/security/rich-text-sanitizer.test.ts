@@ -42,6 +42,15 @@ describe("Rich Text Sanitizer (Stored XSS Protection)", () => {
     expect(clean).toContain("<ul><li>Item 1</li></ul>")
   })
 
+  it("should strip residual outline and outline-offset from image styles", () => {
+    const dirty = '<img src="https://img.dudit.com.br/test.png" style="max-width: 100%; outline: 2px solid #79c325; outline-offset: 2px;" alt="Crown" />'
+    const clean = sanitizeRichText(dirty)
+    expect(clean).not.toContain("outline")
+    expect(clean).not.toContain("#79c325")
+    expect(clean).toContain('src="https://img.dudit.com.br/test.png"')
+    expect(clean).toContain('alt="Crown"')
+  })
+
   it("should return empty string for null, undefined or empty input", () => {
     expect(sanitizeRichText(null)).toBe("")
     expect(sanitizeRichText(undefined)).toBe("")

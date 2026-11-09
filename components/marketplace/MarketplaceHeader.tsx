@@ -26,6 +26,7 @@ import { IconPlaceholder } from "../reusable"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
 import { useModalLayer } from "@/lib/modal-stack"
+import { logLogoutAction } from "@/app/actions/auth/audit"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -743,6 +744,11 @@ const Header: React.FC<HeaderProps> = ({
     const handleSignOut = useCallback(async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
         localStorage.removeItem("dudit_city")
+        try {
+            await logLogoutAction()
+        } catch {
+            // Audit logging must never block logout.
+        }
         await supabase.auth.signOut({ scope: 'local' })
         setIsUserMenuOpen(false)
         setIsMobileUserMenuOpen(false)

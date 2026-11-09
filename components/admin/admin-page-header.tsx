@@ -7,6 +7,7 @@ import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { useTheme } from "next-themes"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { logLogoutAction } from "@/app/actions/auth/audit"
 
 interface AdminPageHeaderProps {
     pageTitle: string
@@ -31,6 +32,11 @@ export function AdminPageHeader({ pageTitle, userProfile }: AdminPageHeaderProps
     }, [])
 
     const handleSignOut = async () => {
+        try {
+            await logLogoutAction()
+        } catch {
+            // Audit logging must never block logout.
+        }
         await supabase.auth.signOut()
         window.location.href = "/login"
     }

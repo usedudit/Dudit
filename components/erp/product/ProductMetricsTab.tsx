@@ -152,7 +152,7 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                     {/* Score / Reputation Gauge */}
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col items-center justify-between">
                         <div className="flex items-center justify-between w-full mb-6">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Score no Marketplace</h3>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Score na Vitrine</h3>
                             <StarIcon className="text-brand-green fill-brand-green w-5 h-5" />
                         </div>
 

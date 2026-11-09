@@ -32,8 +32,9 @@ import {
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
-import { createProductComprehensiveAction } from "@/app/actions/erp/products"
+import { createProductComprehensiveAction, searchProductByBarcodeAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
+import { trackEvent } from "@/lib/analytics"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pdv/SelectSellerSheet"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
@@ -736,14 +737,32 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         const cleanCode = code.trim()
         if (!cleanCode) return
 
-        // 1. Search in local products state first
-        let matchedProduct = products.find(p => p.gtin === cleanCode || p.sku === cleanCode)
+        const strippedCode = cleanCode.replace(/^0+/, "")
+        const padded13Code = cleanCode.padStart(13, "0")
+
+        // 1. Search in local products state first (instant 0ms)
+        let matchedProduct = products.find(p => {
+            if (p.gtin === cleanCode || p.sku === cleanCode) return true
+            if (p.gtin) {
+                const g = p.gtin.trim()
+                if (g === cleanCode || (strippedCode && g.replace(/^0+/, "") === strippedCode) || g.padStart(13, "0") === padded13Code) return true
+            }
+            if (p.sku) {
+                const s = p.sku.trim()
+                if (s === cleanCode || (strippedCode && s.replace(/^0+/, "") === strippedCode)) return true
+            }
+            return false
+        })
         let matchedVariantId: string | null = null
 
         if (!matchedProduct) {
             // Check variant SKUs locally
             for (const p of products) {
-                const v = p.product_variants?.find(v => v.sku === cleanCode)
+                const v = p.product_variants?.find(v => {
+                    if (!v.sku) return false
+                    const s = v.sku.trim()
+                    return s === cleanCode || (strippedCode && s.replace(/^0+/, "") === strippedCode)
+                })
                 if (v) {
                     matchedProduct = p
                     matchedVariantId = v.id
@@ -765,9 +784,8 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             return
         }
 
-        // 2. Not found locally, call server action to find it in DB (handles overflow products)
+        // 2. Not found locally, call optimized server action to find it in DB (handles overflow products)
         try {
-            const { searchProductByBarcodeAction } = await import("@/app/actions/erp/products")
             const result = await searchProductByBarcodeAction(partnerId, cleanCode)
             if (result.success) {
                 if (result.data) {
@@ -777,14 +795,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         name: String(serverProduct.name),
                         category: serverProduct.category ?? null,
                         sku: serverProduct.sku ?? null,
+                        gtin: serverProduct.gtin ?? null,
                         price: Number(serverProduct.price) || 0,
+                        promotional_price: serverProduct.promotional_price != null ? Number(serverProduct.promotional_price) : null,
                         stock_available: Number(serverProduct.stock_available ?? serverProduct.stock_quantity ?? 0),
                         allow_sell_without_stock: Boolean(serverProduct.allow_sell_without_stock),
                         images: Array.isArray(serverProduct.images) ? serverProduct.images : null,
                         product_variants: Array.isArray(serverProduct.product_variants) ? serverProduct.product_variants : [],
                     }
 
-                    // Add to local products state so it's visible in PDV
+                    // Add to local products state so future scans of this product are instant
                     setProducts(prev => {
                         if (prev.some(p => p.id === dbProduct.id)) return prev
                         return [dbProduct, ...prev]
@@ -1269,6 +1289,14 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                 notifyError(result.error || "Não foi possível finalizar a venda.")
                 return { error: result.error || "Não foi possível finalizar a venda." }
             }
+
+            trackEvent("sale_completed", {
+                partner_id: partnerId,
+                store_id: activeStoreId || null,
+                payment_method: paymentData.paymentMethod || null,
+                items_count: cart.length,
+                amount: total,
+            })
 
             // Deduct sold products and variants stock immediately in local state
             const soldList: Array<{ productId: string; variantId: string | null; qty: number }> = []

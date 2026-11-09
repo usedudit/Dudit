@@ -9,6 +9,7 @@ import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { ShieldAlert } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { useSidebar } from "@/lib/sidebar-context"
+import { logLogoutAction } from "@/app/actions/auth/audit"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -240,10 +241,16 @@ export function AdminHeader({
 
                             <div className="py-2 border-t border-brand-border dark:border-dark-border">
                                 <DropdownItem
-                                    onClick={() => {
+                                    onClick={async () => {
                                         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
                                         localStorage.removeItem("dudit_city")
-                                        supabase.auth.signOut({ scope: 'local' }).then(() => (window.location.href = "/auth/login"))
+                                        try {
+                                            await logLogoutAction()
+                                        } catch {
+                                            // Audit logging must never block logout.
+                                        }
+                                        await supabase.auth.signOut({ scope: 'local' })
+                                        window.location.href = "/auth/login"
                                     }}
                                     className="text-brand-red dark:text-brand-red"
                                 >

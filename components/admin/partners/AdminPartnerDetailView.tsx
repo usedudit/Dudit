@@ -32,6 +32,7 @@ import {
     DropdownItem,
     SidebarCard,
     FormTextarea,
+    InfoCard,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -560,61 +561,57 @@ export function AdminPartnerDetailView({
                                     <FadeIn key="general">
                                         {/* Banner: ERP Desativado */}
                                         {isErpDisabled && (
-                                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 mb-6">
-                                                <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <h3 className="text-sm font-bold text-amber-950 dark:text-amber-300">
-                                                            Acesso ao ERP Desativado (Conta do Parceiro)
-                                                        </h3>
-                                                        {partner?.suspended_case_id && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(partner.suspended_case_id)
-                                                                    toast.success("Protocolo do caso copiado!")
-                                                                }}
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-mono text-xs font-bold border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-200"
-                                                            >
-                                                                <span>Caso: {partner.suspended_case_id}</span>
-                                                                <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-amber-900/80 dark:text-amber-400/80 mt-0.5">
-                                                        Motivo: {partner?.suspended_reason || "Sem motivo informado."}
-                                                        {partner?.suspended_until ? ` • Vigência até: ${formatDate(partner.suspended_until)}` : " • Permanente"}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            <InfoCard
+                                                title="Acesso ao ERP Desativado (Conta do Parceiro)"
+                                                message={`Motivo: ${partner?.suspended_reason || "Sem motivo informado."}${partner?.suspended_until ? ` • Vigência até: ${formatDate(partner.suspended_until)}` : " • Permanente"}`}
+                                                color="orange"
+                                                bottomElement={
+                                                    partner?.suspended_case_id && (
+                                                        <Button
+                                                            variant="link"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(partner.suspended_case_id)
+                                                                toast.success("Protocolo do caso copiado!")
+                                                            }}
+                                                        >
+                                                            <span>
+                                                                Caso: {partner.suspended_case_id}
+                                                            </span>
+                                                            <span className="text-sm uppercase font-semibold">
+                                                                Copiar
+                                                            </span>
+                                                        </Button>
+                                                    )
+                                                }
+                                            />
                                         )}
-
                                         {/* Banner: Loja Suspensa */}
                                         {isStoreSuspended && (
-                                            <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
-                                                <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                            Loja Suspensa Administrativamente
-                                                        </h3>
-                                                        {(store.suspended_case_id || partner?.suspended_case_id) && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
-                                                                    toast.success("Protocolo do caso copiado!")
-                                                                }}
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
-                                                            >
-                                                                <span>Caso: {store.suspended_case_id || partner?.suspended_case_id}</span>
-                                                                <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
-                                                        Motivo: {store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            <InfoCard
+                                                title="Loja Suspensa Administrativamente"
+                                                message={`Motivo: ${store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}`}
+                                                color="red"
+                                                bottomElement={
+                                                    (store.suspended_case_id || partner?.suspended_case_id) && (
+                                                        <Button
+                                                            variant="link"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(
+                                                                    store.suspended_case_id || partner?.suspended_case_id
+                                                                )
+                                                                toast.success("Protocolo do caso copiado!")
+                                                            }}
+                                                        >
+                                                            <span>
+                                                                Caso: {store.suspended_case_id || partner?.suspended_case_id}
+                                                            </span>
+                                                            <span className="text-sm uppercase font-semibold">
+                                                                Copiar
+                                                            </span>
+                                                        </Button>
+                                                    )
+                                                }
+                                            />
                                         )}
 
                                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
@@ -1147,28 +1144,30 @@ export function AdminPartnerDetailView({
                             </div>
                         </div>
                     </Tabs>
-                </div>
-            </FadeIn>
+                </div >
+            </FadeIn >
 
             {/* Mobile bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
-                {isStoreSuspended ? (
-                    <Button
-                        variant="outline"
-                        onClick={() => setUnsuspendStoreModalOpen(true)}
-                        className="flex-1 h-12"
-                    >
-                        Reativar Loja
-                    </Button>
-                ) : (
-                    <Button
-                        variant="destructive"
-                        onClick={() => setSuspendStoreModalOpen(true)}
-                        className="flex-1 h-12"
-                    >
-                        Suspender Loja
-                    </Button>
-                )}
+            < div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2" >
+                {
+                    isStoreSuspended ? (
+                        <Button
+                            variant="outline"
+                            onClick={() => setUnsuspendStoreModalOpen(true)
+                            }
+                            className="flex-1 h-12"
+                        >
+                            Reativar Loja
+                        </Button >
+                    ) : (
+                        <Button
+                            variant="destructive"
+                            onClick={() => setSuspendStoreModalOpen(true)}
+                            className="flex-1 h-12"
+                        >
+                            Suspender Loja
+                        </Button>
+                    )}
 
                 <Button
                     variant="outline"
@@ -1205,10 +1204,10 @@ export function AdminPartnerDetailView({
                         </DropdownItem>
                     )}
                 </ActionsDropdown>
-            </div>
+            </div >
 
             {/* Modal: Ajustar Score de Risco */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={riskModalOpen}
                 onClose={() => {
                     setRiskModalOpen(false)
@@ -1267,10 +1266,10 @@ export function AdminPartnerDetailView({
                         </Button>
                     </div>
                 </div>
-            </DefaultModal>
+            </DefaultModal >
 
             {/* 1. Modal: Suspender Loja (Apenas esta filial) */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={suspendStoreModalOpen}
                 onClose={() => setSuspendStoreModalOpen(false)}
                 onConfirm={handleConfirmSuspendStore}
@@ -1282,7 +1281,7 @@ export function AdminPartnerDetailView({
             />
 
             {/* 2. Modal: Reativar Loja (Apenas esta filial) */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={unsuspendStoreModalOpen}
                 onClose={() => setUnsuspendStoreModalOpen(false)}
                 onConfirm={handleConfirmUnsuspendStore}
@@ -1294,7 +1293,7 @@ export function AdminPartnerDetailView({
             />
 
             {/* 3. Modal: Desativar Acesso ao ERP (Conta do Parceiro) */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={disableErpModalOpen}
                 onClose={() => setDisableErpModalOpen(false)}
                 onConfirm={handleConfirmDisableERP}
@@ -1306,7 +1305,7 @@ export function AdminPartnerDetailView({
             />
 
             {/* 4. Modal: Reativar Acesso ao ERP (Conta do Parceiro) */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={enableErpModalOpen}
                 onClose={() => setEnableErpModalOpen(false)}
                 onConfirm={handleConfirmEnableERP}
@@ -1318,7 +1317,7 @@ export function AdminPartnerDetailView({
             />
 
             {/* 5. Modal: Suspender Parceiro Inteiro */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={suspendPartnerModalOpen}
                 onClose={() => setSuspendPartnerModalOpen(false)}
                 onConfirm={handleConfirmSuspendPartner}
@@ -1330,7 +1329,7 @@ export function AdminPartnerDetailView({
             />
 
             {/* 6. Modal: Reativar Parceiro Inteiro */}
-            <AdminEnforcementModal
+            < AdminEnforcementModal
                 isOpen={unsuspendPartnerModalOpen}
                 onClose={() => setUnsuspendPartnerModalOpen(false)}
                 onConfirm={handleConfirmUnsuspendPartner}

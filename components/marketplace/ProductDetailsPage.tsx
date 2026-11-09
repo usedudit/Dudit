@@ -9,6 +9,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { filterUnflaggedImages } from "@/lib/utils/product-display-images"
 import { Button, Input, FormDropdown, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, Checkbox, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
 import { formatCurrency, formatQuantityWithUnit, formatDeliveryDaysRange } from "@/lib/utils"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
@@ -307,6 +308,18 @@ export function ProductDetailsPageClient({
 
     const isProductOwner = !canBuyState.canBuy
     const isTeamMember = canBuyState.isTeamMember
+
+    // Funnel event: one capture per product id. Owner/team views are ignored.
+    useEffect(() => {
+        if (!product?.id || isProductOwner) return
+        trackEvent("product_viewed", {
+            product_id: product.id,
+            partner_id: partner?.partner_id || partner?.id || null,
+            store_id: product.store_id || null,
+            category_id: product.category_id || null,
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [product?.id, isProductOwner])
 
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
@@ -927,10 +940,16 @@ export function ProductDetailsPageClient({
     }, [userId, user])
 
     const productImages = useMemo(() => {
-        let images = (product.images || [])
+        const rawImages = (product.images || [])
             .filter((img: any) => typeof img === "string" && img.trim())
-            .map(getProductImageUrl)
-        if (variants.length > 0) {
+        const cleanImages = filterUnflaggedImages(
+            rawImages,
+            product.moderation_status,
+            product.moderation_reason,
+            (product as any).flagged_images,
+        )
+        let images = cleanImages.map((img) => getProductImageUrl(img))
+        if (variants.length > 0 && product.moderation_status !== "flagged") {
             variants.forEach((v) => {
                 const opts = typeof v.variant_options === "string" ? JSON.parse(v.variant_options) : v.variant_options
                 const url = getProductImageUrl(v.image_url || opts?.image)
@@ -938,14 +957,14 @@ export function ProductDetailsPageClient({
             })
         }
         if (images.length) return images
-        if (product.video_type && product.video_url) return []
+        if (product.video_type && product.video_url && product.moderation_status !== "flagged") return []
         const videoThumb = product.video_thumbnail
-        if (videoThumb && String(videoThumb).trim()) {
+        if (videoThumb && String(videoThumb).trim() && product.moderation_status !== "flagged") {
             const url = String(videoThumb)
             return [url.startsWith("http") ? url : getProductImageUrl(url)]
         }
         return [PLACEHOLDER]
-    }, [product.images, product.video_thumbnail, product.video_type, product.video_url, variants])
+    }, [product.images, product.moderation_status, product.moderation_reason, (product as any).flagged_images, product.video_thumbnail, product.video_type, product.video_url, variants])
 
     const galleryItems = useMemo(() => {
         const videoType = product.video_type

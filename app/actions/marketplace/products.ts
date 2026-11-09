@@ -30,7 +30,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
     .from("products")
     .select(`
       id, short_id, store_id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
-      is_active, status, moderation_status,
+      is_active, status, moderation_status, moderation_reason,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
       brand, brand_id, brand_entity:brands!brand_id(name),

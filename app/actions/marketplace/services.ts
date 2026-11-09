@@ -33,7 +33,7 @@ async function _getMarketplaceServiceBase(serviceId: string, storeId?: string | 
     .from("services")
     .select(`
       id, short_id, partner_id, store_id, name, description, price, duration_minutes,
-      images, is_active, status, rating, category_id, subcategory_id, sku, unit,
+      images, is_active, status, moderation_status, moderation_reason, rating, category_id, subcategory_id, sku, unit,
       show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
       video_thumbnail, video_duration, video_provider_id, service_type,
       warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,

@@ -108,6 +108,11 @@ const HARD_TOKENS = new Set([
   "vagabunda", "vadia", "piranha", "putinha",
   // neonazismo
   "nazista", "neonazista",
+  // baixo calão / ofensas graves
+  "arrombado", "arrombada", "caralho", "foder", "fuder", "fudido", "fudida",
+  "desgracado", "desgracada", "putaria",
+  // substâncias e produtos ilícitos
+  "cocaina", "maconha", "crack",
 ])
 
 /** Frases candidatas — normalizadas automaticamente na carga do módulo. */
@@ -120,6 +125,12 @@ const RAW_HARD_PHRASES = [
   "heil hitler", "sieg heil", "morte aos judeus", "morte aos negros",
   "morte aos viados", "morte aos gays",
   "estuprar", "estupro corretivo",
+  // ofensas e insultos frequentes
+  "filho da puta", "filha da puta", "filhos da puta", "filhas da puta",
+  "vai se foder", "vai tomar no cu", "tomar no cu", "toma no cu",
+  "puta que pariu", "vai pra puta que pariu",
+  // armas e fraudes
+  "arma de fogo", "armas de fogo", "cartao clonado", "nota falsa", "dinheiro falso",
 ]
 
 const HARD_PHRASES = RAW_HARD_PHRASES.map(normalizeForMatch)

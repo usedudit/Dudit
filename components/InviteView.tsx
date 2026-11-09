@@ -104,12 +104,12 @@ export default function InviteView(props: InviteViewProps) {
                     />
                 </div>
 
-                <Button asChild className="w-full h-[44px] text-[15px] font-bold">
+                <Button asChild className="w-full h-[44px]">
                     <Link href="/" prefetch={false}>Ir para a página inicial</Link>
                 </Button>
 
                 <Link href="/" prefetch={false} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">
-                    ← Voltar para o início
+                    Voltar para o início
                 </Link>
             </Shell>
         )

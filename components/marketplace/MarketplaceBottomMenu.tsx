@@ -13,6 +13,7 @@ import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useCollectionDetailMenu } from "@/lib/collection-detail-menu"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useAddressSync } from "@/lib/utils/address-sync"
+import { logLogoutAction } from "@/app/actions/auth/audit"
 
 function MenuItem({
     label,
@@ -169,6 +170,11 @@ export function MarketplaceBottomMenu() {
     const handleSignOut = async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
         localStorage.removeItem("dudit_city")
+        try {
+            await logLogoutAction()
+        } catch {
+            // Audit logging must never block logout.
+        }
         await supabase.auth.signOut({ scope: "local" })
         setIsMenuOpen(false)
         window.location.href = "/"

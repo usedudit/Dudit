@@ -47,6 +47,12 @@ function formatBrazilDateTime(): string {
 
 // ─── Helper: increment partner risk_score (capped at 100) ──────────────────
 
+export interface AdminModerationActionOptions {
+    reason?: string | null
+    riskScore?: number | null
+    notifySeller?: boolean
+}
+
 async function incrementRiskScore(partnerId: string, points: number): Promise<void> {
     try {
         const admin = getAdminClient()
@@ -72,6 +78,20 @@ async function incrementRiskScore(partnerId: string, points: number): Promise<vo
     }
 }
 
+async function applyRiskScore(partnerId: string, riskScore?: number | null, defaultIncrement?: number): Promise<void> {
+    const admin = getAdminClient()
+    if (riskScore !== undefined && riskScore !== null) {
+        const clamped = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+        try {
+            await admin.from("stores").update({ risk_score: clamped }).eq("partner_id", partnerId)
+        } catch (e) {
+            console.error("[RISK_SCORE] Failed to update risk score:", partnerId, e)
+        }
+    } else if (defaultIncrement && defaultIncrement > 0) {
+        await incrementRiskScore(partnerId, defaultIncrement)
+    }
+}
+
 // ─── Get Moderation Queue ───────────────────────────────────────────────────
 
 export async function getModerationQueue(
@@ -89,7 +109,7 @@ export async function getModerationQueue(
     let productQuery = supabase
         .from("products")
         .select(`
-      id, name, description, price, images, moderation_status, created_at, store_id,
+      id, name, description, price, images, moderation_status, moderation_reason, created_at, store_id,
       category_id, category:product_categories!category_id(name),
       brand, brand_id, brand_rel:brands!brand_id(name),
       video_url, video_type, video_thumbnail,
@@ -120,7 +140,7 @@ export async function getModerationQueue(
     let serviceQuery = supabase
         .from("services")
         .select(`
-      id, name, description, price, images, moderation_status, created_at, store_id,
+      id, name, description, price, images, moderation_status, moderation_reason, created_at, store_id,
       video_url, video_type, video_thumbnail,
       partner:partners!inner(id, user_id),
       store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
@@ -195,6 +215,7 @@ export async function getModerationQueue(
             store_logo_url: st?.logo_url || undefined,
             owner_user_id: p.partner?.user_id || undefined,
             moderation_status: p.moderation_status,
+            moderation_reason: p.moderation_reason || null,
             risk_score: st?.risk_score ?? 0,
             created_at: p.created_at,
             category_name: p.category?.name || null,
@@ -226,6 +247,7 @@ export async function getModerationQueue(
             store_logo_url: st?.logo_url || undefined,
             owner_user_id: s.partner?.user_id || undefined,
             moderation_status: s.moderation_status,
+            moderation_reason: s.moderation_reason || null,
             risk_score: st?.risk_score ?? 0,
             created_at: s.created_at,
             category_name: null,
@@ -332,18 +354,27 @@ export async function getModerationQueue(
 
 export async function approveModeration(
     entityId: string,
-    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product",
+    options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const supabase = getAdminClient()
 
+    // Resolve admin actor name
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", admin.userId)
+        .maybeSingle()
+    const adminName = profile?.full_name || admin.email || "Equipe Dudit"
+
     // Anti-IDOR: re-fetch entity
     if (type === "community_video") {
         const { data: video } = await supabase
             .from("community_videos")
-            .select("id, moderation_status")
+            .select("id, partner_id, moderation_status")
             .eq("id", entityId)
             .single()
 
@@ -359,12 +390,21 @@ export async function approveModeration(
 
         if (updateError) return { success: false, error: updateError.message }
 
+        if (video.partner_id) {
+            await applyRiskScore(video.partner_id, options?.riskScore)
+        }
+
         await adminAuditLog({
             adminUserId: admin.userId,
             actionType: AdminActionType.MODERATION_APPROVE,
             targetType: "community_video",
             targetId: entityId,
-            metadata: { previousStatus: video.moderation_status },
+            metadata: {
+                previousStatus: video.moderation_status,
+                reason: options?.reason?.trim() || null,
+                riskScore: options?.riskScore ?? null,
+                adminName,
+            },
         })
 
         return { success: true }
@@ -389,7 +429,7 @@ export async function approveModeration(
             p_refund_payment_method: null,
             p_return_to_inventory: false,
             p_store_credit_amount: 0,
-            p_notes: "Moderacao aprovou o cliente para continuidade da resolução.",
+            p_notes: options?.reason?.trim() || "Moderacao aprovou o cliente para continuidade da resolução.",
             p_idempotency_key: `moderation-approve:${entityId}:${Date.now()}`,
         })
         if (error) return { success: false, error: error.message }
@@ -410,13 +450,27 @@ export async function approveModeration(
                 await logAuditEvent({
                     partnerId: rr.partner_id,
                     actorUserId: admin.userId,
+                    actorName: adminName,
                     entityType: "order",
                     entityId: rr.order_id,
                     actionType: "cancelled",
-                    changeLines: ["Pedido cancelado - disputa de cancelamento aprovada pela moderação."],
+                    changeLines: [
+                        "Pedido cancelado - disputa de cancelamento aprovada pela moderação.",
+                        ...(options?.reason?.trim() ? [`Mensagem: "${options.reason.trim()}"`] : []),
+                    ],
+                    metadata: {
+                        is_admin_action: true,
+                        dudit_action: true,
+                        admin_actor_name: adminName,
+                        reason: options?.reason?.trim() || null,
+                    },
                     source: "manual",
                 })
             }
+        }
+
+        if (rr.partner_id) {
+            await applyRiskScore(rr.partner_id, options?.riskScore)
         }
 
         await adminAuditLog({
@@ -424,7 +478,13 @@ export async function approveModeration(
             actionType: AdminActionType.MODERATION_APPROVE,
             targetType: "return_request",
             targetId: entityId,
-            metadata: { previousStatus: rr.status, partnerId: rr.partner_id },
+            metadata: {
+                previousStatus: rr.status,
+                partnerId: rr.partner_id,
+                reason: options?.reason?.trim() || null,
+                riskScore: options?.riskScore ?? null,
+                adminName,
+            },
         })
         return { success: true }
     }
@@ -434,7 +494,7 @@ export async function approveModeration(
 
     const { data: entity, error: fetchError } = await supabase
         .from(targetTable)
-        .select(isItem ? "id, name, moderation_status, images" : "id, stores!left(name)")
+        .select(isItem ? "id, name, moderation_status, images, partner_id" : "id, stores!left(name)")
         .eq("id", entityId)
         .single()
 
@@ -447,6 +507,7 @@ export async function approveModeration(
             .from(targetTable)
             .update({
                 moderation_status: "approved",
+                moderation_reason: null,
                 moderation_reviewed_by: admin.userId,
                 moderation_reviewed_at: new Date().toISOString(),
                 status: "ativo",
@@ -454,6 +515,71 @@ export async function approveModeration(
             .eq("id", entityId)
 
         if (updateError) return { success: false, error: updateError.message }
+
+        // Sincroniza e revalida caches
+        try {
+            const { syncToExploreRedis } = await import("@/lib/redis-sync")
+            await syncToExploreRedis({
+                id: entityId,
+                type: type === "product" ? "produto" : "servico",
+                data: {},
+                silent: true,
+            })
+            const { revalidateTag } = await import("next/cache")
+            ;(revalidateTag as any)(`${type}-${entityId}`, "max")
+            ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+        } catch (syncErr) {
+            console.warn("[ADMIN_MODERATION] Erro ao sincronizar cache pós-aprovação:", syncErr)
+        }
+
+        // Apply risk score and partner notifications
+        if (entity.partner_id) {
+            await applyRiskScore(entity.partner_id, options?.riskScore)
+
+            if (options?.notifySeller && options?.reason?.trim()) {
+                const userIds = await getPartnerTeamUserIds(entity.partner_id)
+                const typeLabel = type === "service" ? "serviço" : "produto"
+                const notificationMessage = `Seu ${typeLabel} "${entity.name}" foi aprovado na moderação. Mensagem: ${options.reason.trim()}`
+
+                for (const uid of userIds) {
+                    await createNotification({
+                        userId: uid,
+                        type: "admin_announcement",
+                        title: `${type === "service" ? "Serviço" : "Produto"} aprovado`,
+                        message: notificationMessage,
+                        entityType: "product",
+                        entityId: entityId,
+                        data: { audience: "seller", partner_id: entity.partner_id, moderation_type: type },
+                        idempotencyKey: buildIdempotencyKey("admin_announcement", type, entityId, uid, "approved"),
+                        origin: "system",
+                    })
+                }
+            }
+
+            // Append to audit_logs for timeline visibility
+            const changeLines = [
+                `Aprovou o ${type === "service" ? "serviço" : "produto"} na moderação.`,
+                ...(options?.reason?.trim() ? [`Mensagem: "${options.reason.trim()}"`] : []),
+                ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+            ]
+            await logAuditEvent({
+                partnerId: entity.partner_id,
+                actorUserId: admin.userId,
+                actorName: adminName,
+                entityType: type,
+                entityId,
+                actionType: "approved",
+                changeLines,
+                metadata: {
+                    is_admin_action: true,
+                    dudit_action: true,
+                    admin_actor_name: adminName,
+                    reason: options?.reason?.trim() || null,
+                    risk_score: options?.riskScore ?? null,
+                },
+                source: "manual",
+            })
+        }
     }
 
     // Audit log (append-only, via service-role)
@@ -464,7 +590,10 @@ export async function approveModeration(
         targetId: entityId,
         metadata: {
             previousStatus: isItem ? entity.moderation_status : "approved",
-            name: isItem ? entity.name : entity.stores?.[0]?.name
+            name: isItem ? entity.name : entity.stores?.[0]?.name,
+            reason: options?.reason?.trim() || null,
+            riskScore: options?.riskScore ?? null,
+            adminName,
         },
     })
 
@@ -477,12 +606,15 @@ export async function rejectFlaggedImages(
     entityId: string,
     reason: string,
     flaggedImageUrls: string[],
-    type: "product" | "service" = "product"
+    type: "product" | "service" = "product",
+    options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string; noImagesLeft?: boolean }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
-    if (!reason || reason.trim().length < 5) {
+    const effectiveReason = (options?.reason?.trim() || reason || "").trim()
+
+    if (!effectiveReason || effectiveReason.length < 5) {
         return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
     }
 
@@ -491,6 +623,14 @@ export async function rejectFlaggedImages(
     }
 
     const supabase = getAdminClient()
+
+    // Resolve admin actor name
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", admin.userId)
+        .maybeSingle()
+    const adminName = profile?.full_name || admin.email || "Equipe Dudit"
 
     const targetTable = type === "service" ? "services" : "products"
     // Anti-IDOR: re-fetch entity with all relevant data
@@ -514,7 +654,7 @@ export async function rejectFlaggedImages(
     const removedWord = removedCount === 1 ? "removida" : "removidas"
 
     // Build detailed reason for deleted_reason / moderation_reason
-    const detailedReason = `${removedCount} ${imageWord} ${removedWord} por "${reason.trim()}" do produto "${entity.name}" em ${formatBrazilDateTime()}`
+    const detailedReason = `${removedCount} ${imageWord} ${removedWord} por "${effectiveReason}" do ${type === "service" ? "serviço" : "produto"} "${entity.name}" em ${formatBrazilDateTime()}`
 
     // SAFETY CHECK: if no images remain, don't approve - product needs at least 1 image
     if (remainingImages.length === 0) {
@@ -537,9 +677,9 @@ export async function rejectFlaggedImages(
         // Delete flagged images from R2
         await Promise.all(flaggedImageUrls.map(url => _deleteFromR2(url)))
 
-        // Risk score: +2 for image removal (admin-confirmed)
+        // Risk score adjustment
         if (entity.partner_id) {
-            await incrementRiskScore(entity.partner_id, 2)
+            await applyRiskScore(entity.partner_id, options?.riskScore, 2)
         }
 
         // Audit log
@@ -554,15 +694,43 @@ export async function rejectFlaggedImages(
                 remainingImages: 0,
                 previousStatus: entity.moderation_status,
                 productName: entity.name,
-                riskScoreAdded: 2,
+                riskScore: options?.riskScore ?? null,
+                adminName,
             },
         })
 
-        // Send notification to partner
+        // Partner timeline log
         if (entity.partner_id) {
+            await logAuditEvent({
+                partnerId: entity.partner_id,
+                actorUserId: admin.userId,
+                actorName: adminName,
+                entityType: type,
+                entityId,
+                actionType: "updated",
+                changeLines: [
+                    `Removeu todas as imagens (${removedCount}) na moderação.`,
+                    `Motivo: "${effectiveReason}"`,
+                    "Item requer novas imagens para aprovação.",
+                    ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+                ],
+                metadata: {
+                    is_admin_action: true,
+                    dudit_action: true,
+                    admin_actor_name: adminName,
+                    removed_images: flaggedImageUrls,
+                    reason: effectiveReason,
+                    risk_score: options?.riskScore ?? null,
+                },
+                source: "manual",
+            })
+        }
+
+        // Send notification to partner
+        if (entity.partner_id && options?.notifySeller !== false) {
             const userIds = await getPartnerTeamUserIds(entity.partner_id)
             const typeLabel = type === "service" ? "serviço" : "produto"
-            const notificationMessage = `Todas as imagens do ${typeLabel} "${entity.name}" foram removidas. Motivo: ${reason.trim()}. Adicione novas imagens para que o item possa ser aprovado.`
+            const notificationMessage = `Todas as imagens do ${typeLabel} "${entity.name}" foram removidas. Motivo: ${effectiveReason}. Adicione novas imagens para que o item possa ser aprovado.`
 
             for (const uid of userIds) {
                 await createNotification({
@@ -602,12 +770,25 @@ export async function rejectFlaggedImages(
         return { success: false, error: updateError.message }
     }
 
+    try {
+        const { syncToExploreRedis } = await import("@/lib/redis-sync")
+        await syncToExploreRedis({
+            id: entityId,
+            type: type === "product" ? "produto" : "servico",
+            data: {},
+            silent: true,
+        })
+        const { revalidateTag } = await import("next/cache")
+        ;(revalidateTag as any)(`${type}-${entityId}`, "max")
+        ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+    } catch {}
+
     // Delete flagged images from R2
     await Promise.all(flaggedImageUrls.map(url => _deleteFromR2(url)))
 
-    // Risk score: +2 for image removal (admin-confirmed)
+    // Risk score adjustment
     if (entity.partner_id) {
-        await incrementRiskScore(entity.partner_id, 2)
+        await applyRiskScore(entity.partner_id, options?.riskScore, 2)
     }
 
     // Audit log
@@ -622,15 +803,42 @@ export async function rejectFlaggedImages(
             remainingImages: remainingImages.length,
             previousStatus: entity.moderation_status,
             productName: entity.name,
-            riskScoreAdded: 2,
+            riskScore: options?.riskScore ?? null,
+            adminName,
         },
     })
 
-    // Send notification to partner
+    // Partner timeline log
     if (entity.partner_id) {
+        await logAuditEvent({
+            partnerId: entity.partner_id,
+            actorUserId: admin.userId,
+            actorName: adminName,
+            entityType: type,
+            entityId,
+            actionType: "updated",
+            changeLines: [
+                `Removeu ${removedCount} ${imageWord} na moderação e aprovou com as restantes.`,
+                `Motivo: "${effectiveReason}"`,
+                ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+            ],
+            metadata: {
+                is_admin_action: true,
+                dudit_action: true,
+                admin_actor_name: adminName,
+                removed_images: flaggedImageUrls,
+                reason: effectiveReason,
+                risk_score: options?.riskScore ?? null,
+            },
+            source: "manual",
+        })
+    }
+
+    // Send notification to partner
+    if (entity.partner_id && options?.notifySeller !== false) {
         const userIds = await getPartnerTeamUserIds(entity.partner_id)
         const typeLabel = type === "service" ? "serviço" : "produto"
-        const notificationMessage = `${removedCount} ${removedWord} do ${typeLabel} "${entity.name}" foi removida. Motivo: ${reason.trim()}. O item foi aprovado com as imagens restantes.`
+        const notificationMessage = `${removedCount} ${removedWord} do ${typeLabel} "${entity.name}" foi removida. Motivo: ${effectiveReason}. O item foi aprovado com as imagens restantes.`
 
         for (const uid of userIds) {
             await createNotification({
@@ -650,21 +858,184 @@ export async function rejectFlaggedImages(
     return { success: true, noImagesLeft: false }
 }
 
+// ─── Remove single image via moderation ────────────────────────────────────
+
+export async function removeModerationImage(
+    entityId: string,
+    imageUrl: string,
+    type: "product" | "service" = "product",
+    options?: AdminModerationActionOptions
+): Promise<{ success: boolean; error?: string; remainingImages?: string[]; noImagesLeft?: boolean }> {
+    const admin = await requireAdminScope("moderation")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!imageUrl || !imageUrl.trim()) {
+        return { success: false, error: "URL da imagem inválida" }
+    }
+
+    const supabase = getAdminClient()
+
+    // Resolve admin actor name
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", admin.userId)
+        .maybeSingle()
+    const adminName = profile?.full_name || admin.email || "Equipe Dudit"
+
+    const targetTable = type === "service" ? "services" : "products"
+    const { data: entity, error: fetchError } = await supabase
+        .from(targetTable)
+        .select("id, name, images, moderation_status, partner_id")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: `${type === "service" ? "Serviço" : "Produto"} não encontrado` }
+    }
+
+    const currentImages: string[] = entity.images || []
+    const remainingImages = currentImages.filter((img: string) => img !== imageUrl)
+    const noImagesLeft = remainingImages.length === 0
+    const reasonText = options?.reason?.trim()
+
+    const updatePayload: Record<string, any> = {
+        images: remainingImages,
+    }
+
+    if (noImagesLeft) {
+        updatePayload.moderation_status = "needs_images"
+        updatePayload.moderation_reason = reasonText || "Todas as imagens foram removidas pela moderação."
+        updatePayload.moderation_reviewed_by = admin.userId
+        updatePayload.moderation_reviewed_at = new Date().toISOString()
+    }
+
+    const { error: updateError } = await supabase
+        .from(targetTable)
+        .update(updatePayload)
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Delete image from R2
+    await _deleteFromR2(imageUrl)
+
+    // Apply risk score adjustment if provided
+    if (entity.partner_id) {
+        await applyRiskScore(entity.partner_id, options?.riskScore, 2)
+    }
+
+    // Audit log
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_REMOVE_IMAGE,
+        targetType: type,
+        targetId: entityId,
+        metadata: {
+            removedImage: imageUrl,
+            remainingImages: remainingImages.length,
+            reason: reasonText || null,
+            riskScore: options?.riskScore ?? null,
+            adminName,
+            productName: entity.name,
+        },
+    })
+
+    // Partner timeline log
+    if (entity.partner_id) {
+        const changeLines = [
+            "Removeu 1 imagem do item na moderação.",
+            ...(reasonText ? [`Motivo: "${reasonText}"`] : []),
+            ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+            ...(noImagesLeft ? ["O item ficou sem imagens e requer novas imagens para aprovação."] : []),
+        ]
+        await logAuditEvent({
+            partnerId: entity.partner_id,
+            actorUserId: admin.userId,
+            actorName: adminName,
+            entityType: type,
+            entityId,
+            actionType: "updated",
+            changeLines,
+            metadata: {
+                is_admin_action: true,
+                dudit_action: true,
+                admin_actor_name: adminName,
+                removed_image: imageUrl,
+                reason: reasonText || null,
+                risk_score: options?.riskScore ?? null,
+            },
+            source: "manual",
+        })
+    }
+
+    // Send notification to partner if requested
+    if (entity.partner_id && options?.notifySeller && reasonText) {
+        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const typeLabel = type === "service" ? "serviço" : "produto"
+        const notificationMessage = `Uma imagem do ${typeLabel} "${entity.name}" foi removida pela moderação. Motivo: ${reasonText}.`
+
+        for (const uid of userIds) {
+            await createNotification({
+                userId: uid,
+                type: "admin_announcement",
+                title: "Imagem removida pela moderação",
+                message: notificationMessage,
+                entityType: "product",
+                entityId: entityId,
+                data: { audience: "seller", partner_id: entity.partner_id, remaining: remainingImages.length },
+                idempotencyKey: buildIdempotencyKey("admin_announcement", type, entityId, uid, `img_removed_${Date.now()}`),
+                origin: "system",
+            })
+        }
+    }
+
+    // Sincroniza Redis e revalida tags
+    try {
+        const { syncToExploreRedis } = await import("@/lib/redis-sync")
+        await syncToExploreRedis({
+            id: entityId,
+            type: type === "product" ? "produto" : "servico",
+            data: {},
+            silent: true,
+        })
+        const { revalidateTag } = await import("next/cache")
+        ;(revalidateTag as any)(`${type}-${entityId}`, "max")
+        ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+    } catch {}
+
+    return { success: true, remainingImages, noImagesLeft }
+}
+
 // ─── Full Reject (reject product entirely) ──────────────────────────────────
 
 export async function rejectModeration(
     entityId: string,
     reason: string,
-    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product",
+    options?: AdminModerationActionOptions
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
-    if (!reason || reason.trim().length < 5) {
+    const effectiveReason = (options?.reason?.trim() || reason || "").trim()
+
+    if (!effectiveReason || effectiveReason.length < 5) {
         return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
     }
 
     const supabase = getAdminClient()
+
+    // Resolve admin actor name
+    const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", admin.userId)
+        .maybeSingle()
+    const adminName = profile?.full_name || admin.email || "Equipe Dudit"
 
     if (type === "community_video") {
         const { data: video } = await supabase
@@ -679,25 +1050,34 @@ export async function rejectModeration(
             .from("community_videos")
             .update({
                 moderation_status: "rejected",
-                moderation_reason: reason.trim(),
+                moderation_reason: effectiveReason,
             })
             .eq("id", entityId)
 
         if (updateError) return { success: false, error: updateError.message }
+
+        if (video.partner_id) {
+            await applyRiskScore(video.partner_id, options?.riskScore)
+        }
 
         await adminAuditLog({
             adminUserId: admin.userId,
             actionType: AdminActionType.MODERATION_REJECT,
             targetType: "community_video",
             targetId: entityId,
-            metadata: { reason: reason.trim(), previousStatus: video.moderation_status },
+            metadata: {
+                reason: effectiveReason,
+                previousStatus: video.moderation_status,
+                riskScore: options?.riskScore ?? null,
+                adminName,
+            },
         })
 
         // Send notification to partner
-        if (video.partner_id) {
+        if (video.partner_id && options?.notifySeller !== false) {
             const userIds = await getPartnerTeamUserIds(video.partner_id)
-            const notificationMessage = reason.trim().length > 0
-                ? reason.trim()
+            const notificationMessage = effectiveReason.length > 0
+                ? effectiveReason
                 : "Seu vídeo da comunidade não atendeu aos critérios de moderação e não foi aprovado."
 
             for (const uid of userIds) {
@@ -736,17 +1116,27 @@ export async function rejectModeration(
             p_refund_payment_method: null,
             p_return_to_inventory: false,
             p_store_credit_amount: 0,
-            p_notes: reason.trim(),
+            p_notes: effectiveReason,
             p_idempotency_key: `moderation-reject:${entityId}:${Date.now()}`,
         })
         if (error) return { success: false, error: error.message }
+
+        if (rr.partner_id) {
+            await applyRiskScore(rr.partner_id, options?.riskScore)
+        }
 
         await adminAuditLog({
             adminUserId: admin.userId,
             actionType: AdminActionType.MODERATION_REJECT,
             targetType: "return_request",
             targetId: entityId,
-            metadata: { reason: reason.trim(), previousStatus: rr.status, partnerId: rr.partner_id },
+            metadata: {
+                reason: effectiveReason,
+                previousStatus: rr.status,
+                partnerId: rr.partner_id,
+                riskScore: options?.riskScore ?? null,
+                adminName,
+            },
         })
         return { success: true }
     }
@@ -770,7 +1160,7 @@ export async function rejectModeration(
             .from(targetTable)
             .update({
                 moderation_status: "rejected",
-                moderation_reason: reason.trim(),
+                moderation_reason: effectiveReason,
                 moderation_reviewed_by: admin.userId,
                 moderation_reviewed_at: new Date().toISOString(),
                 status: "inativo",
@@ -778,11 +1168,19 @@ export async function rejectModeration(
             .eq("id", entityId)
 
         if (updateError) return { success: false, error: updateError.message }
+
+        try {
+            const { removeFromExploreRedis } = await import("@/lib/redis-sync")
+            await removeFromExploreRedis(entityId, type === "product" ? "produto" : "servico", true, false)
+            const { revalidateTag } = await import("next/cache")
+            ;(revalidateTag as any)(`${type}-${entityId}`, "max")
+            ;(revalidateTag as any)(type === "product" ? "products" : "services", "max")
+        } catch {}
     }
 
-    // Risk score: +3 for full product rejection (admin-confirmed)
+    // Risk score adjustment: +3 for full product rejection or specified score
     if (entity.partner_id) {
-        await incrementRiskScore(entity.partner_id, 3)
+        await applyRiskScore(entity.partner_id, options?.riskScore, isItem ? 3 : 0)
     }
 
     await adminAuditLog({
@@ -791,20 +1189,47 @@ export async function rejectModeration(
         targetType: type,
         targetId: entityId,
         metadata: {
-            reason: reason.trim(),
+            reason: effectiveReason,
             previousStatus: isItem ? entity.moderation_status : "approved",
             name: isItem ? entity.name : entity.stores?.[0]?.name,
-            riskScoreAdded: isItem ? 3 : 0
+            riskScore: options?.riskScore ?? null,
+            adminName,
         },
     })
 
-    // Send notification to partner
+    // Partner timeline log
     if (entity.partner_id) {
+        const changeLines = [
+            `Rejeitou o ${type === "service" ? "serviço" : "produto"} na moderação.`,
+            `Motivo: "${effectiveReason}"`,
+            ...(options?.riskScore != null ? [`Risk score da loja ajustado para: ${options.riskScore}`] : []),
+        ]
+        await logAuditEvent({
+            partnerId: entity.partner_id,
+            actorUserId: admin.userId,
+            actorName: adminName,
+            entityType: type,
+            entityId,
+            actionType: "rejected",
+            changeLines,
+            metadata: {
+                is_admin_action: true,
+                dudit_action: true,
+                admin_actor_name: adminName,
+                reason: effectiveReason,
+                risk_score: options?.riskScore ?? null,
+            },
+            source: "manual",
+        })
+    }
+
+    // Send notification to partner
+    if (entity.partner_id && options?.notifySeller !== false) {
         const userIds = await getPartnerTeamUserIds(entity.partner_id)
         const itemName = isItem ? entity.name : "seu perfil"
         const typeLabel = type === "product" ? "produto" : type === "service" ? "serviço" : "perfil"
-        const notificationMessage = reason.trim().length > 0
-            ? `Seu ${typeLabel} "${itemName}" foi rejeitado. Motivo: ${reason.trim()}`
+        const notificationMessage = effectiveReason.length > 0
+            ? `Seu ${typeLabel} "${itemName}" foi rejeitado. Motivo: ${effectiveReason}`
             : `Seu ${typeLabel} "${itemName}" foi rejeitado e não está visível no marketplace.`
 
         for (const uid of userIds) {
@@ -1075,4 +1500,200 @@ export async function getModerationItemDetail(
     }
 
     return { success: false, error: "Item não encontrado" }
+}
+
+// ─── Get Admin Entity Timeline (audit_logs + admin_audit_logs) ─────────────
+
+export async function getAdminEntityTimeline(
+    entityId: string,
+    entityType: "product" | "service" = "product"
+): Promise<{ success: boolean; data: any[]; error?: string }> {
+    try {
+        await requireAdminScope("moderation")
+        await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+        const supabase = getAdminClient()
+        const targetTable = entityType === "service" ? "services" : "products"
+
+        // 1. Fetch entity details
+        const { data: entity } = await supabase
+            .from(targetTable)
+            .select("id, name, created_at, partner_id, partner:partners(id, stores(name))")
+            .eq("id", entityId)
+            .maybeSingle()
+
+        // 2. Fetch admin_audit_logs for this target
+        const { data: adminLogs } = await supabase
+            .from("admin_audit_logs")
+            .select("*")
+            .eq("target_id", entityId)
+            .order("created_at", { ascending: false })
+            .limit(100)
+
+        // 3. Fetch audit_logs for this entity
+        const { data: auditLogs } = await supabase
+            .from("audit_logs")
+            .select("*")
+            .eq("entity_id", entityId)
+            .order("created_at", { ascending: false })
+            .limit(100)
+
+        // 4. Resolve admin and actor user IDs to full_name
+        const allUserIds = [
+            ...new Set([
+                ...(adminLogs || []).map((l: any) => l.admin_user_id),
+                ...(auditLogs || []).map((l: any) => l.actor_user_id),
+            ].filter(Boolean))
+        ]
+
+        const profileMap = new Map<string, string>()
+        if (allUserIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from("user_profiles")
+                .select("id, full_name")
+                .in("id", allUserIds)
+            for (const p of profiles || []) {
+                if (p.full_name) profileMap.set(p.id, p.full_name)
+            }
+        }
+
+        const entries: any[] = []
+        const seenTimestamps = new Set<string>()
+
+        // 5. Transform adminLogs
+        for (const log of (adminLogs || [])) {
+            const adminName = profileMap.get(log.admin_user_id) || log.metadata?.adminName || "Equipe Dudit"
+            const meta = (log.metadata as Record<string, any>) || {}
+            const changeLines: string[] = []
+            let entryType = log.action_type || "admin_action"
+
+            switch (log.action_type) {
+                case "moderation.approve":
+                    changeLines.push("Aprovou o item na moderação.")
+                    if (meta.reason) changeLines.push(`Mensagem: "${meta.reason}"`)
+                    if (meta.riskScore != null) changeLines.push(`Risk score da loja ajustado para: ${meta.riskScore}`)
+                    entryType = "approved"
+                    break
+                case "moderation.reject":
+                    changeLines.push("Rejeitou o item na moderação.")
+                    if (meta.reason) changeLines.push(`Motivo: "${meta.reason}"`)
+                    if (meta.removedImages?.length) changeLines.push(`${meta.removedImages.length} imagem(ns) removida(s).`)
+                    if (meta.riskScore != null) changeLines.push(`Risk score da loja ajustado para: ${meta.riskScore}`)
+                    entryType = "rejected"
+                    break
+                case "moderation.remove_image":
+                    changeLines.push("Removeu 1 imagem do item na moderação.")
+                    if (meta.reason || meta.notes) changeLines.push(`Motivo: "${meta.reason || meta.notes}"`)
+                    if (meta.riskScore != null) changeLines.push(`Risk score da loja ajustado para: ${meta.riskScore}`)
+                    if (meta.riskScoreIncrement) changeLines.push(`Risk score incrementado em: +${meta.riskScoreIncrement}`)
+                    entryType = "deleted"
+                    break
+                case "catalog.product_update":
+                case "catalog.service_update":
+                    changeLines.push("Atualizou informações do item no painel admin.")
+                    if (Array.isArray(meta.changedFields) && meta.changedFields.length > 0) {
+                        changeLines.push(`Campos alterados: ${meta.changedFields.join(", ")}`)
+                    }
+                    if (meta.reason) changeLines.push(`Mensagem: "${meta.reason}"`)
+                    if (meta.riskScore != null) changeLines.push(`Risk score da loja ajustado para: ${meta.riskScore}`)
+                    entryType = "updated"
+                    break
+                case "catalog.product_archive":
+                case "catalog.service_archive":
+                    changeLines.push("Arquivou o item no catálogo.")
+                    if (meta.reason) changeLines.push(`Motivo: "${meta.reason}"`)
+                    entryType = "archived"
+                    break
+                case "catalog.product_unarchive":
+                case "catalog.service_unarchive":
+                    changeLines.push("Desarquivou o item no catálogo.")
+                    if (meta.reason) changeLines.push(`Motivo: "${meta.reason}"`)
+                    entryType = "unarchived"
+                    break
+                case "catalog.product_delete":
+                case "catalog.service_delete":
+                    changeLines.push("Excluiu o item do catálogo.")
+                    if (meta.reason) changeLines.push(`Motivo: "${meta.reason}"`)
+                    entryType = "deleted"
+                    break
+                default: {
+                    const norm = String(log.action_type || "").replace(/\./g, " ").replace(/_/g, " ")
+                    changeLines.push(`Ação administrativa: ${norm}`)
+                    if (meta.reason) changeLines.push(`Motivo: "${meta.reason}"`)
+                    break
+                }
+            }
+
+            const tsKey = log.created_at ? log.created_at.slice(0, 19) : ""
+            if (tsKey) seenTimestamps.add(tsKey)
+
+            entries.push({
+                id: log.id,
+                actor_name: `${adminName} (Dudit)`,
+                change_lines: changeLines,
+                created_at: log.created_at,
+                metadata: {
+                    ...meta,
+                    is_admin_action: true,
+                    dudit_action: true,
+                    admin_actor_name: adminName,
+                },
+                entry_type: entryType,
+                highlight: true,
+            })
+        }
+
+        // 6. Transform auditLogs (skipping any close timestamp twins)
+        const storeName = (entity?.partner as any)?.stores?.[0]?.name || "Vendedor"
+        for (const aLog of (auditLogs || [])) {
+            const tsKey = aLog.created_at ? aLog.created_at.slice(0, 19) : ""
+            if (tsKey && seenTimestamps.has(tsKey)) {
+                continue // duplicate of adminLog
+            }
+
+            const isDudit = Boolean(
+                aLog.metadata?.is_admin_action ||
+                aLog.metadata?.dudit_action ||
+                (aLog.actor_name && aLog.actor_name.toLowerCase().includes("dudit"))
+            )
+            const rawActor = aLog.actor_name || profileMap.get(aLog.actor_user_id) || (isDudit ? "Equipe Dudit" : storeName)
+            const actorName = isDudit && !rawActor.includes("Dudit") ? `${rawActor} (Dudit)` : rawActor
+
+            const rawLines = Array.isArray(aLog.change_lines)
+                ? aLog.change_lines
+                : typeof aLog.change_lines === "string"
+                    ? [aLog.change_lines]
+                    : ["Ação registrada."]
+
+            entries.push({
+                id: aLog.id,
+                actor_name: actorName,
+                change_lines: rawLines,
+                created_at: aLog.created_at,
+                metadata: aLog.metadata,
+                entry_type: aLog.action_type,
+                highlight: isDudit,
+            })
+        }
+
+        // 7. Base entity creation event
+        if (entity?.created_at) {
+            entries.push({
+                id: `creation-${entityId}`,
+                actor_name: storeName,
+                change_lines: ["Item cadastrado na plataforma."],
+                created_at: entity.created_at,
+                entry_type: "created",
+                highlight: false,
+            })
+        }
+
+        // 8. Sort descending
+        entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        return { success: true, data: entries }
+    } catch (err: any) {
+        console.error("[getAdminEntityTimeline] error:", err)
+        return { success: false, data: [], error: err.message || "Erro ao buscar histórico" }
+    }
 }

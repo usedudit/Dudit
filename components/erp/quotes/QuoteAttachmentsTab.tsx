@@ -344,7 +344,7 @@ export default function QuoteAttachmentsTab({
                         key={doc.id}
                         icon={FileIcon}
                         title={doc.file_name || doc.file?.name || "Documento"}
-                        description={doc.file ? "Pendente de envio" : (doc.file_size ? formatFileSize(doc.file_size) : undefined)}
+                        description={doc.file ? `${doc.file.size ? formatFileSize(doc.file.size) + " • " : ""}Pendente de envio` : (doc.file_size ? formatFileSize(doc.file_size) : undefined)}
                         onClick={() => {
                             if (!doc.file && doc.file_key) {
                                 handleDownloadDoc(doc.file_key)

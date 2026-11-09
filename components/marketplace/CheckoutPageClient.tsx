@@ -3382,6 +3382,12 @@ export function CheckoutPageClient() {
             const msg = err.message || "Erro ao processar pedido"
             const systemKeywords = ["rls", "database", "server", "banco", "tabela", "processar pedido", "conexão"]
             const isSystemError = systemKeywords.some(key => msg.toLowerCase().includes(key))
+            trackEvent("checkout_failed", {
+                partner_id: partnerId,
+                store_id: storeId,
+                payment_method: formData.paymentMethod,
+                error_type: isSystemError ? "system" : "validation",
+            })
             setCheckoutError(msg)
 
             if (isSystemError) {
@@ -3396,6 +3402,15 @@ export function CheckoutPageClient() {
             setIsLoading(false)
         }
     }
+
+    useEffect(() => {
+        if (!formData.paymentMethod) return
+        trackEvent("payment_method_selected", {
+            payment_method: formData.paymentMethod,
+            partner_id: partnerId,
+            store_id: storeId,
+        })
+    }, [formData.paymentMethod, partnerId, storeId])
 
     useEffect(() => {
         if (bypassSubmitRef.current) {

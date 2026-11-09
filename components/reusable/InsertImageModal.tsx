@@ -14,6 +14,7 @@ import { WebsiteInput } from "./Inputs/WebsiteInput"
 import Input from "./Input"
 import { InfoCard } from "./InfoCard"
 import IconPlaceholder from "./IconPlaceholder"
+import { Spinner } from "./Spinner"
 
 interface EditImageData {
   url: string
@@ -35,7 +36,7 @@ interface InsertImageModalProps {
 
 const MAX_IMAGES = 5
 const MAX_DIMENSION = 900
-const DEFAULT_WIDTH = 512
+const DEFAULT_WIDTH = 500
 
 export const InsertImageModal: React.FC<InsertImageModalProps> = ({
   isOpen, onClose, onInsert, imageCount, imageUploadBlocked, onUpgradeClick, editImageData, onEdit,
@@ -79,11 +80,39 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
     }
   }, [isOpen, editImageData])
 
+  const handleWidthBlur = () => {
+    if (!width) return
+    const num = Number(width)
+    if (isNaN(num)) {
+      setWidth(String(DEFAULT_WIDTH))
+      return
+    }
+    if (num < 50) {
+      setWidth("50")
+    } else if (num > MAX_DIMENSION) {
+      setWidth(String(MAX_DIMENSION))
+    }
+  }
+
+  const handleHeightBlur = () => {
+    if (!height) return
+    const num = Number(height)
+    if (isNaN(num) || num <= 0) {
+      setHeight("")
+      return
+    }
+    if (num > MAX_DIMENSION) {
+      setHeight(String(MAX_DIMENSION))
+    }
+  }
+
   const handleConfirm = () => {
     const finalUrl = tab === "upload" ? uploadedUrl : url
     if (!finalUrl) return
-    const w = Math.min(Number(width) || DEFAULT_WIDTH, MAX_DIMENSION)
-    const h = height ? Math.min(Number(height), MAX_DIMENSION) : 0
+    const numW = width ? Number(width) : DEFAULT_WIDTH
+    const w = Math.min(MAX_DIMENSION, Math.max(50, numW || DEFAULT_WIDTH))
+    const numH = height ? Number(height) : 0
+    const h = numH ? Math.min(MAX_DIMENSION, Math.max(0, numH)) : 0
     if (editMode && onEdit) {
       onEdit(finalUrl, alt, String(w), h ? String(h) : "")
     } else {
@@ -177,44 +206,68 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
           </TabsContent>
 
           <TabsContent value="upload" className="flex flex-col gap-4">
-            <div className="relative border border-brand-border dark:border-dark-border rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-border/50 min-h-[120px] flex items-center justify-center">
-              {uploadedUrl ? (
-                <img src={uploadedUrl} alt="Preview" className="max-h-48 object-contain" />
-              ) : isUploading ? (
-                <div className="text-sm text-brand-dark/60 dark:text-dark-body/60">Enviando imagem...</div>
-              ) : (
-                <ImageOffIcon className="w-8 h-8 text-brand-dark/30 dark:text-dark-body/30" />
-              )}
-            </div>
             {imageUploadBlocked ? (
-              <div className="text-sm text-brand-dark/60 dark:text-dark-body/60 p-3 bg-gray-50 dark:bg-dark-border/20 rounded-lg text-center">
+              <div className="text-sm text-brand-dark/60 dark:text-dark-body/60 p-4 bg-gray-50 dark:bg-dark-border/20 rounded-lg text-center">
                 Faça upgrade para fazer upload de imagens.
               </div>
+            ) : uploadedUrl ? (
+              <div className="flex flex-col gap-2">
+                <div className="relative border border-brand-border dark:border-dark-border rounded-lg overflow-hidden bg-gray-50 dark:bg-dark-border/50 min-h-[140px] flex items-center justify-center">
+                  <img src={uploadedUrl} alt="Preview" className="max-h-48 object-contain" />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Trocar imagem
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghostred"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setUploadedUrl("")
+                      if (fileInputRef.current) fileInputRef.current.value = ""
+                    }}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              </div>
+            ) : isUploading ? (
+              <div className="border border-brand-border dark:border-dark-border rounded-lg min-h-[160px] flex flex-col items-center justify-center gap-2 bg-gray-50 dark:bg-dark-border/50">
+                <Spinner size={24} className="text-brand-green" />
+                <span className="text-sm text-brand-dark/60 dark:text-dark-body/60">Enviando imagem...</span>
+              </div>
             ) : (
-              <div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green rounded-lg py-8 px-4 flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50/50 dark:bg-dark-border/20 group"
+              >
                 <IconPlaceholder
                   icon={ImageIcon}
                   title="Upload de imagem"
-                  subtitle="Selecione uma imagem para recortar e enviar."
+                  subtitle="Clique para selecionar"
                 />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp, image/avif"
-                  onChange={handleFileSelect}
-                  disabled={isUploading}
-                  className="block w-full"
-                />
-                {uploadError && (
-                  <div className="mt-2 text-sm text-red-500">{uploadError}</div>
-                )}
-                {uploadedUrl && (
-                  <div className="mt-2 text-sm text-brand-green">Imagem enviada com sucesso!</div>
-                )}
-                <p className="mt-1.5 text-xs text-brand-dark/50 dark:text-dark-body/50">
-                  Selecione uma imagem para recortar e enviar.
-                </p>
               </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png, image/jpeg, image/webp, image/avif"
+              onChange={handleFileSelect}
+              disabled={isUploading}
+              className="hidden"
+            />
+
+            {uploadError && (
+              <div className="text-sm text-red-500 text-center">{uploadError}</div>
             )}
           </TabsContent>
         </Tabs>
@@ -234,20 +287,25 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
             <div>
               <Input
                 label="Largura (px)"
+                type="number"
                 min={50}
                 max={MAX_DIMENSION}
                 value={width}
-                onChange={(e) => setWidth(String(Math.min(MAX_DIMENSION, Math.max(50, Number(e.target.value) || 50))))}
+                onChange={(e) => setWidth(e.target.value)}
+                onBlur={handleWidthBlur}
+                placeholder="500"
                 className="w-full"
               />
             </div>
             <div>
               <Input
                 label="Altura (px)"
+                type="number"
                 min={0}
                 max={MAX_DIMENSION}
                 value={height}
-                onChange={(e) => setHeight(e.target.value ? String(Math.min(MAX_DIMENSION, Number(e.target.value))) : "")}
+                onChange={(e) => setHeight(e.target.value)}
+                onBlur={handleHeightBlur}
                 placeholder="Automático"
                 className="w-full"
               />

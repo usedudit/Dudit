@@ -187,6 +187,7 @@ export interface ModerationItem {
     store_logo_url?: string | null
     owner_user_id?: string
     moderation_status: string
+    moderation_reason?: string | null
     risk_score: number
     created_at: string
     // Product-specific fields

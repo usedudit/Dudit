@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } fro
 import dynamic from "next/dynamic"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon, SparklesIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useNotification } from "@/hooks/use-notification"
@@ -220,6 +220,12 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const [productData, setProductData] = useState<any>(quickAdjustedInitial)
     const [originalProductData, setOriginalProductData] = useState(quickAdjustedInitial)
     const [originalNameForDuplicate, setOriginalNameForDuplicate] = useState("")
+
+    useEffect(() => {
+        if (internalMode === "duplicate" && initialProduct?.name) {
+            setOriginalNameForDuplicate(initialProduct.name)
+        }
+    }, [internalMode, initialProduct])
 
     useEffect(() => {
         setProductData(quickAdjustedInitial)
@@ -962,7 +968,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
         setIsLoadingSharePartner(true)
         getPartnerProfile(partnerId)
             .then((value) => { if (value) setSharePartner(value) })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setIsLoadingSharePartner(false))
     }, [partnerId, sharePartner, isLoadingSharePartner])
 
@@ -1207,8 +1213,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     <FadeIn key="variations" className="block">
                                         {isLoadingDetails ? (
                                             <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                                <Spinner size={36} className="text-brand-primary" />
-                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando variações...</p>
+                                                <ThreeDotsLoader />
                                             </div>
                                         ) : (
                                             <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
@@ -1219,8 +1224,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     <FadeIn key="suppliers" className="block">
                                         {isLoadingDetails ? (
                                             <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                                <Spinner size={36} className="text-brand-primary" />
-                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
+                                                <ThreeDotsLoader />
                                             </div>
                                         ) : (
                                             <ProductSuppliersTab isEditing={isEditing} productData={productData} partnerId={partnerId} onSavePendingSuppliers={handleSavePendingSuppliers} />
@@ -1231,8 +1235,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     <FadeIn key="marketplace" className="block">
                                         {isLoadingDetails ? (
                                             <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                                <Spinner size={36} className="text-brand-primary" />
-                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando marketplace...</p>
+                                                <ThreeDotsLoader />
                                             </div>
                                         ) : (
                                             <ProductMarketplaceTab
@@ -1249,6 +1252,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
                                                 videoPlanBlocked={videoPlanBlocked}
                                                 storeFulfillmentCapabilities={storeFulfillmentCaps}
+                                                isDesapego={isDesapego}
                                             />
                                         )}
                                     </FadeIn>

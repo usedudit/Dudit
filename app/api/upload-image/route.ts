@@ -6,7 +6,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { validateR2Config } from "@/lib/r2/r2-server-config"
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE, MIME_TO_EXT } from "@/lib/r2/config"
+import { MAX_FILE_SIZE, MIME_TO_EXT } from "@/lib/r2/config"
 import { moderateImageWithBase64 } from "@/lib/moderation/sightengine-moderation"
 import {
   calculateImageHash,
@@ -14,6 +14,7 @@ import {
   findSimilarImageInCache,
   getImageFromCache,
   cacheImageModeration,
+  cacheImageUrlStatus,
 } from "@/lib/moderation/image-cache"
 import { decideImageStatus } from "@/lib/moderation/image-decision"
 import { Buffer } from "buffer"
@@ -219,6 +220,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     let decision: ReturnType<typeof decideImageStatus>
+    let isUncheckedUpload = false
 
     if (cachedModeration) {
       // Trata status legado BLOCKED como FLAGGED para nunca bloquear upload
@@ -233,39 +235,12 @@ async function handleUpload(request: NextRequest) {
     } else {
       // Moderação assíncrona/otimista:
       // Não bloqueia o upload nem segura a requisição HTTP por 2-3s esperando o Sightengine.
-      // O upload prossegue imediatamente, e a checagem no Sightengine roda em background via after().
+      // O upload para o R2 prossegue imediatamente (< 200ms), e a checagem do Sightengine roda em background via after().
+      isUncheckedUpload = true
       decision = {
         status: "APPROVED",
-        message: "Imagem aprovada.",
+        message: "Imagem enviada.",
         shouldSaveToR2: true,
-      }
-
-      // Agenda a análise de moderação e gravação em cache no background
-      const base64Payload = buffer.toString("base64")
-      try {
-        after(async () => {
-          try {
-            const analysis = await moderateImageWithBase64(base64Payload)
-            if (!analysis.isUnavailable) {
-              const bgDecision = decideImageStatus(analysis)
-              await cacheImageModeration(
-                imageHash,
-                analysis.riskLevel,
-                analysis.confidence,
-                analysis.categories,
-                bgDecision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
-                imagePHash,
-              )
-              if (bgDecision.status === "FLAGGED") {
-                console.warn(`[UPLOAD MODERATION] Imagem marcada para revisão em background: hash=${imageHash}`)
-              }
-            }
-          } catch (bgErr) {
-            console.error("[UPLOAD MODERATION] Falha na moderação em background:", bgErr)
-          }
-        })
-      } catch (scheduleErr) {
-        console.warn("[UPLOAD MODERATION] after() indisponível; agendamento ignorado:", scheduleErr)
       }
     }
 
@@ -315,6 +290,45 @@ async function handleUpload(request: NextRequest) {
     // if directUpload is requested (or universally for direct upload mode), return the uploadUrl
     // =============================
     const isDirect = request.nextUrl.searchParams.get("directUpload") === "true"
+
+    // Registra ou agenda status da imagem em cache
+    if (cachedModeration) {
+      const status = decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED"
+      await cacheImageUrlStatus(signedUrl.key, status)
+      if (signedUrl.publicUrl) await cacheImageUrlStatus(signedUrl.publicUrl, status)
+    } else if (isUncheckedUpload) {
+      const base64Payload = buffer.toString("base64")
+      const uploadedKey = signedUrl.key
+      const uploadedPublicUrl = signedUrl.publicUrl
+      try {
+        after(async () => {
+          try {
+            const analysis = await moderateImageWithBase64(base64Payload)
+            if (!analysis.isUnavailable) {
+              const bgDecision = decideImageStatus(analysis)
+              const status = bgDecision.status === "FLAGGED" ? "FLAGGED" : "APPROVED"
+              await cacheImageModeration(
+                imageHash,
+                analysis.riskLevel,
+                analysis.confidence,
+                analysis.categories,
+                status,
+                imagePHash,
+              )
+              await cacheImageUrlStatus(uploadedKey, status)
+              if (uploadedPublicUrl) await cacheImageUrlStatus(uploadedPublicUrl, status)
+              if (status === "FLAGGED") {
+                console.warn(`[UPLOAD MODERATION] Imagem marcada para revisão em background: key=${uploadedKey}`)
+              }
+            }
+          } catch (bgErr) {
+            console.error("[UPLOAD MODERATION] Falha na moderação em background:", bgErr)
+          }
+        })
+      } catch (scheduleErr) {
+        console.warn("[UPLOAD MODERATION] after() indisponível; agendamento ignorado:", scheduleErr)
+      }
+    }
 
     if (isDirect) {
       // Return the upload URL so the client does the upload directly

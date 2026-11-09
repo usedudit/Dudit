@@ -354,7 +354,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                                 type="button"
                                                 onClick={onGenerateDetails}
                                                 disabled={isGeneratingDetails || !serviceData.name?.trim()}
-                                                className="flex items-center gap-1.5 text-xs text-brand-primary font-medium hover:opacity-80 transition-opacity disabled:opacity-50 cursor-pointer"
+                                                className="flex items-center gap-1.5 text-xs text-brand-purple font-medium hover:opacity-80 transition-opacity disabled:opacity-50 cursor-pointer"
                                             >
                                                 {isGeneratingDetails ? (
                                                     <>
@@ -363,7 +363,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <SparklesIcon className="w-3.5 h-3.5" />
+                                                        <SparklesIcon className="w-3.5 h-3.5 text-brand-purple" />
                                                         <span>Gerar com IA</span>
                                                     </>
                                                 )}

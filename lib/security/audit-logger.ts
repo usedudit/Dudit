@@ -32,8 +32,10 @@ export type AuditAction =
     | "member.removed"
     // Auth events
     | "auth.login"
+    | "auth.login_failed"
     | "auth.logout"
     | "auth.password_changed"
+    | "auth.password_reset_requested"
     | "auth.2fa_enabled"
     | "auth.2fa_disabled"
     // Data mutations (sensitive)
@@ -58,8 +60,8 @@ export type AuditAction =
 interface AuditLogEntry {
     /** The action being logged */
     action: AuditAction
-    /** The user who performed the action */
-    actorUserId: string
+    /** The user who performed the action (null for anonymous events such as failed logins) */
+    actorUserId: string | null
     /** The tenant this action belongs to (nullable for auth events) */
     partnerId?: string | null
     /** Target user affected by the action (e.g. invited user, removed member) */
@@ -82,8 +84,10 @@ const ACTION_MESSAGES: Record<string, string> = {
     "role.changed": "alterou o cargo de um membro.",
     "member.removed": "removeu um membro da equipe.",
     "auth.login": "realizou login.",
+    "auth.login_failed": "tentativa de login falhou.",
     "auth.logout": "realizou logout.",
     "auth.password_changed": "alterou a senha de acesso.",
+    "auth.password_reset_requested": "solicitou redefinição de senha.",
     "auth.2fa_enabled": "ativou autenticação de dois fatores.",
     "auth.2fa_disabled": "desativou autenticação de dois fatores.",
     "partner.updated": "atualizou dados do parceiro.",

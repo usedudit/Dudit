@@ -8,10 +8,12 @@ import { LockIcon, CheckCircleIcon, AlertCircleIcon, ArrowRightIcon } from "@/li
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
+import type { EmailOtpType } from "@supabase/supabase-js"
 import { Button, PasswordInput, PasswordStrengthMeter, InfoCard, Spinner } from "@/components/reusable"
 import { SupportModal } from "@/components/support/SupportModal"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { trackEvent } from "@/lib/analytics"
 
 // Background com ondas no padrão da Dudit
 const WavesBackground = React.memo(() => (
@@ -38,6 +40,15 @@ function UpdatePasswordContent() {
     const [countdown, setCountdown] = useState(3)
     const [activeAuthClient, setActiveAuthClient] = useState<any>(null)
     const [isSupportOpen, setIsSupportOpen] = useState(false)
+
+    const isCrossDeviceError = Boolean(
+        errorMessage &&
+        (errorMessage.toLowerCase().includes("mesmo navegador") ||
+         errorMessage.toLowerCase().includes("dispositivo") ||
+         errorMessage.toLowerCase().includes("aparelho") ||
+         errorMessage.toLowerCase().includes("pkce") ||
+         errorMessage.toLowerCase().includes("code verifier"))
+    )
 
     useEffect(() => {
         let isMounted = true
@@ -90,7 +101,39 @@ function UpdatePasswordContent() {
                 }
             }
 
-            // 3. Verifica fluxo PKCE via código na URL (?code=...)
+            // 3. Verifica fluxo universal de Token Hash / OTP (?token_hash=... ou ?token=...)
+            // Permite redefinição universal entre diferentes dispositivos e navegadores (ex: solicitado no PC e aberto no celular/PWA)
+            // sem a dependência do code_verifier do PKCE salvo no navegador de origem.
+            const tokenHash = searchParams.get("token_hash") || searchParams.get("token")
+            const type = (searchParams.get("type") as EmailOtpType) || "recovery"
+            if (tokenHash) {
+                try {
+                    const { data, error } = await recoveryClient.auth.verifyOtp({
+                        token_hash: tokenHash,
+                        type,
+                    })
+                    if (error) {
+                        if (isMounted) {
+                            setErrorMessage(getErrorMessage(error))
+                            setStatus("error")
+                        }
+                        return
+                    }
+                    if (data?.session && isMounted) {
+                        setRecoveryForm(recoveryClient)
+                        window.history.replaceState(null, "", window.location.pathname)
+                        return
+                    }
+                } catch (e: any) {
+                    if (isMounted) {
+                        setErrorMessage(getErrorMessage(e))
+                        setStatus("error")
+                    }
+                    return
+                }
+            }
+
+            // 4. Verifica fluxo PKCE via código na URL (?code=...)
             const code = searchParams.get("code")
             if (code) {
                 try {
@@ -119,8 +162,7 @@ function UpdatePasswordContent() {
                 }
             }
 
-            // 4. Only the isolated recovery client can authorize this form.
-            // A normal logged-in session must never unlock password recovery.
+            // 5. Verifica se há sessão ativa no cliente isolado de recuperação
             try {
                 const { data: { session }, error } = await recoveryClient.auth.getSession()
                 if (error) throw error
@@ -131,6 +173,22 @@ function UpdatePasswordContent() {
             } catch (error: any) {
                 if (isMounted && error) {
                     setErrorMessage(getErrorMessage(error))
+                }
+            }
+
+            // 6. Verifica se veio redirecionado do callback (/auth/callback)
+            if (searchParams.get("source") === "recovery" || searchParams.get("source") === "callback") {
+                try {
+                    const { data: { session }, error } = await supabase.auth.getSession()
+                    if (error) throw error
+                    if (session && isMounted) {
+                        setRecoveryForm(supabase)
+                        return
+                    }
+                } catch (error: any) {
+                    if (isMounted && error) {
+                        setErrorMessage(getErrorMessage(error))
+                    }
                 }
             }
 
@@ -207,6 +265,8 @@ function UpdatePasswordContent() {
 
             const { error } = await activeAuthClient.auth.updateUser({ password })
             if (error) throw error
+
+            trackEvent("password_reset_completed", { method: "email" })
 
             // A recovery session is single-purpose. It must not become a
             // normal logged-in session after the password change.
@@ -298,7 +358,7 @@ function UpdatePasswordContent() {
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                        Link expirado ou inválido
+                                        {isCrossDeviceError ? "Dispositivo ou navegador diferente" : "Link expirado ou inválido"}
                                     </h2>
                                     <p className="text-brand-inactive-text dark:text-dark-body text-sm max-w-sm mx-auto">
                                         {errorMessage || "Este link de recuperação expirou ou já foi utilizado. Por segurança, solicite um novo link de redefinição."}
@@ -310,7 +370,7 @@ function UpdatePasswordContent() {
                                         onClick={() => window.location.assign("/auth/login?mode=forgot-password")}
                                         className="w-full h-[46px]"
                                     >
-                                        Solicitar novo link de recuperação
+                                        {isCrossDeviceError ? "Solicitar link por este aparelho" : "Solicitar novo link de recuperação"}
                                     </Button>
 
                                     <Button
@@ -397,7 +457,7 @@ function UpdatePasswordContent() {
                                         prefetch={false}
                                         className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green font-medium"
                                     >
-                                        ← Cancelar e voltar para o Login
+                                        Cancelar e voltar para o Login
                                     </Link>
                                 </div>
                             </motion.div>

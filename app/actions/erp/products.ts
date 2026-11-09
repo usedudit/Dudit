@@ -6,7 +6,7 @@ import { cache } from "react"
 import { requireUser, requireStorePermission } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
+import { generateAvailableSKU, generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { parseDecimalInput } from "@/lib/utils/formatters"
 import { sanitizeInput } from "@/lib/input-validator"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
@@ -42,6 +42,7 @@ import {
 } from "@/lib/erp/pricing-alerts"
 import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { scheduleDeferredTextModeration } from "@/lib/moderation/deferred-moderation"
+import { scheduleDeferredImageModeration } from "@/lib/moderation/deferred-image-moderation"
 import { headers } from "next/headers"
 
 const _deleteOwnedProductMediaFromR2 = async (url: string, userId: string) => {
@@ -666,7 +667,12 @@ export async function createProductComprehensiveAction(data: {
         // SKU: sanitização e geração automática caso venha vazio ou 'Gerar automaticamente'
         const rawSku = data.sku?.trim()
         const isAutoSku = !rawSku || rawSku.toLowerCase() === "gerar automaticamente" || rawSku.toLowerCase() === "gerar" || rawSku.toLowerCase() === "sem sku"
-        const sku = isAutoSku ? generateSKUBase(data.name) : rawSku
+        let sku = isAutoSku ? generateSKUBase(data.name) : rawSku
+        // Resolve colisões antes do INSERT (o gerador semântico é determinístico
+        // para nomes com 2+ palavras, então duplicatas tendem a repetir o SKU).
+        if (sku && (isAutoSku || data.isDuplicate)) {
+            sku = await generateAvailableSKU(getAdminClient(), finalPartnerId, sku)
+        }
 
         const videoMetadata = await normalizeVideoMetadata({
             video_type: data.videoType || (data.videoUrl ? "youtube" : null),
@@ -763,7 +769,7 @@ export async function createProductComprehensiveAction(data: {
             technical_specs: data.technicalSpecs || {},
             delivery_format: data.deliveryFormat || null,
             show_in_marketplace: data.showInMarketplace !== false,
-            moderation_status: data.requiresManualModeration ? 'pending_moderation' : 'approved',
+            moderation_status: data.requiresManualModeration ? 'flagged' : 'approved',
             tags: data.tags || [],
             allow_sell_without_stock: data.allow_sell_without_stock || false,
             created_at: getBrasiliaTime(),
@@ -856,6 +862,14 @@ export async function createProductComprehensiveAction(data: {
                 texts: [data.name, data.description],
             })
         }
+
+        // Agenda checagem assíncrona das imagens no Sightengine
+        await scheduleDeferredImageModeration({
+            entityType: "product",
+            entityId: createdProductId,
+            partnerId: finalPartnerId,
+            images: data.images || [],
+        })
 
         // IBS/CBS (2027) ainda não fazem parte da RPC de criação: grava direto.
         // Defaults da operação padrão de 2027 (CST 000 / cClassTrib 000001).
@@ -1245,7 +1259,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace
 
         payload.moderation_status = data.requiresManualModeration
-            ? 'pending_moderation'
+            ? 'flagged'
             : (product.moderation_status || 'approved')
 
         const adminRpc = getAdminClient()
@@ -1324,6 +1338,16 @@ export async function updateProductComprehensiveAction(productId: string, data: 
                 partnerId: product.partner_id,
                 autoApprove: product.moderation_status === "approved" && !data.requiresManualModeration,
                 texts: [data.name, data.description],
+            })
+        }
+
+        // Agenda checagem assíncrona das imagens no Sightengine
+        if (data.images !== undefined) {
+            await scheduleDeferredImageModeration({
+                entityType: "product",
+                entityId: productId,
+                partnerId: product.partner_id,
+                images: data.images || [],
             })
         }
 
@@ -2898,8 +2922,12 @@ export async function duplicateProductsAction(productIds: string[]) {
             return { success: false, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
         }
 
-        // SKU puro (zero queries) - unicidade pelo banco
+        // SKU puro (zero queries no caminho feliz) - unicidade pelo banco.
+        // Para duplicatas, confere a base antes do INSERT porque o gerador é
+        // determinístico para nomes com 2+ palavras e repetir a duplicação
+        // geraria o mesmo SKU (23505) até o retry aplicar um sufixo.
         const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
+        const admin = getAdminClient()
         const duplicated = await Promise.all(products.map(async (p: any) => {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id, created_at, updated_at, ...data } = p
@@ -2910,11 +2938,16 @@ export async function duplicateProductsAction(productIds: string[]) {
                 user.id,
                 R2_PREFIXES.products
             )
+            const sku = await generateAvailableSKU(
+                admin,
+                partnerId,
+                generateSKUBase(`${data.name} Copy`)
+            )
             return {
                 ...data,
                 images: cloned.images || [],
                 name: `${data.name} (Cópia)`,
-                sku: generateSKUBase(`${data.name} Copy`),
+                sku,
             }
         }))
 
@@ -3375,37 +3408,24 @@ export async function searchProductByBarcodeAction(
             return q
         }
 
-        // 1. GTIN exact match on products
-        const { data: gtinMatch } = await scopeActiveOnly(applyStoreFilter(supabase
+        const strippedCode = cleanCode.replace(/^0+/, "")
+        const padded13Code = cleanCode.padStart(13, "0")
+        const candidateCodes = Array.from(new Set([cleanCode, strippedCode, padded13Code].filter(Boolean)))
+
+        // 1 & 2. Parallel exact match on products (GTIN or SKU) and product variants (SKU)
+        const productExactPromise = scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", resolvedPartnerId)
-            .eq("gtin", cleanCode)
-            .eq("is_active", true)))
+            .eq("is_active", true)
+            .or(`gtin.in.(${candidateCodes.map(c => `"${c}"`).join(",")}),sku.in.(${candidateCodes.map(c => `"${c}"`).join(",")})`)))
+            .limit(1)
             .maybeSingle()
 
-        if (gtinMatch) {
-            return { success: true, data: gtinMatch }
-        }
-
-        // 2. SKU exact match on products
-        const { data: skuMatch } = await scopeActiveOnly(applyStoreFilter(supabase
-            .from("products")
-            .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
-            .eq("partner_id", resolvedPartnerId)
-            .eq("sku", cleanCode)
-            .eq("is_active", true)))
-            .maybeSingle()
-
-        if (skuMatch) {
-            return { success: true, data: skuMatch }
-        }
-
-        // 3. SKU exact match on product variants (joining active product only)
         let variantBaseQuery = supabase
             .from("product_variants")
             .select("*, products!inner(*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options))")
-            .eq("sku", cleanCode)
+            .in("sku", candidateCodes)
             .eq("is_active", true)
             .is("products.deleted_at", null)
 
@@ -3413,17 +3433,23 @@ export async function searchProductByBarcodeAction(
             variantBaseQuery = variantBaseQuery.eq("products.store_id", resolvedStoreId)
         }
 
-        const { data: variantMatch } = await variantBaseQuery.maybeSingle()
+        const variantExactPromise = variantBaseQuery.limit(1).maybeSingle()
 
-        if (variantMatch && variantMatch.products && variantMatch.products.partner_id === resolvedPartnerId) {
+        const [productExactRes, variantExactRes] = await Promise.all([productExactPromise, variantExactPromise])
+
+        if (productExactRes.data) {
+            return { success: true, data: productExactRes.data }
+        }
+
+        if (variantExactRes.data?.products && variantExactRes.data.products.partner_id === resolvedPartnerId) {
             const product = {
-                ...variantMatch.products,
-                matchedVariantId: variantMatch.id
+                ...variantExactRes.data.products,
+                matchedVariantId: variantExactRes.data.id
             }
             return { success: true, data: product }
         }
 
-        // 4. Partial SKU fallback
+        // 3. Fallback: Partial SKU match
         const { data: partialSkuMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
@@ -3436,7 +3462,7 @@ export async function searchProductByBarcodeAction(
             return { success: true, data: partialSkuMatch[0] }
         }
 
-        // 5. Product name fallback
+        // 4. Fallback: Product name match
         const { data: nameMatch } = await scopeActiveOnly(applyStoreFilter(supabase
             .from("products")
             .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")

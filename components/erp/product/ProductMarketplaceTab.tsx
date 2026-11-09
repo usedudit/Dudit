@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard, ListItem } from "@/components/reusable"
+import { TagsManagerModal } from "@/components/erp/shared/TagsManagerModal"
 import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
 import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
@@ -41,6 +42,7 @@ interface ProductMarketplaceTabProps {
     onVideoChange: (video: any) => void
     videoPlanBlocked?: boolean
     storeFulfillmentCapabilities?: StoreFulfillmentCapabilities
+    isDesapego?: boolean
 }
 
 export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
@@ -52,8 +54,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     onVideoChange,
     videoPlanBlocked = false,
     storeFulfillmentCapabilities = DEFAULT_STORE_FULFILLMENT_CAPABILITIES,
+    isDesapego = false,
 }) => {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+    const [isTagsModalOpen, setIsTagsModalOpen] = useState(false)
 
     const manualChange = (name: string, value: any) => {
         handleInputChange({
@@ -227,12 +231,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Formas de entrega</span>
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {selectedFulfillmentModes.map((mode) => (
-                                        <Badge key={mode} variant="gray">{FULFILLMENT_LABELS[mode]}</Badge>
+                                        <Badge key={mode} variant="gray" icon={null}>{FULFILLMENT_LABELS[mode]}</Badge>
                                     ))}
                                 </div>
                             </div>
 
-                            {(productData?.accepts_offers || productData?.accepts_trades) && (
+                            {isDesapego && (productData?.accepts_offers || productData?.accepts_trades) && (
                                 <div className="flex flex-wrap gap-2 pt-3 border-t border-brand-border/50 dark:border-dark-border/50">
                                     {productData?.accepts_offers && (
                                         <Badge variant="blue">Aceita Ofertas</Badge>
@@ -517,20 +521,22 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 />
                             </div>
 
-                            <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
-                                <Checkbox
-                                    checked={!!productData?.accepts_offers}
-                                    label="Aceita proposta de preço (negociação)"
-                                    onChange={(val) => manualChange("accepts_offers", val)}
-                                    disabled={!isEditing}
-                                />
-                                <Checkbox
-                                    checked={!!productData?.accepts_trades}
-                                    label="Aceita troca por outro item"
-                                    onChange={(val) => manualChange("accepts_trades", val)}
-                                    disabled={!isEditing}
-                                />
-                            </div>
+                            {isDesapego && (
+                                <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
+                                    <Checkbox
+                                        checked={!!productData?.accepts_offers}
+                                        label="Aceita proposta de preço (negociação)"
+                                        onChange={(val) => manualChange("accepts_offers", val)}
+                                        disabled={!isEditing}
+                                    />
+                                    <Checkbox
+                                        checked={!!productData?.accepts_trades}
+                                        label="Aceita troca por outro item"
+                                        onChange={(val) => manualChange("accepts_trades", val)}
+                                        disabled={!isEditing}
+                                    />
+                                </div>
+                            )}
 
                             <div className="pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                                 <FulfillmentModesEditor
@@ -549,11 +555,36 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         hasSeparator
                     >
-                        <TagsInput
+                        <ListItem
+                            title="Gerenciar palavras-chave"
+                            description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
+                            right={tags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5 max-w-[70%]">
+                                    {tags.slice(0, 3).map((tag: string, i: number) => (
+                                        <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
+                                            {tag}
+                                        </Badge>
+                                    ))}
+                                    {tags.length > 3 && (
+                                        <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
+                                            +{tags.length - 3}
+                                        </Badge>
+                                    )}
+                                </div>
+                            ) : null}
+                            showChevron
+                            onClick={() => setIsTagsModalOpen(true)}
+                            disabled={!isEditing}
+                            className={`cursor-pointer ${!isEditing ? "opacity-50" : ""}`}
+                        />
+                        <TagsManagerModal
+                            isOpen={isTagsModalOpen}
+                            onClose={() => setIsTagsModalOpen(false)}
                             tags={tags}
                             onChange={(t) => manualChange("tags", t)}
                             disabled={!isEditing}
-                            placeholder="Adicionar tag..."
+                            title="Palavras-chave de busca"
+                            description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         />
                     </FormSection>
                 </div>
@@ -654,20 +685,22 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 />
                             </div>
 
-                            <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
-                                <Checkbox
-                                    checked={!!productData?.accepts_offers}
-                                    label="Aceita proposta de preço (negociação)"
-                                    onChange={(val) => manualChange("accepts_offers", val)}
-                                    disabled={!isEditing}
-                                />
-                                <Checkbox
-                                    checked={!!productData?.accepts_trades}
-                                    label="Aceita troca por outro item"
-                                    onChange={(val) => manualChange("accepts_trades", val)}
-                                    disabled={!isEditing}
-                                />
-                            </div>
+                            {isDesapego && (
+                                <div className="pt-2 border-t border-brand-border/50 dark:border-dark-border/50 space-y-3">
+                                    <Checkbox
+                                        checked={!!productData?.accepts_offers}
+                                        label="Aceita proposta de preço (negociação)"
+                                        onChange={(val) => manualChange("accepts_offers", val)}
+                                        disabled={!isEditing}
+                                    />
+                                    <Checkbox
+                                        checked={!!productData?.accepts_trades}
+                                        label="Aceita troca por outro item"
+                                        onChange={(val) => manualChange("accepts_trades", val)}
+                                        disabled={!isEditing}
+                                    />
+                                </div>
+                            )}
 
                             <div className="pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                                 <FulfillmentModesEditor
@@ -683,14 +716,41 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                     {/* Card de Tags */}
                     <SidebarCard hasSeparator hasTopStrip title="Palavras-chave de busca">
-                        <p className="text-sm text-brand-inactive-text mb-4">
-                            Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine.
-                        </p>
-                        <TagsInput
+                        <div className="space-y-3">
+                            <p className="text-sm text-brand-inactive-text mb-2">
+                                Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine.
+                            </p>
+                            <ListItem
+                                title="Gerenciar palavras-chave"
+                                description={tags.length > 0 ? `${tags.length} tag${tags.length !== 1 ? "s" : ""} cadastrada${tags.length !== 1 ? "s" : ""}` : "Nenhuma tag cadastrada"}
+                                right={tags.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1.5 max-w-[70%]">
+                                        {tags.slice(0, 3).map((tag: string, i: number) => (
+                                            <Badge key={i} variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium">
+                                                {tag}
+                                            </Badge>
+                                        ))}
+                                        {tags.length > 3 && (
+                                            <Badge variant="gray" icon={null} className="px-2 py-0.5 text-[11px] font-medium text-brand-inactive-text">
+                                                +{tags.length - 3}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                ) : null}
+                                showChevron
+                                onClick={() => setIsTagsModalOpen(true)}
+                                disabled={!isEditing}
+                                className={`cursor-pointer ${!isEditing ? "opacity-50" : ""}`}
+                            />
+                        </div>
+                        <TagsManagerModal
+                            isOpen={isTagsModalOpen}
+                            onClose={() => setIsTagsModalOpen(false)}
                             tags={tags}
                             onChange={(t) => manualChange("tags", t)}
                             disabled={!isEditing}
-                            placeholder="Adicionar tag..."
+                            title="Palavras-chave de busca"
+                            description="Adicione termos relacionados para ajudar clientes a encontrarem este produto na vitrine."
                         />
                     </SidebarCard>
                 </div>

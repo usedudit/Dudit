@@ -18,6 +18,7 @@ import {
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { PLAN_UPGRADE_ICONS, PLAN_UPGRADE_MASCOTS, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { Input as FormInput } from "@/components/reusable/Input"
+import { trackEvent } from "@/lib/analytics"
 
 type UpgradeTarget = PlanTierSlug
 
@@ -117,10 +118,18 @@ function PlanUpgradeModalInner({
       }
       const data = result.data as { initPoint?: string; message?: string }
       if (data?.initPoint) {
+        trackEvent("plan_upgrade_started", {
+          target_plan: targetPlan.slug,
+          had_active_subscription: Boolean(hasActiveSub),
+        })
         toast.success("Redirecionando para o pagamento...")
         window.location.href = data.initPoint
         return
       }
+      trackEvent("plan_upgrade_completed", {
+        target_plan: targetPlan.slug,
+        had_active_subscription: Boolean(hasActiveSub),
+      })
       toast.success(data?.message || "Plano atualizado!")
       onClose()
     } catch {

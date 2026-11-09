@@ -75,30 +75,27 @@ export function SelectErpSuspendedSection({
                                     </div>
 
                                     {/* Protocol & Reason Box */}
-                                    <div className="border-t border-brand-border dark:border-dark-border space-y-2 text-xs">
+                                    <div className="border-t border-brand-border dark:border-dark-border space-y-2 text-sm">
                                         <div className="flex items-center justify-between pt-2">
-                                            <span className="font-bold text-red-900 dark:text-red-300">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                 Protocolo do Caso:
                                             </span>
                                             <button
                                                 onClick={() => handleCopyProtocol(caseId)}
-                                                className="font-mono font-bold text-red-700 dark:text-red-400 hover:underline cursor-pointer flex items-center gap-1"
+                                                className="font-mono font-bold text-brand-red hover:underline cursor-pointer flex items-center gap-1"
                                             >
                                                 <span>{caseId}</span>
-                                                <span className="text-[10px] uppercase font-sans font-bold bg-white dark:bg-dark-surface px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800">
-                                                    {isCopied ? "✓ Copiado" : "Copiar"}
-                                                </span>
                                             </button>
                                         </div>
 
                                         <div>
-                                            <span className="text-red-800/80 dark:text-red-400/80 block font-medium">Motivo:</span>
-                                            <p className="font-semibold text-red-950 dark:text-red-200 mt-0.5">
+                                            <span className="text-brand-red block font-medium">Motivo:</span>
+                                            <p className="font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {item.reason || "Decisão administrativa da moderação."}
                                             </p>
                                         </div>
 
-                                        <div className="text-[11px] text-red-700/70 dark:text-red-400/70 pt-1 border-t border-red-100 dark:border-red-900/30">
+                                        <div className="text-sm text-brand-red pt-1 border-t border-brand-border dark:border-dark-border">
                                             Vigência: {isPermanent ? "Permanente" : `Até ${unbanDate}`}
                                         </div>
                                     </div>
@@ -106,21 +103,19 @@ export function SelectErpSuspendedSection({
                                     {/* Appeal CTA - apenas para o dono (isOwn) */}
                                     {item.isOwn ? (
                                         <div className="flex items-center justify-between gap-3 pt-1">
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                                 Acredita que houve um equívoco?
                                             </span>
                                             <Button
-                                                type="button"
                                                 size="sm"
                                                 variant="outline"
                                                 onClick={() => setAppealTarget(item)}
-                                                className="text-xs font-semibold"
                                             >
                                                 Recorrer da Decisão
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="pt-1 text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                        <div className="pt-1 text-sm text-brand-inactive-text dark:text-dark-body">
                                             Apenas o proprietário titular da conta pode submeter recursos para esta loja.
                                         </div>
                                     )}

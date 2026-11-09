@@ -691,7 +691,7 @@ async function hydrateMarketplaceSearchHits(
         _hydrateProdIdx = promises.length
         promises.push(
             supabase.from("products").select(`
-                id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -709,7 +709,7 @@ async function hydrateMarketplaceSearchHits(
         _hydrateServIdx = promises.length
         promises.push(
             supabase.from("services").select(`
-                id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id),
                 stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)),
@@ -1094,7 +1094,7 @@ async function searchMarketplaceByCity(
             let pq = supabase
                 .from("products")
                 .select(`
-                id, short_id, status, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, sales_last_30_days,
+                id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, sales_last_30_days,
                     category_id, category:product_categories!category_id(name), created_at,
                     marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                     subcategory_id, subcategory:product_categories!subcategory_id(name),
@@ -1118,7 +1118,7 @@ async function searchMarketplaceByCity(
             let sq = supabase
                 .from("services")
                 .select(`
-                    id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                    id, short_id, status, moderation_status, moderation_reason, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                     partners!inner(id),
                     stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude), delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)),

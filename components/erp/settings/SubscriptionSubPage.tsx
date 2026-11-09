@@ -23,6 +23,7 @@ import {
     ClockIcon,
     InfoIcon,
 } from "@/lib/icons"
+import { trackEvent } from "@/lib/analytics"
 
 const CANCELLATION_REASONS = [
     { id: "cost", label: "Redução de custos / Achei o valor elevado" },
@@ -665,6 +666,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 return
             }
 
+            trackEvent("subscription_cancelled", {
+                reason_category: cancelReason || "other",
+            })
             toast.success(result.data?.message || "Assinatura cancelada com sucesso.")
             setCancelModal(false)
             setCancelConfirmOpen(false)

@@ -553,6 +553,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
                                             <TabsTrigger value="Visualização">Visualização</TabsTrigger>
+                                            <TabsTrigger value="Anexos">Anexos</TabsTrigger>
                                             <TabsTrigger value="Histórico">Histórico</TabsTrigger>
                                         </TabsList>
                                     </div>

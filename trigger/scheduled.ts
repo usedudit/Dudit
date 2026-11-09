@@ -7,6 +7,10 @@ import {
   type DeferredTextModerationPayload,
 } from "@/lib/moderation/deferred-moderation"
 import {
+  runDeferredImageModeration,
+  type DeferredImageModerationPayload,
+} from "@/lib/moderation/deferred-image-moderation"
+import {
   executeNotificationScheduledJob,
   type NotificationScheduledJobPayload,
 } from "./notification-jobs"
@@ -89,6 +93,28 @@ export const moderationTextJob = task({
       return { status: "skipped" as const }
     }
     return runDeferredTextModeration(payload)
+  },
+})
+
+/**
+ * Re-checa em background imagens de produto/serviço no Sightengine.
+ * Enfileirado por `scheduleDeferredImageModeration`.
+ */
+export const moderationImageJob = task({
+  id: "moderation-image-job",
+  maxDuration: 60,
+  retry: {
+    maxAttempts: 3,
+    factor: 2,
+    minTimeoutInMs: 2_000,
+    maxTimeoutInMs: 30_000,
+    randomize: true,
+  },
+  run: async (payload: DeferredImageModerationPayload) => {
+    if (!payload?.entityId || !payload?.entityType) {
+      return { status: "skipped" as const, flaggedCount: 0 }
+    }
+    return runDeferredImageModeration(payload)
   },
 })
 

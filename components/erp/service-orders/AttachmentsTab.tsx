@@ -207,40 +207,34 @@ export default function AttachmentsTab({
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                 {docs.map((doc) => (
-                    <div
+                    <ListItem
                         key={doc.id}
+                        icon={FileIcon}
+                        title={doc.file_name || doc.file?.name || "Documento"}
+                        description={doc.file ? `${doc.file.size ? formatFileSize(doc.file.size) + " • " : ""}Pendente de envio` : (doc.file_size ? formatFileSize(doc.file_size) : "Salvo")}
                         onClick={() => {
                             if (!doc.file && doc.file_key) {
                                 handleDownloadDoc(doc.file_key, doc.file_name || "Documento")
                             }
                         }}
-                        className={`flex items-center gap-3 p-3 bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl group relative ${!doc.file && doc.file_key ? "cursor-pointer hover:bg-brand-gray/80 dark:hover:bg-dark-border/40 transition-colors" : ""
-                            }`}
-                    >
-                        <div className="w-10 h-10 rounded-lg bg-white dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
-                            <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {doc.file_name || doc.file?.name || "Documento"}
-                            </p>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                {doc.file ? "Pendente de salvamento" : (doc.file_size ? formatFileSize(doc.file_size) : "Salvo")}
-                            </p>
-                        </div>
-                        {isEditing && (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    requestDeleteDoc(doc.id)
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg"
-                            >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                    </div>
+                        className="p-3.5"
+                        right={
+                            isEditing ? (
+                                <Button
+                                    type="button"
+                                    variant="ghostred"
+                                    size="icon"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        requestDeleteDoc(doc.id)
+                                    }}
+                                    title="Excluir anexo"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                </Button>
+                            ) : undefined
+                        }
+                    />
                 ))}
             </div>
         )

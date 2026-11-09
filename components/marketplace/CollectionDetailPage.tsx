@@ -120,10 +120,9 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
     }
 
     return (
-        <>
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
             <MarketplaceHeader simpleTitle={collection.name} />
-            <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
-                <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-24 lg:pb-20 mt-[78px] lg:mt-[108px] relative">
 
                     {/* Page Header */}
                     <div className="mb-6 animate-fade-in">
@@ -251,7 +250,6 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                         )}
                     </FormSection>
                 </div>
-            </div>
             <MarketplaceFooter />
 
             {/* Edit Modal */}
@@ -319,6 +317,6 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                 cancelText="Cancelar"
                 variant="danger"
             />
-        </>
+        </div>
     )
 }
