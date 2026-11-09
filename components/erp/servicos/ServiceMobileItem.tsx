@@ -79,6 +79,10 @@ const ServiceMobileItem = React.memo(
                                 <Badge variant={service.is_active ? "green" : "red"} className="h-5 text-[10px] px-1.5">
                                     {service.is_active ? "Ativo" : "Inativo"}
                                 </Badge>
+                                <span className="mx-1"></span>
+                                <Badge variant={service.show_in_marketplace ? "green" : "gray"} className="h-5 text-[10px] px-1.5">
+                                    {service.show_in_marketplace ? "Visível" : "Oculto"}
+                                </Badge>
                             </div>
 
                             {onSelect && (

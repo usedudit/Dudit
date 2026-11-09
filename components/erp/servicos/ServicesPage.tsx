@@ -68,6 +68,7 @@ type ColumnId =
     | "category"
     | "duration"
     | "price"
+    | "visibility"
     | "status"
     | "actions"
 
@@ -102,6 +103,7 @@ const FIXED_COLUMNS: ColumnDef[] = [
     { id: "category", label: "Categoria", align: "left", width: "130px", minWidth: "120px" },
     { id: "duration", label: "Duração", align: "left", width: "110px", minWidth: "100px" },
     { id: "price", label: "Preço", align: "left", width: "110px", minWidth: "100px" },
+    { id: "visibility", label: "Visibilidade", align: "center", width: "90px", minWidth: "90px" },
     { id: "status", label: "Status", align: "center", width: "90px", minWidth: "90px" },
     { id: "actions", label: "Ações", align: "center", width: "70px", minWidth: "70px" },
 ]
@@ -455,6 +457,10 @@ export default function ServicesPage({
                     valA = a.price ?? 0
                     valB = b.price ?? 0
                     break
+                case "visibility":
+                    valA = a.show_in_marketplace ? 1 : 0
+                    valB = b.show_in_marketplace ? 1 : 0
+                    break
                 case "status":
                     valA = a.is_active ? 1 : 0
                     valB = b.is_active ? 1 : 0
@@ -737,7 +743,7 @@ export default function ServicesPage({
                     else if (payload.priceMode === 'fixed') newPrice = payload.priceValue || 0
                     update.price = newPrice
                 } else if (payload.type === 'visibility') {
-                    update.is_active = payload.visibilityMode === 'publish'
+                    update.show_in_marketplace = payload.visibilityMode === 'publish'
                 } else if (payload.type === 'image' && uploadedImageUrl) {
                     update.images = [uploadedImageUrl, ...(service.images || [])]
                 } else if (payload.type === 'remove_image') {

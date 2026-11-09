@@ -124,23 +124,31 @@ const ServiceGridCard = React.memo(
 
                 {/* Área do Rodapé */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    {/* Linha: Duração e Ações */}
-                    <div className="flex items-end justify-between">
+                    {/* Linha A: Visibilidade (Esq) e Unidade (Dir) */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Visibilidade</span>
+                            <Tooltip text={service.show_in_marketplace ? "Visibilidade: Visível" : "Visibilidade: Oculto"}>
+                                <Badge variant={service.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90" />
+                            </Tooltip>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 items-end">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Unidade</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                {service.unit || "Sessão"}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Linha B: Duração e Ações */}
+                    <div className="flex items-end justify-between mt-1">
                         {/* Seção de Duração */}
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Duração</span>
                             <div className="flex items-center gap-2.5">
                                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                     {service.duration_minutes ? `${service.duration_minutes} min` : "-"}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2 items-center">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Unidade</span>
-                            <div className="flex items-center gap-2.5">
-                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                    {service.unit || "Sessão"}
                                 </span>
                             </div>
                         </div>

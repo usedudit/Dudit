@@ -13,7 +13,6 @@ import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import {
     revalidateProducts,
     revalidateSuppliers,
-    revalidateExploreSearch,
 } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { AUTH_MESSAGES } from "@/lib/constants/messages"
@@ -24,7 +23,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { decryptCpfIfEncrypted, generateCpfLookupHash } from "@/lib/crypto"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
+import { syncToExploreRedis } from "@/lib/redis-sync"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter, adjustItemUsageCounter } from "@/lib/services/subscription.service"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -2831,7 +2830,7 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
         await requirePermission(partnerId, "products", "edit", user)
         await requireBatchProductStorePermission(products, partnerId, "products", "edit")
 
-        const allowedFields = new Set(["price", "stock_quantity", "status", "is_active", "isActive", "images"])
+        const allowedFields = new Set(["price", "stock_quantity", "status", "is_active", "isActive", "images", "show_in_marketplace"])
         const normalizedUpdates: Array<{ id: string; data: Record<string, unknown> }> = []
         for (const update of updates) {
             if (!update || typeof update !== "object" || !sanitized.includes(update.id)) {
@@ -2860,6 +2859,10 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
             } else if (update.status !== undefined) {
                 if (update.status !== "ativo" && update.status !== "inativo") return { error: "Status inválido" }
                 updateData.status = update.status
+            }
+            if (update.show_in_marketplace !== undefined) {
+                if (typeof update.show_in_marketplace !== "boolean") return { error: "Visibilidade inválida" }
+                updateData.show_in_marketplace = update.show_in_marketplace
             }
             if (update.images !== undefined) {
                 if (!Array.isArray(update.images) || update.images.length > 50 || update.images.some((image: unknown) => typeof image !== "string" || image.length > 2048)) {

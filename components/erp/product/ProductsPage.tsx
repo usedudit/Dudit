@@ -918,7 +918,7 @@ export default function ProductsPage({
                     else if (payload.stockMode === 'zero') newStock = 0
                     update.stock_quantity = newStock
                 } else if (payload.type === 'visibility') {
-                    update.is_active = payload.visibilityMode === 'publish'
+                    update.show_in_marketplace = payload.visibilityMode === 'publish'
                 } else if (payload.type === 'image' && uploadedImageUrl) {
                     update.images = [uploadedImageUrl, ...(product.images || [])]
                 } else if (payload.type === 'remove_image') {

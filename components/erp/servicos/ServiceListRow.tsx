@@ -100,6 +100,18 @@ const ServiceListItem = React.memo(
                         </span>
                     )
 
+                case "visibility":
+                    return (
+                        <div className="flex justify-center">
+                            <Badge
+                                variant={service.show_in_marketplace ? "green" : "gray"}
+                                className="w-fit whitespace-nowrap"
+                            >
+                                {service.show_in_marketplace ? "Visível" : "Oculto"}
+                            </Badge>
+                        </div>
+                    )
+
                 case "status": {
                     const isArchived = service.status === "arquivado" || service.status === "archived"
                     return (

@@ -105,7 +105,7 @@ export async function getERPServicesPageAction(
                 const supabase = getAdminClient()
                 let q = supabase
                     .from("services")
-                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
+                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, show_in_marketplace, service_categories!category_id(name)")
                     .eq("partner_id", partnerId)
                 if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
@@ -836,12 +836,16 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
                 updateData.status = updateData.isActive ? "ativo" : "inativo"
                 delete updateData.isActive
             }
-            return supabase.from("services").update(updateData).eq("id", id)
+            if (updateData.show_in_marketplace !== undefined) {
+                updateData.show_in_marketplace = Boolean(updateData.show_in_marketplace)
+            }
+            return supabase.from("services").update(updateData).eq("id", id).eq("partner_id", partnerId)
         }))
 
         const firstError = results.find(r => r.error)
         if (firstError) return errorResponse(firstError.error?.message || "Erro no batch update")
 
+        await Promise.all(serviceIds.map(id => invalidateServiceCache(id, partnerId, 'update')))
         await Promise.all(serviceIds.map(id => syncToExploreRedis({ id, type: "servico", data: {}, silent: true })))
         await revalidateServices(partnerId)
         revalidatePath("/erp/servicos")
