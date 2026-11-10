@@ -19,6 +19,7 @@ import {
   CancelIcon,
   TruckIcon,
   MoneyIcon,
+  ArrowRightIcon,
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -98,6 +99,7 @@ export interface ActionsDropdownProps {
   onPrint?: (() => void) | undefined
   onUndo?: (() => void) | undefined
   onDelete?: (() => void) | undefined
+  onOpenOrder?: (() => void) | undefined
   trigger?: React.ReactElement
   className?: string
   /** Stretches the trigger (and its wrapper) to fill the available width. */
@@ -121,6 +123,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onCancel,
   cancelLabel,
   onDelete,
+  onOpenOrder,
   trigger,
   className,
   fullWidth = false,
@@ -207,6 +210,11 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     {onDelete && (
       <DropdownItem onClick={onDelete} className="text-brand-red dark:text-brand-red">
         <TrashIcon size={18} /> Excluir
+      </DropdownItem>
+    )}
+    {onOpenOrder && (
+      <DropdownItem onClick={onOpenOrder} className="text-brand-blue dark:text-brand-blue font-medium">
+        <ArrowRightIcon size={18} /> Abrir pedido
       </DropdownItem>
     )}
   </Dropdown>

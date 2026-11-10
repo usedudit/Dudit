@@ -219,12 +219,22 @@ export async function getERPServiceOrdersPageAction(
         const supabase = getAdminClient()
         let q = supabase
           .from("service_orders")
-          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
+          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at, diagnosis, description, specifications")
           .eq("partner_id", partnerId)
         if (statuses.length > 0) q = q.in("status", statuses)
         else if (options?.status && options.status !== "all") q = q.eq("status", options.status)
         if (search) {
-          q = q.or(`order_number.ilike.%${search}%,title.ilike.%${search}%,customer_snapshot->>name.ilike.%${search}%`)
+          q = q.or(
+            [
+              `order_number.ilike.%${search}%`,
+              `title.ilike.%${search}%`,
+              `customer_snapshot->>name.ilike.%${search}%`,
+              `customer_snapshot->>phone.ilike.%${search}%`,
+              `customer_snapshot->>email.ilike.%${search}%`,
+              `diagnosis.ilike.%${search}%`,
+              `description.ilike.%${search}%`,
+            ].join(",")
+          )
         }
         q = q.eq("store_id", storeId)
         if (cursor) q = q.or(buildKeysetOrFilter(cursor))

@@ -43,6 +43,7 @@ import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
 import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
 import { buildVendorLocationPopupHtml } from "@/lib/map/mapbox-popup"
@@ -61,6 +62,7 @@ interface VendorPageClientProps {
     productCategories: string[]
     serviceCategories: string[]
     coupons?: any[]
+    initialPromotions?: any[]
     userProfile?: any
     cartCount?: number
     isShowcaseActive?: boolean
@@ -88,40 +90,71 @@ const openWhatsApp = (phone?: string, storeName?: string) => {
     window.open(`https://wa.me/${number}?text=${text}`, "_blank")
 }
 
-const normalizeItemForCard = (item: any, partner: any) => {
+const normalizeItemForCard = (item: any, partner: any, promotions?: any[]) => {
     const itemType = item.itemType || (item.duration_minutes !== undefined ? "servico" : undefined)
+
+    const resolvedPartnerId = partner?.partner_id || partner?.partnerId || partner?.id
 
     if (item.itemType === 'plano') {
         return {
             ...item,
             partners: {
-                store_name: partner.storeName,
-                store_avatar: partner.storeImageUrl,
-                city: partner.city,
-                state: partner.state,
-                distance_km_formatted: partner.distance_km_formatted,
+                id: resolvedPartnerId,
+                partner_id: resolvedPartnerId,
+                store_id: partner?.id,
+                store_name: partner?.storeName,
+                store_avatar: partner?.storeImageUrl,
+                city: partner?.city,
+                state: partner?.state,
+                distance_km_formatted: partner?.distance_km_formatted,
             }
         }
     }
-    const price = (!item.promotional_price && item.fallback_variant_price)
-        ? item.fallback_variant_price
-        : (item.promotional_price || item.price || 0)
+    const hasVariants = !!item.product_variants?.length || !!item.variants?.length || !!item.fallback_variant_price
+    const basePrice = Number(item.price) || 0
+    const rawPromo = item.promotional_price ? Number(item.promotional_price) : null
+    const individualPromo = (hasVariants || !rawPromo || rawPromo >= basePrice) ? null : rawPromo
+
+    let effectivePrice = (!individualPromo && item.fallback_variant_price)
+        ? Number(item.fallback_variant_price)
+        : (individualPromo || basePrice || 0)
+    let originalPrice: number | undefined = individualPromo ? basePrice : undefined
+
+    if (promotions && promotions.length > 0) {
+        const pricing = computeItemDisplayPrice(
+            basePrice > 0 ? basePrice : effectivePrice,
+            individualPromo,
+            promotions,
+            {
+                productId: itemType === "produto" ? item.id : undefined,
+                serviceId: itemType === "servico" ? item.id : undefined,
+                categoryId: item.category_id || undefined,
+            }
+        )
+        if (pricing.hasDiscount) {
+            effectivePrice = pricing.bestPrice
+            originalPrice = pricing.referencePrice || basePrice
+        }
+    }
 
     return {
         ...item,
         itemType,
-        price,
-        originalPrice: item.promotional_price ? item.price : undefined,
+        price: effectivePrice,
+        originalPrice,
+        promotional_price: originalPrice ? effectivePrice : undefined,
+        _promotions: promotions,
         images: getProductDisplayImages(item),
         partners: {
-            id: partner.id,
-            store_id: partner.id,
-            store_name: partner.storeName,
-            store_avatar: partner.storeImageUrl,
-            city: partner.city,
-            state: partner.state,
-            distance_km_formatted: partner.distance_km_formatted,
-            delivery_settings: partner.delivery_settings || partner.deliverySettings || null,
+            id: resolvedPartnerId,
+            partner_id: resolvedPartnerId,
+            store_id: partner?.id,
+            store_name: partner?.storeName,
+            store_avatar: partner?.storeImageUrl,
+            city: partner?.city,
+            state: partner?.state,
+            distance_km_formatted: partner?.distance_km_formatted,
+            delivery_settings: partner?.delivery_settings || partner?.deliverySettings || null,
         },
     }
 }
@@ -183,7 +216,7 @@ const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviews
 
 const openStatusToneClass = (status?: string) =>
     status === "open" ? "text-brand-green"
-        : status === "closing_soon" ? "text-brand-yellow"
+        : status === "closing_soon" ? "text-brand-orange"
             : "text-brand-red"
 
 const StoreStatusLine = ({ openStatus, delivery }: { openStatus: { label: string; status: string } | null; delivery: ReactNode | null }) => (
@@ -658,26 +691,30 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
 }
 
 function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico") {
-    if (!promo) return false
+    if (!promo || !item) return false
 
-    // Check campaign scope
-    if (promo.applyScope === "entire_cart") return true
+    const scope = promo.applyScope || promo.apply_scope
+    if (scope === "entire_cart") return true
+
+    const productIds = promo.applicableProductIds || (promo.promotion_products || []).map((p: any) => p.product_id || p)
+    const categoryIds = promo.applicableCategoryIds || (promo.promotion_categories || []).map((c: any) => c.category_id || c)
+    const serviceIds = promo.applicableServiceIds || (promo.promotion_services || []).map((s: any) => s.service_id || s)
 
     if (itemType === "produto") {
-        if (promo.applyScope === "specific_products") {
-            return promo.applicableProductIds?.includes(item.id)
+        if (scope === "specific_products") {
+            return productIds?.includes(item.id)
         }
-        if (promo.applyScope === "category" && item.category_id) {
-            return promo.applicableCategoryIds?.includes(item.category_id)
+        if (scope === "category" && item.category_id) {
+            return categoryIds?.includes(item.category_id)
         }
     }
 
     if (itemType === "servico") {
-        if (promo.applyScope === "specific_services") {
-            return promo.applicableServiceIds?.includes(item.id)
+        if (scope === "specific_services") {
+            return serviceIds?.includes(item.id)
         }
-        if (promo.applyScope === "category" && item.category_id) {
-            return promo.applicableCategoryIds?.includes(item.category_id)
+        if (scope === "category" && item.category_id) {
+            return categoryIds?.includes(item.category_id)
         }
     }
 
@@ -685,18 +722,27 @@ function isItemInPromotion(item: any, promo: any, itemType: "produto" | "servico
 }
 
 function getPromotionScore(promo: any): number {
-    switch (promo.promotionType) {
+    const promoType = promo.promotionType || promo.promotion_type
+    const discountType = promo.discountType || promo.discount_type
+    const discountValue = Number(promo.discountValue ?? promo.discount_value ?? 0)
+    const buyQuantity = Number(promo.buyQuantity ?? promo.buy_quantity ?? 1)
+    const payQuantity = Number(promo.payQuantity ?? promo.pay_quantity ?? 0)
+
+    switch (promoType) {
         case PromotionType.DISCOUNT:
-            if (promo.discountType === DiscountType.PERCENTAGE) {
-                return 10000 + (promo.discountValue || 0)
+        case "discount":
+            if (discountType === DiscountType.PERCENTAGE || discountType === "percentage") {
+                return 10000 + discountValue
             }
-            return (promo.discountValue || 0)
-        case PromotionType.BUY_X_PAY_Y: {
-            const buy = promo.buyQuantity || 1
-            const pay = promo.payQuantity || 0
+            return discountValue
+        case PromotionType.BUY_X_PAY_Y:
+        case "buy_x_pay_y": {
+            const buy = buyQuantity || 1
+            const pay = payQuantity || 0
             return 20000 + ((buy - pay) / buy) * 100
         }
         case PromotionType.GIFT:
+        case "gift":
             return 15000 + (promo.priority || 0)
         default:
             return 0
@@ -716,11 +762,11 @@ function pickBestSection(sections: any[], seed: string | number): any | null {
     if (!sections.length) return null
 
     const discountSections = sections.filter(
-        s => s.promotion.promotionType === PromotionType.DISCOUNT
+        s => (s.promotion.promotionType === PromotionType.DISCOUNT || s.promotion.promotion_type === "discount")
     )
     const benefitSections = sections.filter(
-        s => s.promotion.promotionType === PromotionType.BUY_X_PAY_Y ||
-            s.promotion.promotionType === PromotionType.GIFT
+        s => (s.promotion.promotionType === PromotionType.BUY_X_PAY_Y || s.promotion.promotion_type === "buy_x_pay_y" ||
+            s.promotion.promotionType === PromotionType.GIFT || s.promotion.promotion_type === "gift")
     )
 
     const bestDiscount = discountSections.length > 0
@@ -776,7 +822,7 @@ function VendorListItem({ item, partner }: { item: any; partner: any }) {
     )
 }
 
-export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount, isShowcaseActive: propIsShowcaseActive, initialCategory }: VendorPageClientProps) {
+export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], initialPromotions = [], userProfile, cartCount, isShowcaseActive: propIsShowcaseActive, initialCategory }: VendorPageClientProps) {
     const isShowcaseActive = propIsShowcaseActive !== undefined
         ? propIsShowcaseActive
         : (partner?.isShowcaseActive ?? partner?.is_showcase_active ?? true)
@@ -941,16 +987,18 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         return applyVendorUrgencyBadges(products, user?.id ?? null)
     }, [products, user?.id, isMounted])
 
-    const [partnerPromotions, setPartnerPromotions] = useState<any[]>([])
+    const [partnerPromotions, setPartnerPromotions] = useState<any[]>(initialPromotions || [])
 
     useEffect(() => {
         setIsMounted(true)
-        if (partner?.id) {
-            listActivePromotionsForMarketplaceAction(partner.id)
+        const targetPartnerId = partner?.partner_id || partner?.partnerId || partner?.id
+        const targetStoreId = partner?.id || null
+        if (targetPartnerId) {
+            listActivePromotionsForMarketplaceAction(targetPartnerId, null, targetStoreId)
                 .then(res => setPartnerPromotions(Array.isArray(res) ? res : []))
                 .catch(() => { })
         }
-    }, [partner?.id])
+    }, [partner?.id, partner?.partner_id, partner?.partnerId])
 
     const campaignSections = useMemo(() => {
         if (!partnerPromotions || partnerPromotions.length === 0) return []
@@ -1003,8 +1051,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const normalizeVendorItem = useCallback((item: any) => {
         const rawType = item?.itemType || item?._itemType
         const itemType = rawType || (activeContext === "Servicos" ? "servico" : activeContext === "Planos" ? "plano" : "produto")
-        return normalizeItemForCard({ ...item, itemType }, partner)
-    }, [activeContext, partner])
+        return normalizeItemForCard({ ...item, itemType }, partner, partnerPromotions)
+    }, [activeContext, partner, partnerPromotions])
 
     const currentItems = activeContext === "Produtos" ? displayProducts : (activeContext === "Servicos" ? services : plans)
 
@@ -1865,7 +1913,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                             {categoryFilteredItems.map((item: any) => (
                                                 <ItemCard
                                                     key={item.id}
-                                                    product={normalizeItemForCard(item, partner)}
+                                                    product={normalizeItemForCard(item, partner, partnerPromotions)}
                                                     showSeller={false}
                                                     className="w-full"
                                                     promotions={partnerPromotions}
@@ -1915,7 +1963,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     {items.map((item: any) => (
                                                         <div key={item.id} className="snap-start shrink-0">
                                                             <ItemCard
-                                                                product={normalizeItemForCard(item, partner)}
+                                                                product={normalizeItemForCard(item, partner, partnerPromotions)}
                                                                 showSeller={false}
                                                                 promotions={partnerPromotions}
                                                                 hidePromoBadge={true}
@@ -1936,7 +1984,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     title={group.name}
                                                     items={group.items.slice(0, 20)}
                                                     renderItem={(item) => (
-                                                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
+                                                        <ItemCard product={normalizeItemForCard(item, partner, partnerPromotions)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
                                                     )}
                                                     onSeeAll={() => openCategory(group.id)}
                                                     itemWidthClass="w-[150px] md:w-[230px]"

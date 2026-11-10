@@ -7,6 +7,8 @@ export interface Appointment {
     partnerId: string;
     customerId?: string | null;
     customerAvatar?: string | null;
+    customerPhone?: string | null;
+    customerEmail?: string | null;
     customer: string;
     service: string;
     date: string;       // Start Date (YYYY-MM-DD)

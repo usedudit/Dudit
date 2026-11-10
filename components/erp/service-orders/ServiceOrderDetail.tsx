@@ -768,29 +768,19 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Online Signature Link & Code Card */}
                                                 {hasMinimumPlan(planSlug, "crescer") ? (
-                                                    <SidebarCard
-                                                        hasSeparator
-                                                        hasTopStrip
-                                                        title={
-                                                            <span className="flex items-center gap-2">
-                                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                                Aprovação e Assinatura Online
-                                                            </span>
-                                                        }
-                                                    >
-                                                        <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente aprovar e assinar online.</p>
+                                                    <SidebarCard hasSeparator hasTopStrip title="Aprovação e Assinatura Online">
+                                                        <p className="text-sm text-brand-inactive-text">Compartilhe o link da OS para o cliente aprovar e assinar online</p>
 
                                                         <div className="space-y-3">
                                                             <div className="flex gap-2">
-                                                                <input
-                                                                    type="text"
+                                                                <Input
                                                                     readOnly
                                                                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/os/${order.public_token || ''}`}
-                                                                    className="flex-1 min-w-0 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
+                                                                    className="flex-1 min-w-0 cursor-default select-all"
                                                                 />
                                                                 <Button
                                                                     variant="outline"
-                                                                    className="shrink-0 h-auto w-[42px] p-0 rounded-xl"
+                                                                    className="shrink-0 h-auto w-[42px]"
                                                                     title="Copiar link"
                                                                     onClick={handleCopyPublicLink}
                                                                     disabled={shareLoading}
@@ -801,8 +791,8 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                             <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center gap-3">
                                                                 <div className="min-w-0">
-                                                                    <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
-                                                                    <span className="text-lg font-bold text-emerald-500 tracking-wider">
+                                                                    <span className="text-sm text-brand-inactive-text block">Código de Aprovação</span>
+                                                                    <span className="text-lg font-bold text-brand-green tracking-wider">
                                                                         {order.metadata?.plain_code || "---"}
                                                                     </span>
                                                                 </div>
@@ -826,17 +816,16 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         </div>
                                                     </SidebarCard>
                                                 ) : (
-                                                    <SidebarCard hasSeparator title="Link de Assinatura Online">
+                                                    <SidebarCard hasSeparator title="Aprovação e Assinatura Online">
                                                         <div className="flex flex-col items-center text-center py-4">
-                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível no plano Crescer</p>
-                                                            <p className="text-xs text-brand-inactive-text mb-4">Compartilhe a OS online e receba a assinatura do cliente em tempo real.</p>
-                                                            <Button onClick={() => openPlanUpgrade("crescer")} className="text-xs h-9">
+                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível nos planos Crescer e Escalar</p>
+                                                            <p className="text-sm text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente aprovar e assinar online</p>
+                                                            <Button onClick={() => openPlanUpgrade("crescer")} className="h-9">
                                                                 Fazer upgrade
                                                             </Button>
                                                         </div>
                                                     </SidebarCard>
                                                 )}
-
                                             </div>
                                         </div>
                                     </FadeIn>

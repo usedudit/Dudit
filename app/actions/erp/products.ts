@@ -3095,7 +3095,7 @@ const fetchProductsStatic = unstable_cache(
         const supabase = getAdminClient()
         let query = supabase
             .from("products")
-            .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs, items_included")
+            .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs")
             .eq("partner_id", partnerId)
             .limit(100)
             .order("created_at", { ascending: false })
@@ -3134,7 +3134,6 @@ const fetchProductsStatic = unstable_cache(
                 location: p.location_rel?.name || p.location || null,
                 specs_keywords: specsKeywords,
                 tags: Array.isArray(p.tags) ? p.tags : [],
-                items_included: p.items_included || null,
             }
         })
         const withVariants = rows.filter((p: any) => {
@@ -3368,7 +3367,7 @@ export async function getERPProductsPageAction(
                 const supabase = getAdminClient()
                 let q = supabase
                     .from("products")
-                    .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs, items_included")
+                    .select("id, short_id, store_id, name, stock_quantity, stock_reserved, stock_available, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), subcategory_id, subcategory:product_categories!subcategory_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name), tags, technical_specs")
                     .eq("partner_id", partnerId)
 
                 if (storeId) q = q.or(`store_id.eq.${storeId},store_id.is.null`)
@@ -3422,7 +3421,6 @@ export async function getERPProductsPageAction(
                         location: p.location_rel?.name || p.location || null,
                         specs_keywords: specsKeywords,
                         tags: Array.isArray(p.tags) ? p.tags : [],
-                        items_included: p.items_included || null,
                     }
                 })
 

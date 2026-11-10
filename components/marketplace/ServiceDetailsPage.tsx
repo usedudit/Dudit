@@ -1136,7 +1136,7 @@ export function ServiceDetailsPageClient({
                 {service.name}
             </h1>
 
-            {showPrice && activePromo && !pricing.hasCampaignDiscount && !pricing.hasManualPromo && (
+            {showPrice && activePromo && pricing.hasCampaignDiscount && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}

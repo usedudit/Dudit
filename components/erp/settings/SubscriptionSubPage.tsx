@@ -278,15 +278,13 @@ const AnnualPromoCard = ({
         <ListItem
             icon={<GiftIcon size={22} className="text-brand-green" />}
             iconContainerClassName="bg-brand-green/15 border-brand-green/30 text-brand-green group-hover:bg-brand-green/25"
-            className={`p-4 md:p-5 transition-colors duration-300 ${active
+            className={`px-4 py-3 transition-colors duration-300 ${active
                 ? "border-brand-green/40 bg-brand-green/5 dark:bg-brand-green/10 cursor-default"
-                : "border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-surface hover:border-brand-green/40"
+                : "border-brand-border dark:border-dark-border hover:border-brand-green/40"
                 }`}
             title={
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm md:text-base">
-                        2 meses grátis no plano anual
-                    </span>
+                    2 meses grátis no plano anual
                     <span className="bg-brand-green text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0">
                         Economize 20%
                     </span>
@@ -294,7 +292,6 @@ const AnnualPromoCard = ({
             }
             titleClassName="!whitespace-normal !overflow-visible"
             description="Assine qualquer plano no anual hoje e os 2 primeiros meses são por nossa conta. É a melhor forma de começar economizando, sem perder a liberdade de cancelar quando quiser."
-            descriptionClassName="mt-1"
             right={
                 active ? (
                     <div className="flex items-center gap-2 text-brand-green text-sm font-bold shrink-0 md:pl-4">

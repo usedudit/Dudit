@@ -228,7 +228,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <Input
                                     label=""
                                     name="productSearch"
-                                    placeholder="Buscar produtos para adicionar..."
+                                    placeholder="Buscar itens para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={props.searchQuery}
                                     onChange={(e) => {

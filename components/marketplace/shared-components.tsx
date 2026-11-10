@@ -414,7 +414,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
 
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage, "thumb") : null
-    const partnerId = partner?.id || null
+    const partnerId = partner?.partner_id || partner?.partnerId || partner?.id || (product as any)?.partner_id || null
     const sellerName = partner?.store_name || (product.partners as any)?.store_name || 'Vendedor'
     const sellerCategory = (product as any).category as string | null | undefined
     const sellerSubcategory = (product as any).subcategoryName as string | null | undefined

@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { getCachedStoreProducts, getCachedStoreServices, getCachedStoreReviews, getCachedStoreStats } from "@/app/actions/marketplace/stores"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
@@ -17,11 +18,12 @@ export async function StorePage({ storeData }: { storeData: any }) {
     const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null, avatar_url: sessionData.profile.avatar_url || null, latitude: sessionData.profile.latitude, longitude: sessionData.profile.longitude } : null
     const cartCount = sessionData?.cartCount || 0
 
-    const [products, services, reviews, stats] = await Promise.all([
+    const [products, services, reviews, stats, activePromotions] = await Promise.all([
         getCachedStoreProducts(storeId, partnerId),
         getCachedStoreServices(storeId, partnerId),
         getCachedStoreReviews(storeId),
         getCachedStoreStats(storeId),
+        listActivePromotionsForMarketplaceAction(partnerId, null, storeId).catch(() => []),
     ])
 
     const filteredProducts = (products || []).filter((p: any) => p.store_is_active !== false)
@@ -97,6 +99,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
                     ratingDistribution={ratingDistribution}
                     productCategories={productCategories}
                     serviceCategories={serviceCategories}
+                    initialPromotions={activePromotions || []}
                     isShowcaseActive={partnerData.isShowcaseActive}
                     userProfile={userProfile}
                     cartCount={cartCount}

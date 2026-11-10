@@ -1244,7 +1244,7 @@ export async function getERPCustomersPageAction(
         const supabase = createAdminClient()
         let q = supabase
           .from("customers")
-          .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, person_type, birth_date, user_id, image_url")
+          .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, person_type, birth_date, user_id, image_url, cnpj, nome_fantasia, razao_social, notes")
           .eq("partner_id", partnerId)
 
         if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
@@ -1284,7 +1284,7 @@ export async function getERPCustomersPageAction(
           const [addressResult, orderResult] = await Promise.all([
             supabase
               .from("addresses")
-              .select("customer_id, city, state")
+              .select("customer_id, city, state, neighborhood")
               .in("customer_id", customerIds),
             canViewOrders
               ? supabase
@@ -1299,16 +1299,17 @@ export async function getERPCustomersPageAction(
           const addrRows = addressResult.data
 
           if (addrRows) {
-            const addrMap = new Map<string, { city: string | null; state: string | null }>()
+            const addrMap = new Map<string, { city: string | null; state: string | null; neighborhood: string | null }>()
             for (const a of addrRows) {
               if (!addrMap.has(a.customer_id)) {
-                addrMap.set(a.customer_id, { city: a.city, state: a.state })
+                addrMap.set(a.customer_id, { city: a.city, state: a.state, neighborhood: a.neighborhood })
               }
             }
             for (const item of items) {
               const addr = addrMap.get(item.id)
               item.city = addr?.city || null
               item.state = addr?.state || null
+              item.neighborhood = addr?.neighborhood || null
             }
           }
 

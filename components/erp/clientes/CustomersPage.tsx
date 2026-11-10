@@ -247,13 +247,27 @@ export default function CustomersPage({
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.createdPeriod)
         const dateBoundsActive = startYmd !== null || endYmd !== null
 
+        const cleanSearchDigits = debouncedSearch.replace(/\D/g, "")
+
         const filtered = rawCustomers
             .filter((c: any) => {
+                if (!term) return true
                 const nameMatch = (c.name || "").toLowerCase().includes(term)
                 const emailMatch = (c.email || "").toLowerCase().includes(term)
-                const phoneMatch = (c.phone || "").includes(debouncedSearch)
+                const phoneMatch = (c.phone || "").includes(debouncedSearch) || (cleanSearchDigits.length > 2 && (c.phone || "").replace(/\D/g, "").includes(cleanSearchDigits))
+                const phoneFixedMatch = (c.phone_fixed || "").includes(debouncedSearch) || (cleanSearchDigits.length > 2 && (c.phone_fixed || "").replace(/\D/g, "").includes(cleanSearchDigits))
+                const docMatch = (cleanSearchDigits.length > 2 && (
+                    (c.cnpj && c.cnpj.replace(/\D/g, "").includes(cleanSearchDigits)) ||
+                    (c.cpf && c.cpf.replace(/\D/g, "").includes(cleanSearchDigits))
+                )) || ((c.cnpj || "").toLowerCase().includes(term)) || ((c.cpf || "").toLowerCase().includes(term))
+                const fantasyMatch = (c.nome_fantasia || "").toLowerCase().includes(term)
+                const companyMatch = (c.razao_social || "").toLowerCase().includes(term)
+                const cityMatch = (c.city || "").toLowerCase().includes(term)
+                const stateMatch = (c.state || "").toLowerCase().includes(term)
+                const neighborhoodMatch = (c.neighborhood || "").toLowerCase().includes(term)
+                const notesMatch = (c.notes || "").toLowerCase().includes(term)
 
-                return nameMatch || emailMatch || phoneMatch
+                return nameMatch || emailMatch || phoneMatch || phoneFixedMatch || docMatch || fantasyMatch || companyMatch || cityMatch || stateMatch || neighborhoodMatch || notesMatch
             })
             .filter((c: any) => {
                 if (c.status === "deleted" || c.status === "deletado" || c.deleted_at != null) return false

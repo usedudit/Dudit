@@ -16,7 +16,7 @@ import {
     ShareIcon,
     ChartIcon,
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, DropdownItem, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, DropdownItem, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar, SidebarCard, Input } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -803,27 +803,21 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                             {/* Link de Aprovação do Cliente */}
                                             {hasMinimumPlan(planSlug, "crescer") ? (
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                        Link de Aprovação Online
-                                                    </h3>
-
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Compartilhe o link do orçamento para o cliente aprovar online.
+                                                <SidebarCard hasSeparator hasTopStrip title="Link de Aprovação Online">
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                        Compartilhe o link do orçamento para o cliente aprovar online
                                                     </p>
 
                                                     <div className="space-y-3">
                                                         <div className="flex gap-2">
-                                                            <input
-                                                                type="text"
+                                                            <Input
                                                                 readOnly
                                                                 value={`${typeof window !== 'undefined' ? window.location.origin : ''}/quote/${quote.public_token}`}
-                                                                className="flex-1 min-w-0 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
+                                                                className="flex-1 min-w-0 cursor-default select-all"
                                                             />
                                                             <Button
                                                                 variant="outline"
-                                                                className="shrink-0 h-auto w-[42px] p-0 rounded-xl"
+                                                                className="shrink-0 h-auto w-[42px]"
                                                                 title="Copiar link"
                                                                 onClick={handleCopyPublicLink}
                                                             >
@@ -833,8 +827,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                                         <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center gap-3">
                                                             <div className="min-w-0">
-                                                                <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
-                                                                <span className="text-lg font-bold text-emerald-500 tracking-wider">
+                                                                <span className="text-sm text-brand-inactive-text block">Código de Aprovação</span>
+                                                                <span className="text-lg font-bold text-brand-green tracking-wider">
                                                                     {quote.metadata?.plain_code || "---"}
                                                                 </span>
                                                             </div>
@@ -854,21 +848,18 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                             </ActionsDropdown>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </SidebarCard>
                                             ) : (
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                        Link de Aprovação Online
-                                                    </h3>
+                                                <SidebarCard hasSeparator hasTopStrip title="Link de Aprovação Online">
                                                     <div className="flex flex-col items-center text-center py-4">
                                                         <img src={PLAN_UPGRADE_MASCOTS.crescer} alt="Crescer" className="w-16 h-16 mb-3" />
                                                         <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível nos planos Crescer e Escalar</p>
-                                                        <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o orçamento online e receba aprovação dos clientes em tempo real.</p>
+                                                        <p className="text-sm text-brand-inactive-text mb-4">Compartilhe o link do orçamento para o cliente aprovar online</p>
                                                         <Button onClick={() => openPlanUpgrade("crescer")} className="h-9">
                                                             Fazer upgrade
                                                         </Button>
                                                     </div>
-                                                </div>
+                                                </SidebarCard>
                                             )}
 
                                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6">
@@ -947,6 +938,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                 onDelete={() => setShowDeleteModal(true)}
                                 onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                                 onStatus={handleOpenStatusModal}
+                                onOpenOrder={quote.converted && quote.converted_order_id ? () => router.push(`/erp/pedidos?view=${quote.converted_order_id}`) : undefined}
                                 trigger={
                                     <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
                                         Opções
@@ -959,17 +951,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                     className="flex-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white border-none"
                                     disabled={isConverting}
                                     onClick={handleConvertClick}
-                                    leftIcon={<ArrowRightIcon size={18} />}
                                 >
                                     {isConverting ? "…" : "Converter"}
-                                </Button>
-                            )}
-                            {quote.converted && quote.converted_order_id && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
-                                >
-                                    Abrir pedido <ArrowRightIcon size={14} />
                                 </Button>
                             )}
                             <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap" leftIcon={<EditIcon size={18} />}>

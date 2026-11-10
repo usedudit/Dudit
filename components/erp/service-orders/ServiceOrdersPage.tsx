@@ -263,11 +263,25 @@ export default function ServiceOrdersPage({
 
   const filteredOrders = useMemo(() => {
     const term = debouncedSearch.toLowerCase()
+    const cleanDigits = debouncedSearch.replace(/\D/g, "")
     return (effectiveOrders || []).filter((o: any) => {
+      const specMatch = Array.isArray(o.specifications) && o.specifications.some((spec: any) =>
+        (typeof spec?.label === "string" && spec.label.toLowerCase().includes(term)) ||
+        (typeof spec?.value === "string" && spec.value.toLowerCase().includes(term))
+      )
+      const phoneRaw = String(o.customer_snapshot?.phone || "")
+      const phoneMatch = phoneRaw.includes(debouncedSearch) || (cleanDigits.length > 2 && phoneRaw.replace(/\D/g, "").includes(cleanDigits))
+
       const matchesSearch = !term || (
         String(o.order_number || "").toLowerCase().includes(term) ||
         String(o.title || "").toLowerCase().includes(term) ||
-        String(o.customer_snapshot?.name || "").toLowerCase().includes(term)
+        String(o.customer_snapshot?.name || "").toLowerCase().includes(term) ||
+        String(o.customer_snapshot?.email || "").toLowerCase().includes(term) ||
+        phoneMatch ||
+        String(o.assigned_user_name || "").toLowerCase().includes(term) ||
+        String(o.diagnosis || "").toLowerCase().includes(term) ||
+        String(o.description || "").toLowerCase().includes(term) ||
+        specMatch
       )
       const matchesTab = activeTab === "all" ||
         (activeTab === "aberta" && (o.status === "aberta" || o.status === "aguardando_aprovacao" || o.status === "aprovada")) ||

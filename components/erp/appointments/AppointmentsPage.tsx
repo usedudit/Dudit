@@ -131,6 +131,8 @@ const AppointmentsPage = ({
         id: String(row.id),
         customerId: row.customer_id || row.customerId || null,
         customerAvatar: row.customers?.image_url || row.customer_avatar || row.customerAvatar || null,
+        customerPhone: row.customer_phone || row.customers?.phone || null,
+        customerEmail: row.customer_email || row.customers?.email || null,
         customer: row.customer_name || 'Cliente Sem Nome',
         service: row.service_name || 'Serviço',
         date: row.start_date,
@@ -717,10 +719,22 @@ const AppointmentsPage = ({
         }
         if (searchTerm.trim() !== '') {
             const query = searchTerm.toLowerCase();
-            items = items.filter((appointment) =>
-                (appointment.customer || '').toLowerCase().includes(query) ||
-                (appointment.service || '').toLowerCase().includes(query)
-            );
+            const cleanDigits = searchTerm.replace(/\D/g, "");
+            items = items.filter((appointment: Appointment) => {
+                const phoneRaw = String(appointment.customerPhone || "");
+                const phoneMatch = phoneRaw.includes(searchTerm) || (cleanDigits.length > 2 && phoneRaw.replace(/\D/g, "").includes(cleanDigits));
+                return (
+                    (appointment.customer || '').toLowerCase().includes(query) ||
+                    (appointment.service || '').toLowerCase().includes(query) ||
+                    (appointment.staff || '').toLowerCase().includes(query) ||
+                    (appointment.orderNumber || '').toLowerCase().includes(query) ||
+                    (appointment.paymentMethod || '').toLowerCase().includes(query) ||
+                    (appointment.status || '').toLowerCase().includes(query) ||
+                    (appointment.notes || '').toLowerCase().includes(query) ||
+                    (appointment.customerEmail || '').toLowerCase().includes(query) ||
+                    phoneMatch
+                );
+            });
         }
         return items;
     }, [appointments, appointmentFilters.teamIds, searchTerm]);

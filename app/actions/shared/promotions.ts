@@ -996,23 +996,62 @@ export async function simulatePromotionsAction(
 // Marketplace Active Promotions Fetch (Bypassing ERP user permissions)
 // ---------------------------------------------------------------------------
 
-export async function listActivePromotionsForMarketplaceAction(partnerId: string, customerId?: string | null) {
+export async function listActivePromotionsForMarketplaceAction(
+  partnerId: string,
+  customerId?: string | null,
+  storeId?: string | null
+) {
+  if (!partnerId) return []
+
+  // Use admin client to query promotions securely
+  const supabase = getAdminClient()
+
+  let canonicalPartnerId = partnerId
+  let canonicalStoreId = storeId || null
+
+  // In some routes/components, a store ID might be passed instead of partnerId.
+  // Resolve canonical partnerId and storeId defensively.
+  const { data: partnerRow } = await supabase
+    .from("partners")
+    .select("id")
+    .eq("id", partnerId)
+    .maybeSingle()
+
+  if (!partnerRow) {
+    const { data: storeRow } = await supabase
+      .from("stores")
+      .select("id, partner_id")
+      .eq("id", partnerId)
+      .maybeSingle()
+
+    if (storeRow) {
+      canonicalPartnerId = storeRow.partner_id
+      if (!canonicalStoreId) {
+        canonicalStoreId = storeRow.id
+      }
+    }
+  }
+
   // Campanhas/promoções desativadas no ERP não devem precificar o marketplace.
-  const capabilities = await resolveMarketplaceCapabilities(partnerId)
+  const capabilities = await resolveMarketplaceCapabilities(canonicalPartnerId, {
+    storeId: canonicalStoreId || undefined,
+  })
   if (!capabilities.campaignsEnabled) return []
 
-  // Use admin client to query promotions securely, filtering by partnerId
-  const supabase = getAdminClient()
   const now = new Date().toISOString()
 
   // Fetch campaigns that are active and current
   let campaignsQuery = supabase
     .from("campaigns")
     .select("id, customer_scope")
-    .eq("partner_id", partnerId)
+    .eq("partner_id", canonicalPartnerId)
     .eq("is_active", true)
     .or(`starts_at.is.null,starts_at.lte.${now}`)
     .or(`ends_at.is.null,ends_at.gte.${now}`)
+
+  if (canonicalStoreId) {
+    campaignsQuery = campaignsQuery.or(`store_id.is.null,store_id.eq.${canonicalStoreId}`)
+  }
 
   const { data: campaigns, error: campError } = await campaignsQuery
   if (campError || !campaigns || campaigns.length === 0) {
@@ -1058,7 +1097,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       promotion_categories(category_id),
       promotion_services(service_id)
     `)
-    .eq("partner_id", partnerId)
+    .eq("partner_id", canonicalPartnerId)
     .eq("is_active", true)
     .in("campaign_id", activeCampaignIds)
 
@@ -1319,14 +1358,39 @@ export async function getPromotionScopeDataAction(partnerId: string) {
 export async function listActivePromotionsInBatch(partnerIds: string[], customerId?: string | null) {
   if (!partnerIds || partnerIds.length === 0) return {}
 
+  const rawIds = Array.from(new Set(partnerIds.filter(Boolean)))
+  if (rawIds.length === 0) return {}
+
+  const supabase = getAdminClient()
+
+  // Check if any passed IDs are actually store IDs and resolve them to partner IDs
+  const { data: storeRows } = await supabase
+    .from("stores")
+    .select("id, partner_id")
+    .in("id", rawIds)
+
+  const storeToPartnerMap = new Map<string, string>()
+  if (storeRows) {
+    for (const s of storeRows) {
+      storeToPartnerMap.set(s.id, s.partner_id)
+    }
+  }
+
+  const canonicalPartnerIds: string[] = []
+  for (const id of rawIds) {
+    const pId = storeToPartnerMap.get(id) || id
+    if (!canonicalPartnerIds.includes(pId)) {
+      canonicalPartnerIds.push(pId)
+    }
+  }
+
   const eligiblePartnerIds: string[] = []
-  for (const partnerId of Array.from(new Set(partnerIds))) {
+  for (const partnerId of canonicalPartnerIds) {
     const capabilities = await resolveMarketplaceCapabilities(partnerId)
     if (capabilities.campaignsEnabled) eligiblePartnerIds.push(partnerId)
   }
   if (eligiblePartnerIds.length === 0) return {}
 
-  const supabase = getAdminClient()
   const now = new Date().toISOString()
 
   // 1. Fetch campaigns that are active and current for all partners
@@ -1463,6 +1527,12 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
   for (const partnerId of Object.keys(result)) {
     result[partnerId] = await filterRawPromotionsByGiftStock(result[partnerId], supabase)
   }
+
+  // Also map back to any store IDs that were passed
+  for (const [storeId, mappedPartnerId] of storeToPartnerMap.entries()) {
+    result[storeId] = result[mappedPartnerId] || []
+  }
+
   return result
 }
 

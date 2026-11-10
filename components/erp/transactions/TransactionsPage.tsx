@@ -535,6 +535,14 @@ export default function TransactionsPage({
         [paymentTypeOptions, statusFilterOptions, loadedTransactions, activeTab],
     )
 
+    const accountNameMap = useMemo(() => {
+        const map = new Map<string, string>()
+        for (const a of accounts || []) {
+            if (a.id && a.name) map.set(a.id, a.name)
+        }
+        return map
+    }, [accounts])
+
     const filteredTransactions = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase()
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
@@ -588,12 +596,19 @@ export default function TransactionsPage({
         const allItems = [...loadedTransactions, ...virtualItems]
 
         let result = allItems.filter((item) => {
+            const accountName = item.accountId ? (accountNameMap.get(item.accountId) || "") : ""
             const matchesSearch =
                 !term ||
                 item.description.toLowerCase().includes(term) ||
                 item.displayId.toLowerCase().includes(term) ||
                 item.contactName.toLowerCase().includes(term) ||
-                item.category.toLowerCase().includes(term)
+                item.category.toLowerCase().includes(term) ||
+                (typeof item.details === "string" && item.details.toLowerCase().includes(term)) ||
+                (typeof item.paymentType === "string" && item.paymentType.toLowerCase().includes(term)) ||
+                (typeof item.notes === "string" && item.notes.toLowerCase().includes(term)) ||
+                (typeof item.referenceNote === "string" && item.referenceNote.toLowerCase().includes(term)) ||
+                (typeof item.installmentGroupDescription === "string" && item.installmentGroupDescription.toLowerCase().includes(term)) ||
+                accountName.toLowerCase().includes(term)
 
             const isPrevisto = item.isRecurringOccurrence || item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
             const isCancelled = isCancelledTransaction(item)

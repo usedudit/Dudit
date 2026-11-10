@@ -207,40 +207,40 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
     // Helper to get the charged amount for a payment leg (handles installment fees, discounts, etc.)
     const getLegEffectiveAmount = (entry: any): number => {
-      const effective = Number(entry?.effectiveAmount ?? 0);
-      if (effective > 0.009) return effective;
-      const amount = Number(entry?.amount ?? 0);
-      const received = Number(entry?.amountReceived ?? 0);
-      const hasPricingAdjustment =
-        Number(entry?.interestAmount || 0) > 0.009 ||
-        Number(entry?.feeAmount || 0) > 0.009 ||
-        Number(entry?.fixedFeeAmount || 0) > 0.009 ||
-        Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
-        String(entry?.adjustmentType || "none").toLowerCase() !== "none";
-      if (
-        !hasPricingAdjustment &&
-        received > 0.009 &&
-        received < amount - 0.009
-      ) {
-        return received;
-      }
-      return amount > 0.009 ? amount : received;
+        const effective = Number(entry?.effectiveAmount ?? 0);
+        if (effective > 0.009) return effective;
+        const amount = Number(entry?.amount ?? 0);
+        const received = Number(entry?.amountReceived ?? 0);
+        const hasPricingAdjustment =
+            Number(entry?.interestAmount || 0) > 0.009 ||
+            Number(entry?.feeAmount || 0) > 0.009 ||
+            Number(entry?.fixedFeeAmount || 0) > 0.009 ||
+            Number(entry?.paymentMethodDiscountAmount || 0) > 0.009 ||
+            String(entry?.adjustmentType || "none").toLowerCase() !== "none";
+        if (
+            !hasPricingAdjustment &&
+            received > 0.009 &&
+            received < amount - 0.009
+        ) {
+            return received;
+        }
+        return amount > 0.009 ? amount : received;
     };
 
     const isCashLeg = (entry: any): boolean => {
-      const method = String(entry?.method || "")
-        .toLowerCase()
-        .trim();
-      return method === "cash" || method.includes("dinheiro");
+        const method = String(entry?.method || "")
+            .toLowerCase()
+            .trim();
+        return method === "cash" || method.includes("dinheiro");
     };
 
     const getLegSettledAmount = (entry: any): number => {
-      const payWith = Number(entry?.payWithAmount ?? 0);
-      if (isCashLeg(entry) && (entry?.wantsChange || payWith > 0.009)) {
-        const cashReceived = payWith > 0.009 ? payWith : Number(entry?.amountReceived ?? 0);
-        if (cashReceived > 0.009) return cashReceived;
-      }
-      return getLegEffectiveAmount(entry);
+        const payWith = Number(entry?.payWithAmount ?? 0);
+        if (isCashLeg(entry) && (entry?.wantsChange || payWith > 0.009)) {
+            const cashReceived = payWith > 0.009 ? payWith : Number(entry?.amountReceived ?? 0);
+            if (cashReceived > 0.009) return cashReceived;
+        }
+        return getLegEffectiveAmount(entry);
     };
     const breakdownTotals = useMemo(() => {
         if (!hasDetailedBreakdownFees) return { customerInterest: 0, customerFee: 0, customerFixedFee: 0 }
@@ -347,7 +347,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label=""
                                     name="productSearch"
                                     dataField="productSearch"
-                                    placeholder="Buscar produtos para adicionar..."
+                                    placeholder="Buscar itens para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={searchQuery}
                                     onChange={(e: any) => {
@@ -830,22 +830,22 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     type PaymentValueLine = { label: string; amount: number; baseAmount: number; installmentNumber: number };
                                     const grouped = new Map<string, PaymentValueLine>();
                                     for (const entry of paidBreakdown) {
-                                      const method = String(entry?.method || "").trim();
-                                      const methodLabel = method
-                                        ? formatPaymentMethodLabel(method, null)
-                                        : "Método não informado";
-                                      const label = methodLabel;
-                                      const amount = getLegEffectiveAmount(entry);
-                                      const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
-                                      const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
-                                      const key = `${label.toLowerCase()}::${installmentNumber}`;
-                                      const existing = grouped.get(key);
-                                      if (existing) {
-                                        existing.amount += amount;
-                                        existing.baseAmount += baseAmount;
-                                      } else {
-                                        grouped.set(key, { label, amount, baseAmount, installmentNumber });
-                                      }
+                                        const method = String(entry?.method || "").trim();
+                                        const methodLabel = method
+                                            ? formatPaymentMethodLabel(method, null)
+                                            : "Método não informado";
+                                        const label = methodLabel;
+                                        const amount = getLegEffectiveAmount(entry);
+                                        const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
+                                        const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
+                                        const key = `${label.toLowerCase()}::${installmentNumber}`;
+                                        const existing = grouped.get(key);
+                                        if (existing) {
+                                            existing.amount += amount;
+                                            existing.baseAmount += baseAmount;
+                                        } else {
+                                            grouped.set(key, { label, amount, baseAmount, installmentNumber });
+                                        }
                                     }
                                     const paymentValueLines = Array.from(grouped.values());
 
@@ -1206,7 +1206,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label=""
                                     name="productSearchMobile"
                                     dataField="productSearch"
-                                    placeholder="Buscar produtos para adicionar..."
+                                    placeholder="Buscar itens  para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={searchQuery}
                                     onChange={(e: any) => {
@@ -1545,22 +1545,22 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 type PaymentValueLine = { label: string; amount: number; baseAmount: number; installmentNumber: number };
                                 const grouped = new Map<string, PaymentValueLine>();
                                 for (const entry of paidBreakdown) {
-                                  const method = String(entry?.method || "").trim();
-                                  const methodLabel = method
-                                    ? formatPaymentMethodLabel(method, null)
-                                    : "Método não informado";
-                                  const label = methodLabel;
-                                  const amount = getLegEffectiveAmount(entry);
-                                  const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
-                                  const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
-                                  const key = `${label.toLowerCase()}::${installmentNumber}`;
-                                  const existing = grouped.get(key);
-                                  if (existing) {
-                                    existing.amount += amount;
-                                    existing.baseAmount += baseAmount;
-                                  } else {
-                                    grouped.set(key, { label, amount, baseAmount, installmentNumber });
-                                  }
+                                    const method = String(entry?.method || "").trim();
+                                    const methodLabel = method
+                                        ? formatPaymentMethodLabel(method, null)
+                                        : "Método não informado";
+                                    const label = methodLabel;
+                                    const amount = getLegEffectiveAmount(entry);
+                                    const baseAmount = isCashLeg(entry) ? amount : Number(entry?.amountReceived ?? entry?.amount ?? 0);
+                                    const installmentNumber = Math.max(1, Number(entry?.installmentNumber || 1));
+                                    const key = `${label.toLowerCase()}::${installmentNumber}`;
+                                    const existing = grouped.get(key);
+                                    if (existing) {
+                                        existing.amount += amount;
+                                        existing.baseAmount += baseAmount;
+                                    } else {
+                                        grouped.set(key, { label, amount, baseAmount, installmentNumber });
+                                    }
                                 }
                                 const paymentValueLines = Array.from(grouped.values());
 

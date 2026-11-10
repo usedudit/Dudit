@@ -1267,9 +1267,9 @@ export const AppointmentSheet = ({
                     </h2>
                 </div>
 
-                <button onClick={handleCloseAttempt} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-                    <XIcon size={24} className="text-brand-inactive-text dark:text-dark-body" />
-                </button>
+                <Button variant="filled" onClick={handleCloseAttempt} className="hidden lg:flex">
+                    <XIcon className="h-5 w-5" />
+                </Button>
             </div>
         );
     }
@@ -1905,8 +1905,8 @@ export const AppointmentSheet = ({
                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
                                             <Button
                                                 variant="link"
-                                                className="text-sm"
-                                                leftIcon={<CalendarIcon size={18} className="hidden lg:block" />}
+                                                className="text-xs"
+                                                leftIcon={<CalendarIcon size={14} className="hidden lg:block" />}
                                                 onClick={handleEnterSelectionMode}
                                             >
                                                 Escolha no calendário

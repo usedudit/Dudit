@@ -14,6 +14,7 @@ import {
   getCachedStoreReviews,
   getCachedStoreStats,
 } from "@/app/actions/marketplace/stores"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { listMarketplaceRecurringPlansAction } from "@/app/actions/marketplace/recurring-subscriptions"
 
@@ -93,7 +94,7 @@ export default async function VendorPage({
     redirect(preservedQuery ? `${canonicalUrl}?${preservedQuery}` : canonicalUrl)
   }
 
-  const [user, products, services, reviews, statsBase, plan, plansRes] = await Promise.all([
+  const [user, products, services, reviews, statsBase, plan, plansRes, activePromotions] = await Promise.all([
     getCurrentUser(),
     getCachedStoreProducts(storeId, partnerId),
     getCachedStoreServices(storeId, partnerId),
@@ -101,6 +102,7 @@ export default async function VendorPage({
     getCachedStoreStats(storeId),
     getPartnerPlan(partnerId),
     listMarketplaceRecurringPlansAction(partnerId),
+    listActivePromotionsForMarketplaceAction(partnerId, null, storeId).catch(() => []),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
@@ -292,6 +294,7 @@ export default async function VendorPage({
           ratingDistribution={ratingDistribution}
           productCategories={productCategories}
           serviceCategories={serviceCategories}
+          initialPromotions={activePromotions || []}
           userProfile={userProfile}
           cartCount={cartCount}
           isShowcaseActive={partnerData.isShowcaseActive}
